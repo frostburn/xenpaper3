@@ -1,0 +1,90 @@
+# Patch syntax is Python inspired with JS camelCase style guide
+
+# When using the synth patch, the top level scope will be seeded with a trigger.
+# Triggers can be fired well ahead of time by the transport or just ahead of time by controller input.
+
+type NoteOnTrigger = Trigger<{
+  # Specific moment in time when the patch should start producing sound
+  start: Instant
+
+  # Continuous stream of cents detune from 440 Hz indicating which note to play (pitch bend and glissandi are baked in)
+  pitch: AudioParam<Cents>
+
+  # Number from 0% to 100% (cannot go below zero but can exceed 1 when overdriving)
+  velocity: Level
+
+  # Trigger to be fired at note-off
+  off: Trigger<{end: Instant}>
+}>
+
+# Triple-quote strings span multiple lines.
+# The environment will execute something like this for each note
+"""
+on: NoteOnTrigger = Trigger({
+  start: origin + 1000ms
+  pitch: ConstantSourceNode(offset = -200c)
+  velocity: 85%
+  off: Trigger({ end: origin + 2000ms })  # The actual end time may be assigned just ahead of time
+})
+"""
+
+# This is the default synth patch in Xenpaper 3
+
+# The instrument is initialized once.
+# The super environment may assign different values to named constants
+const oscillatorType: 'sine' | 'square' | 'sawtooth' | 'triangle' = 'triangle'
+
+# Super environment also provides a destination node (may be a bus to further processing)
+"""
+destination = AudioNode(...)
+"""
+
+# The environment may assign different values to the named parameters
+param attack: Duration = 100ms
+param decay: Duration = 200ms
+param sustain: Level = 70%
+param release: Duration = 300ms
+
+# This block of code will be executed when the note is scheduled
+@on:
+    # start, pitch, velocity and off are locally assigned
+
+    # JS: `new OscillatorNode(context, {type: oscillatorType})`
+    osc = OscillatorNode(type = oscillatorType)
+    envelope = GainNode(gain = 0)
+    osc.start()
+
+    cleanup = Trigger()
+
+    # Connections store associated disconnection
+    with cleanup:
+        # JS: `osc.connect(envelope).connect(destination)`
+        osc -> envelope -> destination
+
+        pitch -> osc.detune
+
+    @cleanup:
+        # JS `osc.stop(context.currentTime)`
+        osc.stop(currentTime)
+
+    # JS `envelope.gain.setValueAtTime(0, start.valueOf())`
+    @start envelope.gain = 0
+
+    # JS `envelope.gain.linearRampToValueAtTime(velocity.valueOf(), eval("start + attack").valueOf())`
+    @(start + attack;linear) envelope.gain = velocity
+
+    # JS `envelope.gain.setTargetAtTime(eval("velocity * sustain").valueOf(), eval("start + attack").valueOf(), decay.valueOf())`
+    @(start + attack;target decay) envelope.gain = velocity * sustain
+
+    # This block of code will be executed when the note-off is scheduled
+    @off:
+        # end is locally assigned
+
+        t = end - start
+        if t < attack:
+            # Holding values is broken... Calculate partial attack manually.
+            @end envelope.gain = velocity * (t / attack)
+
+        @(end;target release) envelope.gain = 0
+
+        @(end + 5 * release) cleanup.fire()
