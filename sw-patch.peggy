@@ -136,8 +136,10 @@ ElseStatement
 Suite
   = H ":" H InlineComment? EOL BlankLine*
     &{ return isChildIndent(); }
-    indent:$([ \t]+) {
+    indent:$([ \t]+)
+    &{
       pushIndent(indent);
+      return true;
     }
     first:(StatementBody / &{ popIndent(); return false; })
     rest:(BlankLine / StatementLine)* {
