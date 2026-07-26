@@ -25,6 +25,11 @@
     return indentStack[indentStack.length - 1];
   }
 
+  function resetIndent() {
+    indentStack.length = 1;
+    indentStack[0] = "";
+  }
+
   function isCurrentIndent() {
     return atLineStart() && readIndent() === currentIndent();
   }
@@ -74,7 +79,8 @@
 }
 
 Start
-  = BOM? lines:(BlankLine / TopStatementLine)* H EndOfFile {
+  = &{ resetIndent(); return true; }
+    BOM? lines:(BlankLine / TopStatementLine)* H EndOfFile {
       return node("Program", {
         body: lines.filter((line) => line !== null),
       });
@@ -130,8 +136,10 @@ ElseStatement
 Suite
   = H ":" H InlineComment? EOL BlankLine*
     &{ return isChildIndent(); }
-    indent:$([ \t]+) {
+    indent:$([ \t]+)
+    &{
       pushIndent(indent);
+      return true;
     }
     first:(StatementBody / &{ popIndent(); return false; })
     rest:(BlankLine / StatementLine)* {
