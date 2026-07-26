@@ -31,8 +31,8 @@ on: NoteOnTrigger = Trigger({
 # This is the default synth patch in Xenpaper 3
 
 # The instrument is initialized once.
-# The super environment may assign different values to named constants
-const oscillatorType: 'sine' | 'square' | 'sawtooth' | 'triangle' = 'triangle'
+# The super environment may assign different values to named config
+config oscillatorType: 'sine' | 'square' | 'sawtooth' | 'triangle' = 'triangle'
 
 # Super environment also provides a destination node (may be a bus to further processing)
 """

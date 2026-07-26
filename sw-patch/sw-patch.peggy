@@ -149,7 +149,7 @@ Suite
 
 SimpleStatement
   = TypeAlias
-  / ConstDeclaration
+  / ConfigDeclaration
   / ParamDeclaration
   / TypedBinding
   / ScheduledStatement
@@ -164,9 +164,9 @@ TypeAlias
       return node("TypeAlias", { name, value });
     }
 
-ConstDeclaration
-  = KeywordConst __ name:Identifier annotation:TypeAnnotation? H "=" H value:Expression {
-      return node("ConstDeclaration", { name, annotation, value });
+ConfigDeclaration
+  = KeywordConfig __ name:Identifier annotation:TypeAnnotation? H "=" H value:Expression {
+      return node("ConfigDeclaration", { name, annotation, value });
     }
 
 ParamDeclaration
@@ -518,7 +518,7 @@ Identifier
   = !ReservedWord value:Name { return value; }
 
 ReservedWord
-  = ("type" / "const" / "param" / "with" / "if" / "elif" / "else"
+  = ("type" / "config" / "param" / "with" / "if" / "elif" / "else"
     / "and" / "or" / "not" / "true" / "false" / "null"
     / "linear" / "exponential" / "target") !IdentifierContinue
 
@@ -526,7 +526,7 @@ IdentifierContinue
   = [A-Za-z0-9_]
 
 KeywordType = "type" !IdentifierContinue
-KeywordConst = "const" !IdentifierContinue
+KeywordConfig = "config" !IdentifierContinue
 KeywordParam = "param" !IdentifierContinue
 KeywordWith = "with" !IdentifierContinue
 KeywordIf = "if" !IdentifierContinue
