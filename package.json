@@ -14,7 +14,8 @@
     "lint": "run-s \"lint:*\"",
     "lint:oxlint": "oxlint . --fix",
     "lint:eslint": "eslint . --fix --cache",
-    "format": "oxfmt src/"
+    "format": "oxfmt src/",
+    "compile:sw-patch": "peggy --format es sw-patch/sw-patch.peggy -o sw-patch/parser.generated.js"
   },
   "dependencies": {
     "peggy": "^5.1.0",
