@@ -291,7 +291,7 @@ export interface Identifier extends Node {
 
 export interface ParseOptions {
   grammarSource?: string
-  startRule?: string
+  startRule?: 'Start'
   [key: string]: unknown
 }
 
