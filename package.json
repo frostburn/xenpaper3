@@ -4,8 +4,8 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "vite",
-    "build": "run-p type-check \"build-only {@}\" --",
+    "dev": "npm run compile:sw-patch && vite",
+    "build": "npm run compile:sw-patch && run-p type-check \"build-only {@}\" --",
     "preview": "vite preview",
     "test:unit": "npm run compile:sw-patch && vitest",
     "build-only": "vite build",
