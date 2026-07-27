@@ -34,6 +34,7 @@ type AudioParameter = {
 }
 
 const RETURN = Symbol('sw-patch return')
+const FORBIDDEN_MEMBERS = new Set(['constructor', 'prototype', '__proto__'])
 interface Returned { [RETURN]: true; value: unknown }
 
 /**
@@ -67,27 +68,7 @@ export class PatchRuntime {
 
   evaluate(program: Program): SynthPatch {
     const patch: SynthPatch = {}
-
-    for (const statement of program.body) {
-      if (statement.type === 'ConfigDeclaration') {
-        const value = Object.hasOwn(this.options.config ?? {}, statement.name)
-          ? this.options.config?.[statement.name]
-          : this.expression(statement.value, this.root)
-        this.root.set(statement.name, value)
-        Object.defineProperty(patch, statement.name, {
-          enumerable: true,
-          get: () => this.root.get(statement.name),
-          set: (next) => this.root.set(statement.name, next),
-        })
-      } else if (statement.type === 'FunctionDeclaration') {
-        const fn = this.function(statement, this.root)
-        this.root.set(statement.name, fn)
-        patch[statement.name] = fn
-      } else if (!this.isMetadata(statement)) {
-        this.statements([statement], this.root)
-      }
-    }
-
+    this.statements(program.body, this.root, undefined, patch)
     return patch
   }
 
@@ -129,7 +110,12 @@ export class PatchRuntime {
     }
   }
 
-  private statements(statements: Statement[], scope: Scope): Returned | undefined {
+  private statements(
+    statements: Statement[],
+    scope: Scope,
+    connectionCleanups?: Array<() => void>,
+    exports?: SynthPatch,
+  ): Returned | undefined {
     for (let index = 0; index < statements.length; index += 1) {
       const statement = statements[index]
       if (!statement) continue
@@ -138,7 +124,7 @@ export class PatchRuntime {
         let matched = false
         if (this.expression(statement.test, scope)) {
           matched = true
-          const result = this.statements(statement.body, scope)
+          const result = this.statements(statement.body, scope, connectionCleanups, exports)
           if (result) return result
         }
         while (true) {
@@ -148,24 +134,30 @@ export class PatchRuntime {
           const branch = next
           if (!matched && (branch.type === 'ElseStatement' || this.expression(branch.test, scope))) {
             matched = true
-            const result = this.statements(branch.body, scope)
+            const result = this.statements(branch.body, scope, connectionCleanups, exports)
             if (result) return result
           }
         }
         continue
       }
 
-      const result = this.statement(statement, scope)
+      const result = this.statement(statement, scope, connectionCleanups, exports)
       if (result) return result
     }
     return undefined
   }
 
-  private statement(statement: Statement, scope: Scope): Returned | undefined {
+  private statement(
+    statement: Statement,
+    scope: Scope,
+    connectionCleanups?: Array<() => void>,
+    exports?: SynthPatch,
+  ): Returned | undefined {
     switch (statement.type) {
       case 'FunctionDeclaration': {
         const fn = this.function(statement, scope)
         scope.set(statement.name, fn)
+        if (exports) exports[statement.name] = fn
         if (statement.returned) return { [RETURN]: true, value: fn }
         return undefined
       }
@@ -175,8 +167,11 @@ export class PatchRuntime {
         this.assign(statement.target, this.expression(statement.value, scope), scope); return undefined
       case 'ExpressionStatement':
         this.expression(statement.expression, scope); return undefined
-      case 'ConnectionStatement':
-        this.connection(statement.first, statement.links, scope); return undefined
+      case 'ConnectionStatement': {
+        const cleanups = this.connection(statement.first, statement.links, scope)
+        connectionCleanups?.push(...cleanups)
+        return undefined
+      }
       case 'ScheduledStatement':
         this.scheduled(statement.at, statement.automation, statement.statement, scope); return undefined
       case 'UntilStatement':
@@ -186,8 +181,19 @@ export class PatchRuntime {
       case 'ElifStatement':
       case 'ElseStatement':
         throw new Error(`${statement.type} must immediately follow an if statement`)
-      case 'ConfigDeclaration':
-        scope.set(statement.name, this.expression(statement.value, scope)); return undefined
+      case 'ConfigDeclaration': {
+        const config = this.options.config ?? {}
+        const value = Object.prototype.hasOwnProperty.call(config, statement.name)
+          ? config[statement.name]
+          : this.expression(statement.value, scope)
+        scope.set(statement.name, value)
+        if (exports) Object.defineProperty(exports, statement.name, {
+          enumerable: true,
+          get: () => scope.get(statement.name),
+          set: (next) => scope.set(statement.name, next),
+        })
+        return undefined
+      }
       case 'TypeAlias':
       case 'CommentStatement':
       case 'DocStringStatement':
@@ -199,12 +205,20 @@ export class PatchRuntime {
     const time = Number(this.expression(at, scope))
     if (statement.type !== 'AssignmentStatement') {
       if (statement.type === 'ExpressionStatement') {
-        const target = this.expression(statement.expression, scope) as AudioParameter
-        if (automation?.type === 'HoldAutomation') target.cancelAndHoldAtTime(time)
-        else if (automation?.type === 'CancelAutomation') target.cancelScheduledValues(time)
-        else if (automation) throw new Error(`${automation.type} requires an assignment`)
+        if (automation?.type === 'HoldAutomation' || automation?.type === 'CancelAutomation') {
+          const target = this.expression(statement.expression, scope) as AudioParameter
+          if (automation.type === 'HoldAutomation') target.cancelAndHoldAtTime(time)
+          else target.cancelScheduledValues(time)
+        } else {
+          if (automation) throw new Error(`${automation.type} requires an assignment`)
+          if (statement.expression.type !== 'CallExpression') {
+            throw new Error('A scheduled expression must be a method call')
+          }
+          this.call(statement.expression.callee, statement.expression.arguments, scope, time)
+        }
+      } else if (statement.type === 'ConnectionStatement') {
+        throw new Error('Connections cannot be scheduled at an AudioContext timestamp')
       }
-      else if (statement.type === 'ConnectionStatement') this.connection(statement.first, statement.links, scope)
       return
     }
     const target = this.expression(statement.target, scope) as AudioParameter
@@ -223,11 +237,7 @@ export class PatchRuntime {
   private until(event: Expression, body: Statement[], scope: Scope): void {
     // Connections in an `until` suite are established now and torn down by the event.
     const cleanups: Array<() => void> = []
-    for (const statement of body) {
-      if (statement.type === 'ConnectionStatement') {
-        cleanups.push(...this.connection(statement.first, statement.links, scope))
-      } else this.statement(statement, scope)
-    }
+    this.statements(body, scope, cleanups)
     if (event.type !== 'MemberExpression') throw new Error('until expects an event member')
     const emitter = this.expression(event.object, scope) as EventTarget
     emitter.addEventListener(event.property, () => {
@@ -251,6 +261,7 @@ export class PatchRuntime {
   private assign(target: Expression, value: unknown, scope: Scope): void {
     if (target.type === 'Identifier') scope.set(target.name, value)
     else if (target.type === 'MemberExpression') {
+      this.assertSafeMember(target.property)
       const object = this.expression(target.object, scope) as Record<string, unknown>
       object[target.property] = value
     } else throw new Error('Invalid assignment target')
@@ -269,14 +280,16 @@ export class PatchRuntime {
       case 'NullLiteral': return null
       case 'ListLiteral': return expression.elements.map((value) => this.expression(value, scope))
       case 'ObjectLiteral': return Object.fromEntries(expression.entries.map(({ key, value }) => [key, this.expression(value, scope)]))
-      case 'MemberExpression': return (this.expression(expression.object, scope) as Record<string, unknown>)[expression.property]
+      case 'MemberExpression':
+        this.assertSafeMember(expression.property)
+        return (this.expression(expression.object, scope) as Record<string, unknown>)[expression.property]
       case 'UnaryExpression': return this.unary(expression.operator, this.expression(expression.argument, scope))
       case 'BinaryExpression': return this.binary(expression.operator, this.expression(expression.left, scope), () => this.expression(expression.right, scope))
       case 'CallExpression': return this.call(expression.callee, expression.arguments, scope)
     }
   }
 
-  private call(callee: Expression, args: Argument[], scope: Scope): unknown {
+  private call(callee: Expression, args: Argument[], scope: Scope, scheduledAt?: number): unknown {
     const positional: unknown[] = []
     const named: Record<string, unknown> = {}
     for (const argument of args) {
@@ -284,7 +297,9 @@ export class PatchRuntime {
       else positional.push(this.expression(argument.value, scope))
     }
     if (Object.keys(named).length) positional.push(named)
+    if (scheduledAt !== undefined) positional.unshift(scheduledAt)
     if (callee.type === 'MemberExpression') {
+      this.assertSafeMember(callee.property)
       const receiver = this.expression(callee.object, scope) as Record<string, unknown>
       return (receiver[callee.property] as PatchFunction).apply(receiver, positional)
     }
@@ -329,7 +344,9 @@ export class PatchRuntime {
     }
   }
 
-  private isMetadata(statement: Statement): boolean {
-    return statement.type === 'TypeAlias' || statement.type === 'CommentStatement' || statement.type === 'DocStringStatement'
+  private assertSafeMember(property: string): void {
+    if (FORBIDDEN_MEMBERS.has(property)) {
+      throw new Error(`Patch access to member \`${property}\` is forbidden`)
+    }
   }
 }
