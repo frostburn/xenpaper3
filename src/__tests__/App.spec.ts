@@ -1,7 +1,9 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 
 import { mount } from '@vue/test-utils'
 import App from '../App.vue'
+
+vi.stubGlobal('AudioContext', class MockAudioContext {})
 
 describe('App', () => {
   it('mounts renders properly', () => {

@@ -1,5 +1,4 @@
 import { describe, it, expect } from 'vitest'
-import { readFileSync } from 'node:fs'
 import { parse, type Node } from '../parser.generated.js'
 
 function stripLocation<T extends Node>(node: T): Omit<T, 'location'> {
@@ -8,10 +7,50 @@ function stripLocation<T extends Node>(node: T): Omit<T, 'location'> {
   return result as Omit<T, 'location'>
 }
 
+const DEFAULT_PATCH = `
+config oscillatorType:
+    'sine' | 'square' | 'sawtooth' | 'triangle' = 'triangle'
+
+fn on(
+    destination: AudioNode,
+    start: Instant,
+    pitch: AudioSignal<Cents>,
+    velocity: Level,
+    attack: Duration = 100ms,
+    decay: Duration = 200ms,
+    sustain: Level = 70%,
+    release: Duration = 300ms,
+):
+    osc = OscillatorNode(type = oscillatorType)
+    attackEnv = GainNode(gain = 0)
+    decayEnv = GainNode(gain = 1)
+
+    until osc.ended:
+        osc -> attackEnv -> decayEnv -> destination
+        pitch -> osc.detune
+
+    osc.start(start)
+
+    @(start) attackEnv.gain = 0
+    @(start + attack; linear) attackEnv.gain = velocity
+
+    @(start + attack) decayEnv.gain = 1
+    @(start + attack; target decay) decayEnv.gain = sustain
+
+    ret once fn off(end: Instant):
+        @(end; hold) attackEnv.gain
+        @(end; hold) decayEnv.gain
+        @(end; target release) decayEnv.gain = 0
+
+        cutOff = end + 5 * release
+        osc.stop(cutOff)
+
+        ret cutOff
+`
+
 describe('SW Patch parser', () => {
   it('parses the default v3 patch', () => {
-    const source = readFileSync(new URL('../../default-v3.swpatch', import.meta.url), 'utf8')
-    const ast = parse(source)
+    const ast = parse(DEFAULT_PATCH)
 
     expect(ast.body.map(({ type }) => type)).toEqual([
       'ConfigDeclaration',
