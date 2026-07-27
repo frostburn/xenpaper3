@@ -9,7 +9,7 @@ function location() {
 
 describe('SW Patch runtime', () => {
   it('keeps top-level if/elif/else nodes together', () => {
-    const mark = vi.fn()
+    const mark = vi.fn<() => void>()
     const runtime = new PatchRuntime({} as BaseAudioContext, { globals: { mark } })
 
     runtime.evaluate({
@@ -39,7 +39,7 @@ describe('SW Patch runtime', () => {
   })
 
   it('passes a scheduled timestamp as the first Web Audio method argument', () => {
-    const start = vi.fn()
+    const start = vi.fn<(when: number) => void>()
     const runtime = new PatchRuntime({} as BaseAudioContext, { globals: { osc: { start } } })
     const expression = {
       type: 'CallExpression' as const, location: location(),
@@ -65,8 +65,8 @@ describe('SW Patch runtime', () => {
 
   it('runs nested branches in until suites and disconnects their connections', () => {
     const emitter = new EventTarget()
-    const source = { connect: vi.fn(), disconnect: vi.fn() }
-    const target = { connect: vi.fn(), disconnect: vi.fn() }
+    const source = { connect: vi.fn<(node: AudioNode) => AudioNode>(), disconnect: vi.fn<(node: AudioNode) => void>() }
+    const target = { connect: vi.fn<(node: AudioNode) => AudioNode>(), disconnect: vi.fn<(node: AudioNode) => void>() }
     const runtime = new PatchRuntime({} as BaseAudioContext, {
       globals: { emitter, source, target },
     })
