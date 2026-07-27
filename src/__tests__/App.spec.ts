@@ -1,7 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { flushPromises, mount } from '@vue/test-utils'
 
-const { synthOn } = vi.hoisted(() => ({ synthOn: vi.fn() }))
+type NoteOff = (stop?: number) => number
+
+const { synthOn } = vi.hoisted(() => ({ synthOn: vi.fn<() => NoteOff>() }))
 
 vi.mock('../../sw-patch', () => ({
   createPatch: () => ({ on: synthOn }),
@@ -16,10 +18,10 @@ class MockAudioContext {
   state: AudioContextState = 'suspended'
   currentTime = 1
   destination = {} as AudioDestinationNode
-  resume = vi.fn(async () => {
+  resume = vi.fn<() => Promise<void>>(async () => {
     this.state = 'running'
   })
-  close = vi.fn(async () => {
+  close = vi.fn<() => Promise<void>>(async () => {
     this.state = 'closed'
   })
 
@@ -29,8 +31,8 @@ class MockAudioContext {
 }
 
 class MockConstantSourceNode {
-  start = vi.fn()
-  stop = vi.fn()
+  start = vi.fn<() => void>()
+  stop = vi.fn<(when?: number) => void>()
 
   constructor() {
     sources.push(this)
@@ -44,7 +46,7 @@ beforeEach(() => {
   contexts.length = 0
   sources.length = 0
   synthOn.mockReset()
-  synthOn.mockReturnValue(vi.fn(() => 2))
+  synthOn.mockReturnValue(vi.fn<NoteOff>(() => 2))
   vi.stubGlobal('AudioContext', MockAudioContext)
   vi.stubGlobal('ConstantSourceNode', MockConstantSourceNode)
 })
@@ -72,7 +74,7 @@ describe('App', () => {
   })
 
   it('releases active notes when the window loses focus', async () => {
-    const off = vi.fn(() => 2)
+    const off = vi.fn<NoteOff>(() => 2)
     synthOn.mockReturnValue(off)
     const wrapper = mount(App)
     dispatchKey('keydown', 65)
@@ -86,7 +88,7 @@ describe('App', () => {
   })
 
   it('removes listeners, releases notes, and closes its context on unmount', async () => {
-    const off = vi.fn(() => 2)
+    const off = vi.fn<NoteOff>(() => 2)
     synthOn.mockReturnValue(off)
     const wrapper = mount(App)
     dispatchKey('keydown', 65)
