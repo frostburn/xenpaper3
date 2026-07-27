@@ -102,20 +102,46 @@ StatementBody
   / statement:SimpleStatement LineEnd { return statement; }
 
 CompoundStatement
-  = TriggerHandler
-  / WithStatement
+  = FunctionDeclaration
+  / UntilStatement
   / IfStatement
   / ElifStatement
   / ElseStatement
 
-TriggerHandler
-  = "@" trigger:PostfixExpression body:Suite {
-      return node("TriggerHandler", { trigger, body });
+FunctionDeclaration
+  = returned:(KeywordRet __ { return true; })?
+    once:(KeywordOnce __ { return true; })?
+    KeywordFn __ name:Identifier H parameters:Parameters body:Suite {
+      return node("FunctionDeclaration", {
+        name,
+        parameters,
+        once: once ?? false,
+        returned: returned ?? false,
+        body,
+      });
     }
 
-WithStatement
-  = KeywordWith __ resource:Expression body:Suite {
-      return node("WithStatement", { resource, body });
+Parameters
+  = "(" W values:ParameterList? W ")" { return values ?? []; }
+
+ParameterList
+  = head:Parameter tail:(W "," W @Parameter)* W ","? {
+      return [head, ...tail];
+    }
+
+Parameter
+  = name:Identifier annotation:TypeAnnotation
+    defaultValue:(H "=" H @Expression)? {
+      return node("Parameter", {
+        name,
+        annotation,
+        defaultValue: defaultValue ?? null,
+      });
+    }
+
+UntilStatement
+  = KeywordUntil __ event:Expression body:Suite {
+      return node("UntilStatement", { event, body });
     }
 
 IfStatement
@@ -150,11 +176,11 @@ Suite
 SimpleStatement
   = TypeAlias
   / ConfigDeclaration
-  / ParamDeclaration
   / TypedBinding
   / ScheduledStatement
   / ConnectionStatement
   / AssignmentStatement
+  / ReturnStatement
   / DocStringStatement
   / CommentStatement
   / ExpressionStatement
@@ -168,10 +194,9 @@ ConfigDeclaration
   = KeywordConfig __ name:Identifier annotation:TypeAnnotation? H "=" H value:Expression {
       return node("ConfigDeclaration", { name, annotation, value });
     }
-
-ParamDeclaration
-  = KeywordParam __ name:Identifier annotation:TypeAnnotation H "=" H value:Expression {
-      return node("ParamDeclaration", { name, annotation, value });
+  / KeywordConfig __ name:Identifier H ":" H EOL
+    [ \t]+ annotation:TypeExpression H "=" H value:Expression {
+      return node("ConfigDeclaration", { name, annotation, value });
     }
 
 TypedBinding
@@ -202,6 +227,7 @@ ScheduleSpec
 AutomationSpec
   = KeywordLinear { return node("LinearAutomation"); }
   / KeywordExponential { return node("ExponentialAutomation"); }
+  / KeywordHold { return node("HoldAutomation"); }
   / KeywordTarget __ timeConstant:Expression {
       return node("TargetAutomation", { timeConstant });
     }
@@ -229,6 +255,11 @@ ConnectionOperator
 AssignmentStatement
   = target:Assignable H "=" !"=" H value:Expression {
       return node("AssignmentStatement", { target, value });
+    }
+
+ReturnStatement
+  = KeywordRet __ value:Expression {
+      return node("ReturnStatement", { value });
     }
 
 Assignable
@@ -518,17 +549,19 @@ Identifier
   = !ReservedWord value:Name { return value; }
 
 ReservedWord
-  = ("type" / "config" / "param" / "with" / "if" / "elif" / "else"
+  = ("type" / "config" / "fn" / "once" / "until" / "ret" / "if" / "elif" / "else"
     / "and" / "or" / "not" / "true" / "false" / "null"
-    / "linear" / "exponential" / "target") !IdentifierContinue
+    / "linear" / "exponential" / "hold" / "target") !IdentifierContinue
 
 IdentifierContinue
   = [A-Za-z0-9_]
 
 KeywordType = "type" !IdentifierContinue
 KeywordConfig = "config" !IdentifierContinue
-KeywordParam = "param" !IdentifierContinue
-KeywordWith = "with" !IdentifierContinue
+KeywordFn = "fn" !IdentifierContinue
+KeywordOnce = "once" !IdentifierContinue
+KeywordUntil = "until" !IdentifierContinue
+KeywordRet = "ret" !IdentifierContinue
 KeywordIf = "if" !IdentifierContinue
 KeywordElif = "elif" !IdentifierContinue
 KeywordElse = "else" !IdentifierContinue
@@ -540,6 +573,7 @@ KeywordFalse = "false" !IdentifierContinue
 KeywordNull = "null" !IdentifierContinue
 KeywordLinear = "linear" !IdentifierContinue
 KeywordExponential = "exponential" !IdentifierContinue
+KeywordHold = "hold" !IdentifierContinue
 KeywordTarget = "target" !IdentifierContinue
 
 CurrentIndent
