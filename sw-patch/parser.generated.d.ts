@@ -96,6 +96,7 @@ export interface ScheduledStatement extends Node {
 export type Automation =
   | LinearAutomation
   | ExponentialAutomation
+  | CancelAutomation
   | HoldAutomation
   | TargetAutomation
 
@@ -109,6 +110,10 @@ export interface ExponentialAutomation extends Node {
 
 export interface HoldAutomation extends Node {
   type: 'HoldAutomation'
+}
+
+export interface CancelAutomation extends Node {
+  type: 'CancelAutomation'
 }
 
 export interface TargetAutomation extends Node {

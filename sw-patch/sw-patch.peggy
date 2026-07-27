@@ -228,6 +228,7 @@ AutomationSpec
   = KeywordLinear { return node("LinearAutomation"); }
   / KeywordExponential { return node("ExponentialAutomation"); }
   / KeywordHold { return node("HoldAutomation"); }
+  / KeywordCancel { return node("CancelAutomation"); }
   / KeywordTarget __ timeConstant:Expression {
       return node("TargetAutomation", { timeConstant });
     }
@@ -551,7 +552,7 @@ Identifier
 ReservedWord
   = ("type" / "config" / "fn" / "once" / "until" / "ret" / "if" / "elif" / "else"
     / "and" / "or" / "not" / "true" / "false" / "null"
-    / "linear" / "exponential" / "hold" / "target") !IdentifierContinue
+    / "linear" / "exponential" / "hold" / "cancel" / "target") !IdentifierContinue
 
 IdentifierContinue
   = [A-Za-z0-9_]
@@ -573,6 +574,7 @@ KeywordFalse = "false" !IdentifierContinue
 KeywordNull = "null" !IdentifierContinue
 KeywordLinear = "linear" !IdentifierContinue
 KeywordExponential = "exponential" !IdentifierContinue
+KeywordCancel = "cancel" !IdentifierContinue
 KeywordHold = "hold" !IdentifierContinue
 KeywordTarget = "target" !IdentifierContinue
 
