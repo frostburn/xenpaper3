@@ -11,31 +11,41 @@ export interface Program extends Node {
 }
 
 export type Statement =
-  | TriggerHandler
-  | WithStatement
+  | FunctionDeclaration
+  | UntilStatement
   | IfStatement
   | ElifStatement
   | ElseStatement
   | TypeAlias
-  | ConstDeclaration
-  | ParamDeclaration
+  | ConfigDeclaration
   | TypedBinding
   | ScheduledStatement
   | ConnectionStatement
   | AssignmentStatement
+  | ReturnStatement
   | DocStringStatement
   | CommentStatement
   | ExpressionStatement
 
-export interface TriggerHandler extends Node {
-  type: 'TriggerHandler'
-  trigger: Expression
+export interface FunctionDeclaration extends Node {
+  type: 'FunctionDeclaration'
+  name: string
+  parameters: Parameter[]
+  once: boolean
+  returned: boolean
   body: Statement[]
 }
 
-export interface WithStatement extends Node {
-  type: 'WithStatement'
-  resource: Expression
+export interface Parameter extends Node {
+  type: 'Parameter'
+  name: string
+  annotation: TypeExpression
+  defaultValue: Expression | null
+}
+
+export interface UntilStatement extends Node {
+  type: 'UntilStatement'
+  event: Expression
   body: Statement[]
 }
 
@@ -62,17 +72,10 @@ export interface TypeAlias extends Node {
   value: TypeExpression
 }
 
-export interface ConstDeclaration extends Node {
-  type: 'ConstDeclaration'
+export interface ConfigDeclaration extends Node {
+  type: 'ConfigDeclaration'
   name: string
   annotation: TypeExpression | null
-  value: Expression
-}
-
-export interface ParamDeclaration extends Node {
-  type: 'ParamDeclaration'
-  name: string
-  annotation: TypeExpression
   value: Expression
 }
 
@@ -90,7 +93,11 @@ export interface ScheduledStatement extends Node {
   statement: AssignmentStatement | ConnectionStatement | ExpressionStatement
 }
 
-export type Automation = LinearAutomation | ExponentialAutomation | TargetAutomation
+export type Automation =
+  | LinearAutomation
+  | ExponentialAutomation
+  | HoldAutomation
+  | TargetAutomation
 
 export interface LinearAutomation extends Node {
   type: 'LinearAutomation'
@@ -98,6 +105,10 @@ export interface LinearAutomation extends Node {
 
 export interface ExponentialAutomation extends Node {
   type: 'ExponentialAutomation'
+}
+
+export interface HoldAutomation extends Node {
+  type: 'HoldAutomation'
 }
 
 export interface TargetAutomation extends Node {
@@ -119,6 +130,11 @@ export interface ConnectionLink {
 export interface AssignmentStatement extends Node {
   type: 'AssignmentStatement'
   target: Identifier | MemberExpression
+  value: Expression
+}
+
+export interface ReturnStatement extends Node {
+  type: 'ReturnStatement'
   value: Expression
 }
 
