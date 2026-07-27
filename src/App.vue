@@ -1,12 +1,17 @@
 <script setup lang="ts">
-import {createPatch} from '../sw-patch'
+import {createPatch, type RuntimeOptions} from '../sw-patch'
 import DEFAULT_PATCH from './patches/default.swpatch?raw'
+
+type NoteOff = () => number
+interface Synth {
+  on: (destination: AudioNode, start: number, pitch: AudioNode, velocity: number, attack?: number, decay?: number, sustain?: number, release?: number) => NoteOff
+}
 
 // Dummy audio code just to get something going
 const ctx = new AudioContext({latencyHint: 'interactive'})
 const inputDelay = 0.01
 
-const synth = createPatch(DEFAULT_PATCH, ctx, {oscillatorType: 'square'})
+const synth = createPatch(DEFAULT_PATCH, ctx, {config: {oscillatorType: 'square'}} as RuntimeOptions) as unknown as Synth
 
 const noteOffs = new Map()
 
@@ -18,7 +23,7 @@ window.addEventListener('keydown', (e) => {
   }
   const pitch = new ConstantSourceNode(ctx, {offset: 1200 * (e.keyCode % 10) / 10})
   const velocity = 0.2
-  const attack = 0.05
+  const attack = 0.02
   pitch.start()
   const off = synth.on(ctx.destination, ctx.currentTime + inputDelay, pitch, velocity, attack)
   noteOffs.set(e.keyCode, [off, pitch])
