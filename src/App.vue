@@ -28,8 +28,6 @@ const synth = createPatch(DEFAULT_PATCH, ctx, {
 type ActiveNote = [off: NoteOff, pitch: ConstantSourceNode]
 
 const noteOffs = new Map<number, ActiveNote>()
-const heldKeys = new Set<number>()
-let isMounted = false
 
 const releaseNote = (keyCode: number) => {
   const note = noteOffs.get(keyCode)
@@ -42,22 +40,17 @@ const releaseNote = (keyCode: number) => {
 }
 
 const releaseAllNotes = () => {
-  heldKeys.clear()
   for (const keyCode of noteOffs.keys()) releaseNote(keyCode)
 }
 
-const handleKeyDown = async (e: KeyboardEvent) => {
+const handleKeyDown = (e: KeyboardEvent) => {
   console.log('down', e.keyCode)
-  if (heldKeys.has(e.keyCode)) {
+  if (noteOffs.has(e.keyCode)) {
     console.log('nope')
     return
   }
-  heldKeys.add(e.keyCode)
 
-  if (ctx.state === 'suspended') await ctx.resume()
-
-  // The key may have been released, or the component unmounted, while resume was pending.
-  if (!isMounted || !heldKeys.has(e.keyCode)) return
+  if (ctx.state === 'suspended') void ctx.resume()
 
   const pitch = new ConstantSourceNode(ctx, { offset: (1200 * (e.keyCode % 10)) / 10 })
   const velocity = 0.2
@@ -69,7 +62,6 @@ const handleKeyDown = async (e: KeyboardEvent) => {
 
 const handleKeyUp = (e: KeyboardEvent) => {
   console.log('up', e.keyCode)
-  heldKeys.delete(e.keyCode)
   releaseNote(e.keyCode)
 }
 
@@ -78,7 +70,6 @@ const handleVisibilityChange = () => {
 }
 
 onMounted(() => {
-  isMounted = true
   window.addEventListener('keydown', handleKeyDown)
   window.addEventListener('keyup', handleKeyUp)
   window.addEventListener('blur', releaseAllNotes)
@@ -86,7 +77,6 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
-  isMounted = false
   window.removeEventListener('keydown', handleKeyDown)
   window.removeEventListener('keyup', handleKeyUp)
   window.removeEventListener('blur', releaseAllNotes)

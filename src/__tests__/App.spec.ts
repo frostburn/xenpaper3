@@ -56,16 +56,16 @@ describe('App', () => {
     wrapper.unmount()
   })
 
-  it('resumes a suspended context before starting a note', async () => {
+  it('resumes a suspended context before starting a note', () => {
     const wrapper = mount(App)
 
     dispatchKey('keydown', 65)
     expect(contexts[0].resume).toHaveBeenCalledOnce()
-    expect(synthOn).not.toHaveBeenCalled()
-
-    await flushPromises()
     expect(sources[0].start).toHaveBeenCalledOnce()
     expect(synthOn).toHaveBeenCalledOnce()
+    expect(contexts[0].resume.mock.invocationCallOrder[0]).toBeLessThan(
+      sources[0].start.mock.invocationCallOrder[0],
+    )
     wrapper.unmount()
   })
 
