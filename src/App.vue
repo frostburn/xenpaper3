@@ -44,11 +44,7 @@ const releaseAllNotes = () => {
 }
 
 const handleKeyDown = (e: KeyboardEvent) => {
-  console.log('down', e.keyCode)
-  if (noteOffs.has(e.keyCode)) {
-    console.log('nope')
-    return
-  }
+  if (noteOffs.has(e.keyCode)) return
 
   if (ctx.state === 'suspended') void ctx.resume()
 
@@ -61,7 +57,6 @@ const handleKeyDown = (e: KeyboardEvent) => {
 }
 
 const handleKeyUp = (e: KeyboardEvent) => {
-  console.log('up', e.keyCode)
   releaseNote(e.keyCode)
 }
 

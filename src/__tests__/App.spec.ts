@@ -60,11 +60,13 @@ describe('App', () => {
     const wrapper = mount(App)
 
     dispatchKey('keydown', 65)
-    expect(contexts[0].resume).toHaveBeenCalledOnce()
-    expect(sources[0].start).toHaveBeenCalledOnce()
+    const context = contexts[0]!
+    const source = sources[0]!
+    expect(context.resume).toHaveBeenCalledOnce()
+    expect(source.start).toHaveBeenCalledOnce()
     expect(synthOn).toHaveBeenCalledOnce()
-    expect(contexts[0].resume.mock.invocationCallOrder[0]).toBeLessThan(
-      sources[0].start.mock.invocationCallOrder[0],
+    expect(context.resume.mock.invocationCallOrder[0]!).toBeLessThan(
+      source.start.mock.invocationCallOrder[0]!,
     )
     wrapper.unmount()
   })
@@ -79,7 +81,7 @@ describe('App', () => {
     window.dispatchEvent(new Event('blur'))
 
     expect(off).toHaveBeenCalledWith(1.01)
-    expect(sources[0].stop).toHaveBeenCalledWith(2)
+    expect(sources[0]!.stop).toHaveBeenCalledWith(2)
     wrapper.unmount()
   })
 
@@ -94,7 +96,7 @@ describe('App', () => {
     dispatchKey('keydown', 66)
 
     expect(off).toHaveBeenCalledOnce()
-    expect(contexts[0].close).toHaveBeenCalledOnce()
+    expect(contexts[0]!.close).toHaveBeenCalledOnce()
     expect(synthOn).toHaveBeenCalledOnce()
   })
 })
