@@ -40,8 +40,7 @@ interface Returned { [RETURN]: true; value: unknown }
 /**
  * Parses and evaluates SW Patch source against one Web Audio context.
  *
- * The returned object contains the patch's public functions and configuration,
- * so `patch.on(...)` has the same call shape as `Synth.on(...)` in App.vue.
+ * The returned object contains the patch's public functions and configuration.
  */
 export function createPatch(
   source: string,
