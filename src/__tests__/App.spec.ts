@@ -1,13 +1,100 @@
-import { describe, it, expect, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { flushPromises, mount } from '@vue/test-utils'
 
-import { mount } from '@vue/test-utils'
+const { synthOn } = vi.hoisted(() => ({ synthOn: vi.fn() }))
+
+vi.mock('../../sw-patch', () => ({
+  createPatch: () => ({ on: synthOn }),
+}))
+
 import App from '../App.vue'
 
-vi.stubGlobal('AudioContext', class MockAudioContext {})
+const contexts: MockAudioContext[] = []
+const sources: MockConstantSourceNode[] = []
+
+class MockAudioContext {
+  state: AudioContextState = 'suspended'
+  currentTime = 1
+  destination = {} as AudioDestinationNode
+  resume = vi.fn(async () => {
+    this.state = 'running'
+  })
+  close = vi.fn(async () => {
+    this.state = 'closed'
+  })
+
+  constructor() {
+    contexts.push(this)
+  }
+}
+
+class MockConstantSourceNode {
+  start = vi.fn()
+  stop = vi.fn()
+
+  constructor() {
+    sources.push(this)
+  }
+}
+
+const dispatchKey = (type: 'keydown' | 'keyup', keyCode: number) =>
+  window.dispatchEvent(new KeyboardEvent(type, { keyCode }))
+
+beforeEach(() => {
+  contexts.length = 0
+  sources.length = 0
+  synthOn.mockReset()
+  synthOn.mockReturnValue(vi.fn(() => 2))
+  vi.stubGlobal('AudioContext', MockAudioContext)
+  vi.stubGlobal('ConstantSourceNode', MockConstantSourceNode)
+})
 
 describe('App', () => {
-  it('mounts renders properly', () => {
+  it('mounts and renders properly', () => {
     const wrapper = mount(App)
     expect(wrapper.text()).toContain('You did it!')
+    wrapper.unmount()
+  })
+
+  it('resumes a suspended context before starting a note', async () => {
+    const wrapper = mount(App)
+
+    dispatchKey('keydown', 65)
+    expect(contexts[0].resume).toHaveBeenCalledOnce()
+    expect(synthOn).not.toHaveBeenCalled()
+
+    await flushPromises()
+    expect(sources[0].start).toHaveBeenCalledOnce()
+    expect(synthOn).toHaveBeenCalledOnce()
+    wrapper.unmount()
+  })
+
+  it('releases active notes when the window loses focus', async () => {
+    const off = vi.fn(() => 2)
+    synthOn.mockReturnValue(off)
+    const wrapper = mount(App)
+    dispatchKey('keydown', 65)
+    await flushPromises()
+
+    window.dispatchEvent(new Event('blur'))
+
+    expect(off).toHaveBeenCalledWith(1.01)
+    expect(sources[0].stop).toHaveBeenCalledWith(2)
+    wrapper.unmount()
+  })
+
+  it('removes listeners, releases notes, and closes its context on unmount', async () => {
+    const off = vi.fn(() => 2)
+    synthOn.mockReturnValue(off)
+    const wrapper = mount(App)
+    dispatchKey('keydown', 65)
+    await flushPromises()
+
+    wrapper.unmount()
+    dispatchKey('keydown', 66)
+
+    expect(off).toHaveBeenCalledOnce()
+    expect(contexts[0].close).toHaveBeenCalledOnce()
+    expect(synthOn).toHaveBeenCalledOnce()
   })
 })
