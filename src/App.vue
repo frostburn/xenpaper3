@@ -1,17 +1,28 @@
 <script setup lang="ts">
-import {createPatch, type RuntimeOptions} from '../sw-patch'
+import { createPatch, type RuntimeOptions } from '../sw-patch'
 import DEFAULT_PATCH from './patches/default.swpatch?raw'
 
 type NoteOff = () => number
 interface Synth {
-  on: (destination: AudioNode, start: number, pitch: AudioNode, velocity: number, attack?: number, decay?: number, sustain?: number, release?: number) => NoteOff
+  on: (
+    destination: AudioNode,
+    start: number,
+    pitch: AudioNode,
+    velocity: number,
+    attack?: number,
+    decay?: number,
+    sustain?: number,
+    release?: number,
+  ) => NoteOff
 }
 
 // Dummy audio code just to get something going
-const ctx = new AudioContext({latencyHint: 'interactive'})
+const ctx = new AudioContext({ latencyHint: 'interactive' })
 const inputDelay = 0.01
 
-const synth = createPatch(DEFAULT_PATCH, ctx, {config: {oscillatorType: 'square'}} as RuntimeOptions) as unknown as Synth
+const synth = createPatch(DEFAULT_PATCH, ctx, {
+  config: { oscillatorType: 'square' },
+} as RuntimeOptions) as unknown as Synth
 
 const noteOffs = new Map()
 
@@ -21,7 +32,7 @@ window.addEventListener('keydown', (e) => {
     console.log('nope')
     return
   }
-  const pitch = new ConstantSourceNode(ctx, {offset: 1200 * (e.keyCode % 10) / 10})
+  const pitch = new ConstantSourceNode(ctx, { offset: (1200 * (e.keyCode % 10)) / 10 })
   const velocity = 0.2
   const attack = 0.02
   pitch.start()
@@ -38,7 +49,6 @@ window.addEventListener('keyup', (e) => {
   }
   noteOffs.delete(e.keyCode)
 })
-
 </script>
 
 <template>

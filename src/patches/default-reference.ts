@@ -7,10 +7,19 @@ export class Synth {
     this.oscillatorType = 'triangle'
   }
 
-  on(destination: AudioNode, start: number, pitch: AudioNode, velocity: number, attack = 0.1, decay = 0.2, sustain = 0.7, release = 0.3) {
-    const osc = new OscillatorNode(this.context, {type: this.oscillatorType})
-    const attackEnv = new GainNode(this.context, {gain: 0})
-    const decayEnv = new GainNode(this.context, {gain: 1})
+  on(
+    destination: AudioNode,
+    start: number,
+    pitch: AudioNode,
+    velocity: number,
+    attack = 0.1,
+    decay = 0.2,
+    sustain = 0.7,
+    release = 0.3,
+  ) {
+    const osc = new OscillatorNode(this.context, { type: this.oscillatorType })
+    const attackEnv = new GainNode(this.context, { gain: 0 })
+    const decayEnv = new GainNode(this.context, { gain: 1 })
     osc.connect(attackEnv).connect(decayEnv).connect(destination)
     pitch.connect(osc.detune)
 
