@@ -69,7 +69,7 @@ describe('SW Patch runtime', () => {
     const destination = { connect: vi.fn(), disconnect: vi.fn() }
     createPatch(
       'until emitter.ended:\n'
-      + '    source -> destination:2,3\n',
+      + '    source:2 -> destination:3\n',
       {} as BaseAudioContext,
       { globals: { destination, emitter, source } },
     )

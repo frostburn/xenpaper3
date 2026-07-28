@@ -2,6 +2,10 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { flushPromises, mount } from '@vue/test-utils'
 
 type NoteOff = (stop?: number) => number
+type MockGainNode = {
+  connect: (to: AudioNode) => MockGainNode
+  gain: object
+}
 
 const { effectConnect, synthOn } = vi.hoisted(() => ({
   effectConnect: vi.fn(),
@@ -35,8 +39,8 @@ class MockAudioContext {
   }
 
   createGain() {
-    const node: { connect: (to: AudioNode) => AudioNode; gain: object } = {
-      connect: vi.fn<(to: AudioNode) => AudioNode>(() => node),
+    const node: MockGainNode = {
+      connect: vi.fn<(to: AudioNode) => MockGainNode>(() => node),
       gain: {},
     }
     return node
