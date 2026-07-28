@@ -13,9 +13,8 @@ const { effectConnect, synthOn } = vi.hoisted(() => ({
 }))
 
 vi.mock('../../sw-patch', () => ({
-  createPatch: (source: string) => source.includes('delayTime')
-    ? { connect: effectConnect }
-    : { on: synthOn },
+  createPatch: (source: string) =>
+    source.includes('delayTime') ? { connect: effectConnect } : { on: synthOn },
 }))
 
 import App from '../App.vue'

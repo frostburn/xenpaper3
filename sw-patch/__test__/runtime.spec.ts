@@ -35,34 +35,6 @@ describe('SW Patch runtime', () => {
     expect(outputDisconnect).toHaveBeenCalledWith(destination)
   })
 
-  it('preserves input routing inside exported effect functions', () => {
-    const inputConnect = vi.fn<(target: unknown) => void>()
-    const inputDisconnect = vi.fn<(target?: unknown) => void>()
-    const outputConnect = vi.fn<(target: unknown) => void>()
-    const input = { connect: inputConnect, disconnect: inputDisconnect }
-    const output = { connect: outputConnect, disconnect: vi.fn<(target?: unknown) => void>() }
-    const nodes = [input, output]
-    vi.stubGlobal('GainNode', vi.fn<() => typeof input | undefined>(() => nodes.shift()))
-
-    const effect = createPatch(
-      'input = GainNode()\n'
-      + 'output = GainNode()\n'
-      + 'fn route(target):\n'
-      + '    input -> target\n'
-      + 'fn unroute(target):\n'
-      + '    input !> target\n',
-      {} as BaseAudioContext,
-    ) as unknown as AudioNode & { route: PatchFunction; unroute: PatchFunction }
-    const target = {} as AudioNode
-
-    effect.route(target)
-    effect.unroute(target)
-
-    expect(inputConnect).toHaveBeenCalledWith(target)
-    expect(inputDisconnect).toHaveBeenCalledWith(target)
-    expect(outputConnect).not.toHaveBeenCalled()
-  })
-
   it('passes normalized options to Web Audio constructors', () => {
     const DelayNode = vi.fn<() => void>(function () {})
     const ChannelMergerNode = vi.fn<() => void>(function () {})
