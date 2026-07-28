@@ -30,7 +30,8 @@ class MockAudioContext {
   }
 
   createGain() {
-    return vi.fn({connect: vi.fn(), gain: {}})
+    const node = { connect: vi.fn<(to: AudioNode) => AudioNode>(() => node), gain: {} }
+    return node
   }
 }
 

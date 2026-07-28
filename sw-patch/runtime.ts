@@ -111,12 +111,24 @@ export class Quantity {
   negate(): Quantity { return new Quantity(-this.value, this.dimensions) }
 
   add(value: unknown, subtract = false): Quantity {
-    let left: Quantity = this
+    let resultDimensions = this.dimensions
     let right = Quantity.from(value)
-    if (left.isUnitless && !right.isUnitless) left = new Quantity(left.value, right.dimensions)
-    if (!left.isUnitless && right.isUnitless) right = new Quantity(right.value, left.dimensions)
+
+    if (this.isUnitless && !right.isUnitless) {
+      resultDimensions = right.dimensions
+    }
+
+    if (!this.isUnitless && right.isUnitless) {
+      right = new Quantity(right.value, this.dimensions)
+    }
+
+    const left = new Quantity(this.value, resultDimensions)
     left.assertCompatible(right)
-    return new Quantity(left.value + (subtract ? -right.value : right.value), left.dimensions)
+
+    return new Quantity(
+      left.value + (subtract ? -right.value : right.value),
+      resultDimensions,
+    )
   }
 
   multiply(value: unknown, divide = false): Quantity {
