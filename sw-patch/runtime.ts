@@ -68,6 +68,40 @@ export class Quantity {
     }
   }
 
+  static scalar(value: number): Quantity { return new Quantity(value) }
+
+  static from(value: unknown): Quantity {
+    return value instanceof Quantity ? value : Quantity.scalar(Number(value))
+  }
+
+  static truthy(value: unknown): boolean {
+    return value instanceof Quantity ? Boolean(value.value) : Boolean(value)
+  }
+
+  static binary(operator: string, left: unknown, right: unknown): unknown {
+    if ((operator === '==' || operator === '!=')
+      && !(left instanceof Quantity) && !(right instanceof Quantity)) {
+      return operator === '==' ? left === right : left !== right
+    }
+
+    const leftQuantity = Quantity.from(left)
+    const rightQuantity = Quantity.from(right)
+    switch (operator) {
+      case '+': return leftQuantity.add(rightQuantity)
+      case '-': return leftQuantity.add(rightQuantity, true)
+      case '*': return leftQuantity.multiply(rightQuantity)
+      case '/': return leftQuantity.multiply(rightQuantity, true)
+      case '%': return leftQuantity.modulo(rightQuantity)
+      case '<': return leftQuantity.value < rightQuantity.value
+      case '>': return leftQuantity.value > rightQuantity.value
+      case '<=': return leftQuantity.value <= rightQuantity.value
+      case '>=': return leftQuantity.value >= rightQuantity.value
+      case '==': return leftQuantity.value === rightQuantity.value
+      case '!=': return leftQuantity.value !== rightQuantity.value
+      default: throw new Error(`Unsupported operator: ${operator}`)
+    }
+  }
+
   get isDecibels(): boolean {
     return this.dimensions.decibel === 1 && Object.keys(this.dimensions).length === 1
   }
@@ -77,24 +111,31 @@ export class Quantity {
   negate(): Quantity { return new Quantity(-this.value, this.dimensions) }
 
   add(value: unknown, subtract = false): Quantity {
-    const right = Quantity.from(value, this.dimensions)
-    this.assertCompatible(right)
-    return new Quantity(this.value + (subtract ? -right.value : right.value), this.dimensions)
+    let left: Quantity = this
+    let right = Quantity.from(value)
+    if (left.isUnitless && !right.isUnitless) left = new Quantity(left.value, right.dimensions)
+    if (!left.isUnitless && right.isUnitless) right = new Quantity(right.value, left.dimensions)
+    left.assertCompatible(right)
+    return new Quantity(left.value + (subtract ? -right.value : right.value), left.dimensions)
   }
 
   multiply(value: unknown, divide = false): Quantity {
-    if (!(value instanceof Quantity)) {
-      return new Quantity(divide ? this.value / Number(value) : this.value * Number(value), this.dimensions)
-    }
+    const right = Quantity.from(value)
     const dimensions = { ...this.dimensions }
-    for (const [name, exponent] of Object.entries(value.dimensions)) {
+    for (const [name, exponent] of Object.entries(right.dimensions)) {
       dimensions[name] = (dimensions[name] ?? 0) + (divide ? -exponent : exponent)
     }
-    return new Quantity(divide ? this.value / value.value : this.value * value.value, dimensions)
+    return new Quantity(divide ? this.value / right.value : this.value * right.value, dimensions)
   }
 
-  private static from(value: unknown, dimensions: Dimensions): Quantity {
-    return value instanceof Quantity ? value : new Quantity(Number(value), dimensions)
+  modulo(value: unknown): Quantity {
+    const right = Quantity.from(value)
+    if (!right.isUnitless) this.assertCompatible(right)
+    return new Quantity(this.value % right.value, this.dimensions)
+  }
+
+  private get isUnitless(): boolean {
+    return Object.keys(this.dimensions).length === 0
   }
 
   private assertCompatible(other: Quantity): void {
@@ -194,7 +235,7 @@ export class PatchRuntime {
 
       if (statement.type === 'IfStatement') {
         let matched = false
-        if (this.expression(statement.test, scope)) {
+        if (Quantity.truthy(this.expression(statement.test, scope))) {
           matched = true
           const result = this.statements(statement.body, scope, connectionCleanups, exports)
           if (result) return result
@@ -204,7 +245,8 @@ export class PatchRuntime {
           if (next?.type !== 'ElifStatement' && next?.type !== 'ElseStatement') break
           index += 1
           const branch = next
-          if (!matched && (branch.type === 'ElseStatement' || this.expression(branch.test, scope))) {
+          if (!matched && (branch.type === 'ElseStatement'
+            || Quantity.truthy(this.expression(branch.test, scope)))) {
             matched = true
             const result = this.statements(branch.body, scope, connectionCleanups, exports)
             if (result) return result
@@ -348,7 +390,7 @@ export class PatchRuntime {
         if (!scope.has(expression.name)) throw new Error(`Unknown patch identifier: ${expression.name}`)
         return scope.get(expression.name)
       }
-      case 'NumberLiteral': return Number(expression.value)
+      case 'NumberLiteral': return Quantity.scalar(Number(expression.value))
       case 'UnitLiteral': return Quantity.unit(Number(expression.value), expression.unit)
       case 'StringLiteral': return expression.value
       case 'BooleanLiteral': return expression.value
@@ -382,47 +424,15 @@ export class PatchRuntime {
   }
 
   private unary(operator: string, value: unknown): unknown {
-    if (operator === '+' && value instanceof Quantity) return value
-    if (operator === '-' && value instanceof Quantity) return value.negate()
-    if (operator === '+') return Number(value)
-    if (operator === '-') return -Number(value)
-    return !value
+    if (operator === '+') return Quantity.from(value)
+    if (operator === '-') return Quantity.from(value).negate()
+    return !Quantity.truthy(value)
   }
 
   private binary(operator: string, left: unknown, right: () => unknown): unknown {
-    if (operator === 'and') return left && right()
-    if (operator === 'or') return left || right()
-    const value = right()
-    const leftNumber = Number(left)
-    const rightNumber = Number(value)
-    switch (operator) {
-      case '+': return left instanceof Quantity
-        ? left.add(value)
-        : value instanceof Quantity ? value.add(left) : leftNumber + rightNumber
-      case '-': return left instanceof Quantity
-        ? left.add(value, true)
-        : value instanceof Quantity ? value.negate().add(left) : leftNumber - rightNumber
-      case '*': return left instanceof Quantity
-        ? left.multiply(value)
-        : value instanceof Quantity ? value.multiply(left) : leftNumber * rightNumber
-      case '/': return left instanceof Quantity
-        ? left.multiply(value, true)
-        : value instanceof Quantity
-          ? new Quantity(leftNumber).multiply(value, true)
-          : leftNumber / rightNumber
-      case '%': return left instanceof Quantity
-        ? new Quantity(left.value % rightNumber, left.dimensions)
-        : leftNumber % rightNumber
-      case '<': return leftNumber < rightNumber
-      case '>': return leftNumber > rightNumber
-      case '<=': return leftNumber <= rightNumber
-      case '>=': return leftNumber >= rightNumber
-      case '==': return left instanceof Quantity || value instanceof Quantity
-        ? leftNumber === rightNumber : left === value
-      case '!=': return left instanceof Quantity || value instanceof Quantity
-        ? leftNumber !== rightNumber : left !== value
-      default: throw new Error(`Unsupported operator: ${operator}`)
-    }
+    if (operator === 'and') return Quantity.truthy(left) ? right() : left
+    if (operator === 'or') return Quantity.truthy(left) ? left : right()
+    return Quantity.binary(operator, left, right())
   }
 
   private audioParameterValue(amplitude: boolean, value: unknown): number {

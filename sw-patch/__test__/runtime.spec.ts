@@ -183,7 +183,10 @@ describe('SW Patch runtime', () => {
   it('derives units through quantity arithmetic', () => {
     const patch = createPatch(
       'fn period():\n'
-      + '    ret 1 / (1Hz)\n',
+      + '    ret 1 / (1Hz)\n'
+      + '\n'
+      + 'fn scalar():\n'
+      + '    ret 2 * 3\n',
       {} as BaseAudioContext,
     )
 
@@ -192,5 +195,9 @@ describe('SW Patch runtime', () => {
     expect(period).toBeInstanceOf(Quantity)
     expect(period).toMatchObject({ value: 1, dimensions: { time: 1 } })
     expect(Number(period)).toBe(1)
+    expect((patch.scalar as PatchFunction)()).toMatchObject({
+      value: 6,
+      dimensions: {},
+    })
   })
 })
