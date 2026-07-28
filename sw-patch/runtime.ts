@@ -22,6 +22,7 @@ export interface RuntimeOptions {
 }
 
 type Scope = Map<string, unknown>
+type Dimensions = Readonly<Record<string, number>>
 type Connectable = { connect(target: unknown): unknown; disconnect(target?: unknown): unknown }
 type AudioParameter = {
   value?: number
@@ -36,6 +37,114 @@ type AudioParameter = {
 const RETURN = Symbol('sw-patch return')
 const FORBIDDEN_MEMBERS = new Set(['constructor', 'prototype', '__proto__'])
 interface Returned { [RETURN]: true; value: unknown }
+
+/** A scalar expressed in canonical units together with its physical dimensions. */
+export class Quantity {
+  readonly value: number
+  readonly dimensions: Dimensions
+
+  constructor(value: number, dimensions: Dimensions = {}) {
+    this.value = value
+    this.dimensions = Object.fromEntries(
+      Object.entries(dimensions).filter(([, exponent]) => exponent !== 0),
+    )
+  }
+
+  static unit(value: number, unit: string): Quantity {
+    switch (unit.toLowerCase()) {
+      case 'ns': return new Quantity(value / 1e9, { time: 1 })
+      case 'us': return new Quantity(value / 1e6, { time: 1 })
+      case 'ms': return new Quantity(value / 1e3, { time: 1 })
+      case 's': return new Quantity(value, { time: 1 })
+      case 'khz': return new Quantity(value * 1e3, { time: -1 })
+      case 'hz': return new Quantity(value, { time: -1 })
+      case 'beats':
+      case 'beat': return new Quantity(value, { beat: 1 })
+      case 'bpm': return new Quantity(value / 60, { beat: 1, time: -1 })
+      case 'db': return new Quantity(value, { decibel: 1 })
+      case 'c': return new Quantity(value, { cent: 1 })
+      case '%': return new Quantity(value / 100)
+      default: return new Quantity(value)
+    }
+  }
+
+  static scalar(value: number): Quantity { return new Quantity(value) }
+
+  static from(value: unknown): Quantity {
+    return value instanceof Quantity ? value : Quantity.scalar(Number(value))
+  }
+
+  static truthy(value: unknown): boolean {
+    return value instanceof Quantity ? Boolean(value.value) : Boolean(value)
+  }
+
+  static binary(operator: string, left: unknown, right: unknown): unknown {
+    if ((operator === '==' || operator === '!=')
+      && !(left instanceof Quantity) && !(right instanceof Quantity)) {
+      return operator === '==' ? left === right : left !== right
+    }
+
+    const leftQuantity = Quantity.from(left)
+    const rightQuantity = Quantity.from(right)
+    switch (operator) {
+      case '+': return leftQuantity.add(rightQuantity)
+      case '-': return leftQuantity.add(rightQuantity, true)
+      case '*': return leftQuantity.multiply(rightQuantity)
+      case '/': return leftQuantity.multiply(rightQuantity, true)
+      case '%': return leftQuantity.modulo(rightQuantity)
+      case '<': return leftQuantity.value < rightQuantity.value
+      case '>': return leftQuantity.value > rightQuantity.value
+      case '<=': return leftQuantity.value <= rightQuantity.value
+      case '>=': return leftQuantity.value >= rightQuantity.value
+      case '==': return leftQuantity.value === rightQuantity.value
+      case '!=': return leftQuantity.value !== rightQuantity.value
+      default: throw new Error(`Unsupported operator: ${operator}`)
+    }
+  }
+
+  get isDecibels(): boolean {
+    return this.dimensions.decibel === 1 && Object.keys(this.dimensions).length === 1
+  }
+
+  valueOf(): number { return this.value }
+
+  negate(): Quantity { return new Quantity(-this.value, this.dimensions) }
+
+  add(value: unknown, subtract = false): Quantity {
+    let left: Quantity = this
+    let right = Quantity.from(value)
+    if (left.isUnitless && !right.isUnitless) left = new Quantity(left.value, right.dimensions)
+    if (!left.isUnitless && right.isUnitless) right = new Quantity(right.value, left.dimensions)
+    left.assertCompatible(right)
+    return new Quantity(left.value + (subtract ? -right.value : right.value), left.dimensions)
+  }
+
+  multiply(value: unknown, divide = false): Quantity {
+    const right = Quantity.from(value)
+    const dimensions = { ...this.dimensions }
+    for (const [name, exponent] of Object.entries(right.dimensions)) {
+      dimensions[name] = (dimensions[name] ?? 0) + (divide ? -exponent : exponent)
+    }
+    return new Quantity(divide ? this.value / right.value : this.value * right.value, dimensions)
+  }
+
+  modulo(value: unknown): Quantity {
+    const right = Quantity.from(value)
+    if (!right.isUnitless) this.assertCompatible(right)
+    return new Quantity(this.value % right.value, this.dimensions)
+  }
+
+  private get isUnitless(): boolean {
+    return Object.keys(this.dimensions).length === 0
+  }
+
+  private assertCompatible(other: Quantity): void {
+    const names = new Set([...Object.keys(this.dimensions), ...Object.keys(other.dimensions)])
+    if ([...names].some((name) => this.dimensions[name] !== other.dimensions[name])) {
+      throw new Error('Cannot add quantities with incompatible units')
+    }
+  }
+}
 
 /**
  * Parses and evaluates SW Patch source against one Web Audio context.
@@ -57,6 +166,7 @@ export class PatchRuntime {
   readonly context: BaseAudioContext
   readonly options: RuntimeOptions
   private readonly root: Scope
+  private readonly gainNodes = new WeakSet<object>()
 
   constructor(context: BaseAudioContext, options: RuntimeOptions = {}) {
     this.context = context
@@ -83,9 +193,12 @@ export class PatchRuntime {
     const factory = this.context[`create${kind}` as keyof BaseAudioContext]
     if (typeof factory !== 'function') throw new Error(`Audio context cannot create a ${kind}Node`)
     const node = (factory as () => Record<string, unknown>).call(this.context)
+    if (kind === 'Gain') this.gainNodes.add(node)
     for (const [key, value] of Object.entries(options)) {
       const property = node[key] as { value?: unknown } | undefined
-      if (property && typeof property === 'object' && 'value' in property) property.value = value
+      if (property && typeof property === 'object' && 'value' in property) {
+        property.value = this.audioParameterValue(kind === 'Gain' && key === 'gain', value)
+      }
       else node[key] = value
     }
     return node
@@ -122,7 +235,7 @@ export class PatchRuntime {
 
       if (statement.type === 'IfStatement') {
         let matched = false
-        if (this.expression(statement.test, scope)) {
+        if (Quantity.truthy(this.expression(statement.test, scope))) {
           matched = true
           const result = this.statements(statement.body, scope, connectionCleanups, exports)
           if (result) return result
@@ -132,7 +245,8 @@ export class PatchRuntime {
           if (next?.type !== 'ElifStatement' && next?.type !== 'ElseStatement') break
           index += 1
           const branch = next
-          if (!matched && (branch.type === 'ElseStatement' || this.expression(branch.test, scope))) {
+          if (!matched && (branch.type === 'ElseStatement'
+            || Quantity.truthy(this.expression(branch.test, scope)))) {
             matched = true
             const result = this.statements(branch.body, scope, connectionCleanups, exports)
             if (result) return result
@@ -222,7 +336,10 @@ export class PatchRuntime {
       return
     }
     const target = this.expression(statement.target, scope) as AudioParameter
-    const value = Number(this.expression(statement.value, scope))
+    const amplitude = statement.target.type === 'MemberExpression'
+      && statement.target.property === 'gain'
+      && this.isGainNode(this.expression(statement.target.object, scope))
+    const value = this.audioParameterValue(amplitude, this.expression(statement.value, scope))
     switch (automation?.type) {
       case 'LinearAutomation': target.linearRampToValueAtTime(value, time); break
       case 'ExponentialAutomation': target.exponentialRampToValueAtTime(value, time); break
@@ -273,8 +390,8 @@ export class PatchRuntime {
         if (!scope.has(expression.name)) throw new Error(`Unknown patch identifier: ${expression.name}`)
         return scope.get(expression.name)
       }
-      case 'NumberLiteral': return Number(expression.value)
-      case 'UnitLiteral': return this.unit(Number(expression.value), expression.unit)
+      case 'NumberLiteral': return Quantity.scalar(Number(expression.value))
+      case 'UnitLiteral': return Quantity.unit(Number(expression.value), expression.unit)
       case 'StringLiteral': return expression.value
       case 'BooleanLiteral': return expression.value
       case 'NullLiteral': return null
@@ -307,41 +424,27 @@ export class PatchRuntime {
   }
 
   private unary(operator: string, value: unknown): unknown {
-    if (operator === '+') return Number(value)
-    if (operator === '-') return -Number(value)
-    return !value
+    if (operator === '+') return Quantity.from(value)
+    if (operator === '-') return Quantity.from(value).negate()
+    return !Quantity.truthy(value)
   }
 
   private binary(operator: string, left: unknown, right: () => unknown): unknown {
-    if (operator === 'and') return left && right()
-    if (operator === 'or') return left || right()
-    const value = right()
-    switch (operator) {
-      case '+': return Number(left) + Number(value)
-      case '-': return Number(left) - Number(value)
-      case '*': return Number(left) * Number(value)
-      case '/': return Number(left) / Number(value)
-      case '%': return Number(left) % Number(value)
-      case '<': return (left as number) < (value as number)
-      case '>': return (left as number) > (value as number)
-      case '<=': return (left as number) <= (value as number)
-      case '>=': return (left as number) >= (value as number)
-      case '==': return left === value
-      case '!=': return left !== value
-      default: throw new Error(`Unsupported operator: ${operator}`)
-    }
+    if (operator === 'and') return Quantity.truthy(left) ? right() : left
+    if (operator === 'or') return Quantity.truthy(left) ? left : right()
+    return Quantity.binary(operator, left, right())
   }
 
-  private unit(value: number, unit: string): number {
-    switch (unit.toLowerCase()) {
-      case 'ns': return value / 1e9
-      case 'us': return value / 1e6
-      case 'ms': return value / 1e3
-      case 'khz': return value * 1e3
-      case '%': return value / 100
-      case 'db': return 10 ** (value / 20)
-      default: return value
+  private audioParameterValue(amplitude: boolean, value: unknown): number {
+    if (amplitude && value instanceof Quantity && value.isDecibels) {
+      return 10 ** (value.value / 20)
     }
+    return Number(value)
+  }
+
+  private isGainNode(value: unknown): boolean {
+    return typeof value === 'object' && value !== null
+      && (this.gainNodes.has(value) || value.constructor?.name === 'GainNode')
   }
 
   private assertSafeMember(property: string): void {

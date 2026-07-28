@@ -21,7 +21,7 @@ interface Synth {
 // Dummy audio code just to get something going
 const ctx = new AudioContext({ latencyHint: 'interactive' })
 const output = ctx.createGain()
-output.gain.value = 0.3
+output.gain.value = 0.4
 output.connect(ctx.destination)
 const inputDelay = 0.01
 
