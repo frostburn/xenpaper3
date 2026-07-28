@@ -84,8 +84,20 @@ export class Quantity {
       return operator === '==' ? left === right : left !== right
     }
 
+    if ((operator === '==' || operator === '!=')
+      && ((left instanceof Quantity
+        && !(right instanceof Quantity) && typeof right !== 'number')
+        || (right instanceof Quantity
+          && !(left instanceof Quantity) && typeof left !== 'number'))) {
+      return operator === '!='
+    }
+
     const leftQuantity = Quantity.from(left)
     const rightQuantity = Quantity.from(right)
+    if (left instanceof Quantity && right instanceof Quantity
+      && ['<', '>', '<=', '>=', '==', '!='].includes(operator)) {
+      leftQuantity.assertCompatible(rightQuantity, 'compare')
+    }
     switch (operator) {
       case '+': return leftQuantity.add(rightQuantity)
       case '-': return leftQuantity.add(rightQuantity, true)
@@ -150,10 +162,10 @@ export class Quantity {
     return Object.keys(this.dimensions).length === 0
   }
 
-  private assertCompatible(other: Quantity): void {
+  private assertCompatible(other: Quantity, operation = 'add'): void {
     const names = new Set([...Object.keys(this.dimensions), ...Object.keys(other.dimensions)])
     if ([...names].some((name) => this.dimensions[name] !== other.dimensions[name])) {
-      throw new Error('Cannot add quantities with incompatible units')
+      throw new Error(`Cannot ${operation} quantities with incompatible units`)
     }
   }
 }

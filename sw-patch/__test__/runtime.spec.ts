@@ -200,4 +200,26 @@ describe('SW Patch runtime', () => {
       dimensions: {},
     })
   })
+
+  it('uses strict equality when only one operand is a quantity', () => {
+    const one = Quantity.scalar(1)
+    const zero = Quantity.scalar(0)
+
+    expect(Quantity.binary('==', one, true)).toBe(false)
+    expect(Quantity.binary('==', zero, null)).toBe(false)
+    expect(Quantity.binary('==', one, '1')).toBe(false)
+    expect(Quantity.binary('!=', one, true)).toBe(true)
+    expect(Quantity.binary('==', one, 1)).toBe(true)
+    expect(Quantity.binary('==', 1, one)).toBe(true)
+  })
+
+  it('rejects comparisons between quantities with incompatible dimensions', () => {
+    const second = Quantity.unit(1, 's')
+    const hertz = Quantity.unit(1, 'Hz')
+
+    for (const operator of ['<', '>', '<=', '>=', '==', '!=']) {
+      expect(() => Quantity.binary(operator, second, hertz))
+        .toThrow('Cannot compare quantities with incompatible units')
+    }
+  })
 })
