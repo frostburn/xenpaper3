@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { PatchRuntime, createPatch, type PatchFunction } from '../runtime.js'
+import { PatchRuntime, Quantity, createPatch, type PatchFunction } from '../runtime.js'
 import type { Program } from '../parser.generated.js'
 
 function location() {
@@ -105,5 +105,121 @@ describe('SW Patch runtime', () => {
       {} as BaseAudioContext,
     )
     expect(() => (patch.escape as PatchFunction)()).toThrow('forbidden')
+  })
+
+  it('interprets decibel values according to their AudioParam context', () => {
+    const filter = { Q: { value: 0 }, gain: { value: 0 } }
+    const gain = { gain: { value: 0 } }
+    const context = {
+      createBiquadFilter: () => filter,
+      createGain: () => gain,
+    } as unknown as BaseAudioContext
+    const patch = createPatch(
+      'fn values(Q: Gain = +10dB):\n'
+      + "    filter = BiquadFilterNode(Q = Q, gain = Q)\n"
+      + '    output = GainNode(gain = -Q)\n',
+      context,
+    )
+
+    const values = patch.values as PatchFunction
+    values()
+
+    expect(filter.Q.value).toBe(10)
+    expect(filter.gain.value).toBe(10)
+    expect(gain.gain.value).toBeCloseTo(0.316227766)
+  })
+
+  it('converts decibels for scheduled gain assignments on global nodes', () => {
+    const gain = {
+      setValueAtTime: vi.fn<(value: number, time: number) => void>(),
+    }
+    const node = new (class GainNode { readonly gain = gain })()
+    const patch = createPatch(
+      'fn setGain():\n'
+      + '    @(0) node.gain = -6dB\n',
+      {} as BaseAudioContext,
+      { globals: { node } },
+    )
+
+    const setGain = patch.setGain as PatchFunction
+    setGain()
+
+    expect(gain.setValueAtTime).toHaveBeenCalledWith(10 ** (-6 / 20), 0)
+  })
+
+  it('keeps decibels literal for scheduled BiquadFilter gain assignments', () => {
+    const gain = {
+      setValueAtTime: vi.fn<(value: number, time: number) => void>(),
+    }
+    const node = new (class BiquadFilterNode { readonly gain = gain })()
+    const patch = createPatch(
+      'fn setGain():\n'
+      + '    @(0) node.gain = -6dB\n',
+      {} as BaseAudioContext,
+      { globals: { node } },
+    )
+
+    const setGain = patch.setGain as PatchFunction
+    setGain()
+
+    expect(gain.setValueAtTime).toHaveBeenCalledWith(-6, 0)
+  })
+
+  it('preserves decibel values through binary arithmetic', () => {
+    const gain = { gain: { value: 0 } }
+    const context = { createGain: () => gain } as unknown as BaseAudioContext
+    const patch = createPatch(
+      'fn values():\n'
+      + '    output = GainNode(gain = -6dB * 2)\n',
+      context,
+    )
+
+    const values = patch.values as PatchFunction
+    values()
+
+    expect(gain.gain.value).toBeCloseTo(10 ** (-12 / 20))
+  })
+
+  it('derives units through quantity arithmetic', () => {
+    const patch = createPatch(
+      'fn period():\n'
+      + '    ret 1 / (1Hz)\n'
+      + '\n'
+      + 'fn scalar():\n'
+      + '    ret 2 * 3\n',
+      {} as BaseAudioContext,
+    )
+
+    const period = (patch.period as PatchFunction)()
+
+    expect(period).toBeInstanceOf(Quantity)
+    expect(period).toMatchObject({ value: 1, dimensions: { time: 1 } })
+    expect(Number(period)).toBe(1)
+    expect((patch.scalar as PatchFunction)()).toMatchObject({
+      value: 6,
+      dimensions: {},
+    })
+  })
+
+  it('uses strict equality when only one operand is a quantity', () => {
+    const one = Quantity.scalar(1)
+    const zero = Quantity.scalar(0)
+
+    expect(Quantity.binary('==', one, true)).toBe(false)
+    expect(Quantity.binary('==', zero, null)).toBe(false)
+    expect(Quantity.binary('==', one, '1')).toBe(false)
+    expect(Quantity.binary('!=', one, true)).toBe(true)
+    expect(Quantity.binary('==', one, 1)).toBe(true)
+    expect(Quantity.binary('==', 1, one)).toBe(true)
+  })
+
+  it('rejects comparisons between quantities with incompatible dimensions', () => {
+    const second = Quantity.unit(1, 's')
+    const hertz = Quantity.unit(1, 'Hz')
+
+    for (const operator of ['<', '>', '<=', '>=', '==', '!=']) {
+      expect(() => Quantity.binary(operator, second, hertz))
+        .toThrow('Cannot compare quantities with incompatible units')
+    }
   })
 })
