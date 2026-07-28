@@ -8,14 +8,13 @@ type MockGainNode = {
 }
 
 const { effectConnect, synthOn } = vi.hoisted(() => ({
-  effectConnect: vi.fn(),
+  effectConnect: vi.fn<(to: AudioNode) => void>(),
   synthOn: vi.fn<() => NoteOff>(),
 }))
 
 vi.mock('../../sw-patch', () => ({
-  createPatch: (source: string) => source.includes('delayTime')
-    ? { connect: effectConnect }
-    : { on: synthOn },
+  createPatch: (source: string) =>
+    source.includes('delayTime') ? { connect: effectConnect } : { on: synthOn },
 }))
 
 import App from '../App.vue'

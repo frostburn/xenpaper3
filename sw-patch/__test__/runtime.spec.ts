@@ -9,13 +9,13 @@ function location() {
 
 describe('SW Patch runtime', () => {
   it('returns effect patches as input nodes whose output can connect onward', () => {
-    const inputConnect = vi.fn()
-    const outputConnect = vi.fn()
-    const outputDisconnect = vi.fn()
-    const input = { connect: inputConnect, disconnect: vi.fn() }
+    const inputConnect = vi.fn<(target: unknown) => void>()
+    const outputConnect = vi.fn<(target: unknown) => void>()
+    const outputDisconnect = vi.fn<(target?: unknown) => void>()
+    const input = { connect: inputConnect, disconnect: vi.fn<(target?: unknown) => void>() }
     const output = { connect: outputConnect, disconnect: outputDisconnect }
     const nodes = [input, output]
-    const GainNode = vi.fn(function () { return nodes.shift() })
+    const GainNode = vi.fn<() => typeof input | undefined>(function () { return nodes.shift() })
     vi.stubGlobal('GainNode', GainNode)
     const context = {} as BaseAudioContext
 
@@ -36,8 +36,8 @@ describe('SW Patch runtime', () => {
   })
 
   it('passes normalized options to Web Audio constructors', () => {
-    const DelayNode = vi.fn(function () {})
-    const ChannelMergerNode = vi.fn(function () {})
+    const DelayNode = vi.fn<() => void>(function () {})
+    const ChannelMergerNode = vi.fn<() => void>(function () {})
     vi.stubGlobal('DelayNode', DelayNode)
     vi.stubGlobal('ChannelMergerNode', ChannelMergerNode)
     const context = {} as BaseAudioContext
@@ -53,8 +53,8 @@ describe('SW Patch runtime', () => {
   })
 
   it('does not treat inherited global endpoints as patch declarations', () => {
-    const input = { connect: vi.fn(), disconnect: vi.fn() }
-    const output = { connect: vi.fn(), disconnect: vi.fn() }
+    const input = { connect: vi.fn<(target: unknown) => void>(), disconnect: vi.fn<() => void>() }
+    const output = { connect: vi.fn<(target: unknown) => void>(), disconnect: vi.fn<() => void>() }
     const patch = createPatch('fn noop():\n    ret null\n', {} as BaseAudioContext, {
       globals: { input, output },
     })
@@ -65,8 +65,8 @@ describe('SW Patch runtime', () => {
 
   it('connects and cleans up explicitly selected node ports', () => {
     const emitter = new EventTarget()
-    const source = { connect: vi.fn(), disconnect: vi.fn() }
-    const destination = { connect: vi.fn(), disconnect: vi.fn() }
+    const source = { connect: vi.fn<(target: unknown, output?: number, input?: number) => void>(), disconnect: vi.fn<(target?: unknown, output?: number, input?: number) => void>() }
+    const destination = { connect: vi.fn<(target: unknown) => void>(), disconnect: vi.fn<() => void>() }
     createPatch(
       'until emitter.ended:\n'
       + '    source:2 -> destination:3\n',

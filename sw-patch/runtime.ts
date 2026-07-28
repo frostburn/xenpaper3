@@ -197,6 +197,7 @@ export class PatchRuntime {
   readonly options: RuntimeOptions
   private readonly root: Scope
   private readonly gainNodes = new WeakSet<object>()
+  private readonly internalConnections = new WeakMap<object, Connectable>()
   private readonly topLevelBindings = new Set<string>()
 
   constructor(context: BaseAudioContext, options: RuntimeOptions = {}) {
@@ -258,6 +259,10 @@ export class PatchRuntime {
     // patch as a destination. Its outward methods are redirected to the patch's output.
     const connect = (output.connect as (...args: unknown[]) => unknown).bind(output)
     const disconnect = (output.disconnect as (...args: unknown[]) => unknown).bind(output)
+    this.internalConnections.set(input, {
+      connect: (input.connect as Connectable['connect']).bind(input),
+      disconnect: (input.disconnect as Connectable['disconnect']).bind(input),
+    })
     for (const key of Reflect.ownKeys(patch)) {
       Object.defineProperty(input, key, Object.getOwnPropertyDescriptor(patch, key)!)
     }
@@ -442,9 +447,9 @@ export class PatchRuntime {
     const cleanups: Array<() => void> = []
     for (const link of links) {
       const target = this.expression(link.target, scope)
-      if (link.output === undefined && link.input === undefined) source[link.operator](target)
-      else source[link.operator](target, link.output ?? 0, link.input ?? 0)
-      const connectedSource = source
+      const connectedSource = this.internalConnections.get(source as object) ?? source
+      if (link.output === undefined && link.input === undefined) connectedSource[link.operator](target)
+      else connectedSource[link.operator](target, link.output ?? 0, link.input ?? 0)
       if (link.operator === 'connect') {
         cleanups.push(() => {
           if (link.output === undefined && link.input === undefined) connectedSource.disconnect(target)
