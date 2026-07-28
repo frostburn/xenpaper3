@@ -1,0 +1,21 @@
+config delayTime: Duration = 250ms
+config feedback: Level = 55%
+config wet: Level = 35%
+
+input = GainNode()
+output = GainNode()
+dry = GainNode(gain = 1 - wet)
+wetOutput = GainNode(gain = wet)
+leftDelay = DelayNode(maxDelayTime = 2s, delayTime = delayTime)
+rightDelay = DelayNode(maxDelayTime = 2s, delayTime = delayTime)
+leftFeedback = GainNode(gain = feedback)
+rightFeedback = GainNode(gain = feedback)
+merger = ChannelMergerNode(numberOfInputs = 2)
+
+input -> dry -> output
+input -> leftDelay
+leftDelay.connect(merger, 0, 0)
+rightDelay.connect(merger, 0, 1)
+leftDelay -> rightFeedback -> rightDelay
+rightDelay -> leftFeedback -> leftDelay
+merger -> wetOutput -> output

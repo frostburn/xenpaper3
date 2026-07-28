@@ -14,6 +14,9 @@ export interface SynthPatch {
   [name: string]: unknown
 }
 
+/** A patch whose top-level `input` and `output` bindings make it audio-connectable. */
+export type EffectPatch = SynthPatch & AudioNode
+
 export interface RuntimeOptions {
   /** Values for declarations marked `config`. */
   config?: Record<string, unknown>
@@ -202,23 +205,38 @@ export class PatchRuntime {
   evaluate(program: Program): SynthPatch {
     const patch: SynthPatch = {}
     this.statements(program.body, this.root, undefined, patch)
-    return patch
+    return this.effectNode(patch)
   }
 
   private installBuiltins(): void {
     this.root.set('BiquadFilterNode', (...args: unknown[]) => this.makeNode('BiquadFilter', args))
+    this.root.set('ChannelMergerNode', (...args: unknown[]) => this.makeNode('ChannelMerger', args))
+    this.root.set('ChannelSplitterNode', (...args: unknown[]) => this.makeNode('ChannelSplitter', args))
+    this.root.set('DelayNode', (...args: unknown[]) => this.makeNode('Delay', args))
     this.root.set('GainNode', (...args: unknown[]) => this.makeNode('Gain', args))
     this.root.set('OscillatorNode', (...args: unknown[]) => this.makeNode('Oscillator', args))
     this.root.set('context', this.context)
   }
 
-  private makeNode(kind: 'BiquadFilter' | 'Gain' | 'Oscillator', args: unknown[]): unknown {
+  private makeNode(
+    kind: 'BiquadFilter' | 'ChannelMerger' | 'ChannelSplitter' | 'Delay' | 'Gain' | 'Oscillator',
+    args: unknown[],
+  ): unknown {
     const options = (args[0] ?? {}) as Record<string, unknown>
     const factory = this.context[`create${kind}` as keyof BaseAudioContext]
     if (typeof factory !== 'function') throw new Error(`Audio context cannot create a ${kind}Node`)
-    const node = (factory as () => Record<string, unknown>).call(this.context)
+    const factoryArgument = kind === 'Delay'
+      ? options.maxDelayTime
+      : kind === 'ChannelMerger'
+        ? options.numberOfInputs
+        : kind === 'ChannelSplitter'
+          ? options.numberOfOutputs
+          : undefined
+    const node = (factory as unknown as (argument?: number) => Record<string, unknown>)
+      .call(this.context, factoryArgument === undefined ? undefined : Number(factoryArgument))
     if (kind === 'Gain') this.gainNodes.add(node)
     for (const [key, value] of Object.entries(options)) {
+      if (['maxDelayTime', 'numberOfInputs', 'numberOfOutputs'].includes(key)) continue
       const property = node[key] as { value?: unknown } | undefined
       if (property && typeof property === 'object' && 'value' in property) {
         property.value = this.audioParameterValue(kind === 'Gain' && key === 'gain', value)
@@ -226,6 +244,26 @@ export class PatchRuntime {
       else node[key] = value
     }
     return node
+  }
+
+  private effectNode(patch: SynthPatch): SynthPatch {
+    const input = this.root.get('input') as Record<string, unknown> | undefined
+    const output = this.root.get('output') as Record<string, unknown> | undefined
+    if (!input || !output || typeof input.connect !== 'function'
+      || typeof output.connect !== 'function' || typeof output.disconnect !== 'function') return patch
+
+    // The actual input AudioNode is returned so native Web Audio nodes accept the
+    // patch as a destination. Its outward methods are redirected to the patch's output.
+    const connect = (output.connect as (...args: unknown[]) => unknown).bind(output)
+    const disconnect = (output.disconnect as (...args: unknown[]) => unknown).bind(output)
+    for (const key of Reflect.ownKeys(patch)) {
+      Object.defineProperty(input, key, Object.getOwnPropertyDescriptor(patch, key)!)
+    }
+    Object.defineProperties(input, {
+      connect: { configurable: true, value: (...args: unknown[]) => connect(...args) },
+      disconnect: { configurable: true, value: (...args: unknown[]) => disconnect(...args) },
+    })
+    return input as SynthPatch
   }
 
   private function(declaration: FunctionDeclaration, closure: Scope): PatchFunction {
