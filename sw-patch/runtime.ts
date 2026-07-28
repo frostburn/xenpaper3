@@ -22,7 +22,7 @@ export interface RuntimeOptions {
 }
 
 type Scope = Map<string, unknown>
-type DecibelValue = { readonly unit: 'dB'; readonly value: number }
+type Dimensions = Readonly<Record<string, number>>
 type Connectable = { connect(target: unknown): unknown; disconnect(target?: unknown): unknown }
 type AudioParameter = {
   value?: number
@@ -37,6 +37,73 @@ type AudioParameter = {
 const RETURN = Symbol('sw-patch return')
 const FORBIDDEN_MEMBERS = new Set(['constructor', 'prototype', '__proto__'])
 interface Returned { [RETURN]: true; value: unknown }
+
+/** A scalar expressed in canonical units together with its physical dimensions. */
+export class Quantity {
+  readonly value: number
+  readonly dimensions: Dimensions
+
+  constructor(value: number, dimensions: Dimensions = {}) {
+    this.value = value
+    this.dimensions = Object.fromEntries(
+      Object.entries(dimensions).filter(([, exponent]) => exponent !== 0),
+    )
+  }
+
+  static unit(value: number, unit: string): Quantity {
+    switch (unit.toLowerCase()) {
+      case 'ns': return new Quantity(value / 1e9, { time: 1 })
+      case 'us': return new Quantity(value / 1e6, { time: 1 })
+      case 'ms': return new Quantity(value / 1e3, { time: 1 })
+      case 's': return new Quantity(value, { time: 1 })
+      case 'khz': return new Quantity(value * 1e3, { time: -1 })
+      case 'hz': return new Quantity(value, { time: -1 })
+      case 'beats':
+      case 'beat': return new Quantity(value, { beat: 1 })
+      case 'bpm': return new Quantity(value / 60, { beat: 1, time: -1 })
+      case 'db': return new Quantity(value, { decibel: 1 })
+      case 'c': return new Quantity(value, { cent: 1 })
+      case '%': return new Quantity(value / 100)
+      default: return new Quantity(value)
+    }
+  }
+
+  get isDecibels(): boolean {
+    return this.dimensions.decibel === 1 && Object.keys(this.dimensions).length === 1
+  }
+
+  valueOf(): number { return this.value }
+
+  negate(): Quantity { return new Quantity(-this.value, this.dimensions) }
+
+  add(value: unknown, subtract = false): Quantity {
+    const right = Quantity.from(value, this.dimensions)
+    this.assertCompatible(right)
+    return new Quantity(this.value + (subtract ? -right.value : right.value), this.dimensions)
+  }
+
+  multiply(value: unknown, divide = false): Quantity {
+    if (!(value instanceof Quantity)) {
+      return new Quantity(divide ? this.value / Number(value) : this.value * Number(value), this.dimensions)
+    }
+    const dimensions = { ...this.dimensions }
+    for (const [name, exponent] of Object.entries(value.dimensions)) {
+      dimensions[name] = (dimensions[name] ?? 0) + (divide ? -exponent : exponent)
+    }
+    return new Quantity(divide ? this.value / value.value : this.value * value.value, dimensions)
+  }
+
+  private static from(value: unknown, dimensions: Dimensions): Quantity {
+    return value instanceof Quantity ? value : new Quantity(Number(value), dimensions)
+  }
+
+  private assertCompatible(other: Quantity): void {
+    const names = new Set([...Object.keys(this.dimensions), ...Object.keys(other.dimensions)])
+    if ([...names].some((name) => this.dimensions[name] !== other.dimensions[name])) {
+      throw new Error('Cannot add quantities with incompatible units')
+    }
+  }
+}
 
 /**
  * Parses and evaluates SW Patch source against one Web Audio context.
@@ -58,6 +125,7 @@ export class PatchRuntime {
   readonly context: BaseAudioContext
   readonly options: RuntimeOptions
   private readonly root: Scope
+  private readonly gainNodes = new WeakSet<object>()
 
   constructor(context: BaseAudioContext, options: RuntimeOptions = {}) {
     this.context = context
@@ -84,10 +152,11 @@ export class PatchRuntime {
     const factory = this.context[`create${kind}` as keyof BaseAudioContext]
     if (typeof factory !== 'function') throw new Error(`Audio context cannot create a ${kind}Node`)
     const node = (factory as () => Record<string, unknown>).call(this.context)
+    if (kind === 'Gain') this.gainNodes.add(node)
     for (const [key, value] of Object.entries(options)) {
       const property = node[key] as { value?: unknown } | undefined
       if (property && typeof property === 'object' && 'value' in property) {
-        property.value = this.audioParameterValue(key, value)
+        property.value = this.audioParameterValue(kind === 'Gain' && key === 'gain', value)
       }
       else node[key] = value
     }
@@ -225,8 +294,10 @@ export class PatchRuntime {
       return
     }
     const target = this.expression(statement.target, scope) as AudioParameter
-    const parameter = statement.target.type === 'MemberExpression' ? statement.target.property : undefined
-    const value = this.audioParameterValue(parameter, this.expression(statement.value, scope))
+    const amplitude = statement.target.type === 'MemberExpression'
+      && statement.target.property === 'gain'
+      && this.isGainNode(this.expression(statement.target.object, scope))
+    const value = this.audioParameterValue(amplitude, this.expression(statement.value, scope))
     switch (automation?.type) {
       case 'LinearAutomation': target.linearRampToValueAtTime(value, time); break
       case 'ExponentialAutomation': target.exponentialRampToValueAtTime(value, time); break
@@ -278,7 +349,7 @@ export class PatchRuntime {
         return scope.get(expression.name)
       }
       case 'NumberLiteral': return Number(expression.value)
-      case 'UnitLiteral': return this.unit(Number(expression.value), expression.unit)
+      case 'UnitLiteral': return Quantity.unit(Number(expression.value), expression.unit)
       case 'StringLiteral': return expression.value
       case 'BooleanLiteral': return expression.value
       case 'NullLiteral': return null
@@ -311,8 +382,8 @@ export class PatchRuntime {
   }
 
   private unary(operator: string, value: unknown): unknown {
-    if (operator === '+' && this.isDecibelValue(value)) return value
-    if (operator === '-' && this.isDecibelValue(value)) return { unit: 'dB', value: -value.value }
+    if (operator === '+' && value instanceof Quantity) return value
+    if (operator === '-' && value instanceof Quantity) return value.negate()
     if (operator === '+') return Number(value)
     if (operator === '-') return -Number(value)
     return !value
@@ -322,55 +393,48 @@ export class PatchRuntime {
     if (operator === 'and') return left && right()
     if (operator === 'or') return left || right()
     const value = right()
-    const leftNumber = this.literalNumber(left)
-    const rightNumber = this.literalNumber(value)
-    const hasDecibels = this.isDecibelValue(left) || this.isDecibelValue(value)
-    const numeric = (result: number): number | DecibelValue => hasDecibels
-      ? { unit: 'dB', value: result }
-      : result
+    const leftNumber = Number(left)
+    const rightNumber = Number(value)
     switch (operator) {
-      case '+': return numeric(leftNumber + rightNumber)
-      case '-': return numeric(leftNumber - rightNumber)
-      case '*': return numeric(leftNumber * rightNumber)
-      case '/': return numeric(leftNumber / rightNumber)
-      case '%': return numeric(leftNumber % rightNumber)
+      case '+': return left instanceof Quantity
+        ? left.add(value)
+        : value instanceof Quantity ? value.add(left) : leftNumber + rightNumber
+      case '-': return left instanceof Quantity
+        ? left.add(value, true)
+        : value instanceof Quantity ? value.negate().add(left) : leftNumber - rightNumber
+      case '*': return left instanceof Quantity
+        ? left.multiply(value)
+        : value instanceof Quantity ? value.multiply(left) : leftNumber * rightNumber
+      case '/': return left instanceof Quantity
+        ? left.multiply(value, true)
+        : value instanceof Quantity
+          ? new Quantity(leftNumber).multiply(value, true)
+          : leftNumber / rightNumber
+      case '%': return left instanceof Quantity
+        ? new Quantity(left.value % rightNumber, left.dimensions)
+        : leftNumber % rightNumber
       case '<': return leftNumber < rightNumber
       case '>': return leftNumber > rightNumber
       case '<=': return leftNumber <= rightNumber
       case '>=': return leftNumber >= rightNumber
-      case '==': return hasDecibels ? leftNumber === rightNumber : left === value
-      case '!=': return hasDecibels ? leftNumber !== rightNumber : left !== value
+      case '==': return left instanceof Quantity || value instanceof Quantity
+        ? leftNumber === rightNumber : left === value
+      case '!=': return left instanceof Quantity || value instanceof Quantity
+        ? leftNumber !== rightNumber : left !== value
       default: throw new Error(`Unsupported operator: ${operator}`)
     }
   }
 
-  private unit(value: number, unit: string): number | DecibelValue {
-    switch (unit.toLowerCase()) {
-      case 'ns': return value / 1e9
-      case 'us': return value / 1e6
-      case 'ms': return value / 1e3
-      case 'khz': return value * 1e3
-      case '%': return value / 100
-      case 'db': return { unit: 'dB', value }
-      default: return value
-    }
-  }
-
-  private audioParameterValue(parameter: string | undefined, value: unknown): number {
-    if (parameter === 'gain' && this.isDecibelValue(value)) {
+  private audioParameterValue(amplitude: boolean, value: unknown): number {
+    if (amplitude && value instanceof Quantity && value.isDecibels) {
       return 10 ** (value.value / 20)
     }
-    return this.isDecibelValue(value) ? value.value : Number(value)
+    return Number(value)
   }
 
-  private isDecibelValue(value: unknown): value is DecibelValue {
+  private isGainNode(value: unknown): boolean {
     return typeof value === 'object' && value !== null
-      && (value as Partial<DecibelValue>).unit === 'dB'
-      && typeof (value as Partial<DecibelValue>).value === 'number'
-  }
-
-  private literalNumber(value: unknown): number {
-    return this.isDecibelValue(value) ? value.value : Number(value)
+      && (this.gainNodes.has(value) || value.constructor?.name === 'GainNode')
   }
 
   private assertSafeMember(property: string): void {
