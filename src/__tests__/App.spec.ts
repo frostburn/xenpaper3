@@ -3,10 +3,15 @@ import { flushPromises, mount } from '@vue/test-utils'
 
 type NoteOff = (stop?: number) => number
 
-const { synthOn } = vi.hoisted(() => ({ synthOn: vi.fn<() => NoteOff>() }))
+const { effectConnect, synthOn } = vi.hoisted(() => ({
+  effectConnect: vi.fn(),
+  synthOn: vi.fn<() => NoteOff>(),
+}))
 
 vi.mock('../../sw-patch', () => ({
-  createPatch: () => ({ on: synthOn }),
+  createPatch: (source: string) => source.includes('delayTime')
+    ? { connect: effectConnect }
+    : { on: synthOn },
 }))
 
 import App from '../App.vue'
@@ -51,6 +56,7 @@ beforeEach(() => {
   contexts.length = 0
   sources.length = 0
   synthOn.mockReset()
+  effectConnect.mockReset()
   synthOn.mockReturnValue(vi.fn<NoteOff>(() => 2))
   vi.stubGlobal('AudioContext', MockAudioContext)
   vi.stubGlobal('ConstantSourceNode', MockConstantSourceNode)

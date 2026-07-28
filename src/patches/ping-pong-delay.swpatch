@@ -14,8 +14,8 @@ merger = ChannelMergerNode(numberOfInputs = 2)
 
 input -> dry -> output
 input -> leftDelay
-leftDelay.connect(merger, 0, 0)
-rightDelay.connect(merger, 0, 1)
+leftDelay -0,0> merger
+rightDelay -0,1> merger
 leftDelay -> rightFeedback -> rightDelay
 rightDelay -> leftFeedback -> leftDelay
 merger -> wetOutput -> output

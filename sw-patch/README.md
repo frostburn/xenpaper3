@@ -46,6 +46,10 @@ delay = DelayNode(maxDelayTime = 2s, delayTime = 250ms)
 input -> delay -> output
 ```
 
+Use `-output,input>` when a connection needs explicit Web Audio channel ports.
+For example, `delay -0,1> merger` connects output 0 of `delay` to input 1 of
+`merger`; `->` continues to select the default ports.
+
 ```ts
 const effect = createPatch(source, context) as EffectPatch
 synthNode.connect(effect)
