@@ -66,17 +66,17 @@ describe('SW Patch runtime', () => {
   it('connects and cleans up explicitly selected node ports', () => {
     const emitter = new EventTarget()
     const source = { connect: vi.fn(), disconnect: vi.fn() }
-    const target = { connect: vi.fn(), disconnect: vi.fn() }
+    const destination = { connect: vi.fn(), disconnect: vi.fn() }
     createPatch(
       'until emitter.ended:\n'
-      + '    source -2,3> target\n',
+      + '    source -> destination:2,3\n',
       {} as BaseAudioContext,
-      { globals: { emitter, source, target } },
+      { globals: { destination, emitter, source } },
     )
 
-    expect(source.connect).toHaveBeenCalledWith(target, 2, 3)
+    expect(source.connect).toHaveBeenCalledWith(destination, 2, 3)
     emitter.dispatchEvent(new Event('ended'))
-    expect(source.disconnect).toHaveBeenCalledWith(target, 2, 3)
+    expect(source.disconnect).toHaveBeenCalledWith(destination, 2, 3)
   })
 
   it('keeps top-level if/elif/else nodes together', () => {
