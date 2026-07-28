@@ -15,11 +15,11 @@ fn on(
     lpf = BiquadFilterNode(
         type = 'lowpass',
         frequency = 300Hz * (1 + velocity),
-        Q = 10  # TODO: Pass Q as-is
+        Q = Q
     )
     attackEnv = GainNode(gain = 0)
-    Qcompensation = 0.31622
-    decayEnv = GainNode(gain = Qcompensation)  # TODO: read as `gain = -Q` but do unit conversion
+    Qcompensation = -Q
+    decayEnv = GainNode(gain = Qcompensation)
 
     pitchAttenuation = GainNode(gain = 0.7)
 

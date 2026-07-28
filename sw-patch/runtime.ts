@@ -22,6 +22,7 @@ export interface RuntimeOptions {
 }
 
 type Scope = Map<string, unknown>
+type DecibelValue = { readonly unit: 'dB'; readonly value: number }
 type Connectable = { connect(target: unknown): unknown; disconnect(target?: unknown): unknown }
 type AudioParameter = {
   value?: number
@@ -57,6 +58,7 @@ export class PatchRuntime {
   readonly context: BaseAudioContext
   readonly options: RuntimeOptions
   private readonly root: Scope
+  private readonly audioParameterUnits = new WeakMap<object, 'gain'>()
 
   constructor(context: BaseAudioContext, options: RuntimeOptions = {}) {
     this.context = context
@@ -83,9 +85,14 @@ export class PatchRuntime {
     const factory = this.context[`create${kind}` as keyof BaseAudioContext]
     if (typeof factory !== 'function') throw new Error(`Audio context cannot create a ${kind}Node`)
     const node = (factory as () => Record<string, unknown>).call(this.context)
+    if (kind === 'Gain' && typeof node.gain === 'object' && node.gain !== null) {
+      this.audioParameterUnits.set(node.gain, 'gain')
+    }
     for (const [key, value] of Object.entries(options)) {
       const property = node[key] as { value?: unknown } | undefined
-      if (property && typeof property === 'object' && 'value' in property) property.value = value
+      if (property && typeof property === 'object' && 'value' in property) {
+        property.value = this.audioParameterValue(property, value)
+      }
       else node[key] = value
     }
     return node
@@ -222,7 +229,7 @@ export class PatchRuntime {
       return
     }
     const target = this.expression(statement.target, scope) as AudioParameter
-    const value = Number(this.expression(statement.value, scope))
+    const value = this.audioParameterValue(target, this.expression(statement.value, scope))
     switch (automation?.type) {
       case 'LinearAutomation': target.linearRampToValueAtTime(value, time); break
       case 'ExponentialAutomation': target.exponentialRampToValueAtTime(value, time); break
@@ -307,6 +314,8 @@ export class PatchRuntime {
   }
 
   private unary(operator: string, value: unknown): unknown {
+    if (operator === '+' && this.isDecibelValue(value)) return value
+    if (operator === '-' && this.isDecibelValue(value)) return { unit: 'dB', value: -value.value }
     if (operator === '+') return Number(value)
     if (operator === '-') return -Number(value)
     return !value
@@ -332,16 +341,29 @@ export class PatchRuntime {
     }
   }
 
-  private unit(value: number, unit: string): number {
+  private unit(value: number, unit: string): number | DecibelValue {
     switch (unit.toLowerCase()) {
       case 'ns': return value / 1e9
       case 'us': return value / 1e6
       case 'ms': return value / 1e3
       case 'khz': return value * 1e3
       case '%': return value / 100
-      case 'db': return 10 ** (value / 20)
+      case 'db': return { unit: 'dB', value }
       default: return value
     }
+  }
+
+  private audioParameterValue(target: object, value: unknown): number {
+    if (this.audioParameterUnits.get(target) === 'gain' && this.isDecibelValue(value)) {
+      return 10 ** (value.value / 20)
+    }
+    return this.isDecibelValue(value) ? value.value : Number(value)
+  }
+
+  private isDecibelValue(value: unknown): value is DecibelValue {
+    return typeof value === 'object' && value !== null
+      && (value as Partial<DecibelValue>).unit === 'dB'
+      && typeof (value as Partial<DecibelValue>).value === 'number'
   }
 
   private assertSafeMember(property: string): void {

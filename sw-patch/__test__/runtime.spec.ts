@@ -106,4 +106,25 @@ describe('SW Patch runtime', () => {
     )
     expect(() => (patch.escape as PatchFunction)()).toThrow('forbidden')
   })
+
+  it('interprets decibel values according to their AudioParam context', () => {
+    const filter = { Q: { value: 0 } }
+    const gain = { gain: { value: 0 } }
+    const context = {
+      createBiquadFilter: () => filter,
+      createGain: () => gain,
+    } as unknown as BaseAudioContext
+    const patch = createPatch(
+      'fn values(Q: Gain = +10dB):\n'
+      + "    filter = BiquadFilterNode(Q = Q)\n"
+      + '    output = GainNode(gain = -Q)\n',
+      context,
+    )
+
+    const values = patch.values as PatchFunction
+    values()
+
+    expect(filter.Q.value).toBe(10)
+    expect(gain.gain.value).toBeCloseTo(0.316227766)
+  })
 })
