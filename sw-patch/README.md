@@ -13,17 +13,22 @@ We're just pretending to be a monorepo while Xenpaper 3 is being developed.
 ## Runtime
 
 `createPatch` parses a patch and returns its public configuration and functions.
-For example, `default-v3.swpatch` produces an object whose `on` function can be
-called like the prototype `Synth.on` in `src/App.vue`:
+For example, `default.swpatch` produces an object whose `on` function can be
+called to start notes and get a handle for turning the note off.
 
 ```ts
 import { createPatch } from './sw-patch'
-import source from './default-v3.swpatch?raw'
+import source from './src/patches/default.swpatch?raw'
 
 const context = new AudioContext()
 const synth = createPatch(source, context)
+const start = context.currentTime + 1
+const pitch = context.createConstantSource()
+const velocity = 0.5
 const off = synth.on(context.destination, start, pitch, velocity)
+const end = context.currentTime + 2
 const cutOff = off(end)
+pitch.stop(cutOff)
 ```
 
 Pass configuration overrides or extra explicitly allowed patch globals as the
