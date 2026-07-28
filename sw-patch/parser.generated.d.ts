@@ -130,6 +130,8 @@ export interface ConnectionStatement extends Node {
 export interface ConnectionLink {
   operator: 'connect' | 'disconnect'
   target: Expression
+  output?: number
+  input?: number
 }
 
 export interface AssignmentStatement extends Node {
