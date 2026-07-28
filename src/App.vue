@@ -3,7 +3,7 @@ import { onMounted, onUnmounted } from 'vue'
 import { createPatch, type RuntimeOptions } from '../sw-patch'
 import DEFAULT_PATCH from './patches/default.swpatch?raw'
 
-type NoteOff = (stop?: number) => number
+type NoteOff = (end: number) => number
 interface Synth {
   on: (
     destination: AudioNode,
