@@ -127,4 +127,37 @@ describe('SW Patch runtime', () => {
     expect(filter.Q.value).toBe(10)
     expect(gain.gain.value).toBeCloseTo(0.316227766)
   })
+
+  it('converts decibels for scheduled gain assignments on global nodes', () => {
+    const gain = {
+      setValueAtTime: vi.fn<(value: number, time: number) => void>(),
+    }
+    const node = { gain }
+    const patch = createPatch(
+      'fn setGain():\n'
+      + '    @(0) node.gain = -6dB\n',
+      {} as BaseAudioContext,
+      { globals: { node } },
+    )
+
+    const setGain = patch.setGain as PatchFunction
+    setGain()
+
+    expect(gain.setValueAtTime).toHaveBeenCalledWith(10 ** (-6 / 20), 0)
+  })
+
+  it('preserves decibel values through binary arithmetic', () => {
+    const gain = { gain: { value: 0 } }
+    const context = { createGain: () => gain } as unknown as BaseAudioContext
+    const patch = createPatch(
+      'fn values():\n'
+      + '    output = GainNode(gain = -6dB * 2)\n',
+      context,
+    )
+
+    const values = patch.values as PatchFunction
+    values()
+
+    expect(gain.gain.value).toBeCloseTo(10 ** (-12 / 20))
+  })
 })

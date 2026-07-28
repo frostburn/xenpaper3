@@ -58,7 +58,6 @@ export class PatchRuntime {
   readonly context: BaseAudioContext
   readonly options: RuntimeOptions
   private readonly root: Scope
-  private readonly audioParameterUnits = new WeakMap<object, 'gain'>()
 
   constructor(context: BaseAudioContext, options: RuntimeOptions = {}) {
     this.context = context
@@ -85,13 +84,10 @@ export class PatchRuntime {
     const factory = this.context[`create${kind}` as keyof BaseAudioContext]
     if (typeof factory !== 'function') throw new Error(`Audio context cannot create a ${kind}Node`)
     const node = (factory as () => Record<string, unknown>).call(this.context)
-    if (kind === 'Gain' && typeof node.gain === 'object' && node.gain !== null) {
-      this.audioParameterUnits.set(node.gain, 'gain')
-    }
     for (const [key, value] of Object.entries(options)) {
       const property = node[key] as { value?: unknown } | undefined
       if (property && typeof property === 'object' && 'value' in property) {
-        property.value = this.audioParameterValue(property, value)
+        property.value = this.audioParameterValue(key, value)
       }
       else node[key] = value
     }
@@ -229,7 +225,8 @@ export class PatchRuntime {
       return
     }
     const target = this.expression(statement.target, scope) as AudioParameter
-    const value = this.audioParameterValue(target, this.expression(statement.value, scope))
+    const parameter = statement.target.type === 'MemberExpression' ? statement.target.property : undefined
+    const value = this.audioParameterValue(parameter, this.expression(statement.value, scope))
     switch (automation?.type) {
       case 'LinearAutomation': target.linearRampToValueAtTime(value, time); break
       case 'ExponentialAutomation': target.exponentialRampToValueAtTime(value, time); break
@@ -325,18 +322,24 @@ export class PatchRuntime {
     if (operator === 'and') return left && right()
     if (operator === 'or') return left || right()
     const value = right()
+    const leftNumber = this.literalNumber(left)
+    const rightNumber = this.literalNumber(value)
+    const hasDecibels = this.isDecibelValue(left) || this.isDecibelValue(value)
+    const numeric = (result: number): number | DecibelValue => hasDecibels
+      ? { unit: 'dB', value: result }
+      : result
     switch (operator) {
-      case '+': return Number(left) + Number(value)
-      case '-': return Number(left) - Number(value)
-      case '*': return Number(left) * Number(value)
-      case '/': return Number(left) / Number(value)
-      case '%': return Number(left) % Number(value)
-      case '<': return (left as number) < (value as number)
-      case '>': return (left as number) > (value as number)
-      case '<=': return (left as number) <= (value as number)
-      case '>=': return (left as number) >= (value as number)
-      case '==': return left === value
-      case '!=': return left !== value
+      case '+': return numeric(leftNumber + rightNumber)
+      case '-': return numeric(leftNumber - rightNumber)
+      case '*': return numeric(leftNumber * rightNumber)
+      case '/': return numeric(leftNumber / rightNumber)
+      case '%': return numeric(leftNumber % rightNumber)
+      case '<': return leftNumber < rightNumber
+      case '>': return leftNumber > rightNumber
+      case '<=': return leftNumber <= rightNumber
+      case '>=': return leftNumber >= rightNumber
+      case '==': return hasDecibels ? leftNumber === rightNumber : left === value
+      case '!=': return hasDecibels ? leftNumber !== rightNumber : left !== value
       default: throw new Error(`Unsupported operator: ${operator}`)
     }
   }
@@ -353,8 +356,8 @@ export class PatchRuntime {
     }
   }
 
-  private audioParameterValue(target: object, value: unknown): number {
-    if (this.audioParameterUnits.get(target) === 'gain' && this.isDecibelValue(value)) {
+  private audioParameterValue(parameter: string | undefined, value: unknown): number {
+    if (parameter === 'gain' && this.isDecibelValue(value)) {
       return 10 ** (value.value / 20)
     }
     return this.isDecibelValue(value) ? value.value : Number(value)
@@ -364,6 +367,10 @@ export class PatchRuntime {
     return typeof value === 'object' && value !== null
       && (value as Partial<DecibelValue>).unit === 'dB'
       && typeof (value as Partial<DecibelValue>).value === 'number'
+  }
+
+  private literalNumber(value: unknown): number {
+    return this.isDecibelValue(value) ? value.value : Number(value)
   }
 
   private assertSafeMember(property: string): void {
