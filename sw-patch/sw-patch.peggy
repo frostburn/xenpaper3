@@ -245,7 +245,7 @@ ConnectionStatement
     })+ {
       return node("ConnectionStatement", {
         first,
-        links: rest.map(([operator, target, ports]) => ({ operator, target, ...ports })),
+        links: rest.map(([operator, target, ports]) => ({ ...operator, target, ...ports })),
       });
     }
 
