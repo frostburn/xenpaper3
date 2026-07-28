@@ -442,13 +442,13 @@ export class PatchRuntime {
     const cleanups: Array<() => void> = []
     for (const link of links) {
       const target = this.expression(link.target, scope)
-      if (link.output === undefined) source[link.operator](target)
-      else source[link.operator](target, link.output, link.input ?? 0)
+      if (link.output === undefined && link.input === undefined) source[link.operator](target)
+      else source[link.operator](target, link.output ?? 0, link.input ?? 0)
       const connectedSource = source
       if (link.operator === 'connect') {
         cleanups.push(() => {
-          if (link.output === undefined) connectedSource.disconnect(target)
-          else connectedSource.disconnect(target, link.output, link.input ?? 0)
+          if (link.output === undefined && link.input === undefined) connectedSource.disconnect(target)
+          else connectedSource.disconnect(target, link.output ?? 0, link.input ?? 0)
         })
       }
       source = target as Connectable
