@@ -2,6 +2,7 @@
 import { onMounted, onUnmounted } from 'vue'
 import { createPatch, type RuntimeOptions } from '../sw-patch'
 import DEFAULT_PATCH from './patches/default.swpatch?raw'
+import BASS_PATCH from './patches/adr-bass.swpatch?raw'
 
 type NoteOff = (end: number) => number
 interface Synth {
@@ -19,10 +20,13 @@ interface Synth {
 
 // Dummy audio code just to get something going
 const ctx = new AudioContext({ latencyHint: 'interactive' })
+const output = ctx.createGain()
+output.gain.value = 0.3
+output.connect(ctx.destination)
 const inputDelay = 0.01
 
-const synth = createPatch(DEFAULT_PATCH, ctx, {
-  config: { oscillatorType: 'square' },
+const synth = createPatch(BASS_PATCH, ctx, {
+  config: { oscillatorType: 'sawtooth' },
 } as RuntimeOptions) as unknown as Synth
 
 type ActiveNote = [off: NoteOff, pitch: ConstantSourceNode]
@@ -48,11 +52,10 @@ const handleKeyDown = (e: KeyboardEvent) => {
 
   if (ctx.state === 'suspended') void ctx.resume()
 
-  const pitch = new ConstantSourceNode(ctx, { offset: (1200 * (e.keyCode % 10)) / 10 })
-  const velocity = 0.2
-  const attack = 0.02
+  const pitch = new ConstantSourceNode(ctx, { offset: (1200 * (e.keyCode % 23)) / 11 - 1200 * 3 })
+  const velocity = 0.8
   pitch.start()
-  const off = synth.on(ctx.destination, ctx.currentTime + inputDelay, pitch, velocity, attack)
+  const off = synth.on(output, ctx.currentTime + inputDelay, pitch, velocity)
   noteOffs.set(e.keyCode, [off, pitch])
 }
 

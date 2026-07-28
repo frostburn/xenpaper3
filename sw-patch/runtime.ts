@@ -72,12 +72,13 @@ export class PatchRuntime {
   }
 
   private installBuiltins(): void {
-    this.root.set('OscillatorNode', (...args: unknown[]) => this.makeNode('Oscillator', args))
+    this.root.set('BiquadFilterNode', (...args: unknown[]) => this.makeNode('BiquadFilter', args))
     this.root.set('GainNode', (...args: unknown[]) => this.makeNode('Gain', args))
+    this.root.set('OscillatorNode', (...args: unknown[]) => this.makeNode('Oscillator', args))
     this.root.set('context', this.context)
   }
 
-  private makeNode(kind: 'Oscillator' | 'Gain', args: unknown[]): unknown {
+  private makeNode(kind: 'BiquadFilter' | 'Gain' | 'Oscillator', args: unknown[]): unknown {
     const options = (args[0] ?? {}) as Record<string, unknown>
     const factory = this.context[`create${kind}` as keyof BaseAudioContext]
     if (typeof factory !== 'function') throw new Error(`Audio context cannot create a ${kind}Node`)

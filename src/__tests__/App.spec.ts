@@ -28,6 +28,10 @@ class MockAudioContext {
   constructor() {
     contexts.push(this)
   }
+
+  createGain() {
+    return vi.fn({connect: vi.fn(), gain: {}})
+  }
 }
 
 class MockConstantSourceNode {
