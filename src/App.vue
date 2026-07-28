@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { onMounted, onUnmounted } from 'vue'
 import { createPatch, type RuntimeOptions } from '../sw-patch'
-import DEFAULT_PATCH from './patches/default.swpatch?raw'
 import BASS_PATCH from './patches/adr-bass.swpatch?raw'
+import PING_PONG_DELAY_PATCH from './patches/ping-pong-delay.swpatch?raw'
 
 type NoteOff = (end: number) => number
 interface Synth {
@@ -23,6 +23,8 @@ const ctx = new AudioContext({ latencyHint: 'interactive' })
 const output = ctx.createGain()
 output.gain.value = 0.4
 output.connect(ctx.destination)
+const delay = createPatch(PING_PONG_DELAY_PATCH, ctx) as unknown as AudioNode
+delay.connect(output)
 const inputDelay = 0.01
 
 const synth = createPatch(BASS_PATCH, ctx, {
@@ -55,7 +57,7 @@ const handleKeyDown = (e: KeyboardEvent) => {
   const pitch = new ConstantSourceNode(ctx, { offset: (1200 * (e.keyCode % 23)) / 11 - 1200 * 3 })
   const velocity = 0.8
   pitch.start()
-  const off = synth.on(output, ctx.currentTime + inputDelay, pitch, velocity)
+  const off = synth.on(delay, ctx.currentTime + inputDelay, pitch, velocity)
   noteOffs.set(e.keyCode, [off, pitch])
 }
 

@@ -8,6 +8,49 @@ function location() {
 }
 
 describe('SW Patch runtime', () => {
+  it('returns effect patches as input nodes whose output can connect onward', () => {
+    const inputConnect = vi.fn()
+    const outputConnect = vi.fn()
+    const outputDisconnect = vi.fn()
+    const input = { connect: inputConnect, disconnect: vi.fn() }
+    const output = { connect: outputConnect, disconnect: outputDisconnect }
+    const nodes = [input, output]
+    const context = {
+      createGain: () => nodes.shift(),
+    } as unknown as BaseAudioContext
+
+    const effect = createPatch(
+      'input = GainNode()\n'
+      + 'output = GainNode()\n'
+      + 'input -> output\n',
+      context,
+    ) as unknown as AudioNode
+    const destination = {} as AudioNode
+
+    expect(effect).toBe(input)
+    expect(inputConnect).toHaveBeenCalledWith(output)
+    effect.connect(destination)
+    effect.disconnect(destination)
+    expect(outputConnect).toHaveBeenCalledWith(destination)
+    expect(outputDisconnect).toHaveBeenCalledWith(destination)
+  })
+
+  it('passes construction-only effect options to Web Audio factories', () => {
+    const createDelay = vi.fn(() => ({ delayTime: { value: 0 } }))
+    const createChannelMerger = vi.fn(() => ({}))
+    const context = { createDelay, createChannelMerger } as unknown as BaseAudioContext
+
+    createPatch(
+      'delay = DelayNode(maxDelayTime = 2s, delayTime = 250ms)\n'
+      + 'merger = ChannelMergerNode(numberOfInputs = 2)\n',
+      context,
+    )
+
+    expect(createDelay).toHaveBeenCalledWith(2)
+    expect(createDelay.mock.results[0]?.value.delayTime.value).toBe(0.25)
+    expect(createChannelMerger).toHaveBeenCalledWith(2)
+  })
+
   it('keeps top-level if/elif/else nodes together', () => {
     const mark = vi.fn<() => void>()
     const runtime = new PatchRuntime({} as BaseAudioContext, { globals: { mark } })
