@@ -240,24 +240,22 @@ SchedulableStatement
 
 ConnectionStatement
   = first:Expression
-    rest:(H connection:ConnectionOperator H target:Expression {
-      return [connection, target];
+    rest:(H operator:ConnectionOperator H target:Expression ports:ConnectionPorts? {
+      return [operator, target, ports];
     })+ {
       return node("ConnectionStatement", {
         first,
-        links: rest.map(([connection, target]) => ({ ...connection, target })),
+        links: rest.map(([operator, target, ports]) => ({ operator, target, ...ports })),
       });
     }
 
 ConnectionOperator
   = "!->" { return { operator: "disconnect" }; }
   / "->" { return { operator: "connect" }; }
-  / "-" output:[0-9]+ input:("," @([0-9]+))? ">" {
-      return {
-        operator: "connect",
-        output: Number(output.join("")),
-        input: input === null ? 0 : Number(input.join("")),
-      };
+
+ConnectionPorts
+  = ":" output:[0-9]+ "," input:[0-9]+ {
+      return { output: Number(output.join("")), input: Number(input.join("")) };
     }
 
 AssignmentStatement
@@ -374,15 +372,11 @@ ComparisonOperator
 
 AdditiveExpression
   = head:MultiplicativeExpression
-    tail:(H operator:AdditiveOperator H right:MultiplicativeExpression {
+    tail:(H operator:("+" / "-") H right:MultiplicativeExpression {
       return [operator, right];
     })* {
       return foldBinary(head, tail);
     }
-
-AdditiveOperator
-  = "+"
-  / "-" !([0-9]+ ("," [0-9]+)? ">")
 
 MultiplicativeExpression
   = head:UnaryExpression

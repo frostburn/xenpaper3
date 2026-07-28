@@ -14,9 +14,8 @@ merger = ChannelMergerNode(numberOfInputs = 2)
 
 input -> dry -> output
 input -> leftDelay
-# Route output 0 from each delay into the corresponding stereo merger input.
-leftDelay -0,0> merger
-rightDelay -0,1> merger
+leftDelay -> merger:0,0
+rightDelay -> merger:0,1
 leftDelay -> rightFeedback -> rightDelay
 rightDelay -> leftFeedback -> leftDelay
 merger -> wetOutput -> output
