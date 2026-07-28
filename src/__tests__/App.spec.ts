@@ -8,7 +8,7 @@ type MockGainNode = {
 }
 
 const { effectConnect, synthOn } = vi.hoisted(() => ({
-  effectConnect: vi.fn(),
+  effectConnect: vi.fn<(to: AudioNode) => void>(),
   synthOn: vi.fn<() => NoteOff>(),
 }))
 
