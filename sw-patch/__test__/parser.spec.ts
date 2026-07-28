@@ -143,7 +143,7 @@ if true:
   })
 
   it('parses connections with explicit output and input ports', () => {
-    const ast = parse('source -2,3> destination\n')
+    const ast = parse('source -> destination:2,3\n')
 
     expect(ast.body[0]).toMatchObject({
       type: 'ConnectionStatement',
