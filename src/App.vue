@@ -15,6 +15,7 @@ interface Synth {
     decay?: number,
     release?: number,
     Q?: AudioNode,
+    initialGain?: AudioNode,
   ) => NoteOff
 }
 
@@ -27,7 +28,8 @@ const delayTime = new ConstantSourceNode(ctx, { offset: 0.25 })
 const feedback = new ConstantSourceNode(ctx, { offset: 0.55 })
 const wet = new ConstantSourceNode(ctx, { offset: 0.35 })
 const Q = new ConstantSourceNode(ctx, { offset: 10 ** (5 / 20) })
-for (const signal of [delayTime, feedback, wet, Q]) signal.start()
+const initialGain = new ConstantSourceNode(ctx, { offset: 10 ** ((10 + -5) / 20) })
+for (const signal of [delayTime, feedback, wet, Q, initialGain]) signal.start()
 const delay = createPatch(PING_PONG_DELAY_PATCH, ctx, {
   config: { delayTime, feedback, wet },
 }) as unknown as AudioNode
@@ -56,7 +58,12 @@ bindSignal(feedbackModel, feedback)
 bindSignal(wetModel, wet)
 watch(
   qModel,
-  (decibels) => Q.offset.setTargetAtTime(10 ** (Number(decibels) / 20), ctx.currentTime + inputDelay, 0.01),
+  (decibels) => {
+    const qDecibels = Number(decibels)
+    const updateTime = ctx.currentTime + inputDelay
+    Q.offset.setTargetAtTime(10 ** (qDecibels / 20), updateTime, 0.01)
+    initialGain.offset.setTargetAtTime(10 ** ((10 + -qDecibels) / 20), updateTime, 0.01)
+  },
   { immediate: true },
 )
 
@@ -94,7 +101,17 @@ const handleKeyDown = (e: KeyboardEvent) => {
     })
     const velocity = 0.8
     pitch.start()
-    const off = synth.on(delay, ctx.currentTime + inputDelay, pitch, velocity, 0.01, 0.5, 0.1, Q)
+    const off = synth.on(
+      delay,
+      ctx.currentTime + inputDelay,
+      pitch,
+      velocity,
+      0.01,
+      0.5,
+      0.1,
+      Q,
+      initialGain,
+    )
     noteOffs.set(e.keyCode, [off, pitch])
   })
 }

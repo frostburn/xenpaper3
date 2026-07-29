@@ -91,11 +91,17 @@ describe('App', () => {
     dispatchKey('keydown', 65)
     await flushPromises()
     const context = contexts[0]!
-    const source = sources[4]!
+    const source = sources[5]!
     expect(context.resume).toHaveBeenCalledOnce()
     expect(source.start).toHaveBeenCalledOnce()
     expect(synthOn).toHaveBeenCalledOnce()
-    expect(synthOn.mock.calls[0]?.slice(4)).toEqual([0.01, 0.5, 0.1, sources[3]])
+    expect(synthOn.mock.calls[0]?.slice(4)).toEqual([
+      0.01,
+      0.5,
+      0.1,
+      sources[3],
+      sources[4],
+    ])
     expect(context.resume.mock.invocationCallOrder[0]!).toBeLessThan(
       source.start.mock.invocationCallOrder[0]!,
     )
@@ -112,7 +118,7 @@ describe('App', () => {
     window.dispatchEvent(new Event('blur'))
 
     expect(off).toHaveBeenCalledWith(1.01)
-    expect(sources[4]!.stop).toHaveBeenCalledWith(2)
+    expect(sources[5]!.stop).toHaveBeenCalledWith(2)
     wrapper.unmount()
   })
 
@@ -123,6 +129,11 @@ describe('App', () => {
 
     expect(sources[3]!.offset.setTargetAtTime).toHaveBeenLastCalledWith(
       10 ** (15 / 20),
+      1.01,
+      0.01,
+    )
+    expect(sources[4]!.offset.setTargetAtTime).toHaveBeenLastCalledWith(
+      10 ** ((10 + -15) / 20),
       1.01,
       0.01,
     )
