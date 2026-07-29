@@ -176,6 +176,90 @@ export class Quantity {
   }
 }
 
+interface AudioSignalGraph {
+  gain(value?: Quantity): Connectable & { gain: unknown }
+  constant(value: number): Connectable & { stop?: () => void }
+  cleanup(cleanup: () => void): void
+}
+
+/** Builds the implicit Web Audio graph for arithmetic involving audio signals. */
+class AudioSignal {
+  private constructor(
+    readonly node: Connectable,
+    private readonly graph: AudioSignalGraph,
+  ) {}
+
+  static from(value: unknown, graph: AudioSignalGraph): AudioSignal | undefined {
+    return AudioSignal.is(value) ? new AudioSignal(value, graph) : undefined
+  }
+
+  static is(value: unknown): value is Connectable {
+    return typeof value === 'object' && value !== null
+      && typeof (value as Partial<Connectable>).connect === 'function'
+  }
+
+  static binary(
+    operator: string,
+    left: unknown,
+    right: unknown,
+    graph: AudioSignalGraph,
+  ): unknown | undefined {
+    const leftSignal = AudioSignal.from(left, graph)
+    const rightSignal = AudioSignal.from(right, graph)
+    if (!leftSignal && !rightSignal) return undefined
+
+    if (operator === '+' || operator === '-') {
+      const leftOperand = leftSignal ?? AudioSignal.constant(left, graph)
+      const rightOperand = rightSignal ?? AudioSignal.constant(right, graph)
+      return leftOperand.add(operator === '-' ? rightOperand.negate() : rightOperand)
+    }
+    if (operator === '*' && leftSignal && rightSignal) return leftSignal.modulate(rightSignal)
+    if (operator === '*') return (leftSignal ?? rightSignal!).scale(leftSignal ? right : left)
+    if (operator === '/' && leftSignal && !rightSignal) {
+      return leftSignal.scale(Quantity.scalar(1).multiply(right, true))
+    }
+    return undefined
+  }
+
+  negate(): AudioSignal {
+    return this.routeThrough(this.graph.gain(Quantity.scalar(-1)))
+  }
+
+  private add(right: AudioSignal): Connectable {
+    const sum = this.graph.gain()
+    this.connect(sum)
+    right.connect(sum)
+    return sum
+  }
+
+  private modulate(right: AudioSignal): Connectable {
+    const gain = this.graph.gain(Quantity.scalar(0))
+    this.connect(gain)
+    right.connect(gain.gain)
+    return gain
+  }
+
+  private scale(value: unknown): Connectable {
+    return this.routeThrough(this.graph.gain(Quantity.from(value))).node
+  }
+
+  private routeThrough(target: Connectable): AudioSignal {
+    this.connect(target)
+    return new AudioSignal(target, this.graph)
+  }
+
+  private connect(target: unknown): void {
+    this.node.connect(target)
+    this.graph.cleanup(() => this.node.disconnect(target))
+  }
+
+  private static constant(value: unknown, graph: AudioSignalGraph): AudioSignal {
+    const node = graph.constant(Number(value))
+    graph.cleanup(() => node.stop?.())
+    return new AudioSignal(node, graph)
+  }
+}
+
 /**
  * Parses and evaluates SW Patch source against one Web Audio context.
  *
@@ -200,12 +284,20 @@ export class PatchRuntime {
   private readonly gainNodes = new WeakSet<object>()
   private readonly internalConnections = new WeakMap<object, Connectable>()
   private readonly topLevelBindings = new Set<string>()
+  private readonly audioSignalGraph: AudioSignalGraph
   private activeConnectionCleanups?: Array<() => void>
 
   constructor(context: BaseAudioContext, options: RuntimeOptions = {}) {
     this.context = context
     this.options = options
     this.root = new Map(Object.entries(options.globals ?? {}))
+    this.audioSignalGraph = {
+      gain: (value) => this.makeNode('Gain', value ? [{ gain: value }] : []) as Connectable & {
+        gain: unknown
+      },
+      constant: (value) => this.createAndStartAudioSignal(value),
+      cleanup: (cleanup) => { this.activeConnectionCleanups?.push(cleanup) },
+    }
     this.installBuiltins()
   }
 
@@ -529,11 +621,9 @@ export class PatchRuntime {
   }
 
   private unary(operator: string, value: unknown): unknown {
-    if (operator === '+') return this.isAudioSignal(value) ? value : Quantity.from(value)
-    if (operator === '-' && this.isAudioSignal(value)) {
-      const gain = this.makeNode('Gain', [{ gain: new Quantity(-1) }]) as Connectable
-      this.connectImplicit(value, gain)
-      return gain
+    if (operator === '+') return AudioSignal.is(value) ? value : Quantity.from(value)
+    if (operator === '-' && AudioSignal.is(value)) {
+      return AudioSignal.from(value, this.audioSignalGraph)!.negate().node
     }
     if (operator === '-') return Quantity.from(value).negate()
     return !Quantity.truthy(value)
@@ -543,67 +633,11 @@ export class PatchRuntime {
     if (operator === 'and') return Quantity.truthy(left) ? right() : left
     if (operator === 'or') return Quantity.truthy(left) ? left : right()
     const rightValue = right()
-    const leftSignal = this.asAudioSignal(left)
-    const rightSignal = this.asAudioSignal(rightValue)
-    if ((operator === '+' || operator === '-') && (leftSignal || rightSignal)) {
-      const resolvedLeft = leftSignal ?? this.constantSignal(left)
-      const resolvedRight = rightSignal ?? this.constantSignal(rightValue)
-      return operator === '+'
-        ? this.addSignals(resolvedLeft, resolvedRight)
-        : this.addSignals(resolvedLeft, this.unary('-', resolvedRight) as Connectable)
-    }
-    if (operator === '*' && leftSignal && rightSignal) {
-      const gain = this.signalGain(Quantity.scalar(0))
-      this.connectImplicit(leftSignal, gain)
-      this.connectImplicit(rightSignal, gain.gain)
-      return gain
-    }
-    if (operator === '*' && (leftSignal || rightSignal)) {
-      return this.scaledSignal(leftSignal ?? rightSignal!, leftSignal ? rightValue : left)
-    }
-    if (operator === '/' && leftSignal && !rightSignal) {
-      return this.scaledSignal(leftSignal, Quantity.scalar(1).multiply(rightValue, true))
+    if (AudioSignal.is(left) || AudioSignal.is(rightValue)) {
+      const result = AudioSignal.binary(operator, left, rightValue, this.audioSignalGraph)
+      if (result !== undefined) return result
     }
     return Quantity.binary(operator, left, rightValue)
-  }
-
-  private addSignals(left: Connectable, right: Connectable): Connectable {
-    const gain = this.makeNode('Gain', []) as Connectable
-    this.connectImplicit(left, gain)
-    this.connectImplicit(right, gain)
-    return gain
-  }
-
-  private scaledSignal(signal: Connectable, scalar: unknown): Connectable {
-    const gain = this.signalGain(scalar)
-    this.connectImplicit(signal, gain)
-    return gain
-  }
-
-  private signalGain(value: unknown): Connectable & { gain: unknown } {
-    return this.makeNode('Gain', [{ gain: Quantity.from(value) }]) as Connectable & { gain: unknown }
-  }
-
-  private constantSignal(value: unknown): Connectable {
-    const signal = this.createAndStartAudioSignal(Number(value)) as unknown as Connectable & {
-      stop?: () => void
-    }
-    this.activeConnectionCleanups?.push(() => signal.stop?.())
-    return signal
-  }
-
-  private connectImplicit(source: Connectable, target: unknown): void {
-    source.connect(target)
-    this.activeConnectionCleanups?.push(() => source.disconnect(target))
-  }
-
-  private asAudioSignal(value: unknown): Connectable | undefined {
-    return this.isAudioSignal(value) ? value : undefined
-  }
-
-  private isAudioSignal(value: unknown): value is Connectable {
-    return typeof value === 'object' && value !== null
-      && typeof (value as Partial<Connectable>).connect === 'function'
   }
 
   private audioParameterValue(amplitude: boolean, value: unknown): number {
