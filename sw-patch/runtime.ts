@@ -522,7 +522,12 @@ export class PatchRuntime {
   }
 
   private unary(operator: string, value: unknown): unknown {
-    if (operator === '+') return Quantity.from(value)
+    if (operator === '+') return this.isAudioSignal(value) ? value : Quantity.from(value)
+    if (operator === '-' && this.isAudioSignal(value)) {
+      const gain = this.makeNode('Gain', [{ gain: new Quantity(-1) }]) as Connectable
+      value.connect(gain)
+      return gain
+    }
     if (operator === '-') return Quantity.from(value).negate()
     return !Quantity.truthy(value)
   }
@@ -530,7 +535,32 @@ export class PatchRuntime {
   private binary(operator: string, left: unknown, right: () => unknown): unknown {
     if (operator === 'and') return Quantity.truthy(left) ? right() : left
     if (operator === 'or') return Quantity.truthy(left) ? left : right()
-    return Quantity.binary(operator, left, right())
+    const rightValue = right()
+    if (this.isAudioSignal(left) && this.isAudioSignal(rightValue)) {
+      if (operator === '+') return this.addSignals(left, rightValue)
+      if (operator === '-') return this.addSignals(left, this.unary('-', rightValue) as Connectable)
+      if (operator === '*') {
+        const gain = this.makeNode('Gain', [{ gain: Quantity.scalar(0) }]) as Connectable & {
+          gain: unknown
+        }
+        left.connect(gain)
+        rightValue.connect(gain.gain)
+        return gain
+      }
+    }
+    return Quantity.binary(operator, left, rightValue)
+  }
+
+  private addSignals(left: Connectable, right: Connectable): Connectable {
+    const gain = this.makeNode('Gain', []) as Connectable
+    left.connect(gain)
+    right.connect(gain)
+    return gain
+  }
+
+  private isAudioSignal(value: unknown): value is Connectable {
+    return typeof value === 'object' && value !== null
+      && typeof (value as Partial<Connectable>).connect === 'function'
   }
 
   private audioParameterValue(amplitude: boolean, value: unknown): number {
