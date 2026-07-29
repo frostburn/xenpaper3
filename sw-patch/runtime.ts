@@ -200,6 +200,7 @@ export class PatchRuntime {
   private readonly gainNodes = new WeakSet<object>()
   private readonly internalConnections = new WeakMap<object, Connectable>()
   private readonly topLevelBindings = new Set<string>()
+  private activeConnectionCleanups?: Array<() => void>
 
   constructor(context: BaseAudioContext, options: RuntimeOptions = {}) {
     this.context = context
@@ -310,36 +311,42 @@ export class PatchRuntime {
     connectionCleanups?: Array<() => void>,
     exports?: SynthPatch,
   ): Returned | undefined {
-    for (let index = 0; index < statements.length; index += 1) {
-      const statement = statements[index]
-      if (!statement) continue
+    const previousCleanups = this.activeConnectionCleanups
+    this.activeConnectionCleanups = connectionCleanups ?? previousCleanups
+    try {
+      for (let index = 0; index < statements.length; index += 1) {
+        const statement = statements[index]
+        if (!statement) continue
 
-      if (statement.type === 'IfStatement') {
-        let matched = false
-        if (Quantity.truthy(this.expression(statement.test, scope))) {
-          matched = true
-          const result = this.statements(statement.body, scope, connectionCleanups, exports)
-          if (result) return result
-        }
-        while (true) {
-          const next = statements[index + 1]
-          if (next?.type !== 'ElifStatement' && next?.type !== 'ElseStatement') break
-          index += 1
-          const branch = next
-          if (!matched && (branch.type === 'ElseStatement'
-            || Quantity.truthy(this.expression(branch.test, scope)))) {
+        if (statement.type === 'IfStatement') {
+          let matched = false
+          if (Quantity.truthy(this.expression(statement.test, scope))) {
             matched = true
-            const result = this.statements(branch.body, scope, connectionCleanups, exports)
+            const result = this.statements(statement.body, scope, connectionCleanups, exports)
             if (result) return result
           }
+          while (true) {
+            const next = statements[index + 1]
+            if (next?.type !== 'ElifStatement' && next?.type !== 'ElseStatement') break
+            index += 1
+            const branch = next
+            if (!matched && (branch.type === 'ElseStatement'
+              || Quantity.truthy(this.expression(branch.test, scope)))) {
+              matched = true
+              const result = this.statements(branch.body, scope, connectionCleanups, exports)
+              if (result) return result
+            }
+          }
+          continue
         }
-        continue
-      }
 
-      const result = this.statement(statement, scope, connectionCleanups, exports)
-      if (result) return result
+        const result = this.statement(statement, scope, connectionCleanups, exports)
+        if (result) return result
+      }
+      return undefined
+    } finally {
+      this.activeConnectionCleanups = previousCleanups
     }
-    return undefined
   }
 
   private statement(
@@ -525,7 +532,7 @@ export class PatchRuntime {
     if (operator === '+') return this.isAudioSignal(value) ? value : Quantity.from(value)
     if (operator === '-' && this.isAudioSignal(value)) {
       const gain = this.makeNode('Gain', [{ gain: new Quantity(-1) }]) as Connectable
-      value.connect(gain)
+      this.connectImplicit(value, gain)
       return gain
     }
     if (operator === '-') return Quantity.from(value).negate()
@@ -536,26 +543,62 @@ export class PatchRuntime {
     if (operator === 'and') return Quantity.truthy(left) ? right() : left
     if (operator === 'or') return Quantity.truthy(left) ? left : right()
     const rightValue = right()
-    if (this.isAudioSignal(left) && this.isAudioSignal(rightValue)) {
-      if (operator === '+') return this.addSignals(left, rightValue)
-      if (operator === '-') return this.addSignals(left, this.unary('-', rightValue) as Connectable)
-      if (operator === '*') {
-        const gain = this.makeNode('Gain', [{ gain: Quantity.scalar(0) }]) as Connectable & {
-          gain: unknown
-        }
-        left.connect(gain)
-        rightValue.connect(gain.gain)
-        return gain
-      }
+    const leftSignal = this.asAudioSignal(left)
+    const rightSignal = this.asAudioSignal(rightValue)
+    if ((operator === '+' || operator === '-') && (leftSignal || rightSignal)) {
+      const resolvedLeft = leftSignal ?? this.constantSignal(left)
+      const resolvedRight = rightSignal ?? this.constantSignal(rightValue)
+      return operator === '+'
+        ? this.addSignals(resolvedLeft, resolvedRight)
+        : this.addSignals(resolvedLeft, this.unary('-', resolvedRight) as Connectable)
+    }
+    if (operator === '*' && leftSignal && rightSignal) {
+      const gain = this.signalGain(Quantity.scalar(0))
+      this.connectImplicit(leftSignal, gain)
+      this.connectImplicit(rightSignal, gain.gain)
+      return gain
+    }
+    if (operator === '*' && (leftSignal || rightSignal)) {
+      return this.scaledSignal(leftSignal ?? rightSignal!, leftSignal ? rightValue : left)
+    }
+    if (operator === '/' && leftSignal && !rightSignal) {
+      return this.scaledSignal(leftSignal, Quantity.scalar(1).multiply(rightValue, true))
     }
     return Quantity.binary(operator, left, rightValue)
   }
 
   private addSignals(left: Connectable, right: Connectable): Connectable {
     const gain = this.makeNode('Gain', []) as Connectable
-    left.connect(gain)
-    right.connect(gain)
+    this.connectImplicit(left, gain)
+    this.connectImplicit(right, gain)
     return gain
+  }
+
+  private scaledSignal(signal: Connectable, scalar: unknown): Connectable {
+    const gain = this.signalGain(scalar)
+    this.connectImplicit(signal, gain)
+    return gain
+  }
+
+  private signalGain(value: unknown): Connectable & { gain: unknown } {
+    return this.makeNode('Gain', [{ gain: Quantity.from(value) }]) as Connectable & { gain: unknown }
+  }
+
+  private constantSignal(value: unknown): Connectable {
+    const signal = this.createAndStartAudioSignal(Number(value)) as unknown as Connectable & {
+      stop?: () => void
+    }
+    this.activeConnectionCleanups?.push(() => signal.stop?.())
+    return signal
+  }
+
+  private connectImplicit(source: Connectable, target: unknown): void {
+    source.connect(target)
+    this.activeConnectionCleanups?.push(() => source.disconnect(target))
+  }
+
+  private asAudioSignal(value: unknown): Connectable | undefined {
+    return this.isAudioSignal(value) ? value : undefined
   }
 
   private isAudioSignal(value: unknown): value is Connectable {
