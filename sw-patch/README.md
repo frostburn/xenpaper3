@@ -31,6 +31,32 @@ const cutOff = off(end)
 pitch.stop(cutOff)
 ```
 
+## Effects
+
+A patch with top-level `input` and `output` AudioNode bindings is returned as an
+AudioNode-like effect. Other nodes can connect to the patch (which routes into
+`input`), while the patch's `connect()` and `disconnect()` methods operate on
+`output`.
+
+```swpatch
+input = GainNode()
+output = GainNode()
+delay = DelayNode(maxDelayTime = 2s, delayTime = 250ms)
+
+input -> delay -> output
+```
+
+Append a port to either connection endpoint when a connection needs explicit
+Web Audio channel routing. For example, `delay:0 -> merger:1` connects output 0
+of `delay` to input 1 of `merger`; omitting either suffix selects the default
+port for that endpoint.
+
+```ts
+const effect = createPatch(source, context) as EffectPatch
+synthNode.connect(effect)
+effect.connect(context.destination)
+```
+
 Pass configuration overrides or extra explicitly allowed patch globals as the
 third argument:
 

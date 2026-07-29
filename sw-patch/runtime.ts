@@ -14,6 +14,9 @@ export interface SynthPatch {
   [name: string]: unknown
 }
 
+/** A patch whose top-level `input` and `output` bindings make it audio-connectable. */
+export type EffectPatch = SynthPatch & AudioNode
+
 export interface RuntimeOptions {
   /** Values for declarations marked `config`. */
   config?: Record<string, unknown>
@@ -23,7 +26,10 @@ export interface RuntimeOptions {
 
 type Scope = Map<string, unknown>
 type Dimensions = Readonly<Record<string, number>>
-type Connectable = { connect(target: unknown): unknown; disconnect(target?: unknown): unknown }
+type Connectable = {
+  connect(target: unknown, output?: number, input?: number): unknown
+  disconnect(target?: unknown, output?: number, input?: number): unknown
+}
 type AudioParameter = {
   value?: number
   setValueAtTime(value: number, time: number): unknown
@@ -191,6 +197,8 @@ export class PatchRuntime {
   readonly options: RuntimeOptions
   private readonly root: Scope
   private readonly gainNodes = new WeakSet<object>()
+  private readonly internalConnections = new WeakMap<object, Connectable>()
+  private readonly topLevelBindings = new Set<string>()
 
   constructor(context: BaseAudioContext, options: RuntimeOptions = {}) {
     this.context = context
@@ -200,32 +208,69 @@ export class PatchRuntime {
   }
 
   evaluate(program: Program): SynthPatch {
+    this.topLevelBindings.clear()
     const patch: SynthPatch = {}
     this.statements(program.body, this.root, undefined, patch)
-    return patch
+    return this.effectNode(patch)
   }
 
   private installBuiltins(): void {
     this.root.set('BiquadFilterNode', (...args: unknown[]) => this.makeNode('BiquadFilter', args))
+    this.root.set('ChannelMergerNode', (...args: unknown[]) => this.makeNode('ChannelMerger', args))
+    this.root.set('ChannelSplitterNode', (...args: unknown[]) => this.makeNode('ChannelSplitter', args))
+    this.root.set('DelayNode', (...args: unknown[]) => this.makeNode('Delay', args))
     this.root.set('GainNode', (...args: unknown[]) => this.makeNode('Gain', args))
     this.root.set('OscillatorNode', (...args: unknown[]) => this.makeNode('Oscillator', args))
     this.root.set('context', this.context)
   }
 
-  private makeNode(kind: 'BiquadFilter' | 'Gain' | 'Oscillator', args: unknown[]): unknown {
-    const options = (args[0] ?? {}) as Record<string, unknown>
-    const factory = this.context[`create${kind}` as keyof BaseAudioContext]
-    if (typeof factory !== 'function') throw new Error(`Audio context cannot create a ${kind}Node`)
-    const node = (factory as () => Record<string, unknown>).call(this.context)
-    if (kind === 'Gain') this.gainNodes.add(node)
-    for (const [key, value] of Object.entries(options)) {
-      const property = node[key] as { value?: unknown } | undefined
-      if (property && typeof property === 'object' && 'value' in property) {
-        property.value = this.audioParameterValue(kind === 'Gain' && key === 'gain', value)
-      }
-      else node[key] = value
+  private makeNode(
+    kind: 'BiquadFilter' | 'ChannelMerger' | 'ChannelSplitter' | 'Delay' | 'Gain' | 'Oscillator',
+    args: unknown[],
+  ): unknown {
+    const values = (args[0] ?? {}) as Record<string, unknown>
+    const options = Object.fromEntries(Object.entries(values).map(([key, value]) => [
+      key,
+      value instanceof Quantity
+        ? this.audioParameterValue(kind === 'Gain' && key === 'gain', value)
+        : value,
+    ]))
+    const constructorName = `${kind}Node`
+    const NodeConstructor = (globalThis as unknown as Record<string, unknown>)[constructorName]
+    if (typeof NodeConstructor !== 'function') {
+      throw new Error(`Web Audio does not provide ${constructorName}`)
     }
+    const node = new (NodeConstructor as new (
+      context: BaseAudioContext,
+      options: Record<string, unknown>,
+    ) => Record<string, unknown>)(this.context, options)
+    if (kind === 'Gain') this.gainNodes.add(node)
     return node
+  }
+
+  private effectNode(patch: SynthPatch): SynthPatch {
+    if (!this.topLevelBindings.has('input') || !this.topLevelBindings.has('output')) return patch
+    const input = this.root.get('input') as Record<string, unknown> | undefined
+    const output = this.root.get('output') as Record<string, unknown> | undefined
+    if (!input || !output || typeof input.connect !== 'function'
+      || typeof output.connect !== 'function' || typeof output.disconnect !== 'function') return patch
+
+    // The actual input AudioNode is returned so native Web Audio nodes accept the
+    // patch as a destination. Its outward methods are redirected to the patch's output.
+    const connect = (output.connect as (...args: unknown[]) => unknown).bind(output)
+    const disconnect = (output.disconnect as (...args: unknown[]) => unknown).bind(output)
+    this.internalConnections.set(input, {
+      connect: (input.connect as Connectable['connect']).bind(input),
+      disconnect: (input.disconnect as Connectable['disconnect']).bind(input),
+    })
+    for (const key of Reflect.ownKeys(patch)) {
+      Object.defineProperty(input, key, Object.getOwnPropertyDescriptor(patch, key)!)
+    }
+    Object.defineProperties(input, {
+      connect: { configurable: true, value: (...args: unknown[]) => connect(...args) },
+      disconnect: { configurable: true, value: (...args: unknown[]) => disconnect(...args) },
+    })
+    return input as SynthPatch
   }
 
   private function(declaration: FunctionDeclaration, closure: Scope): PatchFunction {
@@ -300,9 +345,15 @@ export class PatchRuntime {
         return undefined
       }
       case 'TypedBinding':
-        scope.set(statement.name, this.expression(statement.value, scope)); return undefined
+        scope.set(statement.name, this.expression(statement.value, scope))
+        if (exports) this.topLevelBindings.add(statement.name)
+        return undefined
       case 'AssignmentStatement':
-        this.assign(statement.target, this.expression(statement.value, scope), scope); return undefined
+        this.assign(statement.target, this.expression(statement.value, scope), scope)
+        if (exports && statement.target.type === 'Identifier') {
+          this.topLevelBindings.add(statement.target.name)
+        }
+        return undefined
       case 'ExpressionStatement':
         this.expression(statement.expression, scope); return undefined
       case 'ConnectionStatement': {
@@ -386,14 +437,25 @@ export class PatchRuntime {
     }, { once: true })
   }
 
-  private connection(first: Expression, links: { operator: 'connect' | 'disconnect'; target: Expression }[], scope: Scope): Array<() => void> {
+  private connection(first: Expression, links: {
+    operator: 'connect' | 'disconnect'
+    target: Expression
+    output?: number
+    input?: number
+  }[], scope: Scope): Array<() => void> {
     let source = this.expression(first, scope) as Connectable
     const cleanups: Array<() => void> = []
     for (const link of links) {
       const target = this.expression(link.target, scope)
-      source[link.operator](target)
-      const connectedSource = source
-      if (link.operator === 'connect') cleanups.push(() => connectedSource.disconnect(target))
+      const connectedSource = this.internalConnections.get(source as object) ?? source
+      if (link.output === undefined && link.input === undefined) connectedSource[link.operator](target)
+      else connectedSource[link.operator](target, link.output ?? 0, link.input ?? 0)
+      if (link.operator === 'connect') {
+        cleanups.push(() => {
+          if (link.output === undefined && link.input === undefined) connectedSource.disconnect(target)
+          else connectedSource.disconnect(target, link.output ?? 0, link.input ?? 0)
+        })
+      }
       source = target as Connectable
     }
     return cleanups

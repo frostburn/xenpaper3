@@ -2,11 +2,19 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { flushPromises, mount } from '@vue/test-utils'
 
 type NoteOff = (stop?: number) => number
+type MockGainNode = {
+  connect: (to: AudioNode) => MockGainNode
+  gain: object
+}
 
-const { synthOn } = vi.hoisted(() => ({ synthOn: vi.fn<() => NoteOff>() }))
+const { effectConnect, synthOn } = vi.hoisted(() => ({
+  effectConnect: vi.fn<(to: AudioNode) => void>(),
+  synthOn: vi.fn<() => NoteOff>(),
+}))
 
 vi.mock('../../sw-patch', () => ({
-  createPatch: () => ({ on: synthOn }),
+  createPatch: (source: string) =>
+    source.includes('delayTime') ? { connect: effectConnect } : { on: synthOn },
 }))
 
 import App from '../App.vue'
@@ -30,7 +38,10 @@ class MockAudioContext {
   }
 
   createGain() {
-    const node = { connect: vi.fn<(to: AudioNode) => AudioNode>(() => node), gain: {} }
+    const node: MockGainNode = {
+      connect: vi.fn<(to: AudioNode) => MockGainNode>(() => node),
+      gain: {},
+    }
     return node
   }
 }
@@ -51,6 +62,7 @@ beforeEach(() => {
   contexts.length = 0
   sources.length = 0
   synthOn.mockReset()
+  effectConnect.mockReset()
   synthOn.mockReturnValue(vi.fn<NoteOff>(() => 2))
   vi.stubGlobal('AudioContext', MockAudioContext)
   vi.stubGlobal('ConstantSourceNode', MockConstantSourceNode)

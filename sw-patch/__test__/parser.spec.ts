@@ -141,4 +141,13 @@ if true:
       value: 'back to top level'
     })
   })
+
+  it('parses connections with explicit output and input ports', () => {
+    const ast = parse('source:2 -> destination:3\n')
+
+    expect(ast.body[0]).toMatchObject({
+      type: 'ConnectionStatement',
+      links: [{ operator: 'connect', output: 2, input: 3 }],
+    })
+  })
 })

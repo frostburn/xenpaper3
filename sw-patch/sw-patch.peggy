@@ -239,19 +239,32 @@ SchedulableStatement
   / ExpressionStatement
 
 ConnectionStatement
-  = first:Expression
-    rest:(H operator:ConnectionOperator H target:Expression {
+  = first:ConnectionEndpoint
+    rest:(H operator:ConnectionOperator H target:ConnectionEndpoint {
       return [operator, target];
     })+ {
+      const endpoints = [first, ...rest.map(([, target]) => target)];
       return node("ConnectionStatement", {
-        first,
-        links: rest.map(([operator, target]) => ({ operator, target })),
+        first: first.expression,
+        links: rest.map(([operator, target], index) => ({
+          ...operator,
+          target: target.expression,
+          ...(endpoints[index].port === null ? {} : { output: endpoints[index].port }),
+          ...(target.port === null ? {} : { input: target.port }),
+        })),
       });
     }
 
 ConnectionOperator
-  = "!->" { return "disconnect"; }
-  / "->" { return "connect"; }
+  = "!->" { return { operator: "disconnect" }; }
+  / "->" { return { operator: "connect" }; }
+
+ConnectionEndpoint
+  = expression:Expression port:(":" digits:[0-9]+ {
+      return Number(digits.join(""));
+    })? {
+      return { expression, port };
+    }
 
 AssignmentStatement
   = target:Assignable H "=" !"=" H value:Expression {

@@ -8,6 +8,77 @@ function location() {
 }
 
 describe('SW Patch runtime', () => {
+  it('returns effect patches as input nodes whose output can connect onward', () => {
+    const inputConnect = vi.fn<(target: unknown) => void>()
+    const outputConnect = vi.fn<(target: unknown) => void>()
+    const outputDisconnect = vi.fn<(target?: unknown) => void>()
+    const input = { connect: inputConnect, disconnect: vi.fn<(target?: unknown) => void>() }
+    const output = { connect: outputConnect, disconnect: outputDisconnect }
+    const nodes = [input, output]
+    const GainNode = vi.fn<() => typeof input | undefined>(function () { return nodes.shift() })
+    vi.stubGlobal('GainNode', GainNode)
+    const context = {} as BaseAudioContext
+
+    const effect = createPatch(
+      'input = GainNode()\n'
+      + 'output = GainNode()\n'
+      + 'input -> output\n',
+      context,
+    ) as unknown as AudioNode
+    const destination = {} as AudioNode
+
+    expect(effect).toBe(input)
+    expect(inputConnect).toHaveBeenCalledWith(output)
+    effect.connect(destination)
+    effect.disconnect(destination)
+    expect(outputConnect).toHaveBeenCalledWith(destination)
+    expect(outputDisconnect).toHaveBeenCalledWith(destination)
+  })
+
+  it('passes normalized options to Web Audio constructors', () => {
+    const DelayNode = vi.fn<() => void>(function () {})
+    const ChannelMergerNode = vi.fn<() => void>(function () {})
+    vi.stubGlobal('DelayNode', DelayNode)
+    vi.stubGlobal('ChannelMergerNode', ChannelMergerNode)
+    const context = {} as BaseAudioContext
+
+    createPatch(
+      'delay = DelayNode(maxDelayTime = 2s, delayTime = 250ms)\n'
+      + 'merger = ChannelMergerNode(numberOfInputs = 2)\n',
+      context,
+    )
+
+    expect(DelayNode).toHaveBeenCalledWith(context, { maxDelayTime: 2, delayTime: 0.25 })
+    expect(ChannelMergerNode).toHaveBeenCalledWith(context, { numberOfInputs: 2 })
+  })
+
+  it('does not treat inherited global endpoints as patch declarations', () => {
+    const input = { connect: vi.fn<(target: unknown) => void>(), disconnect: vi.fn<() => void>() }
+    const output = { connect: vi.fn<(target: unknown) => void>(), disconnect: vi.fn<() => void>() }
+    const patch = createPatch('fn noop():\n    ret null\n', {} as BaseAudioContext, {
+      globals: { input, output },
+    })
+
+    expect(patch).not.toBe(input)
+    expect(patch.noop).toBeTypeOf('function')
+  })
+
+  it('connects and cleans up explicitly selected node ports', () => {
+    const emitter = new EventTarget()
+    const source = { connect: vi.fn<(target: unknown, output?: number, input?: number) => void>(), disconnect: vi.fn<(target?: unknown, output?: number, input?: number) => void>() }
+    const destination = { connect: vi.fn<(target: unknown) => void>(), disconnect: vi.fn<() => void>() }
+    createPatch(
+      'until emitter.ended:\n'
+      + '    source:2 -> destination:3\n',
+      {} as BaseAudioContext,
+      { globals: { destination, emitter, source } },
+    )
+
+    expect(source.connect).toHaveBeenCalledWith(destination, 2, 3)
+    emitter.dispatchEvent(new Event('ended'))
+    expect(source.disconnect).toHaveBeenCalledWith(destination, 2, 3)
+  })
+
   it('keeps top-level if/elif/else nodes together', () => {
     const mark = vi.fn<() => void>()
     const runtime = new PatchRuntime({} as BaseAudioContext, { globals: { mark } })
@@ -110,10 +181,22 @@ describe('SW Patch runtime', () => {
   it('interprets decibel values according to their AudioParam context', () => {
     const filter = { Q: { value: 0 }, gain: { value: 0 } }
     const gain = { gain: { value: 0 } }
-    const context = {
-      createBiquadFilter: () => filter,
-      createGain: () => gain,
-    } as unknown as BaseAudioContext
+    const context = {} as BaseAudioContext
+    vi.stubGlobal('BiquadFilterNode', vi.fn(function (
+      _context: BaseAudioContext,
+      options: { Q: number; gain: number },
+    ) {
+      filter.Q.value = options.Q
+      filter.gain.value = options.gain
+      return filter
+    }))
+    vi.stubGlobal('GainNode', vi.fn(function (
+      _context: BaseAudioContext,
+      options: { gain: number },
+    ) {
+      gain.gain.value = options.gain
+      return gain
+    }))
     const patch = createPatch(
       'fn values(Q: Gain = +10dB):\n'
       + "    filter = BiquadFilterNode(Q = Q, gain = Q)\n"
@@ -167,7 +250,14 @@ describe('SW Patch runtime', () => {
 
   it('preserves decibel values through binary arithmetic', () => {
     const gain = { gain: { value: 0 } }
-    const context = { createGain: () => gain } as unknown as BaseAudioContext
+    const context = {} as BaseAudioContext
+    vi.stubGlobal('GainNode', vi.fn(function (
+      _context: BaseAudioContext,
+      options: { gain: number },
+    ) {
+      gain.gain.value = options.gain
+      return gain
+    }))
     const patch = createPatch(
       'fn values():\n'
       + '    output = GainNode(gain = -6dB * 2)\n',
