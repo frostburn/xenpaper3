@@ -1,11 +1,18 @@
 config delayTime: Duration = 250ms
 config feedback: Level = 55%
-config wet: Level = 35%
+config wet: AudioSignal<Level> = AudioSignal(35%)
 
 input = GainNode()
 output = GainNode()
-dry = GainNode(gain = 1 - wet)
-wetOutput = GainNode(gain = wet)
+dry = GainNode(gain = 1)
+wetOutput = GainNode(gain = 0)
+
+# TODO: -wet -> dry.gain
+neg = GainNode(gain = -1)
+wet -> neg -> dry.gain
+
+wet -> wetOutput.gain
+
 leftDelay = DelayNode(maxDelayTime = 2s, delayTime = delayTime)
 rightDelay = DelayNode(maxDelayTime = 2s, delayTime = delayTime)
 leftFeedback = GainNode(gain = feedback)

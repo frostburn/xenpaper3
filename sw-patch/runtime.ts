@@ -192,6 +192,7 @@ export function createPatch(
 /** Alias emphasizing that source is compiled into a callable patch object. */
 export const compilePatch = createPatch
 
+
 export class PatchRuntime {
   readonly context: BaseAudioContext
   readonly options: RuntimeOptions
@@ -214,6 +215,14 @@ export class PatchRuntime {
     return this.effectNode(patch)
   }
 
+  /** Convenience wrapper for a started `ConstantSourceNode`. */
+  createAndStartAudioSignal(value: number) {
+    const node = new ConstantSourceNode(this.context, { offset: value })
+    node.start()
+    // TODO: Track node and stop when the patch is stopped.
+    return node
+  }
+
   private installBuiltins(): void {
     this.root.set('BiquadFilterNode', (...args: unknown[]) => this.makeNode('BiquadFilter', args))
     this.root.set('ChannelMergerNode', (...args: unknown[]) => this.makeNode('ChannelMerger', args))
@@ -221,11 +230,14 @@ export class PatchRuntime {
     this.root.set('DelayNode', (...args: unknown[]) => this.makeNode('Delay', args))
     this.root.set('GainNode', (...args: unknown[]) => this.makeNode('Gain', args))
     this.root.set('OscillatorNode', (...args: unknown[]) => this.makeNode('Oscillator', args))
+    this.root.set('ConstantSourceNode', (...args: unknown[]) => this.makeNode('ConstantSource', args))
+    this.root.set('AudioSignal', this.createAndStartAudioSignal.bind(this))
+    this.root.set('log', console.log)
     this.root.set('context', this.context)
   }
 
   private makeNode(
-    kind: 'BiquadFilter' | 'ChannelMerger' | 'ChannelSplitter' | 'Delay' | 'Gain' | 'Oscillator',
+    kind: 'BiquadFilter' | 'ChannelMerger' | 'ChannelSplitter' | 'Delay' | 'Gain' | 'Oscillator' | 'ConstantSource',
     args: unknown[],
   ): unknown {
     const values = (args[0] ?? {}) as Record<string, unknown>

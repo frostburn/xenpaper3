@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, onUnmounted } from 'vue'
+import { onMounted, onUnmounted, ref, watch } from 'vue'
 import { createPatch, type RuntimeOptions } from '../sw-patch'
 import BASS_PATCH from './patches/adr-bass.swpatch?raw'
 import PING_PONG_DELAY_PATCH from './patches/ping-pong-delay.swpatch?raw'
@@ -20,16 +20,28 @@ interface Synth {
 
 // Dummy audio code just to get something going
 const ctx = new AudioContext({ latencyHint: 'interactive' })
-const output = ctx.createGain()
-output.gain.value = 0.4
+const output = new GainNode(ctx, { gain: 0.4 })
 output.connect(ctx.destination)
-const delay = createPatch(PING_PONG_DELAY_PATCH, ctx) as unknown as AudioNode
+const wet = new ConstantSourceNode(ctx, { offset: 0.4 })
+wet.start()
+const delay = createPatch(PING_PONG_DELAY_PATCH, ctx, { config: { wet } }) as unknown as AudioNode
 delay.connect(output)
 const inputDelay = 0.01
 
 const synth = createPatch(BASS_PATCH, ctx, {
   config: { oscillatorType: 'sawtooth' },
 } as RuntimeOptions) as unknown as Synth
+
+// A string because <input type="range"> has a silly API.
+const wetModel = ref('0.4')
+
+watch(
+  wetModel,
+  (value) => {
+    wet.offset.setTargetAtTime(Number(value), ctx.currentTime + inputDelay, 0.01)
+  },
+  { immediate: true },
+)
 
 type ActiveNote = [off: NoteOff, pitch: ConstantSourceNode]
 
@@ -92,6 +104,8 @@ onUnmounted(() => {
     Visit <a href="https://vuejs.org/" target="_blank" rel="noopener">vuejs.org</a> to read the
     documentation
   </p>
+  <label for="wet">Wet level</label>
+  <input type="range" v-model="wetModel" min="0" max="1" step="any" />
 </template>
 
 <style scoped></style>
