@@ -18,8 +18,7 @@ fn on(
         Q = 0
     )
     attackEnv = GainNode(gain = 0)
-    QLevel = dbtoa(Q)
-    initialGain = dbtoa(AudioSignal(10dB) - Q)
+    initialGain = dbtoa(10dB - Q)
     decayEnv = GainNode(gain = 0)
     decayLevel = GainNode(gain = 1)
 
@@ -29,7 +28,7 @@ fn on(
         osc -> lpf -> attackEnv -> decayEnv -> destination
         pitch -> osc.detune
         pitch -> pitchAttenuation -> lpf.detune
-        QLevel -> lpf.Q
+        Q -> lpf.Q
         initialGain -> decayLevel -> decayEnv.gain
 
     osc.start(start)

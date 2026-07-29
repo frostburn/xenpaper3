@@ -121,11 +121,7 @@ describe('App', () => {
 
     await wrapper.get('#filter-q').setValue('15')
 
-    expect(sources[3]!.offset.setTargetAtTime).toHaveBeenLastCalledWith(
-      15,
-      1.01,
-      0.01,
-    )
+    expect(sources[3]!.offset.setTargetAtTime).toHaveBeenLastCalledWith(15, 1.01, 0.01)
     wrapper.unmount()
   })
 
