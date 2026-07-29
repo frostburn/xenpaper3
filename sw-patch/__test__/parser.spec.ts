@@ -14,7 +14,7 @@ config oscillatorType:
 fn on(
     destination: AudioNode,
     start: Instant,
-    pitch: AudioSignal<Cents>,
+    pitch: AudioSignal<Pitch>,
     velocity: Level,
     attack: Duration = 100ms,
     decay: Duration = 200ms,
@@ -49,6 +49,16 @@ fn on(
 `
 
 describe('SW Patch parser', () => {
+  it('parses semitone unit names', () => {
+    const ast = parse('octave = 12semitones\nstep = 1 semitone\nshort = 2st\n')
+
+    expect(ast.body).toMatchObject([
+      { value: { type: 'UnitLiteral', value: '12', unit: 'semitones' } },
+      { value: { type: 'UnitLiteral', value: '1', unit: 'semitone' } },
+      { value: { type: 'UnitLiteral', value: '2', unit: 'st' } },
+    ])
+  })
+
   it('parses the default v3 patch', () => {
     const ast = parse(DEFAULT_PATCH)
 

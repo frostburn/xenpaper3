@@ -488,7 +488,7 @@ UnitLiteral
     }
 
 UnitName
-  = value:("beats"i / "beat"i / "bpm"i / "kHz"i / "Hz"i / "ms"i / "us"i / "ns"i / "dB"i / "s"i / "c"i / "%")
+  = value:("semitones"i / "semitone"i / "beats"i / "beat"i / "bpm"i / "kHz"i / "Hz"i / "ms"i / "us"i / "ns"i / "dB"i / "st"i / "s"i / "c"i / "%")
     !IdentifierContinue {
       return value.toLowerCase();
     }

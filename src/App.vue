@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { onMounted, onUnmounted, ref, watch } from 'vue'
-import { createPatch, type RuntimeOptions } from '../sw-patch'
+import { createPatch, registerMathWorklets, type RuntimeOptions } from '../sw-patch'
 import BASS_PATCH from './patches/adr-bass.swpatch?raw'
 import PING_PONG_DELAY_PATCH from './patches/ping-pong-delay.swpatch?raw'
 
@@ -13,19 +13,21 @@ interface Synth {
     velocity: number,
     attack?: number,
     decay?: number,
-    sustain?: number,
     release?: number,
+    Q?: AudioNode,
   ) => NoteOff
 }
 
 // Dummy audio code just to get something going
 const ctx = new AudioContext({ latencyHint: 'interactive' })
+const mathWorkletsReady = registerMathWorklets(ctx)
 const output = new GainNode(ctx, { gain: 0.4 })
 output.connect(ctx.destination)
 const delayTime = new ConstantSourceNode(ctx, { offset: 0.25 })
 const feedback = new ConstantSourceNode(ctx, { offset: 0.55 })
 const wet = new ConstantSourceNode(ctx, { offset: 0.35 })
-for (const signal of [delayTime, feedback, wet]) signal.start()
+const Q = new ConstantSourceNode(ctx, { offset: 5 })
+for (const signal of [delayTime, feedback, wet, Q]) signal.start()
 const delay = createPatch(PING_PONG_DELAY_PATCH, ctx, {
   config: { delayTime, feedback, wet },
 }) as unknown as AudioNode
@@ -40,6 +42,7 @@ const synth = createPatch(BASS_PATCH, ctx, {
 const delayTimeModel = ref('0.25')
 const feedbackModel = ref('0.55')
 const wetModel = ref('0.35')
+const qModel = ref('5')
 
 const bindSignal = (model: typeof wetModel, signal: ConstantSourceNode) =>
   watch(
@@ -51,12 +54,16 @@ const bindSignal = (model: typeof wetModel, signal: ConstantSourceNode) =>
 bindSignal(delayTimeModel, delayTime)
 bindSignal(feedbackModel, feedback)
 bindSignal(wetModel, wet)
+bindSignal(qModel, Q)
 
 type ActiveNote = [off: NoteOff, pitch: ConstantSourceNode]
 
 const noteOffs = new Map<number, ActiveNote>()
+const pendingNotes = new Set<number>()
+let mounted = true
 
 const releaseNote = (keyCode: number) => {
+  pendingNotes.delete(keyCode)
   const note = noteOffs.get(keyCode)
   if (note) {
     const [off, pitch] = note
@@ -67,19 +74,25 @@ const releaseNote = (keyCode: number) => {
 }
 
 const releaseAllNotes = () => {
+  pendingNotes.clear()
   for (const keyCode of noteOffs.keys()) releaseNote(keyCode)
 }
 
 const handleKeyDown = (e: KeyboardEvent) => {
-  if (noteOffs.has(e.keyCode)) return
+  if (noteOffs.has(e.keyCode) || pendingNotes.has(e.keyCode)) return
 
   if (ctx.state === 'suspended') void ctx.resume()
-
-  const pitch = new ConstantSourceNode(ctx, { offset: (1200 * (e.keyCode % 23)) / 11 - 1200 * 3 })
-  const velocity = 0.8
-  pitch.start()
-  const off = synth.on(delay, ctx.currentTime + inputDelay, pitch, velocity)
-  noteOffs.set(e.keyCode, [off, pitch])
+  pendingNotes.add(e.keyCode)
+  void mathWorkletsReady.then(() => {
+    if (!mounted || !pendingNotes.delete(e.keyCode)) return
+    const pitch = new ConstantSourceNode(ctx, {
+      offset: (1200 * (e.keyCode % 23)) / 11 - 1200 * 3,
+    })
+    const velocity = 0.8
+    pitch.start()
+    const off = synth.on(delay, ctx.currentTime + inputDelay, pitch, velocity, 0.01, 0.5, 0.1, Q)
+    noteOffs.set(e.keyCode, [off, pitch])
+  })
 }
 
 const handleKeyUp = (e: KeyboardEvent) => {
@@ -98,6 +111,7 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
+  mounted = false
   window.removeEventListener('keydown', handleKeyDown)
   window.removeEventListener('keyup', handleKeyUp)
   window.removeEventListener('blur', releaseAllNotes)
@@ -119,6 +133,8 @@ onUnmounted(() => {
   <input id="feedback" type="range" v-model="feedbackModel" min="0" max="0.95" step="any" />
   <label for="wet">Wet level</label>
   <input id="wet" type="range" v-model="wetModel" min="0" max="1" step="any" />
+  <label for="filter-q">Filter Q</label>
+  <input id="filter-q" type="range" v-model="qModel" min="0" max="20" step="any" />
 </template>
 
 <style scoped></style>

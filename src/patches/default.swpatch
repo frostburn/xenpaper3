@@ -4,7 +4,7 @@ config oscillatorType:
 fn on(
     destination: AudioNode,
     start: Instant,
-    pitch: AudioSignal<Cents>,
+    pitch: AudioSignal<Pitch>,
     velocity: Level,
     attack: Duration = 100ms,
     decay: Duration = 200ms,

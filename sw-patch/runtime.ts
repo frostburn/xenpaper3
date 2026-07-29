@@ -71,6 +71,9 @@ export class Quantity {
       case 'bpm': return new Quantity(value / 60, { beat: 1, time: -1 })
       case 'db': return new Quantity(value, { decibel: 1 })
       case 'c': return new Quantity(value, { cent: 1 })
+      case 'st':
+      case 'semitone':
+      case 'semitones': return new Quantity(value * 100, { cent: 1 })
       case '%': return new Quantity(value / 100)
       default: return new Quantity(value)
     }
@@ -120,10 +123,6 @@ export class Quantity {
       case '!=': return leftQuantity.value !== rightQuantity.value
       default: throw new Error(`Unsupported operator: ${operator}`)
     }
-  }
-
-  get isDecibels(): boolean {
-    return this.dimensions.decibel === 1 && Object.keys(this.dimensions).length === 1
   }
 
   valueOf(): number { return this.value }
@@ -180,7 +179,9 @@ export class Quantity {
 
 interface AudioSignalGraph {
   gain(value?: Quantity): Connectable & { gain: unknown }
-  constant(value: number): Connectable & { stop?: () => void }
+  constant(value: unknown): Connectable & { stop?: () => void }
+  invert(): Connectable
+  convert(name: 'sw-patch-atodb' | 'sw-patch-dbtoa'): Connectable
   cleanup(cleanup: () => void): void
 }
 
@@ -220,6 +221,10 @@ class AudioSignal {
     if (operator === '/' && leftSignal && !rightSignal) {
       return leftSignal.scale(Quantity.scalar(1).multiply(right, true))
     }
+    if (operator === '/') {
+      const numerator = leftSignal ?? AudioSignal.constant(left, graph)
+      return numerator.modulate(rightSignal!.routeThrough(graph.invert()))
+    }
     return undefined
   }
 
@@ -256,10 +261,102 @@ class AudioSignal {
   }
 
   private static constant(value: unknown, graph: AudioSignalGraph): AudioSignal {
-    const node = graph.constant(Number(value))
+    const node = graph.constant(value)
     graph.cleanup(() => node.stop?.())
     return new AudioSignal(node, graph)
   }
+}
+
+const MATH_WORKLET_SOURCE = `
+class SwPatchInvertProcessor extends AudioWorkletProcessor {
+  constructor() {
+    super()
+    this.stopped = false
+    this.port.onmessage = ({ data }) => { if (data === 'stop') this.stopped = true }
+  }
+  process(inputs, outputs) {
+    if (this.stopped) return false
+    const input = inputs[0] || []
+    const output = outputs[0]
+    for (let channel = 0; channel < output.length; channel++) {
+      const source = input[channel] || input[0]
+      for (let sample = 0; sample < output[channel].length; sample++) {
+        output[channel][sample] = 1 / (source ? source[sample] : 0)
+      }
+    }
+    return true
+  }
+}
+class SwPatchAtodbProcessor extends AudioWorkletProcessor {
+  constructor() {
+    super()
+    this.stopped = false
+    this.port.onmessage = ({ data }) => { if (data === 'stop') this.stopped = true }
+  }
+  process(inputs, outputs) {
+    if (this.stopped) return false
+    const input = inputs[0] || []
+    const output = outputs[0]
+    for (let channel = 0; channel < output.length; channel++) {
+      const source = input[channel] || input[0]
+      for (let sample = 0; sample < output[channel].length; sample++) {
+        output[channel][sample] = 20 * Math.log10(Math.abs(source ? source[sample] : 0))
+      }
+    }
+    return true
+  }
+}
+class SwPatchDbtoaProcessor extends AudioWorkletProcessor {
+  constructor() {
+    super()
+    this.stopped = false
+    this.port.onmessage = ({ data }) => { if (data === 'stop') this.stopped = true }
+  }
+  process(inputs, outputs) {
+    if (this.stopped) return false
+    const input = inputs[0] || []
+    const output = outputs[0]
+    for (let channel = 0; channel < output.length; channel++) {
+      const source = input[channel] || input[0]
+      for (let sample = 0; sample < output[channel].length; sample++) {
+        output[channel][sample] = 10 ** ((source ? source[sample] : 0) / 20)
+      }
+    }
+    return true
+  }
+}
+registerProcessor('sw-patch-invert', SwPatchInvertProcessor)
+registerProcessor('sw-patch-atodb', SwPatchAtodbProcessor)
+registerProcessor('sw-patch-dbtoa', SwPatchDbtoaProcessor)
+`
+
+/** Converts a linear amplitude to decibels. */
+export function atodb(value: unknown): number {
+  return 20 * Math.log10(Math.abs(Number(value)))
+}
+
+/** Converts decibels to a linear amplitude. */
+export function dbtoa(value: unknown): number {
+  return 10 ** (Number(value) / 20)
+}
+
+const registeredMathWorklets = new WeakMap<object, Promise<void>>()
+
+/** Registers the inline processors used by SW Patch signal arithmetic. */
+export function registerMathWorklets(context: BaseAudioContext): Promise<void> {
+  const key = context as object
+  const existing = registeredMathWorklets.get(key)
+  if (existing) return existing
+  if (!context.audioWorklet) {
+    const unsupported = Promise.reject(new Error('This AudioContext does not support AudioWorklet'))
+    // Avoid an unhandled rejection when registration was started implicitly.
+    unsupported.catch(() => {})
+    return unsupported
+  }
+  const url = URL.createObjectURL(new Blob([MATH_WORKLET_SOURCE], { type: 'text/javascript' }))
+  const registration = context.audioWorklet.addModule(url).finally(() => URL.revokeObjectURL(url))
+  registeredMathWorklets.set(key, registration)
+  return registration
 }
 
 /**
@@ -283,23 +380,27 @@ export class PatchRuntime {
   readonly context: BaseAudioContext
   readonly options: RuntimeOptions
   private readonly root: Scope
-  private readonly gainNodes = new WeakSet<object>()
   private readonly internalConnections = new WeakMap<object, Connectable>()
   private readonly topLevelBindings = new Set<string>()
   private readonly audioSignalGraph: AudioSignalGraph
   private readonly patchCleanups: Array<() => void> = []
   private activeConnectionCleanups?: Array<() => void>
   private disposed = false
+  readonly workletsReady: Promise<void>
 
   constructor(context: BaseAudioContext, options: RuntimeOptions = {}) {
     this.context = context
     this.options = options
+    this.workletsReady = registerMathWorklets(context)
+    this.workletsReady.catch(() => {})
     this.root = new Map(Object.entries(options.globals ?? {}))
     this.audioSignalGraph = {
       gain: (value) => this.makeNode('Gain', value ? [{ gain: value }] : []) as Connectable & {
         gain: unknown
       },
       constant: (value) => this.createAndStartAudioSignal(value),
+      invert: () => this.createMathWorklet('sw-patch-invert'),
+      convert: (name) => this.createMathWorklet(name),
       cleanup: (cleanup) => { this.registerCleanup(cleanup) },
     }
     this.installBuiltins()
@@ -313,9 +414,16 @@ export class PatchRuntime {
   }
 
   /** Convenience wrapper for a started `ConstantSourceNode`. */
-  createAndStartAudioSignal(value: number) {
-    const node = new ConstantSourceNode(this.context, { offset: value })
+  createAndStartAudioSignal(value: unknown) {
+    const quantity = Quantity.from(value)
+    const node = new ConstantSourceNode(this.context, { offset: quantity.value })
     node.start()
+    return node
+  }
+
+  private createMathWorklet(name: string): AudioWorkletNode {
+    const node = new AudioWorkletNode(this.context, name)
+    this.registerCleanup(() => node.port.postMessage('stop'))
     return node
   }
 
@@ -349,8 +457,23 @@ export class PatchRuntime {
     this.root.set('OscillatorNode', (...args: unknown[]) => this.makeNode('Oscillator', args))
     this.root.set('ConstantSourceNode', (...args: unknown[]) => this.makeNode('ConstantSource', args))
     this.root.set('AudioSignal', this.createAndStartAudioSignal.bind(this))
+    this.root.set('atodb', (value: unknown) => this.convertMath('sw-patch-atodb', atodb, value))
+    this.root.set('dbtoa', (value: unknown) => this.convertMath('sw-patch-dbtoa', dbtoa, value))
     this.root.set('log', console.log)
     this.root.set('context', this.context)
+  }
+
+  private convertMath(
+    processor: 'sw-patch-atodb' | 'sw-patch-dbtoa',
+    scalar: (value: unknown) => number,
+    value: unknown,
+  ): unknown {
+    const signal = AudioSignal.from(value, this.audioSignalGraph)
+    if (!signal) return Quantity.scalar(scalar(value))
+    const converter = this.audioSignalGraph.convert(processor)
+    signal.node.connect(converter)
+    this.registerCleanup(() => signal.node.disconnect(converter))
+    return converter
   }
 
   private makeNode(
@@ -360,9 +483,7 @@ export class PatchRuntime {
     const values = (args[0] ?? {}) as Record<string, unknown>
     const options = Object.fromEntries(Object.entries(values).map(([key, value]) => [
       key,
-      value instanceof Quantity
-        ? this.audioParameterValue(kind === 'Gain' && key === 'gain', value)
-        : value,
+      value instanceof Quantity ? Number(value) : value,
     ]))
     const constructorName = `${kind}Node`
     const NodeConstructor = (globalThis as unknown as Record<string, unknown>)[constructorName]
@@ -373,7 +494,6 @@ export class PatchRuntime {
       context: BaseAudioContext,
       options: Record<string, unknown>,
     ) => Record<string, unknown>)(this.context, options)
-    if (kind === 'Gain') this.gainNodes.add(node)
     return node
   }
 
@@ -546,10 +666,7 @@ export class PatchRuntime {
       return
     }
     const target = this.expression(statement.target, scope) as AudioParameter
-    const amplitude = statement.target.type === 'MemberExpression'
-      && statement.target.property === 'gain'
-      && this.isGainNode(this.expression(statement.target.object, scope))
-    const value = this.audioParameterValue(amplitude, this.expression(statement.value, scope))
+    const value = Number(this.expression(statement.value, scope))
     switch (automation?.type) {
       case 'LinearAutomation': target.linearRampToValueAtTime(value, time); break
       case 'ExponentialAutomation': target.exponentialRampToValueAtTime(value, time); break
@@ -663,18 +780,6 @@ export class PatchRuntime {
       if (result !== undefined) return result
     }
     return Quantity.binary(operator, left, rightValue)
-  }
-
-  private audioParameterValue(amplitude: boolean, value: unknown): number {
-    if (amplitude && value instanceof Quantity && value.isDecibels) {
-      return 10 ** (value.value / 20)
-    }
-    return Number(value)
-  }
-
-  private isGainNode(value: unknown): boolean {
-    return typeof value === 'object' && value !== null
-      && (this.gainNodes.has(value) || value.constructor?.name === 'GainNode')
   }
 
   private assertSafeMember(property: string): void {
