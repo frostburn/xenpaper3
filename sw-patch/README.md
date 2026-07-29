@@ -17,10 +17,11 @@ For example, `default.swpatch` produces an object whose `on` function can be
 called to start notes and get a handle for turning the note off.
 
 ```ts
-import { createPatch } from './sw-patch'
+import { createPatch, registerMathWorklets } from './sw-patch'
 import source from './src/patches/default.swpatch?raw'
 
 const context = new AudioContext()
+await registerMathWorklets(context)
 const synth = createPatch(source, context)
 const start = context.currentTime + 1
 const pitch = context.createConstantSource()
@@ -34,6 +35,13 @@ pitch.stop(cutOff)
 // whole patch is no longer needed.
 synth.dispose()
 ```
+
+`registerMathWorklets()` installs SW Patch's inline inversion and
+decibels-to-level `AudioWorkletProcessor`s from a blob URL. Registration is
+cached per context. Await it before evaluating patch functions that divide one
+audio signal by another or construct a decibel-valued signal such as
+`AudioSignal(+10dB)`. `createPatch()` also starts registration automatically,
+but remains synchronous for patches that do not need those processors.
 
 Every patch owns the Web Audio resources that the runtime creates implicitly,
 including scalar sources used by expressions such as `signal + 5`. Call

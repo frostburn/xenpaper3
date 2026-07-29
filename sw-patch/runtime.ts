@@ -180,7 +180,8 @@ export class Quantity {
 
 interface AudioSignalGraph {
   gain(value?: Quantity): Connectable & { gain: unknown }
-  constant(value: number): Connectable & { stop?: () => void }
+  constant(value: unknown): Connectable & { stop?: () => void }
+  invert(): Connectable
   cleanup(cleanup: () => void): void
 }
 
@@ -220,6 +221,10 @@ class AudioSignal {
     if (operator === '/' && leftSignal && !rightSignal) {
       return leftSignal.scale(Quantity.scalar(1).multiply(right, true))
     }
+    if (operator === '/') {
+      const numerator = leftSignal ?? AudioSignal.constant(left, graph)
+      return numerator.modulate(rightSignal!.routeThrough(graph.invert()))
+    }
     return undefined
   }
 
@@ -256,10 +261,60 @@ class AudioSignal {
   }
 
   private static constant(value: unknown, graph: AudioSignalGraph): AudioSignal {
-    const node = graph.constant(Number(value))
+    const node = graph.constant(value)
     graph.cleanup(() => node.stop?.())
     return new AudioSignal(node, graph)
   }
+}
+
+const MATH_WORKLET_SOURCE = `
+class SwPatchInvertProcessor extends AudioWorkletProcessor {
+  process(inputs, outputs) {
+    const input = inputs[0] || []
+    const output = outputs[0]
+    for (let channel = 0; channel < output.length; channel++) {
+      const source = input[channel] || input[0]
+      for (let sample = 0; sample < output[channel].length; sample++) {
+        output[channel][sample] = 1 / (source ? source[sample] : 0)
+      }
+    }
+    return true
+  }
+}
+class SwPatchDecibelsToLevelProcessor extends AudioWorkletProcessor {
+  process(inputs, outputs) {
+    const input = inputs[0] || []
+    const output = outputs[0]
+    for (let channel = 0; channel < output.length; channel++) {
+      const source = input[channel] || input[0]
+      for (let sample = 0; sample < output[channel].length; sample++) {
+        output[channel][sample] = 10 ** ((source ? source[sample] : 0) / 20)
+      }
+    }
+    return true
+  }
+}
+registerProcessor('sw-patch-invert', SwPatchInvertProcessor)
+registerProcessor('sw-patch-decibels-to-level', SwPatchDecibelsToLevelProcessor)
+`
+
+const registeredMathWorklets = new WeakMap<object, Promise<void>>()
+
+/** Registers the inline processors used by SW Patch signal arithmetic. */
+export function registerMathWorklets(context: BaseAudioContext): Promise<void> {
+  const key = context as object
+  const existing = registeredMathWorklets.get(key)
+  if (existing) return existing
+  if (!context.audioWorklet) {
+    const unsupported = Promise.reject(new Error('This AudioContext does not support AudioWorklet'))
+    // Avoid an unhandled rejection when registration was started implicitly.
+    unsupported.catch(() => {})
+    return unsupported
+  }
+  const url = URL.createObjectURL(new Blob([MATH_WORKLET_SOURCE], { type: 'text/javascript' }))
+  const registration = context.audioWorklet.addModule(url).finally(() => URL.revokeObjectURL(url))
+  registeredMathWorklets.set(key, registration)
+  return registration
 }
 
 /**
@@ -290,16 +345,20 @@ export class PatchRuntime {
   private readonly patchCleanups: Array<() => void> = []
   private activeConnectionCleanups?: Array<() => void>
   private disposed = false
+  readonly workletsReady: Promise<void>
 
   constructor(context: BaseAudioContext, options: RuntimeOptions = {}) {
     this.context = context
     this.options = options
+    this.workletsReady = registerMathWorklets(context)
+    this.workletsReady.catch(() => {})
     this.root = new Map(Object.entries(options.globals ?? {}))
     this.audioSignalGraph = {
       gain: (value) => this.makeNode('Gain', value ? [{ gain: value }] : []) as Connectable & {
         gain: unknown
       },
       constant: (value) => this.createAndStartAudioSignal(value),
+      invert: () => new AudioWorkletNode(this.context, 'sw-patch-invert'),
       cleanup: (cleanup) => { this.registerCleanup(cleanup) },
     }
     this.installBuiltins()
@@ -313,10 +372,16 @@ export class PatchRuntime {
   }
 
   /** Convenience wrapper for a started `ConstantSourceNode`. */
-  createAndStartAudioSignal(value: number) {
-    const node = new ConstantSourceNode(this.context, { offset: value })
+  createAndStartAudioSignal(value: unknown) {
+    const quantity = Quantity.from(value)
+    const node = new ConstantSourceNode(this.context, { offset: quantity.value })
     node.start()
-    return node
+    if (!quantity.isDecibels) return node
+    const converter = new AudioWorkletNode(this.context, 'sw-patch-decibels-to-level')
+    node.connect(converter)
+    this.registerCleanup(() => node.disconnect(converter))
+    this.registerCleanup(() => node.stop())
+    return converter
   }
 
   private registerCleanup(cleanup: () => void): void {

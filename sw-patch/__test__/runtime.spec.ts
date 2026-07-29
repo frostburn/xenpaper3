@@ -1,5 +1,11 @@
 import { describe, expect, it, vi } from 'vitest'
-import { PatchRuntime, Quantity, createPatch, type PatchFunction } from '../runtime.js'
+import {
+  PatchRuntime,
+  Quantity,
+  createPatch,
+  registerMathWorklets,
+  type PatchFunction,
+} from '../runtime.js'
 import type { Program } from '../parser.generated.js'
 
 function location() {
@@ -8,6 +14,70 @@ function location() {
 }
 
 describe('SW Patch runtime', () => {
+  it('registers inline math worklets once per audio context', async () => {
+    const addModule = vi.fn<(_: string) => Promise<void>>().mockResolvedValue(undefined)
+    const createObjectURL = vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:math-worklets')
+    const revokeObjectURL = vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => {})
+    const context = { audioWorklet: { addModule } } as unknown as BaseAudioContext
+
+    await Promise.all([registerMathWorklets(context), registerMathWorklets(context)])
+
+    expect(createObjectURL).toHaveBeenCalledOnce()
+    expect(addModule).toHaveBeenCalledOnce()
+    expect(addModule).toHaveBeenCalledWith('blob:math-worklets')
+    expect(revokeObjectURL).toHaveBeenCalledWith('blob:math-worklets')
+  })
+
+  it('uses worklets for signal division and decibel-valued AudioSignals', async () => {
+    const context = {
+      audioWorklet: { addModule: vi.fn<() => Promise<void>>().mockResolvedValue(undefined) },
+    } as unknown as BaseAudioContext
+    vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:math-worklets-2')
+    vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => {})
+    const worklets: MockAudioWorkletNode[] = []
+    class MockAudioWorkletNode {
+      connect = vi.fn<(target: unknown) => void>()
+      disconnect = vi.fn<(target?: unknown) => void>()
+      constructor(_context: BaseAudioContext, readonly name: string) { worklets.push(this) }
+    }
+    class MockConstantSourceNode {
+      connect = vi.fn<(target: unknown) => void>()
+      disconnect = vi.fn<(target?: unknown) => void>()
+      start = vi.fn<() => void>()
+      stop = vi.fn<() => void>()
+      constructor(_context: BaseAudioContext, readonly options: { offset: number }) {}
+    }
+    class MockGainNode {
+      gain = {}
+      connect = vi.fn<(target: unknown) => void>()
+      disconnect = vi.fn<(target?: unknown) => void>()
+    }
+    vi.stubGlobal('AudioWorkletNode', MockAudioWorkletNode)
+    vi.stubGlobal('ConstantSourceNode', MockConstantSourceNode)
+    vi.stubGlobal('GainNode', MockGainNode)
+    await registerMathWorklets(context)
+    const numerator = {
+      connect: vi.fn<(target: unknown) => void>(),
+      disconnect: vi.fn<(target?: unknown) => void>(),
+    }
+    const denominator = {
+      connect: vi.fn<(target: unknown) => void>(),
+      disconnect: vi.fn<(target?: unknown) => void>(),
+    }
+    const patch = createPatch(
+      'fn divide():\n    ret numerator / denominator\n'
+      + 'fn db():\n    ret AudioSignal(+10dB)\n',
+      context,
+      { globals: { denominator, numerator } },
+    )
+
+    ;(patch.divide as PatchFunction)()
+    const inverter = worklets.find(({ name }) => name === 'sw-patch-invert')
+    expect(denominator.connect).toHaveBeenCalledWith(inverter)
+    ;(patch.db as PatchFunction)()
+    expect(worklets.some(({ name }) => name === 'sw-patch-decibels-to-level')).toBe(true)
+  })
+
   it('builds Web Audio graphs for signal arithmetic', () => {
     const created: MockGainNode[] = []
     class MockGainNode {
