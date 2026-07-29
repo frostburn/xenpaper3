@@ -12,6 +12,8 @@ export type PatchFunction = (...arguments_: unknown[]) => unknown
 
 export interface SynthPatch {
   [name: string]: unknown
+  /** Tears down implicit nodes and connections owned by this patch. */
+  dispose(): void
 }
 
 /** A patch whose top-level `input` and `output` bindings make it audio-connectable. */
@@ -176,6 +178,90 @@ export class Quantity {
   }
 }
 
+interface AudioSignalGraph {
+  gain(value?: Quantity): Connectable & { gain: unknown }
+  constant(value: number): Connectable & { stop?: () => void }
+  cleanup(cleanup: () => void): void
+}
+
+/** Builds the implicit Web Audio graph for arithmetic involving audio signals. */
+class AudioSignal {
+  private constructor(
+    readonly node: Connectable,
+    private readonly graph: AudioSignalGraph,
+  ) {}
+
+  static from(value: unknown, graph: AudioSignalGraph): AudioSignal | undefined {
+    return AudioSignal.is(value) ? new AudioSignal(value, graph) : undefined
+  }
+
+  static is(value: unknown): value is Connectable {
+    return typeof value === 'object' && value !== null
+      && typeof (value as Partial<Connectable>).connect === 'function'
+  }
+
+  static binary(
+    operator: string,
+    left: unknown,
+    right: unknown,
+    graph: AudioSignalGraph,
+  ): unknown | undefined {
+    const leftSignal = AudioSignal.from(left, graph)
+    const rightSignal = AudioSignal.from(right, graph)
+    if (!leftSignal && !rightSignal) return undefined
+
+    if (operator === '+' || operator === '-') {
+      const leftOperand = leftSignal ?? AudioSignal.constant(left, graph)
+      const rightOperand = rightSignal ?? AudioSignal.constant(right, graph)
+      return leftOperand.add(operator === '-' ? rightOperand.negate() : rightOperand)
+    }
+    if (operator === '*' && leftSignal && rightSignal) return leftSignal.modulate(rightSignal)
+    if (operator === '*') return (leftSignal ?? rightSignal!).scale(leftSignal ? right : left)
+    if (operator === '/' && leftSignal && !rightSignal) {
+      return leftSignal.scale(Quantity.scalar(1).multiply(right, true))
+    }
+    return undefined
+  }
+
+  negate(): AudioSignal {
+    return this.routeThrough(this.graph.gain(Quantity.scalar(-1)))
+  }
+
+  private add(right: AudioSignal): Connectable {
+    const sum = this.graph.gain()
+    this.connect(sum)
+    right.connect(sum)
+    return sum
+  }
+
+  private modulate(right: AudioSignal): Connectable {
+    const gain = this.graph.gain(Quantity.scalar(0))
+    this.connect(gain)
+    right.connect(gain.gain)
+    return gain
+  }
+
+  private scale(value: unknown): Connectable {
+    return this.routeThrough(this.graph.gain(Quantity.from(value))).node
+  }
+
+  private routeThrough(target: Connectable): AudioSignal {
+    this.connect(target)
+    return new AudioSignal(target, this.graph)
+  }
+
+  private connect(target: unknown): void {
+    this.node.connect(target)
+    this.graph.cleanup(() => this.node.disconnect(target))
+  }
+
+  private static constant(value: unknown, graph: AudioSignalGraph): AudioSignal {
+    const node = graph.constant(Number(value))
+    graph.cleanup(() => node.stop?.())
+    return new AudioSignal(node, graph)
+  }
+}
+
 /**
  * Parses and evaluates SW Patch source against one Web Audio context.
  *
@@ -192,6 +278,7 @@ export function createPatch(
 /** Alias emphasizing that source is compiled into a callable patch object. */
 export const compilePatch = createPatch
 
+
 export class PatchRuntime {
   readonly context: BaseAudioContext
   readonly options: RuntimeOptions
@@ -199,19 +286,58 @@ export class PatchRuntime {
   private readonly gainNodes = new WeakSet<object>()
   private readonly internalConnections = new WeakMap<object, Connectable>()
   private readonly topLevelBindings = new Set<string>()
+  private readonly audioSignalGraph: AudioSignalGraph
+  private readonly patchCleanups: Array<() => void> = []
+  private activeConnectionCleanups?: Array<() => void>
+  private disposed = false
 
   constructor(context: BaseAudioContext, options: RuntimeOptions = {}) {
     this.context = context
     this.options = options
     this.root = new Map(Object.entries(options.globals ?? {}))
+    this.audioSignalGraph = {
+      gain: (value) => this.makeNode('Gain', value ? [{ gain: value }] : []) as Connectable & {
+        gain: unknown
+      },
+      constant: (value) => this.createAndStartAudioSignal(value),
+      cleanup: (cleanup) => { this.registerCleanup(cleanup) },
+    }
     this.installBuiltins()
   }
 
   evaluate(program: Program): SynthPatch {
     this.topLevelBindings.clear()
-    const patch: SynthPatch = {}
+    const patch: SynthPatch = { dispose: () => { this.dispose() } }
     this.statements(program.body, this.root, undefined, patch)
     return this.effectNode(patch)
+  }
+
+  /** Convenience wrapper for a started `ConstantSourceNode`. */
+  createAndStartAudioSignal(value: number) {
+    const node = new ConstantSourceNode(this.context, { offset: value })
+    node.start()
+    return node
+  }
+
+  private registerCleanup(cleanup: () => void): void {
+    let active = true
+    const once = () => {
+      if (!active) return
+      active = false
+      cleanup()
+    }
+    if (this.disposed) {
+      once()
+      return
+    }
+    this.patchCleanups.push(once)
+    this.activeConnectionCleanups?.push(once)
+  }
+
+  private dispose(): void {
+    if (this.disposed) return
+    this.disposed = true
+    for (const cleanup of this.patchCleanups.splice(0).reverse()) cleanup()
   }
 
   private installBuiltins(): void {
@@ -221,11 +347,14 @@ export class PatchRuntime {
     this.root.set('DelayNode', (...args: unknown[]) => this.makeNode('Delay', args))
     this.root.set('GainNode', (...args: unknown[]) => this.makeNode('Gain', args))
     this.root.set('OscillatorNode', (...args: unknown[]) => this.makeNode('Oscillator', args))
+    this.root.set('ConstantSourceNode', (...args: unknown[]) => this.makeNode('ConstantSource', args))
+    this.root.set('AudioSignal', this.createAndStartAudioSignal.bind(this))
+    this.root.set('log', console.log)
     this.root.set('context', this.context)
   }
 
   private makeNode(
-    kind: 'BiquadFilter' | 'ChannelMerger' | 'ChannelSplitter' | 'Delay' | 'Gain' | 'Oscillator',
+    kind: 'BiquadFilter' | 'ChannelMerger' | 'ChannelSplitter' | 'Delay' | 'Gain' | 'Oscillator' | 'ConstantSource',
     args: unknown[],
   ): unknown {
     const values = (args[0] ?? {}) as Record<string, unknown>
@@ -298,36 +427,42 @@ export class PatchRuntime {
     connectionCleanups?: Array<() => void>,
     exports?: SynthPatch,
   ): Returned | undefined {
-    for (let index = 0; index < statements.length; index += 1) {
-      const statement = statements[index]
-      if (!statement) continue
+    const previousCleanups = this.activeConnectionCleanups
+    this.activeConnectionCleanups = connectionCleanups ?? previousCleanups
+    try {
+      for (let index = 0; index < statements.length; index += 1) {
+        const statement = statements[index]
+        if (!statement) continue
 
-      if (statement.type === 'IfStatement') {
-        let matched = false
-        if (Quantity.truthy(this.expression(statement.test, scope))) {
-          matched = true
-          const result = this.statements(statement.body, scope, connectionCleanups, exports)
-          if (result) return result
-        }
-        while (true) {
-          const next = statements[index + 1]
-          if (next?.type !== 'ElifStatement' && next?.type !== 'ElseStatement') break
-          index += 1
-          const branch = next
-          if (!matched && (branch.type === 'ElseStatement'
-            || Quantity.truthy(this.expression(branch.test, scope)))) {
+        if (statement.type === 'IfStatement') {
+          let matched = false
+          if (Quantity.truthy(this.expression(statement.test, scope))) {
             matched = true
-            const result = this.statements(branch.body, scope, connectionCleanups, exports)
+            const result = this.statements(statement.body, scope, connectionCleanups, exports)
             if (result) return result
           }
+          while (true) {
+            const next = statements[index + 1]
+            if (next?.type !== 'ElifStatement' && next?.type !== 'ElseStatement') break
+            index += 1
+            const branch = next
+            if (!matched && (branch.type === 'ElseStatement'
+              || Quantity.truthy(this.expression(branch.test, scope)))) {
+              matched = true
+              const result = this.statements(branch.body, scope, connectionCleanups, exports)
+              if (result) return result
+            }
+          }
+          continue
         }
-        continue
-      }
 
-      const result = this.statement(statement, scope, connectionCleanups, exports)
-      if (result) return result
+        const result = this.statement(statement, scope, connectionCleanups, exports)
+        if (result) return result
+      }
+      return undefined
+    } finally {
+      this.activeConnectionCleanups = previousCleanups
     }
-    return undefined
   }
 
   private statement(
@@ -358,7 +493,7 @@ export class PatchRuntime {
         this.expression(statement.expression, scope); return undefined
       case 'ConnectionStatement': {
         const cleanups = this.connection(statement.first, statement.links, scope)
-        connectionCleanups?.push(...cleanups)
+        for (const cleanup of cleanups) this.registerCleanup(cleanup)
         return undefined
       }
       case 'ScheduledStatement':
@@ -451,9 +586,10 @@ export class PatchRuntime {
       if (link.output === undefined && link.input === undefined) connectedSource[link.operator](target)
       else connectedSource[link.operator](target, link.output ?? 0, link.input ?? 0)
       if (link.operator === 'connect') {
+        const disconnect = connectedSource.disconnect.bind(connectedSource)
         cleanups.push(() => {
-          if (link.output === undefined && link.input === undefined) connectedSource.disconnect(target)
-          else connectedSource.disconnect(target, link.output ?? 0, link.input ?? 0)
+          if (link.output === undefined && link.input === undefined) disconnect(target)
+          else disconnect(target, link.output ?? 0, link.input ?? 0)
         })
       }
       source = target as Connectable
@@ -510,7 +646,10 @@ export class PatchRuntime {
   }
 
   private unary(operator: string, value: unknown): unknown {
-    if (operator === '+') return Quantity.from(value)
+    if (operator === '+') return AudioSignal.is(value) ? value : Quantity.from(value)
+    if (operator === '-' && AudioSignal.is(value)) {
+      return AudioSignal.from(value, this.audioSignalGraph)!.negate().node
+    }
     if (operator === '-') return Quantity.from(value).negate()
     return !Quantity.truthy(value)
   }
@@ -518,7 +657,12 @@ export class PatchRuntime {
   private binary(operator: string, left: unknown, right: () => unknown): unknown {
     if (operator === 'and') return Quantity.truthy(left) ? right() : left
     if (operator === 'or') return Quantity.truthy(left) ? left : right()
-    return Quantity.binary(operator, left, right())
+    const rightValue = right()
+    if (AudioSignal.is(left) || AudioSignal.is(rightValue)) {
+      const result = AudioSignal.binary(operator, left, rightValue, this.audioSignalGraph)
+      if (result !== undefined) return result
+    }
+    return Quantity.binary(operator, left, rightValue)
   }
 
   private audioParameterValue(amplitude: boolean, value: unknown): number {

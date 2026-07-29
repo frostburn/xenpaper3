@@ -29,7 +29,16 @@ const off = synth.on(context.destination, start, pitch, velocity)
 const end = context.currentTime + 2
 const cutOff = off(end)
 pitch.stop(cutOff)
+
+// Release implicit signal-arithmetic nodes and internal connections when the
+// whole patch is no longer needed.
+synth.dispose()
 ```
+
+Every patch owns the Web Audio resources that the runtime creates implicitly,
+including scalar sources used by expressions such as `signal + 5`. Call
+`dispose()` when the patch is no longer needed. Disposal is idempotent; resources
+inside an `until` suite are still released earlier when that suite's event fires.
 
 ## Effects
 

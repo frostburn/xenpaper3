@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, onUnmounted } from 'vue'
+import { onMounted, onUnmounted, ref, watch } from 'vue'
 import { createPatch, type RuntimeOptions } from '../sw-patch'
 import BASS_PATCH from './patches/adr-bass.swpatch?raw'
 import PING_PONG_DELAY_PATCH from './patches/ping-pong-delay.swpatch?raw'
@@ -20,16 +20,37 @@ interface Synth {
 
 // Dummy audio code just to get something going
 const ctx = new AudioContext({ latencyHint: 'interactive' })
-const output = ctx.createGain()
-output.gain.value = 0.4
+const output = new GainNode(ctx, { gain: 0.4 })
 output.connect(ctx.destination)
-const delay = createPatch(PING_PONG_DELAY_PATCH, ctx) as unknown as AudioNode
+const delayTime = new ConstantSourceNode(ctx, { offset: 0.25 })
+const feedback = new ConstantSourceNode(ctx, { offset: 0.55 })
+const wet = new ConstantSourceNode(ctx, { offset: 0.35 })
+for (const signal of [delayTime, feedback, wet]) signal.start()
+const delay = createPatch(PING_PONG_DELAY_PATCH, ctx, {
+  config: { delayTime, feedback, wet },
+}) as unknown as AudioNode
 delay.connect(output)
 const inputDelay = 0.01
 
 const synth = createPatch(BASS_PATCH, ctx, {
   config: { oscillatorType: 'sawtooth' },
 } as RuntimeOptions) as unknown as Synth
+
+// A string because <input type="range"> has a silly API.
+const delayTimeModel = ref('0.25')
+const feedbackModel = ref('0.55')
+const wetModel = ref('0.35')
+
+const bindSignal = (model: typeof wetModel, signal: ConstantSourceNode) =>
+  watch(
+    model,
+    (value) => signal.offset.setTargetAtTime(Number(value), ctx.currentTime + inputDelay, 0.01),
+    { immediate: true },
+  )
+
+bindSignal(delayTimeModel, delayTime)
+bindSignal(feedbackModel, feedback)
+bindSignal(wetModel, wet)
 
 type ActiveNote = [off: NoteOff, pitch: ConstantSourceNode]
 
@@ -92,6 +113,12 @@ onUnmounted(() => {
     Visit <a href="https://vuejs.org/" target="_blank" rel="noopener">vuejs.org</a> to read the
     documentation
   </p>
+  <label for="delay-time">Delay time</label>
+  <input id="delay-time" type="range" v-model="delayTimeModel" min="0" max="2" step="any" />
+  <label for="feedback">Feedback</label>
+  <input id="feedback" type="range" v-model="feedbackModel" min="0" max="0.95" step="any" />
+  <label for="wet">Wet level</label>
+  <input id="wet" type="range" v-model="wetModel" min="0" max="1" step="any" />
 </template>
 
 <style scoped></style>

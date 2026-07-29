@@ -7,6 +7,11 @@ type MockGainNode = {
   gain: object
 }
 
+class MockGainNodeConstructor {
+  gain = {}
+  connect = vi.fn<(to: AudioNode) => MockGainNodeConstructor>(() => this)
+}
+
 const { effectConnect, synthOn } = vi.hoisted(() => ({
   effectConnect: vi.fn<(to: AudioNode) => void>(),
   synthOn: vi.fn<() => NoteOff>(),
@@ -49,6 +54,9 @@ class MockAudioContext {
 class MockConstantSourceNode {
   start = vi.fn<() => void>()
   stop = vi.fn<(when?: number) => void>()
+  offset = {
+    setTargetAtTime: vi.fn<(value: number, startTime: number, timeConstant: number) => void>(),
+  }
 
   constructor() {
     sources.push(this)
@@ -65,6 +73,7 @@ beforeEach(() => {
   effectConnect.mockReset()
   synthOn.mockReturnValue(vi.fn<NoteOff>(() => 2))
   vi.stubGlobal('AudioContext', MockAudioContext)
+  vi.stubGlobal('GainNode', MockGainNodeConstructor)
   vi.stubGlobal('ConstantSourceNode', MockConstantSourceNode)
 })
 
@@ -80,7 +89,7 @@ describe('App', () => {
 
     dispatchKey('keydown', 65)
     const context = contexts[0]!
-    const source = sources[0]!
+    const source = sources[3]!
     expect(context.resume).toHaveBeenCalledOnce()
     expect(source.start).toHaveBeenCalledOnce()
     expect(synthOn).toHaveBeenCalledOnce()
@@ -100,7 +109,7 @@ describe('App', () => {
     window.dispatchEvent(new Event('blur'))
 
     expect(off).toHaveBeenCalledWith(1.01)
-    expect(sources[0]!.stop).toHaveBeenCalledWith(2)
+    expect(sources[3]!.stop).toHaveBeenCalledWith(2)
     wrapper.unmount()
   })
 

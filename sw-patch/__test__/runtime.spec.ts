@@ -8,11 +8,140 @@ function location() {
 }
 
 describe('SW Patch runtime', () => {
+  it('builds Web Audio graphs for signal arithmetic', () => {
+    const created: MockGainNode[] = []
+    class MockGainNode {
+      gain = {}
+      connect = vi.fn<(target: unknown) => void>()
+      disconnect = vi.fn<(target?: unknown) => void>()
+
+      constructor(_context: BaseAudioContext, readonly options: { gain?: number } = {}) {
+        created.push(this)
+      }
+    }
+    vi.stubGlobal('GainNode', MockGainNode)
+    const signalA = {
+      connect: vi.fn<(target: unknown) => void>(),
+      disconnect: vi.fn<(target?: unknown) => void>(),
+    }
+    const signalB = {
+      connect: vi.fn<(target: unknown) => void>(),
+      disconnect: vi.fn<(target?: unknown) => void>(),
+    }
+
+    const patch = createPatch(
+      'fn negative():\n    ret -signalA\n'
+      + 'fn positive():\n    ret +signalA\n'
+      + 'fn sum():\n    ret signalA + signalB\n'
+      + 'fn difference():\n    ret signalA - signalB\n'
+      + 'fn product():\n    ret signalA * signalB\n',
+      {} as BaseAudioContext,
+      { globals: { signalA, signalB } },
+    )
+
+    const negative = (patch.negative as PatchFunction)()
+    expect(created[0]?.options).toEqual({ gain: -1 })
+    expect(signalA.connect).toHaveBeenCalledWith(negative)
+    expect((patch.positive as PatchFunction)()).toBe(signalA)
+
+    signalA.connect.mockClear()
+    signalB.connect.mockClear()
+    const sum = (patch.sum as PatchFunction)()
+    expect(signalA.connect).toHaveBeenCalledWith(sum)
+    expect(signalB.connect).toHaveBeenCalledWith(sum)
+
+    signalA.connect.mockClear()
+    signalB.connect.mockClear()
+    const difference = (patch.difference as PatchFunction)()
+    const inverter = created.at(-2)
+    expect(inverter?.options).toEqual({ gain: -1 })
+    expect(signalB.connect).toHaveBeenCalledWith(inverter)
+    expect(signalA.connect).toHaveBeenCalledWith(difference)
+    expect(inverter?.connect).toHaveBeenCalledWith(difference)
+
+    signalA.connect.mockClear()
+    signalB.connect.mockClear()
+    const product = (patch.product as PatchFunction)() as MockGainNode
+    expect(product.options).toEqual({ gain: 0 })
+    expect(signalA.connect).toHaveBeenCalledWith(product)
+    expect(signalB.connect).toHaveBeenCalledWith(product.gain)
+  })
+
+  it('combines signals with scalars and cleans up implicit until connections', () => {
+    const gains: MockGainNode[] = []
+    const constants: MockConstantSourceNode[] = []
+    class MockGainNode {
+      gain = {}
+      connect = vi.fn<(target: unknown) => void>()
+      disconnect = vi.fn<(target?: unknown) => void>()
+      constructor(_context: BaseAudioContext, readonly options: { gain?: number } = {}) {
+        gains.push(this)
+      }
+    }
+    class MockConstantSourceNode {
+      connect = vi.fn<(target: unknown) => void>()
+      disconnect = vi.fn<(target?: unknown) => void>()
+      start = vi.fn<() => void>()
+      stop = vi.fn<() => void>()
+      constructor(_context: BaseAudioContext, readonly options: { offset: number }) {
+        constants.push(this)
+      }
+    }
+    vi.stubGlobal('GainNode', MockGainNode)
+    vi.stubGlobal('ConstantSourceNode', MockConstantSourceNode)
+    const emitter = new EventTarget()
+    const signal = {
+      connect: vi.fn<(target: unknown) => void>(),
+      disconnect: vi.fn<(target?: unknown) => void>(),
+    }
+    const destination = {
+      connect: vi.fn<(target: unknown) => void>(),
+      disconnect: vi.fn<(target?: unknown) => void>(),
+    }
+    const patch = createPatch(
+      'fn scaledLeft():\n    ret 2 * signal\n'
+      + 'fn scaledRight():\n    ret signal * 3\n'
+      + 'fn divided():\n    ret signal / 4\n'
+      + 'fn offset():\n    ret signal + 5\n'
+      + 'fn reverseDifference():\n    ret 6 - signal\n'
+      + 'until emitter.ended:\n'
+      + '    sum = signal + 7\n'
+      + '    sum -> destination\n',
+      {} as BaseAudioContext,
+      { globals: { destination, emitter, signal } },
+    )
+
+    expect(((patch.scaledLeft as PatchFunction)() as MockGainNode).options).toEqual({ gain: 2 })
+    expect(((patch.scaledRight as PatchFunction)() as MockGainNode).options).toEqual({ gain: 3 })
+    expect(((patch.divided as PatchFunction)() as MockGainNode).options).toEqual({ gain: 0.25 })
+    const offset = (patch.offset as PatchFunction)()
+    expect(constants[1]?.options).toEqual({ offset: 5 })
+    expect(constants[1]?.start).toHaveBeenCalledOnce()
+    expect(constants[1]?.connect).toHaveBeenCalledWith(offset)
+    const reverseDifference = (patch.reverseDifference as PatchFunction)()
+    expect(constants[2]?.options).toEqual({ offset: 6 })
+    expect(constants[2]?.connect).toHaveBeenCalledWith(reverseDifference)
+
+    const untilSum = gains[0]
+    emitter.dispatchEvent(new Event('ended'))
+    expect(signal.disconnect).toHaveBeenCalledWith(untilSum)
+    expect(constants[0]?.disconnect).toHaveBeenCalledWith(untilSum)
+    expect(constants[0]?.stop).toHaveBeenCalledOnce()
+    expect(untilSum?.disconnect).toHaveBeenCalledWith(destination)
+
+    patch.dispose()
+    expect(constants[1]?.disconnect).toHaveBeenCalledWith(offset)
+    expect(constants[1]?.stop).toHaveBeenCalledOnce()
+    expect(constants[2]?.disconnect).toHaveBeenCalledWith(reverseDifference)
+    expect(constants[2]?.stop).toHaveBeenCalledOnce()
+  })
+
   it('returns effect patches as input nodes whose output can connect onward', () => {
     const inputConnect = vi.fn<(target: unknown) => void>()
+    const inputDisconnect = vi.fn<(target?: unknown) => void>()
     const outputConnect = vi.fn<(target: unknown) => void>()
     const outputDisconnect = vi.fn<(target?: unknown) => void>()
-    const input = { connect: inputConnect, disconnect: vi.fn<(target?: unknown) => void>() }
+    const input = { connect: inputConnect, disconnect: inputDisconnect }
     const output = { connect: outputConnect, disconnect: outputDisconnect }
     const nodes = [input, output]
     const GainNode = vi.fn<() => typeof input | undefined>(function () { return nodes.shift() })
@@ -33,6 +162,10 @@ describe('SW Patch runtime', () => {
     effect.disconnect(destination)
     expect(outputConnect).toHaveBeenCalledWith(destination)
     expect(outputDisconnect).toHaveBeenCalledWith(destination)
+
+    ;(effect as unknown as { dispose(): void }).dispose()
+    expect(inputDisconnect).toHaveBeenCalledWith(output)
+    expect(outputDisconnect).not.toHaveBeenCalledWith(output)
   })
 
   it('passes normalized options to Web Audio constructors', () => {

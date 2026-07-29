@@ -1,21 +1,21 @@
-config delayTime: Duration = 250ms
-config feedback: Level = 55%
-config wet: Level = 35%
+config delayTime: AudioSignal<Duration> = AudioSignal(250ms)
+config feedback: AudioSignal<Level> = AudioSignal(55%)
+config wet: AudioSignal<Level> = AudioSignal(35%)
 
 input = GainNode()
 output = GainNode()
-dry = GainNode(gain = 1 - wet)
-wetOutput = GainNode(gain = wet)
-leftDelay = DelayNode(maxDelayTime = 2s, delayTime = delayTime)
-rightDelay = DelayNode(maxDelayTime = 2s, delayTime = delayTime)
-leftFeedback = GainNode(gain = feedback)
-rightFeedback = GainNode(gain = feedback)
+
+leftDelay = DelayNode(maxDelayTime = 2s)
+rightDelay = DelayNode(maxDelayTime = 2s)
 merger = ChannelMergerNode(numberOfInputs = 2)
 
-input -> dry -> output
+delayTime -> leftDelay.delayTime
+delayTime -> rightDelay.delayTime
+
+input * (1 - wet) -> output
 input -> leftDelay
 leftDelay:0 -> merger:0
 rightDelay:0 -> merger:1
-leftDelay -> rightFeedback -> rightDelay
-rightDelay -> leftFeedback -> leftDelay
-merger -> wetOutput -> output
+leftDelay * feedback -> rightDelay
+rightDelay * feedback -> leftDelay
+merger * wet -> output
