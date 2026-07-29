@@ -12,15 +12,16 @@ class MockGainNodeConstructor {
   connect = vi.fn<(to: AudioNode) => MockGainNodeConstructor>(() => this)
 }
 
-const { effectConnect, synthOn } = vi.hoisted(() => ({
+const { createPatch, effectConnect, registerMathWorklets, synthOn } = vi.hoisted(() => ({
+  createPatch: vi.fn<(source: string) => unknown>(),
   effectConnect: vi.fn<(to: AudioNode) => void>(),
+  registerMathWorklets: vi.fn<() => Promise<void>>(),
   synthOn: vi.fn<(...arguments_: unknown[]) => NoteOff>(),
 }))
 
 vi.mock('../../sw-patch', () => ({
-  createPatch: (source: string) =>
-    source.includes('delayTime') ? { connect: effectConnect } : { on: synthOn },
-  registerMathWorklets: vi.fn<() => Promise<void>>().mockResolvedValue(undefined),
+  createPatch,
+  registerMathWorklets,
 }))
 
 import App from '../App.vue'
@@ -72,6 +73,11 @@ beforeEach(() => {
   sources.length = 0
   synthOn.mockReset()
   effectConnect.mockReset()
+  createPatch.mockReset()
+  createPatch.mockImplementation((source) =>
+    source.includes('delayTime') ? { connect: effectConnect } : { on: synthOn })
+  registerMathWorklets.mockReset()
+  registerMathWorklets.mockResolvedValue(undefined)
   synthOn.mockReturnValue(vi.fn<NoteOff>(() => 2))
   vi.stubGlobal('AudioContext', MockAudioContext)
   vi.stubGlobal('GainNode', MockGainNodeConstructor)
@@ -82,6 +88,23 @@ describe('App', () => {
   it('mounts and renders properly', () => {
     const wrapper = mount(App)
     expect(wrapper.text()).toContain('You did it!')
+    wrapper.unmount()
+  })
+
+  it('initializes patches only after math worklets are registered', async () => {
+    let finishRegistration!: () => void
+    registerMathWorklets.mockReturnValue(new Promise((resolve) => {
+      finishRegistration = resolve
+    }))
+
+    const wrapper = mount(App)
+    expect(createPatch).not.toHaveBeenCalled()
+
+    finishRegistration()
+    await flushPromises()
+
+    expect(createPatch).toHaveBeenCalledTimes(2)
+    expect(effectConnect).toHaveBeenCalledOnce()
     wrapper.unmount()
   })
 
