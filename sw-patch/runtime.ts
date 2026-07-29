@@ -181,7 +181,7 @@ interface AudioSignalGraph {
   gain(value?: Quantity): Connectable & { gain: unknown }
   constant(value: unknown): Connectable & { stop?: () => void }
   invert(): Connectable
-  convert(name: 'sw-patch-atodb' | 'sw-patch-dbtoa'): Connectable
+  convert(name: MathWorkletName): Connectable
   cleanup(cleanup: () => void): void
 }
 
@@ -267,8 +267,18 @@ class AudioSignal {
   }
 }
 
+const MATH_FUNCTIONS = [
+  'abs', 'acos', 'acosh', 'asin', 'asinh', 'atan', 'atanh', 'cbrt', 'ceil', 'cos', 'cosh',
+  'exp', 'expm1', 'floor', 'fround', 'log', 'log10', 'log1p', 'log2', 'round', 'sign', 'sin',
+  'sinh', 'sqrt', 'tan', 'tanh', 'trunc',
+] as const
+type MathFunctionName = typeof MATH_FUNCTIONS[number]
+type MathWorkletName = `sw-patch-${MathFunctionName}` | 'sw-patch-invert'
+  | 'sw-patch-atodb' | 'sw-patch-dbtoa'
+
 const MATH_WORKLET_SOURCE = `
-class SwPatchInvertProcessor extends AudioWorkletProcessor {
+/** Base class for stoppable, sample-by-sample SW Patch worklets. */
+class SwPatchWorkletProcessor extends AudioWorkletProcessor {
   constructor() {
     super()
     this.stopped = false
@@ -277,57 +287,33 @@ class SwPatchInvertProcessor extends AudioWorkletProcessor {
   process(inputs, outputs) {
     if (this.stopped) return false
     const input = inputs[0] || []
-    const output = outputs[0]
+    const output = outputs[0] || []
     for (let channel = 0; channel < output.length; channel++) {
       const source = input[channel] || input[0]
       for (let sample = 0; sample < output[channel].length; sample++) {
-        output[channel][sample] = 1 / (source ? source[sample] : 0)
+        output[channel][sample] = this.transform(source ? source[sample] : 0)
       }
     }
     return true
   }
 }
-class SwPatchAtodbProcessor extends AudioWorkletProcessor {
-  constructor() {
-    super()
-    this.stopped = false
-    this.port.onmessage = ({ data }) => { if (data === 'stop') this.stopped = true }
-  }
-  process(inputs, outputs) {
-    if (this.stopped) return false
-    const input = inputs[0] || []
-    const output = outputs[0]
-    for (let channel = 0; channel < output.length; channel++) {
-      const source = input[channel] || input[0]
-      for (let sample = 0; sample < output[channel].length; sample++) {
-        output[channel][sample] = 20 * Math.log10(Math.abs(source ? source[sample] : 0))
-      }
-    }
-    return true
-  }
+class SwPatchInvertProcessor extends SwPatchWorkletProcessor {
+  transform(value) { return 1 / value }
 }
-class SwPatchDbtoaProcessor extends AudioWorkletProcessor {
-  constructor() {
-    super()
-    this.stopped = false
-    this.port.onmessage = ({ data }) => { if (data === 'stop') this.stopped = true }
-  }
-  process(inputs, outputs) {
-    if (this.stopped) return false
-    const input = inputs[0] || []
-    const output = outputs[0]
-    for (let channel = 0; channel < output.length; channel++) {
-      const source = input[channel] || input[0]
-      for (let sample = 0; sample < output[channel].length; sample++) {
-        output[channel][sample] = 10 ** ((source ? source[sample] : 0) / 20)
-      }
-    }
-    return true
-  }
+class SwPatchAtodbProcessor extends SwPatchWorkletProcessor {
+  transform(value) { return 20 * Math.log10(Math.abs(value)) }
+}
+class SwPatchDbtoaProcessor extends SwPatchWorkletProcessor {
+  transform(value) { return 10 ** (value / 20) }
 }
 registerProcessor('sw-patch-invert', SwPatchInvertProcessor)
 registerProcessor('sw-patch-atodb', SwPatchAtodbProcessor)
 registerProcessor('sw-patch-dbtoa', SwPatchDbtoaProcessor)
+${MATH_FUNCTIONS.map((name) => `
+class SwPatchMath${name}Processor extends SwPatchWorkletProcessor {
+  transform(value) { return Math.${name}(value) }
+}
+registerProcessor('sw-patch-${name}', SwPatchMath${name}Processor)`).join('')}
 `
 
 /** Converts a linear amplitude to decibels. */
@@ -384,6 +370,7 @@ export class PatchRuntime {
   private readonly topLevelBindings = new Set<string>()
   private readonly audioSignalGraph: AudioSignalGraph
   private readonly patchCleanups: Array<() => void> = []
+  private readonly signalTransforms = new WeakSet<PatchFunction>()
   private activeConnectionCleanups?: Array<() => void>
   private disposed = false
   readonly workletsReady: Promise<void>
@@ -459,12 +446,21 @@ export class PatchRuntime {
     this.root.set('AudioSignal', this.createAndStartAudioSignal.bind(this))
     this.root.set('atodb', (value: unknown) => this.convertMath('sw-patch-atodb', atodb, value))
     this.root.set('dbtoa', (value: unknown) => this.convertMath('sw-patch-dbtoa', dbtoa, value))
-    this.root.set('log', console.log)
+    for (const name of MATH_FUNCTIONS) {
+      const transform: PatchFunction = (value: unknown) => this.convertMath(
+        `sw-patch-${name}`,
+        (input) => Math[name](Number(input)),
+        value,
+      )
+      this.signalTransforms.add(transform)
+      this.root.set(name, transform)
+    }
+    this.root.set('print', console.log)
     this.root.set('context', this.context)
   }
 
   private convertMath(
-    processor: 'sw-patch-atodb' | 'sw-patch-dbtoa',
+    processor: MathWorkletName,
     scalar: (value: unknown) => number,
     value: unknown,
   ): unknown {
@@ -699,6 +695,14 @@ export class PatchRuntime {
     const cleanups: Array<() => void> = []
     for (const link of links) {
       const target = this.expression(link.target, scope)
+      if (typeof target === 'function' && this.signalTransforms.has(target as PatchFunction)) {
+        if (link.operator !== 'connect') throw new Error('A waveshaper cannot be disconnected inline')
+        if (link.output !== undefined || link.input !== undefined) {
+          throw new Error('A waveshaper connection cannot select ports')
+        }
+        source = (target as PatchFunction)(source) as Connectable
+        continue
+      }
       const connectedSource = this.internalConnections.get(source as object) ?? source
       if (link.output === undefined && link.input === undefined) connectedSource[link.operator](target)
       else connectedSource[link.operator](target, link.output ?? 0, link.input ?? 0)

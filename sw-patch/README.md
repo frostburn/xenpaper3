@@ -36,8 +36,9 @@ pitch.stop(cutOff)
 synth.dispose()
 ```
 
-`registerMathWorklets()` installs SW Patch's inline inversion, `atodb`, and
-`dbtoa` `AudioWorkletProcessor`s from a blob URL. Registration is
+`registerMathWorklets()` installs SW Patch's inline inversion, conversion, and
+standard unary `Math` `AudioWorkletProcessor`s from a blob URL. All processors
+share a stoppable sample-by-sample superclass. Registration is
 cached per context. Await it before evaluating patch functions that divide one
 audio signal by another or explicitly convert an audio signal with `atodb()` or
 `dbtoa()`. Unit annotations do not implicitly convert signals: for example,
@@ -46,6 +47,17 @@ produces its linear amplitude. The same rule applies to node options and schedul
 `AudioParam` values; call `dbtoa()` rather than relying on the destination node's
 type. `createPatch()` also starts registration automatically,
 but remains synchronous for patches that do not need those processors.
+
+The unary functions `abs`, `acos`, `acosh`, `asin`, `asinh`, `atan`, `atanh`,
+`cbrt`, `ceil`, `cos`, `cosh`, `exp`, `expm1`, `floor`, `fround`, `log`,
+`log10`, `log1p`, `log2`, `round`, `sign`, `sin`, `sinh`, `sqrt`, `tan`,
+`tanh`, and `trunc` accept either scalar quantities or audio signals. In a
+connection chain, a bare function name is waveshaping shorthand, so this creates
+and connects a `tanh` worklet between the oscillator and destination:
+
+```swpatch
+osc -> tanh -> destination
+```
 
 Every patch owns the Web Audio resources that the runtime creates implicitly,
 including scalar sources used by expressions such as `signal + 5`. Call
