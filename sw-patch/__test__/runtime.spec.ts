@@ -128,6 +128,12 @@ describe('SW Patch runtime', () => {
     expect(constants[0]?.disconnect).toHaveBeenCalledWith(untilSum)
     expect(constants[0]?.stop).toHaveBeenCalledOnce()
     expect(untilSum?.disconnect).toHaveBeenCalledWith(destination)
+
+    patch.dispose()
+    expect(constants[1]?.disconnect).toHaveBeenCalledWith(offset)
+    expect(constants[1]?.stop).toHaveBeenCalledOnce()
+    expect(constants[2]?.disconnect).toHaveBeenCalledWith(reverseDifference)
+    expect(constants[2]?.stop).toHaveBeenCalledOnce()
   })
 
   it('returns effect patches as input nodes whose output can connect onward', () => {

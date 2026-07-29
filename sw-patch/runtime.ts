@@ -12,6 +12,8 @@ export type PatchFunction = (...arguments_: unknown[]) => unknown
 
 export interface SynthPatch {
   [name: string]: unknown
+  /** Tears down implicit nodes and connections owned by this patch. */
+  dispose(): void
 }
 
 /** A patch whose top-level `input` and `output` bindings make it audio-connectable. */
@@ -285,7 +287,9 @@ export class PatchRuntime {
   private readonly internalConnections = new WeakMap<object, Connectable>()
   private readonly topLevelBindings = new Set<string>()
   private readonly audioSignalGraph: AudioSignalGraph
+  private readonly patchCleanups: Array<() => void> = []
   private activeConnectionCleanups?: Array<() => void>
+  private disposed = false
 
   constructor(context: BaseAudioContext, options: RuntimeOptions = {}) {
     this.context = context
@@ -296,14 +300,14 @@ export class PatchRuntime {
         gain: unknown
       },
       constant: (value) => this.createAndStartAudioSignal(value),
-      cleanup: (cleanup) => { this.activeConnectionCleanups?.push(cleanup) },
+      cleanup: (cleanup) => { this.registerCleanup(cleanup) },
     }
     this.installBuiltins()
   }
 
   evaluate(program: Program): SynthPatch {
     this.topLevelBindings.clear()
-    const patch: SynthPatch = {}
+    const patch: SynthPatch = { dispose: () => { this.dispose() } }
     this.statements(program.body, this.root, undefined, patch)
     return this.effectNode(patch)
   }
@@ -312,8 +316,28 @@ export class PatchRuntime {
   createAndStartAudioSignal(value: number) {
     const node = new ConstantSourceNode(this.context, { offset: value })
     node.start()
-    // TODO: Track node and stop when the patch is stopped.
     return node
+  }
+
+  private registerCleanup(cleanup: () => void): void {
+    let active = true
+    const once = () => {
+      if (!active) return
+      active = false
+      cleanup()
+    }
+    if (this.disposed) {
+      once()
+      return
+    }
+    this.patchCleanups.push(once)
+    this.activeConnectionCleanups?.push(once)
+  }
+
+  private dispose(): void {
+    if (this.disposed) return
+    this.disposed = true
+    for (const cleanup of this.patchCleanups.splice(0).reverse()) cleanup()
   }
 
   private installBuiltins(): void {
@@ -469,7 +493,7 @@ export class PatchRuntime {
         this.expression(statement.expression, scope); return undefined
       case 'ConnectionStatement': {
         const cleanups = this.connection(statement.first, statement.links, scope)
-        connectionCleanups?.push(...cleanups)
+        for (const cleanup of cleanups) this.registerCleanup(cleanup)
         return undefined
       }
       case 'ScheduledStatement':
