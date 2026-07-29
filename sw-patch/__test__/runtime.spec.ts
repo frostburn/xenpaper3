@@ -508,6 +508,14 @@ describe('SW Patch runtime', () => {
     })
   })
 
+  it('stores semitone quantities as cents', () => {
+    const semitone = Quantity.unit(1.5, 'semitones')
+
+    expect(semitone).toMatchObject({ value: 150, dimensions: { cent: 1 } })
+    expect(Quantity.binary('==', semitone, Quantity.unit(150, 'c'))).toBe(true)
+    expect(Quantity.unit(1, 'st').value).toBe(100)
+  })
+
   it('uses strict equality when only one operand is a quantity', () => {
     const one = Quantity.scalar(1)
     const zero = Quantity.scalar(0)

@@ -71,6 +71,9 @@ export class Quantity {
       case 'bpm': return new Quantity(value / 60, { beat: 1, time: -1 })
       case 'db': return new Quantity(value, { decibel: 1 })
       case 'c': return new Quantity(value, { cent: 1 })
+      case 'st':
+      case 'semitone':
+      case 'semitones': return new Quantity(value * 100, { cent: 1 })
       case '%': return new Quantity(value / 100)
       default: return new Quantity(value)
     }
@@ -120,10 +123,6 @@ export class Quantity {
       case '!=': return leftQuantity.value !== rightQuantity.value
       default: throw new Error(`Unsupported operator: ${operator}`)
     }
-  }
-
-  get isDecibels(): boolean {
-    return this.dimensions.decibel === 1 && Object.keys(this.dimensions).length === 1
   }
 
   valueOf(): number { return this.value }
