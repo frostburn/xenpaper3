@@ -36,6 +36,7 @@ describe('SW Patch runtime', () => {
     vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => {})
     const worklets: MockAudioWorkletNode[] = []
     class MockAudioWorkletNode {
+      port = { postMessage: vi.fn<(message: string) => void>() }
       connect = vi.fn<(target: unknown) => void>()
       disconnect = vi.fn<(target?: unknown) => void>()
       constructor(_context: BaseAudioContext, readonly name: string) { worklets.push(this) }
@@ -76,6 +77,8 @@ describe('SW Patch runtime', () => {
     expect(denominator.connect).toHaveBeenCalledWith(inverter)
     ;(patch.db as PatchFunction)()
     expect(worklets.some(({ name }) => name === 'sw-patch-decibels-to-level')).toBe(true)
+    patch.dispose()
+    for (const worklet of worklets) expect(worklet.port.postMessage).toHaveBeenCalledWith('stop')
   })
 
   it('builds Web Audio graphs for signal arithmetic', () => {

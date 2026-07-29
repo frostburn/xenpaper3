@@ -269,7 +269,13 @@ class AudioSignal {
 
 const MATH_WORKLET_SOURCE = `
 class SwPatchInvertProcessor extends AudioWorkletProcessor {
+  constructor() {
+    super()
+    this.stopped = false
+    this.port.onmessage = ({ data }) => { if (data === 'stop') this.stopped = true }
+  }
   process(inputs, outputs) {
+    if (this.stopped) return false
     const input = inputs[0] || []
     const output = outputs[0]
     for (let channel = 0; channel < output.length; channel++) {
@@ -282,7 +288,13 @@ class SwPatchInvertProcessor extends AudioWorkletProcessor {
   }
 }
 class SwPatchDecibelsToLevelProcessor extends AudioWorkletProcessor {
+  constructor() {
+    super()
+    this.stopped = false
+    this.port.onmessage = ({ data }) => { if (data === 'stop') this.stopped = true }
+  }
   process(inputs, outputs) {
+    if (this.stopped) return false
     const input = inputs[0] || []
     const output = outputs[0]
     for (let channel = 0; channel < output.length; channel++) {
@@ -358,7 +370,7 @@ export class PatchRuntime {
         gain: unknown
       },
       constant: (value) => this.createAndStartAudioSignal(value),
-      invert: () => new AudioWorkletNode(this.context, 'sw-patch-invert'),
+      invert: () => this.createMathWorklet('sw-patch-invert'),
       cleanup: (cleanup) => { this.registerCleanup(cleanup) },
     }
     this.installBuiltins()
@@ -377,11 +389,17 @@ export class PatchRuntime {
     const node = new ConstantSourceNode(this.context, { offset: quantity.value })
     node.start()
     if (!quantity.isDecibels) return node
-    const converter = new AudioWorkletNode(this.context, 'sw-patch-decibels-to-level')
+    const converter = this.createMathWorklet('sw-patch-decibels-to-level')
     node.connect(converter)
     this.registerCleanup(() => node.disconnect(converter))
     this.registerCleanup(() => node.stop())
     return converter
+  }
+
+  private createMathWorklet(name: string): AudioWorkletNode {
+    const node = new AudioWorkletNode(this.context, name)
+    this.registerCleanup(() => node.port.postMessage('stop'))
+    return node
   }
 
   private registerCleanup(cleanup: () => void): void {

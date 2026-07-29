@@ -20,6 +20,7 @@ const { effectConnect, synthOn } = vi.hoisted(() => ({
 vi.mock('../../sw-patch', () => ({
   createPatch: (source: string) =>
     source.includes('delayTime') ? { connect: effectConnect } : { on: synthOn },
+  registerMathWorklets: vi.fn<() => Promise<void>>().mockResolvedValue(undefined),
 }))
 
 import App from '../App.vue'
@@ -84,10 +85,11 @@ describe('App', () => {
     wrapper.unmount()
   })
 
-  it('resumes a suspended context before starting a note', () => {
+  it('resumes a suspended context before starting a note', async () => {
     const wrapper = mount(App)
 
     dispatchKey('keydown', 65)
+    await flushPromises()
     const context = contexts[0]!
     const source = sources[3]!
     expect(context.resume).toHaveBeenCalledOnce()

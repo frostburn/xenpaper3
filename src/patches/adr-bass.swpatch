@@ -9,17 +9,18 @@ fn on(
     attack: Duration = 10ms,
     decay: Duration = 500ms,
     release: Duration = 100ms,
-    Q: Gain = +5dB,
+    Q: AudioSignal<Gain> = AudioSignal(+5dB),
 ):
     osc = OscillatorNode(type = oscillatorType)
     lpf = BiquadFilterNode(
         type = 'lowpass',
         frequency = 300Hz * (1 + velocity),
-        Q = Q
+        Q = 0
     )
     attackEnv = GainNode(gain = 0)
-    initialGain = 10dB - Q
-    decayEnv = GainNode(gain = initialGain)
+    initialGain = AudioSignal(10dB) - Q
+    decayEnv = GainNode(gain = 0)
+    decayLevel = GainNode(gain = 1)
 
     pitchAttenuation = GainNode(gain = 0.7)
 
@@ -27,6 +28,8 @@ fn on(
         osc -> lpf -> attackEnv -> decayEnv -> destination
         pitch -> osc.detune
         pitch -> pitchAttenuation -> lpf.detune
+        Q -> lpf.Q
+        initialGain -> decayLevel -> decayEnv.gain
 
     osc.start(start)
 
@@ -35,13 +38,13 @@ fn on(
     @(start) attackEnv.gain = 0
     @(start + attack; linear) attackEnv.gain = velocity
 
-    @(start) decayEnv.gain = initialGain
-    @(start; target decay) decayEnv.gain = 0
+    @(start) decayLevel.gain = 1
+    @(start; target decay) decayLevel.gain = 0
 
     ret once fn off(end: Instant):
         @(end; hold) attackEnv.gain
-        @(end; hold) decayEnv.gain
-        @(end; target release) decayEnv.gain = 0
+        @(end; hold) decayLevel.gain
+        @(end; target release) decayLevel.gain = 0
 
         cutOff = end + 5 * release
         osc.stop(cutOff)
