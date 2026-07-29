@@ -13,8 +13,8 @@ interface Synth {
     velocity: number,
     attack?: number,
     decay?: number,
-    sustain?: number,
     release?: number,
+    Q?: AudioNode,
   ) => NoteOff
 }
 
@@ -26,7 +26,8 @@ output.connect(ctx.destination)
 const delayTime = new ConstantSourceNode(ctx, { offset: 0.25 })
 const feedback = new ConstantSourceNode(ctx, { offset: 0.55 })
 const wet = new ConstantSourceNode(ctx, { offset: 0.35 })
-for (const signal of [delayTime, feedback, wet]) signal.start()
+const Q = new ConstantSourceNode(ctx, { offset: 10 ** (5 / 20) })
+for (const signal of [delayTime, feedback, wet, Q]) signal.start()
 const delay = createPatch(PING_PONG_DELAY_PATCH, ctx, {
   config: { delayTime, feedback, wet },
 }) as unknown as AudioNode
@@ -41,6 +42,7 @@ const synth = createPatch(BASS_PATCH, ctx, {
 const delayTimeModel = ref('0.25')
 const feedbackModel = ref('0.55')
 const wetModel = ref('0.35')
+const qModel = ref('5')
 
 const bindSignal = (model: typeof wetModel, signal: ConstantSourceNode) =>
   watch(
@@ -52,6 +54,11 @@ const bindSignal = (model: typeof wetModel, signal: ConstantSourceNode) =>
 bindSignal(delayTimeModel, delayTime)
 bindSignal(feedbackModel, feedback)
 bindSignal(wetModel, wet)
+watch(
+  qModel,
+  (decibels) => Q.offset.setTargetAtTime(10 ** (Number(decibels) / 20), ctx.currentTime + inputDelay, 0.01),
+  { immediate: true },
+)
 
 type ActiveNote = [off: NoteOff, pitch: ConstantSourceNode]
 
@@ -87,7 +94,7 @@ const handleKeyDown = (e: KeyboardEvent) => {
     })
     const velocity = 0.8
     pitch.start()
-    const off = synth.on(delay, ctx.currentTime + inputDelay, pitch, velocity)
+    const off = synth.on(delay, ctx.currentTime + inputDelay, pitch, velocity, 0.01, 0.5, 0.1, Q)
     noteOffs.set(e.keyCode, [off, pitch])
   })
 }
@@ -130,6 +137,8 @@ onUnmounted(() => {
   <input id="feedback" type="range" v-model="feedbackModel" min="0" max="0.95" step="any" />
   <label for="wet">Wet level</label>
   <input id="wet" type="range" v-model="wetModel" min="0" max="1" step="any" />
+  <label for="filter-q">Filter Q ({{ qModel }} dB)</label>
+  <input id="filter-q" type="range" v-model="qModel" min="-20" max="20" step="0.1" />
 </template>
 
 <style scoped></style>

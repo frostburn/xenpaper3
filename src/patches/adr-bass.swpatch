@@ -18,7 +18,8 @@ fn on(
         Q = 0
     )
     attackEnv = GainNode(gain = 0)
-    initialGain = AudioSignal(10dB) - Q
+    # Dividing levels is equivalent to subtracting their decibel values.
+    initialGain = AudioSignal(10dB) / Q
     decayEnv = GainNode(gain = 0)
     decayLevel = GainNode(gain = 1)
 

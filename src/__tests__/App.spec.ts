@@ -14,7 +14,7 @@ class MockGainNodeConstructor {
 
 const { effectConnect, synthOn } = vi.hoisted(() => ({
   effectConnect: vi.fn<(to: AudioNode) => void>(),
-  synthOn: vi.fn<() => NoteOff>(),
+  synthOn: vi.fn<(...arguments_: unknown[]) => NoteOff>(),
 }))
 
 vi.mock('../../sw-patch', () => ({
@@ -91,10 +91,11 @@ describe('App', () => {
     dispatchKey('keydown', 65)
     await flushPromises()
     const context = contexts[0]!
-    const source = sources[3]!
+    const source = sources[4]!
     expect(context.resume).toHaveBeenCalledOnce()
     expect(source.start).toHaveBeenCalledOnce()
     expect(synthOn).toHaveBeenCalledOnce()
+    expect(synthOn.mock.calls[0]?.slice(4)).toEqual([0.01, 0.5, 0.1, sources[3]])
     expect(context.resume.mock.invocationCallOrder[0]!).toBeLessThan(
       source.start.mock.invocationCallOrder[0]!,
     )
@@ -111,7 +112,20 @@ describe('App', () => {
     window.dispatchEvent(new Event('blur'))
 
     expect(off).toHaveBeenCalledWith(1.01)
-    expect(sources[3]!.stop).toHaveBeenCalledWith(2)
+    expect(sources[4]!.stop).toHaveBeenCalledWith(2)
+    wrapper.unmount()
+  })
+
+  it('converts the filter Q slider from decibels to a level signal', async () => {
+    const wrapper = mount(App)
+
+    await wrapper.get('#filter-q').setValue('15')
+
+    expect(sources[3]!.offset.setTargetAtTime).toHaveBeenLastCalledWith(
+      10 ** (15 / 20),
+      1.01,
+      0.01,
+    )
     wrapper.unmount()
   })
 
