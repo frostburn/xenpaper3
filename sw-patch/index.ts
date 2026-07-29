@@ -1,2 +1,9 @@
-export { compilePatch, createPatch, PatchRuntime, registerMathWorklets } from './runtime.js'
+export {
+  atodb,
+  compilePatch,
+  createPatch,
+  dbtoa,
+  PatchRuntime,
+  registerMathWorklets,
+} from './runtime.js'
 export type { EffectPatch, PatchFunction, RuntimeOptions, SynthPatch } from './runtime.js'

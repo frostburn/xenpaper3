@@ -36,11 +36,15 @@ pitch.stop(cutOff)
 synth.dispose()
 ```
 
-`registerMathWorklets()` installs SW Patch's inline inversion and
-decibels-to-level `AudioWorkletProcessor`s from a blob URL. Registration is
+`registerMathWorklets()` installs SW Patch's inline inversion, `atodb`, and
+`dbtoa` `AudioWorkletProcessor`s from a blob URL. Registration is
 cached per context. Await it before evaluating patch functions that divide one
-audio signal by another or construct a decibel-valued signal such as
-`AudioSignal(+10dB)`. `createPatch()` also starts registration automatically,
+audio signal by another or explicitly convert an audio signal with `atodb()` or
+`dbtoa()`. Unit annotations do not implicitly convert signals: for example,
+`AudioSignal(+10dB)` carries the value `10`, while `dbtoa(AudioSignal(+10dB))`
+produces its linear amplitude. The same rule applies to node options and scheduled
+`AudioParam` values; call `dbtoa()` rather than relying on the destination node's
+type. `createPatch()` also starts registration automatically,
 but remains synchronous for patches that do not need those processors.
 
 Every patch owns the Web Audio resources that the runtime creates implicitly,

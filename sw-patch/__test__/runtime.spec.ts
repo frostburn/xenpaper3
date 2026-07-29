@@ -2,7 +2,9 @@ import { describe, expect, it, vi } from 'vitest'
 import {
   PatchRuntime,
   Quantity,
+  atodb,
   createPatch,
+  dbtoa,
   registerMathWorklets,
   type PatchFunction,
 } from '../runtime.js'
@@ -14,6 +16,12 @@ function location() {
 }
 
 describe('SW Patch runtime', () => {
+  it('provides classic amplitude and decibel conversion utilities', () => {
+    expect(dbtoa(20)).toBe(10)
+    expect(atodb(10)).toBe(20)
+    expect(atodb(dbtoa(-6))).toBeCloseTo(-6)
+  })
+
   it('registers inline math worklets once per audio context', async () => {
     const addModule = vi.fn<(_: string) => Promise<void>>().mockResolvedValue(undefined)
     const createObjectURL = vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:math-worklets')
@@ -28,7 +36,7 @@ describe('SW Patch runtime', () => {
     expect(revokeObjectURL).toHaveBeenCalledWith('blob:math-worklets')
   })
 
-  it('uses worklets for signal division and decibel-valued AudioSignals', async () => {
+  it('uses worklets for signal division and explicit decibel conversions', async () => {
     const context = {
       audioWorklet: { addModule: vi.fn<() => Promise<void>>().mockResolvedValue(undefined) },
     } as unknown as BaseAudioContext
@@ -67,7 +75,9 @@ describe('SW Patch runtime', () => {
     }
     const patch = createPatch(
       'fn divide():\n    ret numerator / denominator\n'
-      + 'fn db():\n    ret AudioSignal(+10dB)\n',
+      + 'fn conversions():\n    decibels = AudioSignal(+10dB)\n'
+      + '    level = dbtoa(decibels)\n'
+      + '    ret atodb(level)\n',
       context,
       { globals: { denominator, numerator } },
     )
@@ -75,8 +85,9 @@ describe('SW Patch runtime', () => {
     ;(patch.divide as PatchFunction)()
     const inverter = worklets.find(({ name }) => name === 'sw-patch-invert')
     expect(denominator.connect).toHaveBeenCalledWith(inverter)
-    ;(patch.db as PatchFunction)()
-    expect(worklets.some(({ name }) => name === 'sw-patch-decibels-to-level')).toBe(true)
+    ;(patch.conversions as PatchFunction)()
+    expect(worklets.some(({ name }) => name === 'sw-patch-dbtoa')).toBe(true)
+    expect(worklets.some(({ name }) => name === 'sw-patch-atodb')).toBe(true)
     patch.dispose()
     for (const worklet of worklets) expect(worklet.port.postMessage).toHaveBeenCalledWith('stop')
   })
@@ -384,7 +395,7 @@ describe('SW Patch runtime', () => {
     expect(() => (patch.escape as PatchFunction)()).toThrow('forbidden')
   })
 
-  it('interprets decibel values according to their AudioParam context', () => {
+  it('does not implicitly convert decibel values based on AudioParam context', () => {
     const filter = { Q: { value: 0 }, gain: { value: 0 } }
     const gain = { gain: { value: 0 } }
     const context = {} as BaseAudioContext
@@ -415,10 +426,10 @@ describe('SW Patch runtime', () => {
 
     expect(filter.Q.value).toBe(10)
     expect(filter.gain.value).toBe(10)
-    expect(gain.gain.value).toBeCloseTo(0.316227766)
+    expect(gain.gain.value).toBe(-10)
   })
 
-  it('converts decibels for scheduled gain assignments on global nodes', () => {
+  it('keeps decibels literal for scheduled gain assignments', () => {
     const gain = {
       setValueAtTime: vi.fn<(value: number, time: number) => void>(),
     }
@@ -433,7 +444,7 @@ describe('SW Patch runtime', () => {
     const setGain = patch.setGain as PatchFunction
     setGain()
 
-    expect(gain.setValueAtTime).toHaveBeenCalledWith(10 ** (-6 / 20), 0)
+    expect(gain.setValueAtTime).toHaveBeenCalledWith(-6, 0)
   })
 
   it('keeps decibels literal for scheduled BiquadFilter gain assignments', () => {
@@ -473,7 +484,7 @@ describe('SW Patch runtime', () => {
     const values = patch.values as PatchFunction
     values()
 
-    expect(gain.gain.value).toBeCloseTo(10 ** (-12 / 20))
+    expect(gain.gain.value).toBe(-12)
   })
 
   it('derives units through quantity arithmetic', () => {

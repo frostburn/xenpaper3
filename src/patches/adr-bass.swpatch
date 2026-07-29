@@ -9,8 +9,7 @@ fn on(
     attack: Duration = 10ms,
     decay: Duration = 500ms,
     release: Duration = 100ms,
-    Q: AudioSignal<Gain> = AudioSignal(+5dB),
-    initialGain: AudioSignal<Gain> = AudioSignal(10dB + -5dB),
+    Q: AudioSignal<Decibels> = AudioSignal(+5dB),
 ):
     osc = OscillatorNode(type = oscillatorType)
     lpf = BiquadFilterNode(
@@ -19,6 +18,8 @@ fn on(
         Q = 0
     )
     attackEnv = GainNode(gain = 0)
+    QLevel = dbtoa(Q)
+    initialGain = dbtoa(AudioSignal(10dB) - Q)
     decayEnv = GainNode(gain = 0)
     decayLevel = GainNode(gain = 1)
 
@@ -28,7 +29,7 @@ fn on(
         osc -> lpf -> attackEnv -> decayEnv -> destination
         pitch -> osc.detune
         pitch -> pitchAttenuation -> lpf.detune
-        Q -> lpf.Q
+        QLevel -> lpf.Q
         initialGain -> decayLevel -> decayEnv.gain
 
     osc.start(start)
