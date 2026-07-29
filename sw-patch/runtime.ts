@@ -586,9 +586,10 @@ export class PatchRuntime {
       if (link.output === undefined && link.input === undefined) connectedSource[link.operator](target)
       else connectedSource[link.operator](target, link.output ?? 0, link.input ?? 0)
       if (link.operator === 'connect') {
+        const disconnect = connectedSource.disconnect.bind(connectedSource)
         cleanups.push(() => {
-          if (link.output === undefined && link.input === undefined) connectedSource.disconnect(target)
-          else connectedSource.disconnect(target, link.output ?? 0, link.input ?? 0)
+          if (link.output === undefined && link.input === undefined) disconnect(target)
+          else disconnect(target, link.output ?? 0, link.input ?? 0)
         })
       }
       source = target as Connectable

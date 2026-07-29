@@ -138,9 +138,10 @@ describe('SW Patch runtime', () => {
 
   it('returns effect patches as input nodes whose output can connect onward', () => {
     const inputConnect = vi.fn<(target: unknown) => void>()
+    const inputDisconnect = vi.fn<(target?: unknown) => void>()
     const outputConnect = vi.fn<(target: unknown) => void>()
     const outputDisconnect = vi.fn<(target?: unknown) => void>()
-    const input = { connect: inputConnect, disconnect: vi.fn<(target?: unknown) => void>() }
+    const input = { connect: inputConnect, disconnect: inputDisconnect }
     const output = { connect: outputConnect, disconnect: outputDisconnect }
     const nodes = [input, output]
     const GainNode = vi.fn<() => typeof input | undefined>(function () { return nodes.shift() })
@@ -161,6 +162,10 @@ describe('SW Patch runtime', () => {
     effect.disconnect(destination)
     expect(outputConnect).toHaveBeenCalledWith(destination)
     expect(outputDisconnect).toHaveBeenCalledWith(destination)
+
+    ;(effect as unknown as { dispose(): void }).dispose()
+    expect(inputDisconnect).toHaveBeenCalledWith(output)
+    expect(outputDisconnect).not.toHaveBeenCalledWith(output)
   })
 
   it('passes normalized options to Web Audio constructors', () => {
