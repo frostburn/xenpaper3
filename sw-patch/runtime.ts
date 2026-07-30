@@ -803,7 +803,7 @@ export class PatchRuntime {
       case 'ScheduledStatement':
         this.scheduled(statement.at, statement.automation, statement.statement, scope); return undefined
       case 'UntilStatement':
-        this.until(statement.event, statement.body, scope); return undefined
+        this.until(statement.emitter, statement.event, statement.body, scope); return undefined
       case 'ReturnStatement':
         return { [RETURN]: true, value: this.expression(statement.value, scope) }
       case 'ElifStatement':
@@ -862,13 +862,12 @@ export class PatchRuntime {
     }
   }
 
-  private until(event: Expression, body: Statement[], scope: Scope): void {
+  private until(emitterExpression: Expression, event: string, body: Statement[], scope: Scope): void {
     // Connections in an `until` suite are established now and torn down by the event.
     const cleanups: Array<() => void> = []
     this.statements(body, scope, cleanups)
-    if (event.type !== 'MemberExpression') throw new Error('until expects an event member')
-    const emitter = this.expression(event.object, scope) as EventTarget
-    emitter.addEventListener(event.property, () => {
+    const emitter = this.expression(emitterExpression, scope) as EventTarget
+    emitter.addEventListener(event, () => {
       for (const cleanup of cleanups.reverse()) cleanup()
     }, { once: true })
   }

@@ -422,7 +422,7 @@ describe('SW Patch runtime', () => {
       + 'fn divided():\n    ret signal / 4\n'
       + 'fn offset():\n    ret signal + 5\n'
       + 'fn reverseDifference():\n    ret 6 - signal\n'
-      + 'until emitter.ended:\n'
+      + 'until emitter:ended:\n'
       + '    sum = signal + 7\n'
       + '    sum -> destination\n',
       {} as BaseAudioContext,
@@ -519,7 +519,7 @@ describe('SW Patch runtime', () => {
     const source = { connect: vi.fn<(target: unknown, output?: number, input?: number) => void>(), disconnect: vi.fn<(target?: unknown, output?: number, input?: number) => void>() }
     const destination = { connect: vi.fn<(target: unknown) => void>(), disconnect: vi.fn<() => void>() }
     createPatch(
-      'until emitter.ended:\n'
+      'until emitter:ended:\n'
       + '    source:2 -> destination:3\n',
       {} as BaseAudioContext,
       { globals: { destination, emitter, source } },
@@ -596,11 +596,8 @@ describe('SW Patch runtime', () => {
     runtime.evaluate({
       type: 'Program', location: location(), body: [{
         type: 'UntilStatement', location: location(),
-        event: {
-          type: 'MemberExpression', location: location(),
-          object: { type: 'Identifier', name: 'emitter', location: location() },
-          property: 'ended',
-        },
+        emitter: { type: 'Identifier', name: 'emitter', location: location() },
+        event: 'ended',
         body: [{
           type: 'IfStatement', location: location(),
           test: { type: 'BooleanLiteral', value: true, location: location() },

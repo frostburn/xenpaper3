@@ -16,7 +16,7 @@ fn on(
 
     r = TimeNode()
 
-    until t.ended:
+    until t:ended:
         pitch -> phase.detune
         decayEnv = exp(-t / decay)
         sharpness = 0.05 + 0.9 * decayEnv

@@ -25,7 +25,7 @@ fn on(
     attackEnv = GainNode(gain = 0)
     decayEnv = GainNode(gain = 1)
 
-    until osc.ended:
+    until osc:ended:
         osc -> attackEnv -> decayEnv -> destination
         pitch -> osc.detune
 
@@ -49,6 +49,17 @@ fn on(
 `
 
 describe('SW Patch parser', () => {
+  it('distinguishes until events from member access', () => {
+    const ast = parse('until osc:ended:\n    osc -> destination\n')
+
+    expect(ast.body[0]).toMatchObject({
+      type: 'UntilStatement',
+      emitter: { type: 'Identifier', name: 'osc' },
+      event: 'ended',
+    })
+    expect(() => parse('until osc.ended:\n    osc -> destination\n')).toThrow('Expected')
+  })
+
   it('distinguishes spaced percentage literals from modulo expressions', () => {
     const ast = parse('percentage = 70 %\nremainder = 70 % 8\n')
 
@@ -102,7 +113,10 @@ describe('SW Patch parser', () => {
     })
 
     if (on?.type !== 'FunctionDeclaration') throw new Error('Expected function declaration')
-    expect(on.body.some(({ type }) => type === 'UntilStatement')).toBe(true)
+    expect(on.body.find(({ type }) => type === 'UntilStatement')).toMatchObject({
+      emitter: { type: 'Identifier', name: 'osc' },
+      event: 'ended',
+    })
     expect(on.body.at(-1)).toMatchObject({
       type: 'FunctionDeclaration',
       name: 'off',

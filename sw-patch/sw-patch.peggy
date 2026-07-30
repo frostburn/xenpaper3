@@ -140,8 +140,8 @@ Parameter
     }
 
 UntilStatement
-  = KeywordUntil __ event:Expression body:Suite {
-      return node("UntilStatement", { event, body });
+  = KeywordUntil __ emitter:PostfixExpression H ":" H event:Identifier body:Suite {
+      return node("UntilStatement", { emitter, event, body });
     }
 
 IfStatement
