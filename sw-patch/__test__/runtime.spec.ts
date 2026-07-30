@@ -57,8 +57,11 @@ describe('SW Patch runtime', () => {
 
   it('provides native-style utility signal sources', () => {
     const worklets: MockAudioWorkletNode[] = []
-    class MockAudioWorkletNode {
-      port = { postMessage: vi.fn<(message: unknown) => void>() }
+    class MockAudioWorkletNode extends EventTarget {
+      port = {
+        onmessage: null as ((event: MessageEvent) => void) | null,
+        postMessage: vi.fn<(message: unknown) => void>(),
+      }
       parameters = new Map<string, { value: number }>([
         ['frequency', { value: 440 }],
         ['detune', { value: 0 }],
@@ -69,7 +72,10 @@ describe('SW Patch runtime', () => {
         _context: BaseAudioContext,
         readonly name: string,
         readonly options: { numberOfInputs: number },
-      ) { worklets.push(this) }
+      ) {
+        super()
+        worklets.push(this)
+      }
     }
     vi.stubGlobal('AudioWorkletNode', MockAudioWorkletNode)
     const context = { currentTime: 4 } as BaseAudioContext
@@ -94,6 +100,16 @@ describe('SW Patch runtime', () => {
     expect(phase.parameters.get('detune')?.value).toBe(100)
     expect(worklets.at(-3)?.port.postMessage).toHaveBeenCalledWith({ type: 'start', when: 6 })
     expect(worklets.at(-1)?.port.postMessage).toHaveBeenCalledWith({ type: 'start', when: 4 })
+
+    const ended = vi.fn<() => void>()
+    worklets.at(-3)?.addEventListener('ended', ended)
+    worklets.at(-3)?.port.onmessage?.({ data: 'ended' } as MessageEvent)
+    expect(ended).toHaveBeenCalledOnce()
+    expect(worklets.at(-3)?.port.onmessage).toBeNull()
+    const completedSourceMessages = worklets.at(-3)?.port.postMessage.mock.calls.length
+
+    patch.dispose()
+    expect(worklets.at(-3)?.port.postMessage).toHaveBeenCalledTimes(completedSourceMessages!)
   })
 
   it('uses worklets for signal comparisons, Python modulo, and where()', () => {

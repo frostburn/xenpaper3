@@ -368,6 +368,7 @@ class SwPatchScheduledSourceProcessor extends AudioWorkletProcessor {
     super()
     this.startedAt = Infinity
     this.stoppedAt = Infinity
+    this.ended = false
     this.port.onmessage = ({ data }) => {
       if (data.type === 'start') this.startedAt = data.when
       if (data.type === 'stop') this.stoppedAt = data.when
@@ -375,13 +376,20 @@ class SwPatchScheduledSourceProcessor extends AudioWorkletProcessor {
   }
   valueAt() { return 0 }
   process(_inputs, outputs, parameters) {
+    if (currentTime >= this.stoppedAt) {
+      if (!this.ended) {
+        this.ended = true
+        this.port.postMessage('ended')
+      }
+      return false
+    }
     const output = outputs[0] || []
     for (const channel of output) for (let sample = 0; sample < channel.length; sample++) {
       const time = currentTime + sample / sampleRate
       channel[sample] = time >= this.startedAt && time < this.stoppedAt
         ? this.valueAt(time, sample, parameters) : 0
     }
-    return currentTime < this.stoppedAt
+    return true
   }
 }
 class SwPatchTimeProcessor extends SwPatchScheduledSourceProcessor {
@@ -465,7 +473,7 @@ export class PatchRuntime {
   private readonly internalConnections = new WeakMap<object, Connectable>()
   private readonly topLevelBindings = new Set<string>()
   private readonly audioSignalGraph: AudioSignalGraph
-  private readonly patchCleanups: Array<() => void> = []
+  private readonly patchCleanups = new Set<() => void>()
   private activeConnectionCleanups?: Array<() => void>
   private disposed = false
   readonly workletsReady: Promise<void>
@@ -509,25 +517,27 @@ export class PatchRuntime {
     return node
   }
 
-  private registerCleanup(cleanup: () => void): void {
+  private registerCleanup(cleanup: () => void): () => void {
     let active = true
     const once = () => {
       if (!active) return
       active = false
+      this.patchCleanups.delete(once)
       cleanup()
     }
     if (this.disposed) {
       once()
-      return
+      return once
     }
-    this.patchCleanups.push(once)
+    this.patchCleanups.add(once)
     this.activeConnectionCleanups?.push(once)
+    return once
   }
 
   private dispose(): void {
     if (this.disposed) return
     this.disposed = true
-    for (const cleanup of this.patchCleanups.splice(0).reverse()) cleanup()
+    for (const cleanup of [...this.patchCleanups].reverse()) cleanup()
   }
 
   private installBuiltins(): void {
@@ -575,7 +585,16 @@ export class PatchRuntime {
       ...(frequency ? { frequency: { value: frequency } } : {}),
       ...(detune ? { detune: { value: detune } } : {}),
     })
-    this.registerCleanup(() => node.port.postMessage({ type: 'stop', when: this.context.currentTime }))
+    let cleanup = () => {}
+    node.port.onmessage = ({ data }) => {
+      if (data !== 'ended') return
+      node.dispatchEvent(new Event('ended'))
+      cleanup()
+    }
+    cleanup = this.registerCleanup(() => {
+      node.port.onmessage = null
+      node.port.postMessage({ type: 'stop', when: this.context.currentTime })
+    })
     return node
   }
 

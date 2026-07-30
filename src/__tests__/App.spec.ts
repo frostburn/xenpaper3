@@ -181,6 +181,19 @@ describe('App', () => {
     expect(synthDisposes[0]).toHaveBeenCalledOnce()
   })
 
+  it('selects softsaw with the standard ADSR arguments', async () => {
+    const wrapper = mount(App)
+    await flushPromises()
+
+    await wrapper.get('#synth-patch').setValue('softsaw')
+    await flushPromises()
+    dispatchKey('keydown', 65)
+    await flushPromises()
+
+    expect(synthOn.mock.calls[0]?.slice(4)).toEqual([0.01, 0.5, 0.7, 0.1])
+    wrapper.unmount()
+  })
+
   it('recreates and disposes the synth when its oscillator config changes', async () => {
     const wrapper = mount(App)
     await flushPromises()
