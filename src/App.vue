@@ -8,9 +8,11 @@ import PING_PONG_DELAY_PATCH from './patches/ping-pong-delay.swpatch?raw'
 type NoteOff = (end: number) => number
 interface Synth {
   on: (...args: unknown[]) => NoteOff
+  dispose: () => void
 }
 
 type SynthPatch = 'default' | 'bass'
+type OscillatorType = 'sine' | 'square' | 'sawtooth' | 'triangle'
 
 // Dummy audio code just to get something going
 const ctx = new AudioContext({ latencyHint: 'interactive' })
@@ -24,18 +26,36 @@ for (const signal of [delayTime, feedback, wet, Q]) signal.start()
 const inputDelay = 0.01
 let mounted = true
 let delay: AudioNode
-let synth: Synth
+let synth: Synth | undefined
 let activeSynthPatch: SynthPatch
 const synthPatchModel = ref<SynthPatch>('bass')
+const oscillatorTypeModel = ref<OscillatorType>('sawtooth')
+const retiredSynths = new Map<Synth, ReturnType<typeof setTimeout>>()
 
-const createSynth = (patch: SynthPatch) =>
+const createSynth = (patch: SynthPatch, oscillatorType: OscillatorType) =>
   createPatch(patch === 'default' ? DEFAULT_PATCH : BASS_PATCH, ctx, {
-    config: { oscillatorType: 'sawtooth' },
+    config: { oscillatorType },
   } as RuntimeOptions) as unknown as Synth
 
-const selectSynth = (patch: SynthPatch) => {
-  synth = createSynth(patch)
+const retireSynth = (oldSynth: Synth, after: number) => {
+  const delayMilliseconds = Math.max(0, (after - ctx.currentTime) * 1000)
+  if (delayMilliseconds === 0) {
+    oldSynth.dispose()
+    return
+  }
+  const timer = setTimeout(() => {
+    retiredSynths.delete(oldSynth)
+    oldSynth.dispose()
+  }, delayMilliseconds)
+  retiredSynths.set(oldSynth, timer)
+}
+
+const selectSynth = (patch: SynthPatch, oscillatorType: OscillatorType) => {
+  const oldSynth = synth
+  const notesEnd = oldSynth ? releaseAllNotes() : ctx.currentTime
+  synth = createSynth(patch, oscillatorType)
   activeSynthPatch = patch
+  if (oldSynth) retireSynth(oldSynth, notesEnd)
 }
 
 // A patch may instantiate a math worklet while its top-level connections are
@@ -46,7 +66,7 @@ const patchesReady = registerMathWorklets(ctx).then(() => {
     config: { delayTime, feedback, wet },
   }) as unknown as AudioNode
   delay.connect(output)
-  selectSynth(synthPatchModel.value)
+  selectSynth(synthPatchModel.value, oscillatorTypeModel.value)
   return true
 })
 
@@ -72,7 +92,7 @@ type ActiveNote = [off: NoteOff, pitch: ConstantSourceNode]
 
 const noteOffs = new Map<number, ActiveNote>()
 const pendingNotes = new Set<number>()
-const releaseNote = (keyCode: number) => {
+const releaseNote = (keyCode: number): number => {
   pendingNotes.delete(keyCode)
   const note = noteOffs.get(keyCode)
   if (note) {
@@ -82,19 +102,28 @@ const releaseNote = (keyCode: number) => {
     noteOffs.delete(keyCode)
     const cutTime = off(ctx.currentTime + inputDelay)
     pitch.stop(cutTime)
+    return cutTime
   }
+  return ctx.currentTime
 }
 
 const releaseAllNotes = () => {
   pendingNotes.clear()
-  for (const keyCode of noteOffs.keys()) releaseNote(keyCode)
+  let notesEnd = ctx.currentTime
+  for (const keyCode of noteOffs.keys()) notesEnd = Math.max(notesEnd, releaseNote(keyCode))
+  return notesEnd
 }
 
-watch(synthPatchModel, async (patch) => {
+watch([synthPatchModel, oscillatorTypeModel], async ([patch, oscillatorType]) => {
   const ready = await patchesReady
-  if (!ready || !mounted || patch !== synthPatchModel.value) return
-  releaseAllNotes()
-  selectSynth(patch)
+  if (
+    !ready ||
+    !mounted ||
+    patch !== synthPatchModel.value ||
+    oscillatorType !== oscillatorTypeModel.value
+  )
+    return
+  selectSynth(patch, oscillatorType)
 })
 
 const handleKeyDown = (e: KeyboardEvent) => {
@@ -115,8 +144,8 @@ const handleKeyDown = (e: KeyboardEvent) => {
     // AudioNode from being interpreted as the default patch's release duration.
     const off =
       activeSynthPatch === 'default'
-        ? synth.on(...commonArgs, 0.7, 0.1)
-        : synth.on(...commonArgs, 0.1, Q)
+        ? synth!.on(...commonArgs, 0.7, 0.1)
+        : synth!.on(...commonArgs, 0.1, Q)
     noteOffs.set(e.keyCode, [off, pitch])
   })
 }
@@ -143,6 +172,12 @@ onUnmounted(() => {
   window.removeEventListener('blur', releaseAllNotes)
   document.removeEventListener('visibilitychange', handleVisibilityChange)
   releaseAllNotes()
+  synth?.dispose()
+  for (const [retiredSynth, timer] of retiredSynths) {
+    clearTimeout(timer)
+    retiredSynth.dispose()
+  }
+  retiredSynths.clear()
   void ctx.close()
 })
 </script>
@@ -157,6 +192,13 @@ onUnmounted(() => {
   <select id="synth-patch" v-model="synthPatchModel">
     <option value="default">Default</option>
     <option value="bass">Bass</option>
+  </select>
+  <label for="oscillator-type">Oscillator type</label>
+  <select id="oscillator-type" v-model="oscillatorTypeModel">
+    <option value="sine">Sine</option>
+    <option value="square">Square</option>
+    <option value="sawtooth">Sawtooth</option>
+    <option value="triangle">Triangle</option>
   </select>
   <label for="delay-time">Delay time</label>
   <input id="delay-time" type="range" v-model="delayTimeModel" min="0" max="2" step="any" />

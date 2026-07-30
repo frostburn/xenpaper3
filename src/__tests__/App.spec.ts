@@ -12,12 +12,15 @@ class MockGainNodeConstructor {
   connect = vi.fn<(to: AudioNode) => MockGainNodeConstructor>(() => this)
 }
 
-const { createPatch, effectConnect, registerMathWorklets, synthOn } = vi.hoisted(() => ({
-  createPatch: vi.fn<(source: string) => unknown>(),
-  effectConnect: vi.fn<(to: AudioNode) => void>(),
-  registerMathWorklets: vi.fn<() => Promise<void>>(),
-  synthOn: vi.fn<(...arguments_: unknown[]) => NoteOff>(),
-}))
+const { createPatch, effectConnect, registerMathWorklets, synthDisposes, synthOn } = vi.hoisted(
+  () => ({
+    createPatch: vi.fn<(source: string, ...args: unknown[]) => unknown>(),
+    effectConnect: vi.fn<(to: AudioNode) => void>(),
+    registerMathWorklets: vi.fn<() => Promise<void>>(),
+    synthDisposes: [] as Array<ReturnType<typeof vi.fn>>,
+    synthOn: vi.fn<(...arguments_: unknown[]) => NoteOff>(),
+  }),
+)
 
 vi.mock('../../sw-patch', () => ({
   createPatch,
@@ -71,12 +74,16 @@ const dispatchKey = (type: 'keydown' | 'keyup', keyCode: number) =>
 beforeEach(() => {
   contexts.length = 0
   sources.length = 0
+  synthDisposes.length = 0
   synthOn.mockReset()
   effectConnect.mockReset()
   createPatch.mockReset()
-  createPatch.mockImplementation((source) =>
-    source.includes('delayTime') ? { connect: effectConnect } : { on: synthOn },
-  )
+  createPatch.mockImplementation((source) => {
+    if (source.includes('delayTime')) return { connect: effectConnect }
+    const dispose = vi.fn<() => void>()
+    synthDisposes.push(dispose)
+    return { dispose, on: synthOn }
+  })
   registerMathWorklets.mockReset()
   registerMathWorklets.mockResolvedValue(undefined)
   synthOn.mockReturnValue(vi.fn<NoteOff>(() => 2))
@@ -165,10 +172,25 @@ describe('App', () => {
     await flushPromises()
     expect(bassOff).toHaveBeenCalledOnce()
     expect(createPatch).toHaveBeenCalledTimes(3)
+    expect(synthDisposes[0]).not.toHaveBeenCalled()
 
     dispatchKey('keydown', 66)
     await flushPromises()
     expect(synthOn.mock.calls[1]?.slice(4)).toEqual([0.01, 0.5, 0.7, 0.1])
+    wrapper.unmount()
+    expect(synthDisposes[0]).toHaveBeenCalledOnce()
+  })
+
+  it('recreates and disposes the synth when its oscillator config changes', async () => {
+    const wrapper = mount(App)
+    await flushPromises()
+
+    expect(createPatch.mock.calls[1]?.[2]).toEqual({ config: { oscillatorType: 'sawtooth' } })
+    await wrapper.get('#oscillator-type').setValue('square')
+    await flushPromises()
+
+    expect(synthDisposes[0]).toHaveBeenCalledOnce()
+    expect(createPatch.mock.calls[2]?.[2]).toEqual({ config: { oscillatorType: 'square' } })
     wrapper.unmount()
   })
 
