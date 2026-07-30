@@ -125,6 +125,77 @@ describe('SW Patch runtime', () => {
     expect(worklets[0]?.port.postMessage).toHaveBeenCalledWith('stop')
   })
 
+  it('provides Math constants and supports custom inline waveshapers', () => {
+    const gains: MockGainNode[] = []
+    const worklets: MockAudioWorkletNode[] = []
+    class MockGainNode {
+      gain = {}
+      connect = vi.fn<(target: unknown) => void>()
+      disconnect = vi.fn<(target?: unknown) => void>()
+      constructor(_context: BaseAudioContext, readonly options: { gain?: number } = {}) {
+        gains.push(this)
+      }
+    }
+    class MockAudioWorkletNode {
+      port = { postMessage: vi.fn<(message: string) => void>() }
+      connect = vi.fn<(target: unknown) => void>()
+      disconnect = vi.fn<(target?: unknown) => void>()
+      constructor(_context: BaseAudioContext, readonly name: string) { worklets.push(this) }
+    }
+    vi.stubGlobal('GainNode', MockGainNode)
+    vi.stubGlobal('AudioWorkletNode', MockAudioWorkletNode)
+    const input = {
+      connect: vi.fn<(target: unknown) => void>(),
+      disconnect: vi.fn<(target?: unknown) => void>(),
+    }
+    const output = {}
+
+    const patch = createPatch(
+      'fn shape(x: Gain):\n'
+      + '    ret 2 * atan(5 * x) / PI\n'
+      + 'input -> shape -> output\n'
+      + 'fn constants():\n'
+      + '    ret E + LN10 + LN2 + LOG10E + LOG2E + PI + SQRT1_2 + SQRT2\n',
+      {} as BaseAudioContext,
+      { globals: { input, output } },
+    )
+
+    expect(gains.map(({ options }) => options.gain)).toEqual([5, 2, 1 / Math.PI])
+    expect(worklets[0]?.name).toBe('sw-patch-atan')
+    expect(input.connect).toHaveBeenCalledWith(gains[0])
+    expect(gains[0]?.connect).toHaveBeenCalledWith(worklets[0])
+    expect(worklets[0]?.connect).toHaveBeenCalledWith(gains[1])
+    expect(gains[1]?.connect).toHaveBeenCalledWith(gains[2])
+    expect(gains[2]?.connect).toHaveBeenCalledWith(output)
+    expect(Number((patch.constants as PatchFunction)())).toBeCloseTo(
+      Math.E + Math.LN10 + Math.LN2 + Math.LOG10E + Math.LOG2E
+      + Math.PI + Math.SQRT1_2 + Math.SQRT2,
+    )
+
+    patch.dispose()
+    expect(gains[2]?.disconnect).toHaveBeenCalledWith(output)
+  })
+
+  it('requires keyword arguments when calling functions with multiple parameters', () => {
+    const patch = createPatch(
+      'fn add(left: Scalar = 10, right: Scalar = 20):\n'
+      + '    ret left + right\n'
+      + 'fn named():\n'
+      + '    ret add(right = 2, left = 3)\n'
+      + 'fn positional():\n'
+      + '    ret add(3, 2)\n'
+      + 'fn defaulted():\n'
+      + '    ret add(right = 5)\n',
+      {} as BaseAudioContext,
+    )
+
+    expect(Number((patch.named as PatchFunction)())).toBe(5)
+    expect(Number((patch.defaulted as PatchFunction)())).toBe(15)
+    expect(() => (patch.positional as PatchFunction)()).toThrow(
+      'Function `add` requires keyword arguments',
+    )
+  })
+
   it('builds Web Audio graphs for signal arithmetic', () => {
     const created: MockGainNode[] = []
     class MockGainNode {

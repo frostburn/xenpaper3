@@ -272,6 +272,9 @@ const MATH_FUNCTIONS = [
   'exp', 'expm1', 'floor', 'fround', 'log', 'log10', 'log1p', 'log2', 'round', 'sign', 'sin',
   'sinh', 'sqrt', 'tan', 'tanh', 'trunc',
 ] as const
+const MATH_CONSTANTS = [
+  'E', 'LN10', 'LN2', 'LOG10E', 'LOG2E', 'PI', 'SQRT1_2', 'SQRT2',
+] as const
 type MathFunctionName = typeof MATH_FUNCTIONS[number]
 type MathWorkletName = `sw-patch-${MathFunctionName}` | 'sw-patch-invert'
   | 'sw-patch-atodb' | 'sw-patch-dbtoa'
@@ -371,6 +374,11 @@ export class PatchRuntime {
   private readonly audioSignalGraph: AudioSignalGraph
   private readonly patchCleanups: Array<() => void> = []
   private readonly signalTransforms = new WeakSet<PatchFunction>()
+  private readonly patchFunctions = new WeakMap<PatchFunction, FunctionDeclaration>()
+  private readonly patchFunctionInvokers = new WeakMap<
+    PatchFunction,
+    (provided: ReadonlyMap<number, unknown>) => unknown
+  >()
   private activeConnectionCleanups?: Array<() => void>
   private disposed = false
   readonly workletsReady: Promise<void>
@@ -455,6 +463,7 @@ export class PatchRuntime {
       this.signalTransforms.add(transform)
       this.root.set(name, transform)
     }
+    for (const name of MATH_CONSTANTS) this.root.set(name, Quantity.scalar(Math[name]))
     this.root.set('print', console.log)
     this.root.set('context', this.context)
   }
@@ -520,13 +529,13 @@ export class PatchRuntime {
 
   private function(declaration: FunctionDeclaration, closure: Scope): PatchFunction {
     let called = false
-    return (...provided: unknown[]) => {
+    const invoke = (provided: ReadonlyMap<number, unknown>) => {
       if (declaration.once && called) throw new Error('Multiple calls to a `once fn`.')
       called = true
       const scope = new Map(closure)
       declaration.parameters.forEach((parameter, index) => {
-        const value = index < provided.length
-          ? provided[index]
+        const value = provided.has(index)
+          ? provided.get(index)
           : parameter.defaultValue === null
             ? undefined
             : this.expression(parameter.defaultValue, scope)
@@ -535,6 +544,11 @@ export class PatchRuntime {
       const result = this.statements(declaration.body, scope)
       return result && RETURN in result ? result.value : undefined
     }
+    const fn: PatchFunction = (...provided: unknown[]) => invoke(
+      new Map(provided.map((value, index) => [index, value])),
+    )
+    this.patchFunctionInvokers.set(fn, invoke)
+    return fn
   }
 
   private statements(
@@ -590,6 +604,8 @@ export class PatchRuntime {
     switch (statement.type) {
       case 'FunctionDeclaration': {
         const fn = this.function(statement, scope)
+        this.patchFunctions.set(fn, statement)
+        if (statement.parameters.length === 1) this.signalTransforms.add(fn)
         scope.set(statement.name, fn)
         if (exports) exports[statement.name] = fn
         if (statement.returned) return { [RETURN]: true, value: fn }
@@ -750,6 +766,39 @@ export class PatchRuntime {
   }
 
   private call(callee: Expression, args: Argument[], scope: Scope, scheduledAt?: number): unknown {
+    let receiver: Record<string, unknown> | undefined
+    let callable: PatchFunction
+    if (callee.type === 'MemberExpression') {
+      this.assertSafeMember(callee.property)
+      receiver = this.expression(callee.object, scope) as Record<string, unknown>
+      callable = receiver[callee.property] as PatchFunction
+    } else {
+      callable = this.expression(callee, scope) as PatchFunction
+    }
+    const declaration = this.patchFunctions.get(callable)
+
+    if (declaration && (declaration.parameters.length > 1
+      || args.some((argument) => argument.type === 'NamedArgument'))) {
+      if (declaration.parameters.length > 1
+        && args.some((argument) => argument.type !== 'NamedArgument')) {
+        throw new Error(`Function \`${declaration.name}\` requires keyword arguments`)
+      }
+      if (args.some((argument) => argument.type !== 'NamedArgument')) {
+        throw new Error(`Function \`${declaration.name}\` cannot mix positional and keyword arguments`)
+      }
+      const provided = new Map<number, unknown>()
+      const names = new Set<string>()
+      for (const argument of args) {
+        if (argument.type !== 'NamedArgument') continue
+        const index = declaration.parameters.findIndex(({ name }) => name === argument.name)
+        if (index < 0) throw new Error(`Unknown argument \`${argument.name}\` for function \`${declaration.name}\``)
+        if (names.has(argument.name)) throw new Error(`Duplicate argument \`${argument.name}\``)
+        names.add(argument.name)
+        provided.set(index, this.expression(argument.value, scope))
+      }
+      return this.patchFunctionInvokers.get(callable)!(provided)
+    }
+
     const positional: unknown[] = []
     const named: Record<string, unknown> = {}
     for (const argument of args) {
@@ -758,12 +807,7 @@ export class PatchRuntime {
     }
     if (Object.keys(named).length) positional.push(named)
     if (scheduledAt !== undefined) positional.unshift(scheduledAt)
-    if (callee.type === 'MemberExpression') {
-      this.assertSafeMember(callee.property)
-      const receiver = this.expression(callee.object, scope) as Record<string, unknown>
-      return (receiver[callee.property] as PatchFunction).apply(receiver, positional)
-    }
-    return (this.expression(callee, scope) as PatchFunction)(...positional)
+    return callable.apply(receiver, positional)
   }
 
   private unary(operator: string, value: unknown): unknown {
