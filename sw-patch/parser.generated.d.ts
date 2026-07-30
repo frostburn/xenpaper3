@@ -13,6 +13,8 @@ export interface Program extends Node {
 export type Statement =
   | FunctionDeclaration
   | UntilStatement
+  | ForStatement
+  | WhileStatement
   | IfStatement
   | ElifStatement
   | ElseStatement
@@ -47,6 +49,19 @@ export interface UntilStatement extends Node {
   type: 'UntilStatement'
   emitter: Expression
   event: string
+  body: Statement[]
+}
+
+export interface ForStatement extends Node {
+  type: 'ForStatement'
+  target: string
+  iterable: Expression
+  body: Statement[]
+}
+
+export interface WhileStatement extends Node {
+  type: 'WhileStatement'
+  test: Expression
   body: Statement[]
 }
 

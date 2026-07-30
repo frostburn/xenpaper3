@@ -832,6 +832,25 @@ export class PatchRuntime {
         this.scheduled(statement.at, statement.automation, statement.statement, scope); return undefined
       case 'UntilStatement':
         this.until(statement.emitter, statement.event, statement.body, scope); return undefined
+      case 'ForStatement': {
+        const value = this.expression(statement.iterable, scope)
+        if (value === null || value === undefined
+          || typeof (value as Partial<Iterable<unknown>>)[Symbol.iterator] !== 'function') {
+          throw new Error('A for loop requires an iterable value')
+        }
+        for (const item of value as Iterable<unknown>) {
+          scope.set(statement.target, item)
+          const result = this.statements(statement.body, scope, connectionCleanups, exports)
+          if (result) return result
+        }
+        return undefined
+      }
+      case 'WhileStatement':
+        while (Quantity.truthy(this.expression(statement.test, scope))) {
+          const result = this.statements(statement.body, scope, connectionCleanups, exports)
+          if (result) return result
+        }
+        return undefined
       case 'ReturnStatement':
         return { [RETURN]: true, value: this.expression(statement.value, scope) }
       case 'ElifStatement':

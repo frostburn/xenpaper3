@@ -16,6 +16,38 @@ function location() {
 }
 
 describe('SW Patch runtime', () => {
+  it('executes for and while loops and propagates returns from their suites', () => {
+    const patch = createPatch(
+      'fn total(values: List<Number>):\n'
+      + '    result = 0\n'
+      + '    for value in values:\n'
+      + '        result = result + value\n'
+      + '    remaining = 3\n'
+      + '    while remaining > 0:\n'
+      + '        result = result + 10\n'
+      + '        remaining = remaining - 1\n'
+      + '    ret result\n'
+      + 'fn first(values: List<Number>):\n'
+      + '    for value in values:\n'
+      + '        ret value\n'
+      + '    ret null\n',
+      {} as BaseAudioContext,
+    )
+
+    expect(Number((patch.total as PatchFunction)([1, 2, 3]))).toBe(36)
+    expect(Number((patch.first as PatchFunction)([7, 8]))).toBe(7)
+    expect((patch.first as PatchFunction)([])).toBeNull()
+  })
+
+  it('rejects non-iterable for loop values', () => {
+    const patch = createPatch(
+      'fn invalid():\n    for value in 3:\n        print(value)\n',
+      {} as BaseAudioContext,
+    )
+
+    expect(() => (patch.invalid as PatchFunction)()).toThrow('requires an iterable')
+  })
+
   it('provides classic amplitude and decibel conversion utilities', () => {
     expect(dbtoa(20)).toBe(10)
     expect(atodb(10)).toBe(20)

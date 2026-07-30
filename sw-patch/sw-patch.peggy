@@ -104,6 +104,8 @@ StatementBody
 CompoundStatement
   = FunctionDeclaration
   / UntilStatement
+  / ForStatement
+  / WhileStatement
   / IfStatement
   / ElifStatement
   / ElseStatement
@@ -142,6 +144,16 @@ Parameter
 UntilStatement
   = KeywordUntil __ emitter:PostfixExpression H ":" H event:Name body:Suite {
       return node("UntilStatement", { emitter, event, body });
+    }
+
+ForStatement
+  = KeywordFor __ target:Identifier __ KeywordIn __ iterable:Expression body:Suite {
+      return node("ForStatement", { target, iterable, body });
+    }
+
+WhileStatement
+  = KeywordWhile __ test:Expression body:Suite {
+      return node("WhileStatement", { test, body });
     }
 
 IfStatement
@@ -578,7 +590,7 @@ Identifier
   = !ReservedWord value:Name { return value; }
 
 ReservedWord
-  = ("type" / "config" / "fn" / "once" / "until" / "ret" / "if" / "elif" / "else"
+  = ("type" / "config" / "fn" / "once" / "until" / "for" / "in" / "while" / "ret" / "if" / "elif" / "else"
     / "and" / "or" / "not" / "true" / "false" / "null"
     / "linear" / "exponential" / "hold" / "cancel" / "target") !IdentifierContinue
 
@@ -590,6 +602,9 @@ KeywordConfig = "config" !IdentifierContinue
 KeywordFn = "fn" !IdentifierContinue
 KeywordOnce = "once" !IdentifierContinue
 KeywordUntil = "until" !IdentifierContinue
+KeywordFor = "for" !IdentifierContinue
+KeywordIn = "in" !IdentifierContinue
+KeywordWhile = "while" !IdentifierContinue
 KeywordRet = "ret" !IdentifierContinue
 KeywordIf = "if" !IdentifierContinue
 KeywordElif = "elif" !IdentifierContinue
