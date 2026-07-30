@@ -1,0 +1,37 @@
+fn on(
+    destination: AudioNode,
+    start: Instant,
+    pitch: AudioSignal<Pitch>,
+    velocity: Level,
+    attack: Duration = 100ms,
+    decay: Duration = 200ms,
+    sustain: Level = 70%,
+    release: Duration = 300ms,
+):
+    t = TimeNode()
+    t.start(start)
+
+    phase = PhaserNode()
+    phase.start(start)
+
+    r = TimeNode()
+
+    until t.ended:
+        pitch -> phase.detune
+        decayEnv = exp(-t / decay)
+        sharpness = 0.05 + 0.9 * decayEnv
+        theta = 2 * PI * phase
+        waveform = atan(sharpness * sin(theta) / (1 + sharpness * cos(theta))) / asin(sharpness)
+
+        env = tanh(t / attack) * (sustain + (1 - sustain) * decayEnv)
+        releaseEnv = exp(-r / release)
+
+        waveform * env * releaseEnv -> destination
+
+    ret once fn off(end: Instant):
+        r.start(end)
+        cutOff = end + 5 * release
+        t.stop(cutOff)
+        phase.stop(cutOff)
+        r.stop(cutOff)
+        ret cutOff

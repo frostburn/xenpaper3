@@ -368,6 +368,7 @@ class SwPatchScheduledSourceProcessor extends AudioWorkletProcessor {
     super()
     this.startedAt = Infinity
     this.stoppedAt = Infinity
+    this.ended = false
     this.port.onmessage = ({ data }) => {
       if (data.type === 'start') this.startedAt = data.when
       if (data.type === 'stop') this.stoppedAt = data.when
@@ -375,13 +376,20 @@ class SwPatchScheduledSourceProcessor extends AudioWorkletProcessor {
   }
   valueAt() { return 0 }
   process(_inputs, outputs, parameters) {
+    if (currentTime >= this.stoppedAt) {
+      if (!this.ended) {
+        this.ended = true
+        this.port.postMessage('ended')
+      }
+      return false
+    }
     const output = outputs[0] || []
     for (const channel of output) for (let sample = 0; sample < channel.length; sample++) {
       const time = currentTime + sample / sampleRate
       channel[sample] = time >= this.startedAt && time < this.stoppedAt
         ? this.valueAt(time, sample, parameters) : 0
     }
-    return currentTime < this.stoppedAt
+    return true
   }
 }
 class SwPatchTimeProcessor extends SwPatchScheduledSourceProcessor {
@@ -569,13 +577,19 @@ export class PatchRuntime {
     const detune = node.parameters?.get('detune')
     if (frequency && options.frequency !== undefined) frequency.value = Number(options.frequency)
     if (detune && options.detune !== undefined) detune.value = Number(options.detune)
+    node.port.onmessage = ({ data }) => {
+      if (data === 'ended') node.dispatchEvent(new Event('ended'))
+    }
     Object.defineProperties(node, {
       start: { value: (when = this.context.currentTime) => node.port.postMessage({ type: 'start', when: Number(when) }) },
       stop: { value: (when = this.context.currentTime) => node.port.postMessage({ type: 'stop', when: Number(when) }) },
       ...(frequency ? { frequency: { value: frequency } } : {}),
       ...(detune ? { detune: { value: detune } } : {}),
     })
-    this.registerCleanup(() => node.port.postMessage({ type: 'stop', when: this.context.currentTime }))
+    this.registerCleanup(() => {
+      node.port.onmessage = null
+      node.port.postMessage({ type: 'stop', when: this.context.currentTime })
+    })
     return node
   }
 
