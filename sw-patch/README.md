@@ -36,8 +36,8 @@ pitch.stop(cutOff)
 synth.dispose()
 ```
 
-`registerMathWorklets()` installs SW Patch's inline inversion, conversion, and
-standard unary `Math` `AudioWorkletProcessor`s from a blob URL. All processors
+`registerMathWorklets()` installs SW Patch's inversion, conversion, and
+standard `Math` `AudioWorkletProcessor`s from a blob URL. All processors
 share a stoppable sample-by-sample superclass. Registration is
 cached per context. Await it before evaluating patch functions that divide one
 audio signal by another or explicitly convert an audio signal with `atodb()` or
@@ -51,12 +51,15 @@ but remains synchronous for patches that do not need those processors.
 The unary functions `abs`, `acos`, `acosh`, `asin`, `asinh`, `atan`, `atanh`,
 `cbrt`, `ceil`, `cos`, `cosh`, `exp`, `expm1`, `floor`, `fround`, `log`,
 `log10`, `log1p`, `log2`, `round`, `sign`, `sin`, `sinh`, `sqrt`, `tan`,
-`tanh`, and `trunc` accept either scalar quantities or audio signals. In a
-connection chain, a bare function name is waveshaping shorthand, so this creates
-and connects a `tanh` worklet between the oscillator and destination:
+`tanh`, `trunc`, and `clz32` accept either scalar quantities or audio signals.
+The multi-argument functions `atan2`, `hypot`, `imul`, `max`, `min`, and `pow`
+do as well. `hypot`, `max`, and `min` accept up to five arguments. `atan2`
+accepts either positional `(y, x)` arguments or named `x` and `y` arguments. Signal
+transforms are explicit function calls, so this creates and connects a `tanh`
+worklet between the oscillator and destination:
 
 ```swpatch
-osc -> tanh -> destination
+tanh(osc) -> destination
 ```
 
 The standard `Math` constants `E`, `LN10`, `LN2`, `LOG10E`, `LOG2E`, `PI`,

@@ -111,7 +111,7 @@ describe('SW Patch runtime', () => {
     for (const worklet of worklets) expect(worklet.port.postMessage).toHaveBeenCalledWith('stop')
   })
 
-  it('supports unary Math functions for scalars and inline waveshaping', () => {
+  it('supports unary Math functions for scalars and explicit signal transforms', () => {
     const worklets: MockAudioWorkletNode[] = []
     class MockAudioWorkletNode {
       port = { postMessage: vi.fn<(message: string) => void>() }
@@ -127,7 +127,7 @@ describe('SW Patch runtime', () => {
     const destination = {}
 
     const patch = createPatch(
-      'oscillator -> tanh -> destination\n'
+      'tanh(oscillator) -> destination\n'
       + 'fn scalar():\n    ret sqrt(9) + cos(0)\n',
       {} as BaseAudioContext,
       { globals: { destination, oscillator } },
@@ -142,6 +142,51 @@ describe('SW Patch runtime', () => {
     expect(oscillator.disconnect).toHaveBeenCalledWith(worklets[0])
     expect(worklets[0]?.disconnect).toHaveBeenCalledWith(destination)
     expect(worklets[0]?.port.postMessage).toHaveBeenCalledWith('stop')
+  })
+
+  it('supports multi-argument Math functions for scalars and audio signals', () => {
+    const worklets: MockAudioWorkletNode[] = []
+    class MockAudioWorkletNode {
+      port = { postMessage: vi.fn<(message: string) => void>() }
+      connect = vi.fn<(target: unknown) => void>()
+      disconnect = vi.fn<(target?: unknown, output?: number, input?: number) => void>()
+      constructor(
+        _context: BaseAudioContext,
+        readonly name: string,
+        readonly options: { numberOfInputs: number },
+      ) { worklets.push(this) }
+    }
+    vi.stubGlobal('AudioWorkletNode', MockAudioWorkletNode)
+    const signalA = {
+      connect: vi.fn<(target: unknown, output?: number, input?: number) => void>(),
+      disconnect: vi.fn<(target?: unknown, output?: number, input?: number) => void>(),
+    }
+    const signalB = {
+      connect: vi.fn<(target: unknown, output?: number, input?: number) => void>(),
+      disconnect: vi.fn<(target?: unknown, output?: number, input?: number) => void>(),
+    }
+    const patch = createPatch(
+      'fn positional():\n    ret atan2(signalA, signalB)\n'
+      + 'fn named():\n    ret atan2(x = signalA, y = signalB)\n'
+      + 'fn atanSignature():\n'
+      + '    ret atan2(0, 1) + atan2(x = 1, y = 0)\n'
+      + 'fn scalar():\n    ret pow(2, 3) + max(1, 7, 4) + clz32(1)\n',
+      {} as BaseAudioContext,
+      { globals: { signalA, signalB } },
+    )
+
+    ;(patch.positional as PatchFunction)()
+    ;(patch.named as PatchFunction)()
+    expect(worklets.map(({ name }) => name).slice(0, 2)).toEqual([
+      'sw-patch-atan2', 'sw-patch-atan2',
+    ])
+    expect(worklets[0]?.options).toEqual({ numberOfInputs: 2 })
+    expect(signalA.connect).toHaveBeenCalledWith(worklets[0], 0, 0)
+    expect(signalB.connect).toHaveBeenCalledWith(worklets[0], 0, 1)
+    expect(signalB.connect).toHaveBeenCalledWith(worklets[1], 0, 0)
+    expect(signalA.connect).toHaveBeenCalledWith(worklets[1], 0, 1)
+    expect(Number((patch.atanSignature as PatchFunction)())).toBe(0)
+    expect(Number((patch.scalar as PatchFunction)())).toBe(46)
   })
 
   it('builds Web Audio graphs for signal arithmetic', () => {
