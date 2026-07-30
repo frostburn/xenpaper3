@@ -181,7 +181,7 @@ interface AudioSignalGraph {
   gain(value?: Quantity): Connectable & { gain: unknown }
   constant(value: unknown): Connectable & { stop?: () => void }
   invert(): Connectable
-  convert(name: MathWorkletName): Connectable
+  convert(name: MathWorkletName, inputs?: number): Connectable
   cleanup(cleanup: () => void): void
 }
 
@@ -267,11 +267,13 @@ class AudioSignal {
   }
 }
 
-const MATH_FUNCTIONS = [
+const UNARY_MATH_FUNCTIONS = [
   'abs', 'acos', 'acosh', 'asin', 'asinh', 'atan', 'atanh', 'cbrt', 'ceil', 'cos', 'cosh',
-  'exp', 'expm1', 'floor', 'fround', 'log', 'log10', 'log1p', 'log2', 'round', 'sign', 'sin',
+  'clz32', 'exp', 'expm1', 'floor', 'fround', 'log', 'log10', 'log1p', 'log2', 'round', 'sign', 'sin',
   'sinh', 'sqrt', 'tan', 'tanh', 'trunc',
 ] as const
+const MULTI_MATH_FUNCTIONS = ['atan2', 'hypot', 'imul', 'max', 'min', 'pow'] as const
+const MATH_FUNCTIONS = [...UNARY_MATH_FUNCTIONS, ...MULTI_MATH_FUNCTIONS] as const
 const MATH_CONSTANTS = [
   'E', 'LN10', 'LN2', 'LOG10E', 'LOG2E', 'PI', 'SQRT1_2', 'SQRT2',
 ] as const
@@ -289,12 +291,14 @@ class SwPatchWorkletProcessor extends AudioWorkletProcessor {
   }
   process(inputs, outputs) {
     if (this.stopped) return false
-    const input = inputs[0] || []
     const output = outputs[0] || []
     for (let channel = 0; channel < output.length; channel++) {
-      const source = input[channel] || input[0]
       for (let sample = 0; sample < output[channel].length; sample++) {
-        output[channel][sample] = this.transform(source ? source[sample] : 0)
+        const values = inputs.map(input => {
+          const source = input[channel] || input[0]
+          return source ? source[sample] : 0
+        })
+        output[channel][sample] = this.transform(...values)
       }
     }
     return true
@@ -312,9 +316,14 @@ class SwPatchDbtoaProcessor extends SwPatchWorkletProcessor {
 registerProcessor('sw-patch-invert', SwPatchInvertProcessor)
 registerProcessor('sw-patch-atodb', SwPatchAtodbProcessor)
 registerProcessor('sw-patch-dbtoa', SwPatchDbtoaProcessor)
-${MATH_FUNCTIONS.map((name) => `
+${UNARY_MATH_FUNCTIONS.map((name) => `
 class SwPatchMath${name}Processor extends SwPatchWorkletProcessor {
   transform(value) { return Math.${name}(value) }
+}
+registerProcessor('sw-patch-${name}', SwPatchMath${name}Processor)`).join('')}
+${MULTI_MATH_FUNCTIONS.map((name) => `
+class SwPatchMath${name}Processor extends SwPatchWorkletProcessor {
+  transform(...values) { return Math.${name}(...values) }
 }
 registerProcessor('sw-patch-${name}', SwPatchMath${name}Processor)`).join('')}
 `
@@ -373,7 +382,6 @@ export class PatchRuntime {
   private readonly topLevelBindings = new Set<string>()
   private readonly audioSignalGraph: AudioSignalGraph
   private readonly patchCleanups: Array<() => void> = []
-  private readonly signalTransforms = new WeakSet<PatchFunction>()
   private activeConnectionCleanups?: Array<() => void>
   private disposed = false
   readonly workletsReady: Promise<void>
@@ -390,7 +398,7 @@ export class PatchRuntime {
       },
       constant: (value) => this.createAndStartAudioSignal(value),
       invert: () => this.createMathWorklet('sw-patch-invert'),
-      convert: (name) => this.createMathWorklet(name),
+      convert: (name, inputs) => this.createMathWorklet(name, inputs),
       cleanup: (cleanup) => { this.registerCleanup(cleanup) },
     }
     this.installBuiltins()
@@ -411,8 +419,8 @@ export class PatchRuntime {
     return node
   }
 
-  private createMathWorklet(name: string): AudioWorkletNode {
-    const node = new AudioWorkletNode(this.context, name)
+  private createMathWorklet(name: string, numberOfInputs = 1): AudioWorkletNode {
+    const node = new AudioWorkletNode(this.context, name, { numberOfInputs })
     this.registerCleanup(() => node.port.postMessage('stop'))
     return node
   }
@@ -449,14 +457,16 @@ export class PatchRuntime {
     this.root.set('AudioSignal', this.createAndStartAudioSignal.bind(this))
     this.root.set('atodb', (value: unknown) => this.convertMath('sw-patch-atodb', atodb, value))
     this.root.set('dbtoa', (value: unknown) => this.convertMath('sw-patch-dbtoa', dbtoa, value))
-    for (const name of MATH_FUNCTIONS) {
+    for (const name of UNARY_MATH_FUNCTIONS) {
       const transform: PatchFunction = (value: unknown) => this.convertMath(
         `sw-patch-${name}`,
         (input) => Math[name](Number(input)),
         value,
       )
-      this.signalTransforms.add(transform)
       this.root.set(name, transform)
+    }
+    for (const name of MULTI_MATH_FUNCTIONS) {
+      this.root.set(name, (...provided: unknown[]) => this.convertMultiMath(name, provided))
     }
     for (const name of MATH_CONSTANTS) this.root.set(name, Quantity.scalar(Math[name]))
     this.root.set('random', () => Quantity.scalar(Math.random()))
@@ -474,6 +484,37 @@ export class PatchRuntime {
     const converter = this.audioSignalGraph.convert(processor)
     signal.node.connect(converter)
     this.registerCleanup(() => signal.node.disconnect(converter))
+    return converter
+  }
+
+  private convertMultiMath(name: typeof MULTI_MATH_FUNCTIONS[number], provided: unknown[]): unknown {
+    const last = provided[provided.length - 1]
+    let values = provided
+    if (last && typeof last === 'object' && !AudioSignal.is(last)
+      && !(last instanceof Quantity) && !Array.isArray(last)) {
+      const named = last as Record<string, unknown>
+      values = name === 'atan2'
+        ? [named.x, named.y]
+        : Object.values(named)
+    }
+    const maximumArguments = name === 'max' || name === 'min' || name === 'hypot' ? 5 : 2
+    if (values.length < (name === 'hypot' || name === 'max' || name === 'min' ? 1 : 2)
+      || values.length > maximumArguments) {
+      throw new Error(`${name}() expects ${maximumArguments === 2 ? 'two' : 'one to five'} arguments`)
+    }
+    if (!values.some(AudioSignal.is)) {
+      const scalar = Math[name] as (...arguments_: number[]) => number
+      return Quantity.scalar(scalar(...values.map(Number)))
+    }
+    const converter = this.audioSignalGraph.convert(`sw-patch-${name}`, values.length)
+    values.forEach((value, index) => {
+      const signal = AudioSignal.from(value, this.audioSignalGraph)
+      const node: Connectable & { stop?: () => void } = signal?.node
+        ?? this.createAndStartAudioSignal(value)
+      node.connect(converter, 0, index)
+      this.registerCleanup(() => node.disconnect(converter, 0, index))
+      if (!signal) this.registerCleanup(() => node.stop?.())
+    })
     return converter
   }
 
@@ -700,14 +741,6 @@ export class PatchRuntime {
     const cleanups: Array<() => void> = []
     for (const link of links) {
       const target = this.expression(link.target, scope)
-      if (typeof target === 'function' && this.signalTransforms.has(target as PatchFunction)) {
-        if (link.operator !== 'connect') throw new Error('A waveshaper cannot be disconnected inline')
-        if (link.output !== undefined || link.input !== undefined) {
-          throw new Error('A waveshaper connection cannot select ports')
-        }
-        source = (target as PatchFunction)(source) as Connectable
-        continue
-      }
       const connectedSource = this.internalConnections.get(source as object) ?? source
       if (link.output === undefined && link.input === undefined) connectedSource[link.operator](target)
       else connectedSource[link.operator](target, link.output ?? 0, link.input ?? 0)
