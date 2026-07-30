@@ -547,6 +547,8 @@ export class PatchRuntime {
     this.root.set('DelayNode', (...args: unknown[]) => this.makeNode('Delay', args))
     this.root.set('GainNode', (...args: unknown[]) => this.makeNode('Gain', args))
     this.root.set('OscillatorNode', (...args: unknown[]) => this.makeNode('Oscillator', args))
+    this.root.set('WaveShaperNode', (...args: unknown[]) => this.makeNode('WaveShaper', args))
+    this.root.set('PeriodicWave', (...args: unknown[]) => this.makePeriodicWave(args))
     this.root.set('ConstantSourceNode', (...args: unknown[]) => this.makeNode('ConstantSource', args))
     this.root.set('AudioSignal', this.createAndStartAudioSignal.bind(this))
     this.root.set('TimeNode', () => this.createUtilitySource('sw-patch-time'))
@@ -661,14 +663,28 @@ export class PatchRuntime {
   }
 
   private makeNode(
-    kind: 'BiquadFilter' | 'ChannelMerger' | 'ChannelSplitter' | 'Delay' | 'Gain' | 'Oscillator' | 'ConstantSource',
+    kind: 'BiquadFilter' | 'ChannelMerger' | 'ChannelSplitter' | 'Delay' | 'Gain'
+      | 'Oscillator' | 'ConstantSource' | 'WaveShaper',
     args: unknown[],
   ): unknown {
     const values = (args[0] ?? {}) as Record<string, unknown>
-    const options = Object.fromEntries(Object.entries(values).map(([key, value]) => [
-      key,
-      value instanceof Quantity ? Number(value) : value,
-    ]))
+    const options = Object.fromEntries(Object.entries(values).map(([key, value]) => {
+      if (kind === 'Oscillator' && key === 'periodicWave' && Array.isArray(value)) {
+        if (value.length !== 2 || !value.every(Array.isArray)) {
+          throw new Error('OscillatorNode periodicWave expects [real, imaginary] arrays')
+        }
+        const real = value[0] as unknown[]
+        const imaginary = value[1] as unknown[]
+        return [key, this.context.createPeriodicWave(
+          Float32Array.from(real, Number),
+          Float32Array.from(imaginary, Number),
+        )]
+      }
+      if (kind === 'WaveShaper' && key === 'curve' && Array.isArray(value)) {
+        return [key, Float32Array.from(value, Number)]
+      }
+      return [key, value instanceof Quantity ? Number(value) : value]
+    }))
     const constructorName = `${kind}Node`
     const NodeConstructor = (globalThis as unknown as Record<string, unknown>)[constructorName]
     if (typeof NodeConstructor !== 'function') {
@@ -679,6 +695,18 @@ export class PatchRuntime {
       options: Record<string, unknown>,
     ) => Record<string, unknown>)(this.context, options)
     return node
+  }
+
+  private makePeriodicWave(args: unknown[]): PeriodicWave {
+    const [real, imaginary, options] = args
+    if (!Array.isArray(real) || !Array.isArray(imaginary)) {
+      throw new Error('PeriodicWave expects real and imaginary coefficient arrays')
+    }
+    return this.context.createPeriodicWave(
+      Float32Array.from(real, Number),
+      Float32Array.from(imaginary, Number),
+      options as PeriodicWaveConstraints | undefined,
+    )
   }
 
   private effectNode(patch: SynthPatch): SynthPatch {
