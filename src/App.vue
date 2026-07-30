@@ -20,7 +20,6 @@ interface Synth {
 
 // Dummy audio code just to get something going
 const ctx = new AudioContext({ latencyHint: 'interactive' })
-const mathWorkletsReady = registerMathWorklets(ctx)
 const output = new GainNode(ctx, { gain: 0.4 })
 output.connect(ctx.destination)
 const delayTime = new ConstantSourceNode(ctx, { offset: 0.25 })
@@ -28,15 +27,24 @@ const feedback = new ConstantSourceNode(ctx, { offset: 0.55 })
 const wet = new ConstantSourceNode(ctx, { offset: 0.35 })
 const Q = new ConstantSourceNode(ctx, { offset: 5 })
 for (const signal of [delayTime, feedback, wet, Q]) signal.start()
-const delay = createPatch(PING_PONG_DELAY_PATCH, ctx, {
-  config: { delayTime, feedback, wet },
-}) as unknown as AudioNode
-delay.connect(output)
 const inputDelay = 0.01
+let mounted = true
+let delay: AudioNode
+let synth: Synth
 
-const synth = createPatch(BASS_PATCH, ctx, {
-  config: { oscillatorType: 'sawtooth' },
-} as RuntimeOptions) as unknown as Synth
+// A patch may instantiate a math worklet while its top-level connections are
+// evaluated. Do not evaluate either patch until the worklet module is loaded.
+const patchesReady = registerMathWorklets(ctx).then(() => {
+  if (!mounted) return false
+  delay = createPatch(PING_PONG_DELAY_PATCH, ctx, {
+    config: { delayTime, feedback, wet },
+  }) as unknown as AudioNode
+  delay.connect(output)
+  synth = createPatch(BASS_PATCH, ctx, {
+    config: { oscillatorType: 'sawtooth' },
+  } as RuntimeOptions) as unknown as Synth
+  return true
+})
 
 // A string because <input type="range"> has a silly API.
 const delayTimeModel = ref('0.25')
@@ -60,8 +68,6 @@ type ActiveNote = [off: NoteOff, pitch: ConstantSourceNode]
 
 const noteOffs = new Map<number, ActiveNote>()
 const pendingNotes = new Set<number>()
-let mounted = true
-
 const releaseNote = (keyCode: number) => {
   pendingNotes.delete(keyCode)
   const note = noteOffs.get(keyCode)
@@ -83,8 +89,8 @@ const handleKeyDown = (e: KeyboardEvent) => {
 
   if (ctx.state === 'suspended') void ctx.resume()
   pendingNotes.add(e.keyCode)
-  void mathWorkletsReady.then(() => {
-    if (!mounted || !pendingNotes.delete(e.keyCode)) return
+  void patchesReady.then((ready) => {
+    if (!ready || !mounted || !pendingNotes.delete(e.keyCode)) return
     const pitch = new ConstantSourceNode(ctx, {
       offset: (1200 * (e.keyCode % 23)) / 11 - 1200 * 3,
     })

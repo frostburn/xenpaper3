@@ -92,6 +92,39 @@ describe('SW Patch runtime', () => {
     for (const worklet of worklets) expect(worklet.port.postMessage).toHaveBeenCalledWith('stop')
   })
 
+  it('supports unary Math functions for scalars and inline waveshaping', () => {
+    const worklets: MockAudioWorkletNode[] = []
+    class MockAudioWorkletNode {
+      port = { postMessage: vi.fn<(message: string) => void>() }
+      connect = vi.fn<(target: unknown) => void>()
+      disconnect = vi.fn<(target?: unknown) => void>()
+      constructor(_context: BaseAudioContext, readonly name: string) { worklets.push(this) }
+    }
+    vi.stubGlobal('AudioWorkletNode', MockAudioWorkletNode)
+    const oscillator = {
+      connect: vi.fn<(target: unknown) => void>(),
+      disconnect: vi.fn<(target?: unknown) => void>(),
+    }
+    const destination = {}
+
+    const patch = createPatch(
+      'oscillator -> tanh -> destination\n'
+      + 'fn scalar():\n    ret sqrt(9) + cos(0)\n',
+      {} as BaseAudioContext,
+      { globals: { destination, oscillator } },
+    )
+
+    expect(worklets[0]?.name).toBe('sw-patch-tanh')
+    expect(oscillator.connect).toHaveBeenCalledWith(worklets[0])
+    expect(worklets[0]?.connect).toHaveBeenCalledWith(destination)
+    expect(Number((patch.scalar as PatchFunction)())).toBe(4)
+
+    patch.dispose()
+    expect(oscillator.disconnect).toHaveBeenCalledWith(worklets[0])
+    expect(worklets[0]?.disconnect).toHaveBeenCalledWith(destination)
+    expect(worklets[0]?.port.postMessage).toHaveBeenCalledWith('stop')
+  })
+
   it('builds Web Audio graphs for signal arithmetic', () => {
     const created: MockGainNode[] = []
     class MockGainNode {
