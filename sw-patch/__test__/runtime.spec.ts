@@ -59,7 +59,10 @@ describe('SW Patch runtime', () => {
     const worklets: MockAudioWorkletNode[] = []
     class MockAudioWorkletNode {
       port = { postMessage: vi.fn<(message: unknown) => void>() }
-      parameters = new Map<string, { value: number }>([['frequency', { value: 1 }]])
+      parameters = new Map<string, { value: number }>([
+        ['frequency', { value: 1 }],
+        ['detune', { value: 0 }],
+      ])
       connect = vi.fn<(target: unknown) => void>()
       disconnect = vi.fn<(target?: unknown) => void>()
       constructor(
@@ -73,7 +76,7 @@ describe('SW Patch runtime', () => {
     const patch = createPatch(
       'fn sources(start: time):\n'
       + '    t = TimeNode()\n'
-      + '    phase = PhaserNode(frequency = 2Hz)\n'
+      + '    phase = PhaserNode(frequency = 2Hz, detune = 100c)\n'
       + '    noise = RandomNode()\n'
       + '    t.start(start)\n'
       + '    phase.start(start)\n'
@@ -88,6 +91,7 @@ describe('SW Patch runtime', () => {
     ])
     expect(phase.options).toEqual({ numberOfInputs: 0 })
     expect(phase.parameters.get('frequency')?.value).toBe(2)
+    expect(phase.parameters.get('detune')?.value).toBe(100)
     expect(worklets.at(-3)?.port.postMessage).toHaveBeenCalledWith({ type: 'start', when: 6 })
     expect(worklets.at(-1)?.port.postMessage).toHaveBeenCalledWith({ type: 'start', when: 4 })
   })
@@ -130,6 +134,46 @@ describe('SW Patch runtime', () => {
     ])
     expect(worklets.at(-1)?.options).toEqual({ numberOfInputs: 3 })
     expect(Number((patch.modulo as PatchFunction)())).toBe(1)
+  })
+
+  it('supports right-associative scalar and audio-signal exponentiation', () => {
+    const worklets: MockAudioWorkletNode[] = []
+    class MockAudioWorkletNode {
+      port = { postMessage: vi.fn<(message: unknown) => void>() }
+      connect = vi.fn<(target: unknown) => void>()
+      disconnect = vi.fn<(target?: unknown) => void>()
+      constructor(
+        _context: BaseAudioContext,
+        readonly name: string,
+        readonly options: { numberOfInputs: number },
+      ) { worklets.push(this) }
+    }
+    class MockConstantSourceNode {
+      connect = vi.fn<(target: unknown, output?: number, input?: number) => void>()
+      disconnect = vi.fn<(target?: unknown, output?: number, input?: number) => void>()
+      start = vi.fn<() => void>()
+      stop = vi.fn<() => void>()
+      constructor(_context: BaseAudioContext, readonly options: { offset: number }) {}
+    }
+    vi.stubGlobal('AudioWorkletNode', MockAudioWorkletNode)
+    vi.stubGlobal('ConstantSourceNode', MockConstantSourceNode)
+    const signal = {
+      connect: vi.fn<(target: unknown, output?: number, input?: number) => void>(),
+      disconnect: vi.fn<(target?: unknown, output?: number, input?: number) => void>(),
+    }
+    const patch = createPatch(
+      'fn signalPower():\n    ret signal ** 2\n'
+      + 'fn scalarPower():\n    ret 2 ** 3 ** 2\n'
+      + 'fn unaryPrecedence():\n    ret -2 ** 2\n',
+      {} as BaseAudioContext,
+      { globals: { signal } },
+    )
+
+    ;(patch.signalPower as PatchFunction)()
+    expect(worklets.at(-1)?.name).toBe('sw-patch-pow')
+    expect(worklets.at(-1)?.options).toEqual({ numberOfInputs: 2 })
+    expect(Number((patch.scalarPower as PatchFunction)())).toBe(512)
+    expect(Number((patch.unaryPrecedence as PatchFunction)())).toBe(-4)
   })
 
   it('uses worklets for signal division and explicit decibel conversions', async () => {

@@ -115,6 +115,7 @@ export class Quantity {
       case '*': return leftQuantity.multiply(rightQuantity)
       case '/': return leftQuantity.multiply(rightQuantity, true)
       case '%': return leftQuantity.modulo(rightQuantity)
+      case '**': return leftQuantity.power(rightQuantity)
       case '<': return leftQuantity.value < rightQuantity.value
       case '>': return leftQuantity.value > rightQuantity.value
       case '<=': return leftQuantity.value <= rightQuantity.value
@@ -164,6 +165,17 @@ export class Quantity {
     if (!right.isUnitless) this.assertCompatible(right)
     const remainder = ((this.value % right.value) + right.value) % right.value
     return new Quantity(Object.is(remainder, -0) ? 0 : remainder, this.dimensions)
+  }
+
+  power(value: unknown): Quantity {
+    const exponent = Quantity.from(value)
+    if (!exponent.isUnitless) throw new Error('A power must have a unitless exponent')
+    return new Quantity(
+      this.value ** exponent.value,
+      Object.fromEntries(Object.entries(this.dimensions).map(([name, power]) => [
+        name, power * exponent.value,
+      ])),
+    )
   }
 
   private get isUnitless(): boolean {
@@ -376,12 +388,19 @@ class SwPatchTimeProcessor extends SwPatchScheduledSourceProcessor {
   valueAt(time) { return time - this.startedAt }
 }
 class SwPatchPhaserProcessor extends SwPatchScheduledSourceProcessor {
-  static get parameterDescriptors() { return [{ name: 'frequency', defaultValue: 1 }] }
+  static get parameterDescriptors() {
+    return [
+      { name: 'frequency', defaultValue: 1 },
+      { name: 'detune', defaultValue: 0 },
+    ]
+  }
   constructor() { super(); this.phase = 0 }
   valueAt(_time, sample, parameters) {
     const frequency = parameters.frequency.length === 1 ? parameters.frequency[0] : parameters.frequency[sample]
+    const detune = parameters.detune.length === 1 ? parameters.detune[0] : parameters.detune[sample]
     const value = this.phase
-    this.phase = ((this.phase + frequency / sampleRate) % 1 + 1) % 1
+    const computedFrequency = frequency * 2 ** (detune / 1200)
+    this.phase = ((this.phase + computedFrequency / sampleRate) % 1 + 1) % 1
     return value
   }
 }
@@ -547,11 +566,14 @@ export class PatchRuntime {
     const node = new AudioWorkletNode(this.context, name, { numberOfInputs: 0 })
     const options = (args[0] ?? {}) as Record<string, unknown>
     const frequency = node.parameters?.get('frequency')
+    const detune = node.parameters?.get('detune')
     if (frequency && options.frequency !== undefined) frequency.value = Number(options.frequency)
+    if (detune && options.detune !== undefined) detune.value = Number(options.detune)
     Object.defineProperties(node, {
       start: { value: (when = this.context.currentTime) => node.port.postMessage({ type: 'start', when: Number(when) }) },
       stop: { value: (when = this.context.currentTime) => node.port.postMessage({ type: 'stop', when: Number(when) }) },
       ...(frequency ? { frequency: { value: frequency } } : {}),
+      ...(detune ? { detune: { value: detune } } : {}),
     })
     this.registerCleanup(() => node.port.postMessage({ type: 'stop', when: this.context.currentTime }))
     return node
@@ -921,6 +943,7 @@ export class PatchRuntime {
     if (AudioSignal.is(left) || AudioSignal.is(rightValue)) {
       const processors: Partial<Record<string, MathWorkletName>> = {
         '%': 'sw-patch-modulo',
+        '**': 'sw-patch-pow',
         '<': 'sw-patch-less-than',
         '>': 'sw-patch-greater-than',
         '<=': 'sw-patch-less-than-or-equal',

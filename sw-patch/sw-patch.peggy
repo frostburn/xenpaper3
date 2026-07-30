@@ -401,6 +401,12 @@ UnaryExpression
   / KeywordNot __ argument:UnaryExpression {
       return node("UnaryExpression", { operator: "not", argument });
     }
+  / PowerExpression
+
+PowerExpression
+  = left:PostfixExpression H "**" H right:UnaryExpression {
+      return node("BinaryExpression", { operator: "**", left, right });
+    }
   / PostfixExpression
 
 PostfixExpression
