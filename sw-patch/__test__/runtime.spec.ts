@@ -22,6 +22,25 @@ describe('SW Patch runtime', () => {
     expect(atodb(dbtoa(-6))).toBeCloseTo(-6)
   })
 
+  it('provides Math constants and random scalar values', () => {
+    const random = vi.spyOn(Math, 'random').mockReturnValue(0.25)
+    const patch = createPatch(
+      'fn constants():\n'
+      + '    ret E + LN10 + LN2 + LOG10E + LOG2E + PI + SQRT1_2 + SQRT2\n'
+      + 'fn randomValue():\n'
+      + '    ret random()\n',
+      {} as BaseAudioContext,
+    )
+
+    expect(Number((patch.constants as PatchFunction)())).toBeCloseTo(
+      Math.E + Math.LN10 + Math.LN2 + Math.LOG10E + Math.LOG2E
+      + Math.PI + Math.SQRT1_2 + Math.SQRT2,
+    )
+    expect((patch.randomValue as PatchFunction)()).toEqual(Quantity.scalar(0.25))
+    expect(random).toHaveBeenCalledOnce()
+    random.mockRestore()
+  })
+
   it('registers inline math worklets once per audio context', async () => {
     const addModule = vi.fn<(_: string) => Promise<void>>().mockResolvedValue(undefined)
     const createObjectURL = vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:math-worklets')
@@ -123,77 +142,6 @@ describe('SW Patch runtime', () => {
     expect(oscillator.disconnect).toHaveBeenCalledWith(worklets[0])
     expect(worklets[0]?.disconnect).toHaveBeenCalledWith(destination)
     expect(worklets[0]?.port.postMessage).toHaveBeenCalledWith('stop')
-  })
-
-  it('provides Math constants and supports custom inline waveshapers', () => {
-    const gains: MockGainNode[] = []
-    const worklets: MockAudioWorkletNode[] = []
-    class MockGainNode {
-      gain = {}
-      connect = vi.fn<(target: unknown) => void>()
-      disconnect = vi.fn<(target?: unknown) => void>()
-      constructor(_context: BaseAudioContext, readonly options: { gain?: number } = {}) {
-        gains.push(this)
-      }
-    }
-    class MockAudioWorkletNode {
-      port = { postMessage: vi.fn<(message: string) => void>() }
-      connect = vi.fn<(target: unknown) => void>()
-      disconnect = vi.fn<(target?: unknown) => void>()
-      constructor(_context: BaseAudioContext, readonly name: string) { worklets.push(this) }
-    }
-    vi.stubGlobal('GainNode', MockGainNode)
-    vi.stubGlobal('AudioWorkletNode', MockAudioWorkletNode)
-    const input = {
-      connect: vi.fn<(target: unknown) => void>(),
-      disconnect: vi.fn<(target?: unknown) => void>(),
-    }
-    const output = {}
-
-    const patch = createPatch(
-      'fn shape(x: Gain):\n'
-      + '    ret 2 * atan(5 * x) / PI\n'
-      + 'input -> shape -> output\n'
-      + 'fn constants():\n'
-      + '    ret E + LN10 + LN2 + LOG10E + LOG2E + PI + SQRT1_2 + SQRT2\n',
-      {} as BaseAudioContext,
-      { globals: { input, output } },
-    )
-
-    expect(gains.map(({ options }) => options.gain)).toEqual([5, 2, 1 / Math.PI])
-    expect(worklets[0]?.name).toBe('sw-patch-atan')
-    expect(input.connect).toHaveBeenCalledWith(gains[0])
-    expect(gains[0]?.connect).toHaveBeenCalledWith(worklets[0])
-    expect(worklets[0]?.connect).toHaveBeenCalledWith(gains[1])
-    expect(gains[1]?.connect).toHaveBeenCalledWith(gains[2])
-    expect(gains[2]?.connect).toHaveBeenCalledWith(output)
-    expect(Number((patch.constants as PatchFunction)())).toBeCloseTo(
-      Math.E + Math.LN10 + Math.LN2 + Math.LOG10E + Math.LOG2E
-      + Math.PI + Math.SQRT1_2 + Math.SQRT2,
-    )
-
-    patch.dispose()
-    expect(gains[2]?.disconnect).toHaveBeenCalledWith(output)
-  })
-
-  it('requires keyword arguments when calling functions with multiple parameters', () => {
-    const patch = createPatch(
-      'fn add(left: Scalar = 10, right: Scalar = 20):\n'
-      + '    ret left + right\n'
-      + 'fn named():\n'
-      + '    ret add(right = 2, left = 3)\n'
-      + 'fn positional():\n'
-      + '    ret add(3, 2)\n'
-      + 'fn defaulted():\n'
-      + '    ret add(right = 5)\n',
-      {} as BaseAudioContext,
-    )
-
-    expect(Number((patch.named as PatchFunction)())).toBe(5)
-    expect(Number((patch.defaulted as PatchFunction)())).toBe(15)
-    expect(() => (patch.positional as PatchFunction)()).toThrow(
-      'Function `add` requires keyword arguments',
-    )
   })
 
   it('builds Web Audio graphs for signal arithmetic', () => {
@@ -453,23 +401,6 @@ describe('SW Patch runtime', () => {
 
     runtime.evaluate(program)
     expect(start).toHaveBeenCalledWith(12.5)
-  })
-
-  it('passes a scheduled timestamp to a declared function called with keywords', () => {
-    const mark = vi.fn<(at: number, value: number) => void>()
-    const patch = createPatch(
-      'fn scheduled(at: Time, value: Scalar):\n'
-      + '    mark(at, value)\n'
-      + 'fn run():\n'
-      + '    @(12.5) scheduled(value = 3)\n',
-      {} as BaseAudioContext,
-      { globals: { mark } },
-    )
-
-    ;(patch.run as PatchFunction)()
-
-    expect(mark).toHaveBeenCalledOnce()
-    expect(mark.mock.calls[0]?.map(Number)).toEqual([12.5, 3])
   })
 
   it('runs nested branches in until suites and disconnects their connections', () => {

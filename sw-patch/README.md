@@ -60,20 +60,8 @@ osc -> tanh -> destination
 ```
 
 The standard `Math` constants `E`, `LN10`, `LN2`, `LOG10E`, `LOG2E`, `PI`,
-`SQRT1_2`, and `SQRT2` are available as scalars. Any function with one parameter
-can also be used as a custom inline waveshaper, regardless of its annotated
-quantity type. Its signal arithmetic
-and unary math calls are expanded into an audio graph:
-
-```swpatch
-fn shape(x: Scalar):
-    ret 2 * atan(5 * x) / PI
-
-input -> shape -> output
-```
-
-Functions with multiple parameters cannot be used as inline waveshapers and
-must be called with keyword arguments (for example, `mix(left = a, right = b)`).
+`SQRT1_2`, and `SQRT2` are available as scalars. `random()` returns a random
+scalar between zero (inclusive) and one (exclusive).
 
 Every patch owns the Web Audio resources that the runtime creates implicitly,
 including scalar sources used by expressions such as `signal + 5`. Call
