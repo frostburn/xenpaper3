@@ -401,6 +401,12 @@ UnaryExpression
   / KeywordNot __ argument:UnaryExpression {
       return node("UnaryExpression", { operator: "not", argument });
     }
+  / PowerExpression
+
+PowerExpression
+  = left:PostfixExpression H "**" H right:UnaryExpression {
+      return node("BinaryExpression", { operator: "**", left, right });
+    }
   / PostfixExpression
 
 PostfixExpression
@@ -479,7 +485,13 @@ ExpressionList
     }
 
 UnitLiteral
-  = value:Decimal spacing:H unit:UnitName {
+  = value:Decimal unit:"%" !IdentifierContinue {
+      return node("UnitLiteral", { value, unit, spaced: false });
+    }
+  / value:Decimal __ unit:"%" &SpacedPercentEnd {
+      return node("UnitLiteral", { value, unit, spaced: true });
+    }
+  / value:Decimal spacing:H unit:UnitName {
       return node("UnitLiteral", {
         value,
         unit,
@@ -487,8 +499,11 @@ UnitLiteral
       });
     }
 
+SpacedPercentEnd
+  = H &(EOL / [,)\]}] / "#" / EndOfFile)
+
 UnitName
-  = value:("semitones"i / "semitone"i / "beats"i / "beat"i / "bpm"i / "kHz"i / "Hz"i / "ms"i / "us"i / "ns"i / "dB"i / "st"i / "s"i / "c"i / "%")
+  = value:("semitones"i / "semitone"i / "beats"i / "beat"i / "bpm"i / "kHz"i / "Hz"i / "ms"i / "us"i / "ns"i / "dB"i / "st"i / "s"i / "c"i)
     !IdentifierContinue {
       return value.toLowerCase();
     }
