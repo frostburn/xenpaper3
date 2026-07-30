@@ -99,6 +99,9 @@ Every patch owns the Web Audio resources that the runtime creates implicitly,
 including scalar sources used by expressions such as `signal + 5`. Call
 `dispose()` when the patch is no longer needed. Disposal is idempotent; resources
 inside an `until` suite are still released earlier when that suite's event fires.
+An event listener uses `emitter:event` syntax, keeping the event name distinct
+from member access. For example, `until osc:ended:` releases the suite's
+resources when `osc` dispatches its `ended` event.
 
 ## Effects
 

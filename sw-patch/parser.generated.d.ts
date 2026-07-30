@@ -45,7 +45,8 @@ export interface Parameter extends Node {
 
 export interface UntilStatement extends Node {
   type: 'UntilStatement'
-  event: Expression
+  emitter: Expression
+  event: string
   body: Statement[]
 }
 

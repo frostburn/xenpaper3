@@ -15,7 +15,7 @@ fn on(
     attackEnv = GainNode(gain = 0)
     decayEnv = GainNode(gain = 1)
 
-    until osc.ended:
+    until osc:ended:
         osc -> attackEnv -> decayEnv -> destination
         pitch -> osc.detune
 

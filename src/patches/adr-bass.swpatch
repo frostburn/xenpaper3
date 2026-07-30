@@ -24,7 +24,7 @@ fn on(
 
     pitchAttenuation = GainNode(gain = 0.7)
 
-    until osc.ended:
+    until osc:ended:
         osc -> lpf -> attackEnv -> decayEnv -> destination
         pitch -> osc.detune
         pitch -> pitchAttenuation -> lpf.detune
