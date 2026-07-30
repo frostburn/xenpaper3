@@ -455,6 +455,23 @@ describe('SW Patch runtime', () => {
     expect(start).toHaveBeenCalledWith(12.5)
   })
 
+  it('passes a scheduled timestamp to a declared function called with keywords', () => {
+    const mark = vi.fn<(at: number, value: number) => void>()
+    const patch = createPatch(
+      'fn scheduled(at: Time, value: Scalar):\n'
+      + '    mark(at, value)\n'
+      + 'fn run():\n'
+      + '    @(12.5) scheduled(value = 3)\n',
+      {} as BaseAudioContext,
+      { globals: { mark } },
+    )
+
+    ;(patch.run as PatchFunction)()
+
+    expect(mark).toHaveBeenCalledOnce()
+    expect(mark.mock.calls[0]?.map(Number)).toEqual([12.5, 3])
+  })
+
   it('runs nested branches in until suites and disconnects their connections', () => {
     const emitter = new EventTarget()
     const source = { connect: vi.fn<(node: AudioNode) => AudioNode>(), disconnect: vi.fn<(node: AudioNode) => void>() }

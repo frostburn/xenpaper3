@@ -796,6 +796,7 @@ export class PatchRuntime {
         names.add(argument.name)
         provided.set(index, this.expression(argument.value, scope))
       }
+      if (scheduledAt !== undefined) provided.set(0, scheduledAt)
       return this.patchFunctionInvokers.get(callable)!(provided)
     }
 
