@@ -60,6 +60,16 @@ describe('SW Patch parser', () => {
     expect(() => parse('until osc.ended:\n    osc -> destination\n')).toThrow('Expected')
   })
 
+  it.each(['cancel', 'target'])('allows reserved word event name %s', (event) => {
+    const ast = parse(`until emitter:${event}:\n    emitter -> destination\n`)
+
+    expect(ast.body[0]).toMatchObject({
+      type: 'UntilStatement',
+      emitter: { type: 'Identifier', name: 'emitter' },
+      event,
+    })
+  })
+
   it('distinguishes spaced percentage literals from modulo expressions', () => {
     const ast = parse('percentage = 70 %\nremainder = 70 % 8\n')
 
