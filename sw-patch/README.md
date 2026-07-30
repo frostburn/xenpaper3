@@ -66,6 +66,29 @@ The standard `Math` constants `E`, `LN10`, `LN2`, `LOG10E`, `LOG2E`, `PI`,
 `SQRT1_2`, and `SQRT2` are available as scalars. `random()` returns a random
 scalar between zero (inclusive) and one (exclusive).
 
+SW Patch also provides audio-rate utility sources that follow the native source
+node API. `TimeNode()` outputs elapsed seconds after `start()`, `PhaserNode()`
+outputs an unfiltered sawtooth phase from zero up to one and exposes an
+automatable `frequency` parameter, and `RandomNode()` produces a new
+`Math.random()` value for every sample. Each accepts an optional AudioContext
+timestamp in `start()` and `stop()`:
+
+```swpatch
+t = TimeNode()
+phase = PhaserNode(frequency = 2Hz)
+noise = RandomNode()
+t.start(start)
+phase.start(start)
+noise.start(start)
+```
+
+Comparisons involving an audio signal (`<`, `>`, `<=`, `>=`, `==`, and `!=`)
+produce a signal whose samples are `0` or `1`. The `%` operator also works at
+audio rate and, for both signals and scalars, follows Python's modulo convention
+that the remainder has the divisor's sign. `where(condition, consequent,
+alternate)` selects between two values at audio rate; all three arguments are
+always evaluated and connected, so it does not short-circuit.
+
 Every patch owns the Web Audio resources that the runtime creates implicitly,
 including scalar sources used by expressions such as `signal + 5`. Call
 `dispose()` when the patch is no longer needed. Disposal is idempotent; resources

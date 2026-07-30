@@ -55,6 +55,83 @@ describe('SW Patch runtime', () => {
     expect(revokeObjectURL).toHaveBeenCalledWith('blob:math-worklets')
   })
 
+  it('provides native-style utility signal sources', () => {
+    const worklets: MockAudioWorkletNode[] = []
+    class MockAudioWorkletNode {
+      port = { postMessage: vi.fn<(message: unknown) => void>() }
+      parameters = new Map<string, { value: number }>([['frequency', { value: 1 }]])
+      connect = vi.fn<(target: unknown) => void>()
+      disconnect = vi.fn<(target?: unknown) => void>()
+      constructor(
+        _context: BaseAudioContext,
+        readonly name: string,
+        readonly options: { numberOfInputs: number },
+      ) { worklets.push(this) }
+    }
+    vi.stubGlobal('AudioWorkletNode', MockAudioWorkletNode)
+    const context = { currentTime: 4 } as BaseAudioContext
+    const patch = createPatch(
+      'fn sources(start: time):\n'
+      + '    t = TimeNode()\n'
+      + '    phase = PhaserNode(frequency = 2Hz)\n'
+      + '    noise = RandomNode()\n'
+      + '    t.start(start)\n'
+      + '    phase.start(start)\n'
+      + '    noise.start()\n'
+      + '    ret phase\n',
+      context,
+    )
+
+    const phase = (patch.sources as PatchFunction)(Quantity.unit(6, 's')) as MockAudioWorkletNode
+    expect(worklets.map(({ name }) => name).slice(-3)).toEqual([
+      'sw-patch-time', 'sw-patch-phaser', 'sw-patch-random',
+    ])
+    expect(phase.options).toEqual({ numberOfInputs: 0 })
+    expect(phase.parameters.get('frequency')?.value).toBe(2)
+    expect(worklets.at(-3)?.port.postMessage).toHaveBeenCalledWith({ type: 'start', when: 6 })
+    expect(worklets.at(-1)?.port.postMessage).toHaveBeenCalledWith({ type: 'start', when: 4 })
+  })
+
+  it('uses worklets for signal comparisons, Python modulo, and where()', () => {
+    const worklets: MockAudioWorkletNode[] = []
+    class MockAudioWorkletNode {
+      port = { postMessage: vi.fn<(message: unknown) => void>() }
+      connect = vi.fn<(target: unknown) => void>()
+      disconnect = vi.fn<(target?: unknown) => void>()
+      constructor(
+        _context: BaseAudioContext,
+        readonly name: string,
+        readonly options: { numberOfInputs: number },
+      ) { worklets.push(this) }
+    }
+    class MockConstantSourceNode {
+      connect = vi.fn<(target: unknown, output?: number, input?: number) => void>()
+      disconnect = vi.fn<(target?: unknown, output?: number, input?: number) => void>()
+      start = vi.fn<() => void>()
+      stop = vi.fn<() => void>()
+      constructor(_context: BaseAudioContext, readonly options: { offset: number }) {}
+    }
+    vi.stubGlobal('AudioWorkletNode', MockAudioWorkletNode)
+    vi.stubGlobal('ConstantSourceNode', MockConstantSourceNode)
+    const signal = {
+      connect: vi.fn<(target: unknown, output?: number, input?: number) => void>(),
+      disconnect: vi.fn<(target?: unknown, output?: number, input?: number) => void>(),
+    }
+    const patch = createPatch(
+      'fn choose():\n    ret where(signal < 0, signal % 3, -1)\n'
+      + 'fn modulo():\n    ret -5 % 3\n',
+      {} as BaseAudioContext,
+      { globals: { signal } },
+    )
+
+    ;(patch.choose as PatchFunction)()
+    expect(worklets.map(({ name }) => name).slice(-3)).toEqual([
+      'sw-patch-less-than', 'sw-patch-modulo', 'sw-patch-where',
+    ])
+    expect(worklets.at(-1)?.options).toEqual({ numberOfInputs: 3 })
+    expect(Number((patch.modulo as PatchFunction)())).toBe(1)
+  })
+
   it('uses worklets for signal division and explicit decibel conversions', async () => {
     const context = {
       audioWorklet: { addModule: vi.fn<() => Promise<void>>().mockResolvedValue(undefined) },

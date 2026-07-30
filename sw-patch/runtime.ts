@@ -162,7 +162,8 @@ export class Quantity {
   modulo(value: unknown): Quantity {
     const right = Quantity.from(value)
     if (!right.isUnitless) this.assertCompatible(right)
-    return new Quantity(this.value % right.value, this.dimensions)
+    const remainder = ((this.value % right.value) + right.value) % right.value
+    return new Quantity(Object.is(remainder, -0) ? 0 : remainder, this.dimensions)
   }
 
   private get isUnitless(): boolean {
@@ -279,7 +280,10 @@ const MATH_CONSTANTS = [
 ] as const
 type MathFunctionName = typeof MATH_FUNCTIONS[number]
 type MathWorkletName = `sw-patch-${MathFunctionName}` | 'sw-patch-invert'
-  | 'sw-patch-atodb' | 'sw-patch-dbtoa'
+  | 'sw-patch-atodb' | 'sw-patch-dbtoa' | 'sw-patch-modulo'
+  | 'sw-patch-less-than' | 'sw-patch-greater-than'
+  | 'sw-patch-less-than-or-equal' | 'sw-patch-greater-than-or-equal'
+  | 'sw-patch-equal' | 'sw-patch-not-equal' | 'sw-patch-where'
 
 const MATH_WORKLET_SOURCE = `
 /** Base class for stoppable, sample-by-sample SW Patch worklets. */
@@ -313,9 +317,30 @@ class SwPatchAtodbProcessor extends SwPatchWorkletProcessor {
 class SwPatchDbtoaProcessor extends SwPatchWorkletProcessor {
   transform(value) { return 10 ** (value / 20) }
 }
+class SwPatchModuloProcessor extends SwPatchWorkletProcessor {
+  transform(left, right) {
+    const remainder = ((left % right) + right) % right
+    return Object.is(remainder, -0) ? 0 : remainder
+  }
+}
+class SwPatchLessThanProcessor extends SwPatchWorkletProcessor { transform(a, b) { return +(a < b) } }
+class SwPatchGreaterThanProcessor extends SwPatchWorkletProcessor { transform(a, b) { return +(a > b) } }
+class SwPatchLessThanOrEqualProcessor extends SwPatchWorkletProcessor { transform(a, b) { return +(a <= b) } }
+class SwPatchGreaterThanOrEqualProcessor extends SwPatchWorkletProcessor { transform(a, b) { return +(a >= b) } }
+class SwPatchEqualProcessor extends SwPatchWorkletProcessor { transform(a, b) { return +(a === b) } }
+class SwPatchNotEqualProcessor extends SwPatchWorkletProcessor { transform(a, b) { return +(a !== b) } }
+class SwPatchWhereProcessor extends SwPatchWorkletProcessor { transform(test, yes, no) { return test ? yes : no } }
 registerProcessor('sw-patch-invert', SwPatchInvertProcessor)
 registerProcessor('sw-patch-atodb', SwPatchAtodbProcessor)
 registerProcessor('sw-patch-dbtoa', SwPatchDbtoaProcessor)
+registerProcessor('sw-patch-modulo', SwPatchModuloProcessor)
+registerProcessor('sw-patch-less-than', SwPatchLessThanProcessor)
+registerProcessor('sw-patch-greater-than', SwPatchGreaterThanProcessor)
+registerProcessor('sw-patch-less-than-or-equal', SwPatchLessThanOrEqualProcessor)
+registerProcessor('sw-patch-greater-than-or-equal', SwPatchGreaterThanOrEqualProcessor)
+registerProcessor('sw-patch-equal', SwPatchEqualProcessor)
+registerProcessor('sw-patch-not-equal', SwPatchNotEqualProcessor)
+registerProcessor('sw-patch-where', SwPatchWhereProcessor)
 ${UNARY_MATH_FUNCTIONS.map((name) => `
 class SwPatchMath${name}Processor extends SwPatchWorkletProcessor {
   transform(value) { return Math.${name}(value) }
@@ -326,6 +351,46 @@ class SwPatchMath${name}Processor extends SwPatchWorkletProcessor {
   transform(...values) { return Math.${name}(...values) }
 }
 registerProcessor('sw-patch-${name}', SwPatchMath${name}Processor)`).join('')}
+class SwPatchScheduledSourceProcessor extends AudioWorkletProcessor {
+  constructor() {
+    super()
+    this.startedAt = Infinity
+    this.stoppedAt = Infinity
+    this.port.onmessage = ({ data }) => {
+      if (data.type === 'start') this.startedAt = data.when
+      if (data.type === 'stop') this.stoppedAt = data.when
+    }
+  }
+  valueAt() { return 0 }
+  process(_inputs, outputs, parameters) {
+    const output = outputs[0] || []
+    for (const channel of output) for (let sample = 0; sample < channel.length; sample++) {
+      const time = currentTime + sample / sampleRate
+      channel[sample] = time >= this.startedAt && time < this.stoppedAt
+        ? this.valueAt(time, sample, parameters) : 0
+    }
+    return currentTime < this.stoppedAt
+  }
+}
+class SwPatchTimeProcessor extends SwPatchScheduledSourceProcessor {
+  valueAt(time) { return time - this.startedAt }
+}
+class SwPatchPhaserProcessor extends SwPatchScheduledSourceProcessor {
+  static get parameterDescriptors() { return [{ name: 'frequency', defaultValue: 1 }] }
+  constructor() { super(); this.phase = 0 }
+  valueAt(_time, sample, parameters) {
+    const frequency = parameters.frequency.length === 1 ? parameters.frequency[0] : parameters.frequency[sample]
+    const value = this.phase
+    this.phase = ((this.phase + frequency / sampleRate) % 1 + 1) % 1
+    return value
+  }
+}
+class SwPatchRandomProcessor extends SwPatchScheduledSourceProcessor {
+  valueAt() { return Math.random() }
+}
+registerProcessor('sw-patch-time', SwPatchTimeProcessor)
+registerProcessor('sw-patch-phaser', SwPatchPhaserProcessor)
+registerProcessor('sw-patch-random', SwPatchRandomProcessor)
 `
 
 /** Converts a linear amplitude to decibels. */
@@ -455,6 +520,10 @@ export class PatchRuntime {
     this.root.set('OscillatorNode', (...args: unknown[]) => this.makeNode('Oscillator', args))
     this.root.set('ConstantSourceNode', (...args: unknown[]) => this.makeNode('ConstantSource', args))
     this.root.set('AudioSignal', this.createAndStartAudioSignal.bind(this))
+    this.root.set('TimeNode', () => this.createUtilitySource('sw-patch-time'))
+    this.root.set('PhaserNode', (...args: unknown[]) => this.createUtilitySource('sw-patch-phaser', args))
+    this.root.set('RandomNode', () => this.createUtilitySource('sw-patch-random'))
+    this.root.set('where', (...values: unknown[]) => this.where(values))
     this.root.set('atodb', (value: unknown) => this.convertMath('sw-patch-atodb', atodb, value))
     this.root.set('dbtoa', (value: unknown) => this.convertMath('sw-patch-dbtoa', dbtoa, value))
     for (const name of UNARY_MATH_FUNCTIONS) {
@@ -472,6 +541,38 @@ export class PatchRuntime {
     this.root.set('random', () => Quantity.scalar(Math.random()))
     this.root.set('print', console.log)
     this.root.set('context', this.context)
+  }
+
+  private createUtilitySource(name: string, args: unknown[] = []): AudioWorkletNode {
+    const node = new AudioWorkletNode(this.context, name, { numberOfInputs: 0 })
+    const options = (args[0] ?? {}) as Record<string, unknown>
+    const frequency = node.parameters?.get('frequency')
+    if (frequency && options.frequency !== undefined) frequency.value = Number(options.frequency)
+    Object.defineProperties(node, {
+      start: { value: (when = this.context.currentTime) => node.port.postMessage({ type: 'start', when: Number(when) }) },
+      stop: { value: (when = this.context.currentTime) => node.port.postMessage({ type: 'stop', when: Number(when) }) },
+      ...(frequency ? { frequency: { value: frequency } } : {}),
+    })
+    this.registerCleanup(() => node.port.postMessage({ type: 'stop', when: this.context.currentTime }))
+    return node
+  }
+
+  private where(values: unknown[]): unknown {
+    if (values.length !== 3) throw new Error('where() expects three arguments')
+    if (!values.some(AudioSignal.is)) return Quantity.truthy(values[0]) ? values[1] : values[2]
+    return this.connectWorkletInputs('sw-patch-where', values)
+  }
+
+  private connectWorkletInputs(name: MathWorkletName, values: unknown[]): AudioWorkletNode {
+    const converter = this.audioSignalGraph.convert(name, values.length) as AudioWorkletNode
+    values.forEach((value, index) => {
+      const signal = AudioSignal.from(value, this.audioSignalGraph)
+      const node = signal?.node ?? this.createAndStartAudioSignal(value)
+      node.connect(converter, 0, index)
+      this.registerCleanup(() => node.disconnect(converter, 0, index))
+      if (!signal) this.registerCleanup(() => (node as Connectable & { stop?: () => void }).stop?.())
+    })
+    return converter
   }
 
   private convertMath(
@@ -818,6 +919,17 @@ export class PatchRuntime {
     if (operator === 'or') return Quantity.truthy(left) ? left : right()
     const rightValue = right()
     if (AudioSignal.is(left) || AudioSignal.is(rightValue)) {
+      const processors: Partial<Record<string, MathWorkletName>> = {
+        '%': 'sw-patch-modulo',
+        '<': 'sw-patch-less-than',
+        '>': 'sw-patch-greater-than',
+        '<=': 'sw-patch-less-than-or-equal',
+        '>=': 'sw-patch-greater-than-or-equal',
+        '==': 'sw-patch-equal',
+        '!=': 'sw-patch-not-equal',
+      }
+      const processor = processors[operator]
+      if (processor) return this.connectWorkletInputs(processor, [left, rightValue])
       const result = AudioSignal.binary(operator, left, rightValue, this.audioSignalGraph)
       if (result !== undefined) return result
     }
