@@ -503,6 +503,69 @@ describe('SW Patch runtime', () => {
     expect(ChannelMergerNode).toHaveBeenCalledWith(context, { numberOfInputs: 2 })
   })
 
+  it('turns array literals into periodic waves and wave-shaper curves', () => {
+    const periodicWave = {}
+    const createPeriodicWave = vi.fn<(
+      real: Float32Array,
+      imaginary: Float32Array,
+    ) => object>(() => periodicWave)
+    const OscillatorNode = vi.fn<() => void>(function () {})
+    const WaveShaperNode = vi.fn<() => void>(function () {})
+    vi.stubGlobal('OscillatorNode', OscillatorNode)
+    vi.stubGlobal('WaveShaperNode', WaveShaperNode)
+    const context = { createPeriodicWave } as unknown as BaseAudioContext
+
+    createPatch(
+      'osc = OscillatorNode(periodicWave = [[0, 0, 0], [0, 1, 0.5]])\n'
+      + 'shaper = WaveShaperNode(curve = [-1, -50%, 0, 50%, 1], oversample = \'4x\')\n',
+      context,
+    )
+
+    expect(createPeriodicWave).toHaveBeenCalledOnce()
+    expect(createPeriodicWave.mock.calls[0]?.[0]).toEqual(new Float32Array([0, 0, 0]))
+    expect(createPeriodicWave.mock.calls[0]?.[1]).toEqual(new Float32Array([0, 1, 0.5]))
+    expect(OscillatorNode).toHaveBeenCalledWith(context, { periodicWave })
+    expect(WaveShaperNode).toHaveBeenCalledWith(context, {
+      curve: new Float32Array([-1, -0.5, 0, 0.5, 1]),
+      oversample: '4x',
+    })
+  })
+
+  it('rejects malformed periodic-wave arrays', () => {
+    const OscillatorNode = vi.fn<() => void>(function () {})
+    vi.stubGlobal('OscillatorNode', OscillatorNode)
+
+    expect(() => createPatch(
+      'osc = OscillatorNode(periodicWave = [0, 1])\n',
+      { createPeriodicWave: vi.fn<() => void>() } as unknown as BaseAudioContext,
+    )).toThrow('periodicWave expects [real, imaginary] arrays')
+  })
+
+  it('constructs PeriodicWave values with an implicit context and options', () => {
+    const periodicWave = {}
+    const createPeriodicWave = vi.fn<(
+      real: Float32Array,
+      imaginary: Float32Array,
+      options?: PeriodicWaveConstraints,
+    ) => object>(() => periodicWave)
+    const OscillatorNode = vi.fn<() => void>(function () {})
+    vi.stubGlobal('OscillatorNode', OscillatorNode)
+    const context = { createPeriodicWave } as unknown as BaseAudioContext
+
+    createPatch(
+      'wave = PeriodicWave([0, 0], [0, 1], {disableNormalization: true})\n'
+      + 'osc = OscillatorNode(periodicWave = wave)\n',
+      context,
+    )
+
+    expect(createPeriodicWave).toHaveBeenCalledWith(
+      new Float32Array([0, 0]),
+      new Float32Array([0, 1]),
+      { disableNormalization: true },
+    )
+    expect(OscillatorNode).toHaveBeenCalledWith(context, { periodicWave })
+  })
+
   it('does not treat inherited global endpoints as patch declarations', () => {
     const input = { connect: vi.fn<(target: unknown) => void>(), disconnect: vi.fn<() => void>() }
     const output = { connect: vi.fn<(target: unknown) => void>(), disconnect: vi.fn<() => void>() }

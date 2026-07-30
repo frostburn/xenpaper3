@@ -95,6 +95,30 @@ The `**` operator performs right-associative exponentiation. When either
 operand is an audio signal, SW Patch routes both operands through the existing
 `pow` worklet.
 
+Array literals can supply the Web Audio data that cannot be expressed as a
+scalar node option. An oscillator's `periodicWave` is a two-element array
+containing its real and imaginary Fourier coefficients; SW Patch converts it
+with `context.createPeriodicWave()`. A wave shaper's `curve` is a single array
+of samples, converted to the `Float32Array` required by Web Audio. Values with
+units are converted to their canonical scalar values in both forms.
+The `PeriodicWave(real, imaginary, options)` helper provides the same conversion
+while supplying the patch's audio context implicitly, including support for the
+`disableNormalization` option.
+
+```swpatch
+osc = OscillatorNode(periodicWave = [[0, 0, 0], [0, 1, 0.5]])
+shaper = WaveShaperNode(curve = [-1, -50%, 0, 50%, 1], oversample = '4x')
+osc -> shaper -> destination
+```
+
+To retain the Fourier coefficients' original amplitude, construct the wave
+explicitly:
+
+```swpatch
+wave = PeriodicWave([0, 0, 0], [0, 1, 0.5], {disableNormalization: true})
+osc = OscillatorNode(periodicWave = wave)
+```
+
 Every patch owns the Web Audio resources that the runtime creates implicitly,
 including scalar sources used by expressions such as `signal + 5`. Call
 `dispose()` when the patch is no longer needed. Disposal is idempotent; resources
