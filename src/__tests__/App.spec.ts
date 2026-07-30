@@ -75,7 +75,8 @@ beforeEach(() => {
   effectConnect.mockReset()
   createPatch.mockReset()
   createPatch.mockImplementation((source) =>
-    source.includes('delayTime') ? { connect: effectConnect } : { on: synthOn })
+    source.includes('delayTime') ? { connect: effectConnect } : { on: synthOn },
+  )
   registerMathWorklets.mockReset()
   registerMathWorklets.mockResolvedValue(undefined)
   synthOn.mockReturnValue(vi.fn<NoteOff>(() => 2))
@@ -93,9 +94,11 @@ describe('App', () => {
 
   it('initializes patches only after math worklets are registered', async () => {
     let finishRegistration!: () => void
-    registerMathWorklets.mockReturnValue(new Promise((resolve) => {
-      finishRegistration = resolve
-    }))
+    registerMathWorklets.mockReturnValue(
+      new Promise((resolve) => {
+        finishRegistration = resolve
+      }),
+    )
 
     const wrapper = mount(App)
     expect(createPatch).not.toHaveBeenCalled()
@@ -145,6 +148,27 @@ describe('App', () => {
     await wrapper.get('#filter-q').setValue('15')
 
     expect(sources[3]!.offset.setTargetAtTime).toHaveBeenLastCalledWith(15, 1.01, 0.01)
+    wrapper.unmount()
+  })
+
+  it('switches between the bass and default synth patches', async () => {
+    const bassOff = vi.fn<NoteOff>(() => 2)
+    synthOn.mockReturnValueOnce(bassOff).mockReturnValue(vi.fn<NoteOff>(() => 2))
+    const wrapper = mount(App)
+    await flushPromises()
+
+    dispatchKey('keydown', 65)
+    await flushPromises()
+    expect(synthOn.mock.calls[0]?.slice(4)).toEqual([0.01, 0.5, 0.1, sources[3]])
+
+    await wrapper.get('#synth-patch').setValue('default')
+    await flushPromises()
+    expect(bassOff).toHaveBeenCalledOnce()
+    expect(createPatch).toHaveBeenCalledTimes(3)
+
+    dispatchKey('keydown', 66)
+    await flushPromises()
+    expect(synthOn.mock.calls[1]?.slice(4)).toEqual([0.01, 0.5, 0.7, 0.1])
     wrapper.unmount()
   })
 

@@ -2,21 +2,15 @@
 import { onMounted, onUnmounted, ref, watch } from 'vue'
 import { createPatch, registerMathWorklets, type RuntimeOptions } from '../sw-patch'
 import BASS_PATCH from './patches/adr-bass.swpatch?raw'
+import DEFAULT_PATCH from './patches/default.swpatch?raw'
 import PING_PONG_DELAY_PATCH from './patches/ping-pong-delay.swpatch?raw'
 
 type NoteOff = (end: number) => number
 interface Synth {
-  on: (
-    destination: AudioNode,
-    start: number,
-    pitch: AudioNode,
-    velocity: number,
-    attack?: number,
-    decay?: number,
-    release?: number,
-    Q?: AudioNode,
-  ) => NoteOff
+  on: (...args: unknown[]) => NoteOff
 }
+
+type SynthPatch = 'default' | 'bass'
 
 // Dummy audio code just to get something going
 const ctx = new AudioContext({ latencyHint: 'interactive' })
@@ -31,6 +25,18 @@ const inputDelay = 0.01
 let mounted = true
 let delay: AudioNode
 let synth: Synth
+let activeSynthPatch: SynthPatch
+const synthPatchModel = ref<SynthPatch>('bass')
+
+const createSynth = (patch: SynthPatch) =>
+  createPatch(patch === 'default' ? DEFAULT_PATCH : BASS_PATCH, ctx, {
+    config: { oscillatorType: 'sawtooth' },
+  } as RuntimeOptions) as unknown as Synth
+
+const selectSynth = (patch: SynthPatch) => {
+  synth = createSynth(patch)
+  activeSynthPatch = patch
+}
 
 // A patch may instantiate a math worklet while its top-level connections are
 // evaluated. Do not evaluate either patch until the worklet module is loaded.
@@ -40,9 +46,7 @@ const patchesReady = registerMathWorklets(ctx).then(() => {
     config: { delayTime, feedback, wet },
   }) as unknown as AudioNode
   delay.connect(output)
-  synth = createPatch(BASS_PATCH, ctx, {
-    config: { oscillatorType: 'sawtooth' },
-  } as RuntimeOptions) as unknown as Synth
+  selectSynth(synthPatchModel.value)
   return true
 })
 
@@ -73,9 +77,11 @@ const releaseNote = (keyCode: number) => {
   const note = noteOffs.get(keyCode)
   if (note) {
     const [off, pitch] = note
+    // Remove the note before running patch code so re-entrant release events
+    // cannot call a patch's `once fn off` more than once.
+    noteOffs.delete(keyCode)
     const cutTime = off(ctx.currentTime + inputDelay)
     pitch.stop(cutTime)
-    noteOffs.delete(keyCode)
   }
 }
 
@@ -83,6 +89,13 @@ const releaseAllNotes = () => {
   pendingNotes.clear()
   for (const keyCode of noteOffs.keys()) releaseNote(keyCode)
 }
+
+watch(synthPatchModel, async (patch) => {
+  const ready = await patchesReady
+  if (!ready || !mounted || patch !== synthPatchModel.value) return
+  releaseAllNotes()
+  selectSynth(patch)
+})
 
 const handleKeyDown = (e: KeyboardEvent) => {
   if (noteOffs.has(e.keyCode) || pendingNotes.has(e.keyCode)) return
@@ -96,7 +109,14 @@ const handleKeyDown = (e: KeyboardEvent) => {
     })
     const velocity = 0.8
     pitch.start()
-    const off = synth.on(delay, ctx.currentTime + inputDelay, pitch, velocity, 0.01, 0.5, 0.1, Q)
+    const commonArgs = [delay, ctx.currentTime + inputDelay, pitch, velocity, 0.01, 0.5]
+    // The stock patch takes sustain before release, while the bass patch takes
+    // release and its filter Q signal. Keeping the calls distinct prevents an
+    // AudioNode from being interpreted as the default patch's release duration.
+    const off =
+      activeSynthPatch === 'default'
+        ? synth.on(...commonArgs, 0.7, 0.1)
+        : synth.on(...commonArgs, 0.1, Q)
     noteOffs.set(e.keyCode, [off, pitch])
   })
 }
@@ -133,6 +153,11 @@ onUnmounted(() => {
     Visit <a href="https://vuejs.org/" target="_blank" rel="noopener">vuejs.org</a> to read the
     documentation
   </p>
+  <label for="synth-patch">Synth patch</label>
+  <select id="synth-patch" v-model="synthPatchModel">
+    <option value="default">Default</option>
+    <option value="bass">Bass</option>
+  </select>
   <label for="delay-time">Delay time</label>
   <input id="delay-time" type="range" v-model="delayTimeModel" min="0" max="2" step="any" />
   <label for="feedback">Feedback</label>
