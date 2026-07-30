@@ -70,7 +70,8 @@ SW Patch also provides audio-rate utility sources that follow the native source
 node API. `TimeNode()` outputs elapsed seconds after `start()`, `PhaserNode()`
 outputs an unfiltered sawtooth phase from zero up to one and exposes an
 automatable `frequency` parameter and an OscillatorNode-style `detune`
-parameter measured in cents, and `RandomNode()` produces a new
+parameter measured in cents. Like `OscillatorNode`, its default frequency is
+440 Hz. `RandomNode()` produces a new
 `Math.random()` value for every sample. Each accepts an optional AudioContext
 timestamp in `start()` and `stop()`:
 

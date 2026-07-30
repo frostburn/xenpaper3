@@ -488,6 +488,9 @@ UnitLiteral
   = value:Decimal unit:"%" !IdentifierContinue {
       return node("UnitLiteral", { value, unit, spaced: false });
     }
+  / value:Decimal __ unit:"%" &SpacedPercentEnd {
+      return node("UnitLiteral", { value, unit, spaced: true });
+    }
   / value:Decimal spacing:H unit:UnitName {
       return node("UnitLiteral", {
         value,
@@ -495,6 +498,9 @@ UnitLiteral
         spaced: spacing.length > 0,
       });
     }
+
+SpacedPercentEnd
+  = H &(EOL / [,)\]}] / "#" / EndOfFile)
 
 UnitName
   = value:("semitones"i / "semitone"i / "beats"i / "beat"i / "bpm"i / "kHz"i / "Hz"i / "ms"i / "us"i / "ns"i / "dB"i / "st"i / "s"i / "c"i)

@@ -60,7 +60,7 @@ describe('SW Patch runtime', () => {
     class MockAudioWorkletNode {
       port = { postMessage: vi.fn<(message: unknown) => void>() }
       parameters = new Map<string, { value: number }>([
-        ['frequency', { value: 1 }],
+        ['frequency', { value: 440 }],
         ['detune', { value: 0 }],
       ])
       connect = vi.fn<(target: unknown) => void>()

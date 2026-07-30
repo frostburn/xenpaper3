@@ -390,7 +390,7 @@ class SwPatchTimeProcessor extends SwPatchScheduledSourceProcessor {
 class SwPatchPhaserProcessor extends SwPatchScheduledSourceProcessor {
   static get parameterDescriptors() {
     return [
-      { name: 'frequency', defaultValue: 1 },
+      { name: 'frequency', defaultValue: 440 },
       { name: 'detune', defaultValue: 0 },
     ]
   }

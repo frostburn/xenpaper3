@@ -49,6 +49,22 @@ fn on(
 `
 
 describe('SW Patch parser', () => {
+  it('distinguishes spaced percentage literals from modulo expressions', () => {
+    const ast = parse('percentage = 70 %\nremainder = 70 % 8\n')
+
+    expect(ast.body).toMatchObject([
+      { value: { type: 'UnitLiteral', value: '70', unit: '%', spaced: true } },
+      {
+        value: {
+          type: 'BinaryExpression',
+          operator: '%',
+          left: { type: 'NumberLiteral', value: '70' },
+          right: { type: 'NumberLiteral', value: '8' },
+        },
+      },
+    ])
+  })
+
   it('parses semitone unit names', () => {
     const ast = parse('octave = 12semitones\nstep = 1 semitone\nshort = 2st\n')
 
