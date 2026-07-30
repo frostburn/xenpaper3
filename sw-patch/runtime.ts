@@ -473,7 +473,7 @@ export class PatchRuntime {
   private readonly internalConnections = new WeakMap<object, Connectable>()
   private readonly topLevelBindings = new Set<string>()
   private readonly audioSignalGraph: AudioSignalGraph
-  private readonly patchCleanups: Array<() => void> = []
+  private readonly patchCleanups = new Set<() => void>()
   private activeConnectionCleanups?: Array<() => void>
   private disposed = false
   readonly workletsReady: Promise<void>
@@ -517,25 +517,27 @@ export class PatchRuntime {
     return node
   }
 
-  private registerCleanup(cleanup: () => void): void {
+  private registerCleanup(cleanup: () => void): () => void {
     let active = true
     const once = () => {
       if (!active) return
       active = false
+      this.patchCleanups.delete(once)
       cleanup()
     }
     if (this.disposed) {
       once()
-      return
+      return once
     }
-    this.patchCleanups.push(once)
+    this.patchCleanups.add(once)
     this.activeConnectionCleanups?.push(once)
+    return once
   }
 
   private dispose(): void {
     if (this.disposed) return
     this.disposed = true
-    for (const cleanup of this.patchCleanups.splice(0).reverse()) cleanup()
+    for (const cleanup of [...this.patchCleanups].reverse()) cleanup()
   }
 
   private installBuiltins(): void {
@@ -577,16 +579,19 @@ export class PatchRuntime {
     const detune = node.parameters?.get('detune')
     if (frequency && options.frequency !== undefined) frequency.value = Number(options.frequency)
     if (detune && options.detune !== undefined) detune.value = Number(options.detune)
-    node.port.onmessage = ({ data }) => {
-      if (data === 'ended') node.dispatchEvent(new Event('ended'))
-    }
     Object.defineProperties(node, {
       start: { value: (when = this.context.currentTime) => node.port.postMessage({ type: 'start', when: Number(when) }) },
       stop: { value: (when = this.context.currentTime) => node.port.postMessage({ type: 'stop', when: Number(when) }) },
       ...(frequency ? { frequency: { value: frequency } } : {}),
       ...(detune ? { detune: { value: detune } } : {}),
     })
-    this.registerCleanup(() => {
+    let cleanup = () => {}
+    node.port.onmessage = ({ data }) => {
+      if (data !== 'ended') return
+      node.dispatchEvent(new Event('ended'))
+      cleanup()
+    }
+    cleanup = this.registerCleanup(() => {
       node.port.onmessage = null
       node.port.postMessage({ type: 'stop', when: this.context.currentTime })
     })

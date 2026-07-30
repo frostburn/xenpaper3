@@ -105,9 +105,11 @@ describe('SW Patch runtime', () => {
     worklets.at(-3)?.addEventListener('ended', ended)
     worklets.at(-3)?.port.onmessage?.({ data: 'ended' } as MessageEvent)
     expect(ended).toHaveBeenCalledOnce()
+    expect(worklets.at(-3)?.port.onmessage).toBeNull()
+    const completedSourceMessages = worklets.at(-3)?.port.postMessage.mock.calls.length
 
     patch.dispose()
-    expect(worklets.at(-3)?.port.onmessage).toBeNull()
+    expect(worklets.at(-3)?.port.postMessage).toHaveBeenCalledTimes(completedSourceMessages!)
   })
 
   it('uses worklets for signal comparisons, Python modulo, and where()', () => {

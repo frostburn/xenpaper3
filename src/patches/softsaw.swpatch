@@ -23,7 +23,7 @@ fn on(
         theta = 2 * PI * phase
         waveform = atan(sharpness * sin(theta) / (1 + sharpness * cos(theta))) / asin(sharpness)
 
-        env = tanh(t / attack) * (sustain + (1 - sustain) * decayEnv)
+        env = velocity * tanh(t / attack) * (sustain + (1 - sustain) * decayEnv)
         releaseEnv = exp(-r / release)
 
         waveform * env * releaseEnv -> destination
