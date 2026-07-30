@@ -54,7 +54,7 @@ The unary functions `abs`, `acos`, `acosh`, `asin`, `asinh`, `atan`, `atanh`,
 `tanh`, `trunc`, and `clz32` accept either scalar quantities or audio signals.
 The multi-argument functions `atan2`, `hypot`, `imul`, `max`, `min`, and `pow`
 do as well. `hypot`, `max`, and `min` accept up to five arguments. `atan2`
-accepts either positional arguments or named `x` and `y` arguments. Signal
+accepts either positional `(y, x)` arguments or named `x` and `y` arguments. Signal
 transforms are explicit function calls, so this creates and connects a `tanh`
 worklet between the oscillator and destination:
 

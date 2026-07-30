@@ -168,6 +168,8 @@ describe('SW Patch runtime', () => {
     const patch = createPatch(
       'fn positional():\n    ret atan2(signalA, signalB)\n'
       + 'fn named():\n    ret atan2(x = signalA, y = signalB)\n'
+      + 'fn atanSignature():\n'
+      + '    ret atan2(0, 1) + atan2(x = 1, y = 0)\n'
       + 'fn scalar():\n    ret pow(2, 3) + max(1, 7, 4) + clz32(1)\n',
       {} as BaseAudioContext,
       { globals: { signalA, signalB } },
@@ -181,8 +183,9 @@ describe('SW Patch runtime', () => {
     expect(worklets[0]?.options).toEqual({ numberOfInputs: 2 })
     expect(signalA.connect).toHaveBeenCalledWith(worklets[0], 0, 0)
     expect(signalB.connect).toHaveBeenCalledWith(worklets[0], 0, 1)
-    expect(signalA.connect).toHaveBeenCalledWith(worklets[1], 0, 0)
-    expect(signalB.connect).toHaveBeenCalledWith(worklets[1], 0, 1)
+    expect(signalB.connect).toHaveBeenCalledWith(worklets[1], 0, 0)
+    expect(signalA.connect).toHaveBeenCalledWith(worklets[1], 0, 1)
+    expect(Number((patch.atanSignature as PatchFunction)())).toBe(0)
     expect(Number((patch.scalar as PatchFunction)())).toBe(46)
   })
 

@@ -494,7 +494,7 @@ export class PatchRuntime {
       && !(last instanceof Quantity) && !Array.isArray(last)) {
       const named = last as Record<string, unknown>
       values = name === 'atan2'
-        ? [named.x, named.y]
+        ? [named.y, named.x]
         : Object.values(named)
     }
     const maximumArguments = name === 'max' || name === 'min' || name === 'hypot' ? 5 : 2
