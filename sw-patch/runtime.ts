@@ -272,6 +272,9 @@ const MATH_FUNCTIONS = [
   'exp', 'expm1', 'floor', 'fround', 'log', 'log10', 'log1p', 'log2', 'round', 'sign', 'sin',
   'sinh', 'sqrt', 'tan', 'tanh', 'trunc',
 ] as const
+const MATH_CONSTANTS = [
+  'E', 'LN10', 'LN2', 'LOG10E', 'LOG2E', 'PI', 'SQRT1_2', 'SQRT2',
+] as const
 type MathFunctionName = typeof MATH_FUNCTIONS[number]
 type MathWorkletName = `sw-patch-${MathFunctionName}` | 'sw-patch-invert'
   | 'sw-patch-atodb' | 'sw-patch-dbtoa'
@@ -455,6 +458,8 @@ export class PatchRuntime {
       this.signalTransforms.add(transform)
       this.root.set(name, transform)
     }
+    for (const name of MATH_CONSTANTS) this.root.set(name, Quantity.scalar(Math[name]))
+    this.root.set('random', () => Quantity.scalar(Math.random()))
     this.root.set('print', console.log)
     this.root.set('context', this.context)
   }

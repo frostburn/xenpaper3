@@ -22,6 +22,25 @@ describe('SW Patch runtime', () => {
     expect(atodb(dbtoa(-6))).toBeCloseTo(-6)
   })
 
+  it('provides Math constants and random scalar values', () => {
+    const random = vi.spyOn(Math, 'random').mockReturnValue(0.25)
+    const patch = createPatch(
+      'fn constants():\n'
+      + '    ret E + LN10 + LN2 + LOG10E + LOG2E + PI + SQRT1_2 + SQRT2\n'
+      + 'fn randomValue():\n'
+      + '    ret random()\n',
+      {} as BaseAudioContext,
+    )
+
+    expect(Number((patch.constants as PatchFunction)())).toBeCloseTo(
+      Math.E + Math.LN10 + Math.LN2 + Math.LOG10E + Math.LOG2E
+      + Math.PI + Math.SQRT1_2 + Math.SQRT2,
+    )
+    expect((patch.randomValue as PatchFunction)()).toEqual(Quantity.scalar(0.25))
+    expect(random).toHaveBeenCalledOnce()
+    random.mockRestore()
+  })
+
   it('registers inline math worklets once per audio context', async () => {
     const addModule = vi.fn<(_: string) => Promise<void>>().mockResolvedValue(undefined)
     const createObjectURL = vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:math-worklets')

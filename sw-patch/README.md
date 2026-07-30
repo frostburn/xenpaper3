@@ -59,6 +59,10 @@ and connects a `tanh` worklet between the oscillator and destination:
 osc -> tanh -> destination
 ```
 
+The standard `Math` constants `E`, `LN10`, `LN2`, `LOG10E`, `LOG2E`, `PI`,
+`SQRT1_2`, and `SQRT2` are available as scalars. `random()` returns a random
+scalar between zero (inclusive) and one (exclusive).
+
 Every patch owns the Web Audio resources that the runtime creates implicitly,
 including scalar sources used by expressions such as `signal + 5`. Call
 `dispose()` when the patch is no longer needed. Disposal is idempotent; resources
