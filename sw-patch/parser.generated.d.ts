@@ -156,6 +156,7 @@ export interface ConnectionLink {
 export interface AssignmentStatement extends Node {
   type: 'AssignmentStatement'
   target: Identifier | MemberExpression
+  operator: '=' | '+=' | '-=' | '*=' | '/=' | '%=' | '**='
   value: Expression
 }
 

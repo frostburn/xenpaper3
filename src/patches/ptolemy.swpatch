@@ -1,0 +1,45 @@
+factors = [2, 3, 5]
+
+harmonics = [0]
+zeros = [0]
+
+for n in range(1, 256):
+    zeros.push(0)
+    m = n
+    for f in factors:
+        while not m%f:
+            m /= f
+    if m == 1:
+        harmonics.push(n ** -1.5)
+    else:
+        harmonics.push(0)
+
+wave = PeriodicWave(zeros, harmonics)
+
+fn on(
+    destination: AudioNode,
+    start: Instant,
+    pitch: AudioSignal<Pitch>,
+    velocity: Level,
+    attack: Duration = 100ms,  # Ignored
+    decay: Duration = 200ms,
+    sustain: Level = 70%,  # Ignored
+    release: Duration = 50ms,
+):
+    osc = OscillatorNode(periodicWave = wave)
+    osc.start(start)
+
+    env = GainNode(gain = velocity)
+    @start env.gain = velocity
+    @(start;target decay) env.gain = 0
+
+    until osc:ended:
+        osc -> env -> destination
+        pitch -> osc.detune
+
+    ret once fn off(end: Instant):
+        @(end; hold) env.gain
+        @(end; target release) env.gain = 0
+        cutOff = end + 5 * release
+        osc.stop(cutOff)
+        ret cutOff

@@ -843,7 +843,17 @@ export class PatchRuntime {
         if (exports) this.topLevelBindings.add(statement.name)
         return undefined
       case 'AssignmentStatement':
-        this.assign(statement.target, this.expression(statement.value, scope), scope)
+        this.assign(
+          statement.target,
+          statement.operator === '='
+            ? this.expression(statement.value, scope)
+            : this.binary(
+                statement.operator.slice(0, -1),
+                this.expression(statement.target, scope),
+                () => this.expression(statement.value, scope),
+              ),
+          scope,
+        )
         if (exports && statement.target.type === 'Identifier') {
           this.topLevelBindings.add(statement.target.name)
         }
@@ -934,7 +944,13 @@ export class PatchRuntime {
       return
     }
     const target = this.expression(statement.target, scope) as AudioParameter
-    const value = Number(this.expression(statement.value, scope))
+    const value = Number(statement.operator === '='
+      ? this.expression(statement.value, scope)
+      : this.binary(
+          statement.operator.slice(0, -1),
+          this.expression(statement.target, scope),
+          () => this.expression(statement.value, scope),
+        ))
     switch (automation?.type) {
       case 'LinearAutomation': target.linearRampToValueAtTime(value, time); break
       case 'ExponentialAutomation': target.exponentialRampToValueAtTime(value, time); break

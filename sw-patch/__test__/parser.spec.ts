@@ -86,6 +86,28 @@ describe('SW Patch parser', () => {
     ])
   })
 
+  it('parses augmented assignments and gives not lower precedence than comparisons and arithmetic', () => {
+    const ast = parse('value += 2\nvalue **= 3\nresult = not value%2 == 0\n')
+
+    expect(ast.body).toMatchObject([
+      { type: 'AssignmentStatement', operator: '+=', target: { name: 'value' } },
+      { type: 'AssignmentStatement', operator: '**=', target: { name: 'value' } },
+      {
+        type: 'AssignmentStatement',
+        operator: '=',
+        value: {
+          type: 'UnaryExpression',
+          operator: 'not',
+          argument: {
+            type: 'BinaryExpression',
+            operator: '==',
+            left: { type: 'BinaryExpression', operator: '%' },
+          },
+        },
+      },
+    ])
+  })
+
   it('parses semitone unit names', () => {
     const ast = parse('octave = 12semitones\nstep = 1 semitone\nshort = 2st\n')
 

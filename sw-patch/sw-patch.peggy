@@ -282,8 +282,8 @@ ConnectionEndpoint
     }
 
 AssignmentStatement
-  = target:Assignable H "=" !"=" H value:Expression {
-      return node("AssignmentStatement", { target, value });
+  = target:Assignable H operator:("**=" / "+=" / "-=" / "*=" / "/=" / "%=" / "=" !"=" { return "="; }) H value:Expression {
+      return node("AssignmentStatement", { target, operator, value });
     }
 
 ReturnStatement
@@ -384,12 +384,18 @@ LogicalOrExpression
     }
 
 LogicalAndExpression
-  = head:ComparisonExpression
-    tail:(H KeywordAnd H right:ComparisonExpression {
+  = head:NotExpression
+    tail:(H KeywordAnd H right:NotExpression {
       return ["and", right];
     })* {
       return foldBinary(head, tail);
     }
+
+NotExpression
+  = KeywordNot __ argument:NotExpression {
+      return node("UnaryExpression", { operator: "not", argument });
+    }
+  / ComparisonExpression
 
 ComparisonExpression
   = head:AdditiveExpression
@@ -421,9 +427,6 @@ MultiplicativeExpression
 UnaryExpression
   = operator:("+" / "-" / "!") H argument:UnaryExpression {
       return node("UnaryExpression", { operator, argument });
-    }
-  / KeywordNot __ argument:UnaryExpression {
-      return node("UnaryExpression", { operator: "not", argument });
     }
   / PowerExpression
 

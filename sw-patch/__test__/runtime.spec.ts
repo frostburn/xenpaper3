@@ -16,6 +16,27 @@ function location() {
 }
 
 describe('SW Patch runtime', () => {
+  it('evaluates augmented assignments and not expressions with Python-style precedence', () => {
+    const patch = createPatch(
+      'fn calculate():\n'
+      + '    value = 5\n'
+      + '    value += 3\n'
+      + '    value *= 2\n'
+      + '    value -= 4\n'
+      + '    value /= 3\n'
+      + '    value **= 2\n'
+      + '    value %= 5\n'
+      + '    ret value\n'
+      + 'fn divisible(value: Number):\n'
+      + '    ret not value%3\n',
+      {} as BaseAudioContext,
+    )
+
+    expect(Number((patch.calculate as PatchFunction)())).toBe(1)
+    expect((patch.divisible as PatchFunction)(6)).toBe(true)
+    expect((patch.divisible as PatchFunction)(7)).toBe(false)
+  })
+
   it('executes for and while loops and propagates returns from their suites', () => {
     const patch = createPatch(
       'fn total(values: List<Number>):\n'
