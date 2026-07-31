@@ -16,6 +16,62 @@ function location() {
 }
 
 describe('SW Patch runtime', () => {
+  it('evaluates augmented assignments and not expressions with Python-style precedence', () => {
+    const patch = createPatch(
+      'fn calculate():\n'
+      + '    value = 5\n'
+      + '    value += 3\n'
+      + '    value *= 2\n'
+      + '    value -= 4\n'
+      + '    value /= 3\n'
+      + '    value **= 2\n'
+      + '    value %= 5\n'
+      + '    ret value\n'
+      + 'fn divisible(value: Number):\n'
+      + '    ret not value%3\n',
+      {} as BaseAudioContext,
+    )
+
+    expect(Number((patch.calculate as PatchFunction)())).toBe(1)
+    expect((patch.divisible as PatchFunction)(6)).toBe(true)
+    expect((patch.divisible as PatchFunction)(7)).toBe(false)
+  })
+
+  it('evaluates an augmented member receiver only once', () => {
+    const first = { value: 1 }
+    const second = { value: 10 }
+    const getTarget = vi.fn<() => typeof first>()
+      .mockReturnValueOnce(first)
+      .mockReturnValue(second)
+    const patch = createPatch(
+      'fn increment():\n    getTarget().value += 1\n',
+      {} as BaseAudioContext,
+      { globals: { getTarget } },
+    )
+
+    ;(patch.increment as PatchFunction)()
+
+    expect(getTarget).toHaveBeenCalledOnce()
+    expect(Number(first.value)).toBe(2)
+    expect(second.value).toBe(10)
+  })
+
+  it('reads AudioParam.value for scheduled augmented assignments', () => {
+    const parameter = {
+      value: 2,
+      setValueAtTime: vi.fn<(value: number, time: number) => void>(),
+    }
+    const patch = createPatch(
+      'fn increase(start: Instant):\n    @start parameter += 0.5\n',
+      {} as BaseAudioContext,
+      { globals: { parameter } },
+    )
+
+    ;(patch.increase as PatchFunction)(3)
+
+    expect(parameter.setValueAtTime).toHaveBeenCalledWith(2.5, 3)
+  })
+
   it('executes for and while loops and propagates returns from their suites', () => {
     const patch = createPatch(
       'fn total(values: List<Number>):\n'

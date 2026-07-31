@@ -4,6 +4,7 @@ import { createPatch, registerMathWorklets, type RuntimeOptions } from '../sw-pa
 import BASS_PATCH from './patches/adr-bass.swpatch?raw'
 import DEFAULT_PATCH from './patches/default.swpatch?raw'
 import PING_PONG_DELAY_PATCH from './patches/ping-pong-delay.swpatch?raw'
+import PTOLEMY_PATCH from './patches/ptolemy.swpatch?raw'
 import SOFTSAW_PATCH from './patches/softsaw.swpatch?raw'
 
 type NoteOff = (end: number) => number
@@ -12,7 +13,7 @@ interface Synth {
   dispose: () => void
 }
 
-type SynthPatch = 'default' | 'bass' | 'softsaw'
+type SynthPatch = 'default' | 'bass' | 'ptolemy' | 'softsaw'
 type OscillatorType = 'sine' | 'square' | 'sawtooth' | 'triangle'
 
 // Dummy audio code just to get something going
@@ -36,6 +37,7 @@ const retiredSynths = new Map<Synth, ReturnType<typeof setTimeout>>()
 const synthPatches: Record<SynthPatch, string> = {
   bass: BASS_PATCH,
   default: DEFAULT_PATCH,
+  ptolemy: PTOLEMY_PATCH,
   softsaw: SOFTSAW_PATCH,
 }
 
@@ -199,6 +201,7 @@ onUnmounted(() => {
   <select id="synth-patch" v-model="synthPatchModel">
     <option value="default">Default</option>
     <option value="bass">Bass</option>
+    <option value="ptolemy">Ptolemy</option>
     <option value="softsaw">Softsaw</option>
   </select>
   <label for="oscillator-type">Oscillator type</label>
