@@ -14,8 +14,8 @@ interface Synth {
   dispose: () => void
 }
 
-type SynthPatch = 'default' | 'bass' | 'ptolemy' | 'softsaw'
-type OscillatorType = 'sine' | 'square' | 'sawtooth' | 'triangle'
+type SynthPatch = 'default' | 'bass' | 'ptolemy' | 'softsaw' | 'soft'
+type OscillatorType = 'triangle' | 'sawtooth' | 'square' | 'parabolic'
 
 // Dummy audio code just to get something going
 const ctx = new AudioContext({ latencyHint: 'interactive' })
@@ -209,10 +209,10 @@ onUnmounted(() => {
   </select>
   <label for="oscillator-type">Oscillator type</label>
   <select id="oscillator-type" v-model="oscillatorTypeModel">
-    <option value="sine">Sine</option>
-    <option value="square">Square</option>
-    <option value="sawtooth">Sawtooth</option>
     <option value="triangle">Triangle</option>
+    <option value="sawtooth">Sawtooth</option>
+    <option value="square">Square</option>
+    <option value="parabolic">Parabolic</option>
   </select>
   <label for="delay-time">Delay time</label>
   <input id="delay-time" type="range" v-model="delayTimeModel" min="0" max="2" step="any" />

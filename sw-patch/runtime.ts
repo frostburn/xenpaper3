@@ -418,7 +418,7 @@ class SwPatchPhaserProcessor extends SwPatchScheduledSourceProcessor {
     return value
   }
 }
-class SwPatchSoftTriangleProcessor extends SwPatchPhaserProcessor {
+class SwPatchSoftOscillatorProcessor extends SwPatchPhaserProcessor {
   static get parameterDescriptors() {
     return [
       { name: 'frequency', defaultValue: 440 },
@@ -426,16 +426,41 @@ class SwPatchSoftTriangleProcessor extends SwPatchPhaserProcessor {
       { name: 'bite', defaultValue: 0.5 },
     ]
   }
+  phaseAndBite(sample, parameters) {
+    super.valueAt(0, sample, parameters)
+    const rawBite = parameters.bite.length === 1 ? parameters.bite[0] : parameters.bite[sample]
+    // Keep inverse-trigonometric inputs in their domains and denominators away
+    // from their singular limits. The square root gives the bite automation a
+    // more perceptually even transition, particularly near zero.
+    const bite = Math.min(1 - 1e-6, Math.max(1e-6, Math.sqrt(Math.max(0, rawBite))))
+    const angle = 2 * Math.PI * this.phase
+    return [bite, Math.sin(angle), Math.cos(angle)]
+  }
+}
+class SwPatchSoftTriangleProcessor extends SwPatchSoftOscillatorProcessor {
   valueAt(_time, sample, parameters) {
-    super.valueAt(_time, sample, parameters)
-    const bite = Math.sqrt(parameters.bite.length === 1 ? parameters.bite[0] : parameters.bite[sample])
-    const sine = Math.sin(2 * Math.PI * this.phase)
-    if (bite < 1e-6) {
-      return sine
-    } else if (bite > 1) {
-      return Math.asin(sine)
-    }
+    const [bite, sine] = this.phaseAndBite(sample, parameters)
     return Math.asin(bite * sine) / Math.asin(bite)
+  }
+}
+class SwPatchSoftSawtoothProcessor extends SwPatchSoftOscillatorProcessor {
+  valueAt(_time, sample, parameters) {
+    const [bite, sine, cosine] = this.phaseAndBite(sample, parameters)
+    return Math.atan(bite * sine / (1 + bite * cosine)) / Math.asin(bite)
+  }
+}
+class SwPatchSoftSquareProcessor extends SwPatchSoftOscillatorProcessor {
+  valueAt(_time, sample, parameters) {
+    const [bite, sine] = this.phaseAndBite(sample, parameters)
+    return Math.atan(bite * sine) / Math.atan(bite)
+  }
+}
+class SwPatchSoftParabolicProcessor extends SwPatchSoftOscillatorProcessor {
+  valueAt(_time, sample, parameters) {
+    const [bite, _sine, cosine] = this.phaseAndBite(sample, parameters)
+    const inverseCosine = Math.asin(bite * cosine)
+    const inverseBite = Math.asin(bite)
+    return (inverseCosine - (inverseCosine ** 2 + inverseBite ** 2) / Math.PI) / inverseBite
   }
 }
 class SwPatchRandomProcessor extends SwPatchScheduledSourceProcessor {
@@ -444,6 +469,9 @@ class SwPatchRandomProcessor extends SwPatchScheduledSourceProcessor {
 registerProcessor('sw-patch-time', SwPatchTimeProcessor)
 registerProcessor('sw-patch-phaser', SwPatchPhaserProcessor)
 registerProcessor('sw-patch-soft-triangle', SwPatchSoftTriangleProcessor)
+registerProcessor('sw-patch-soft-sawtooth', SwPatchSoftSawtoothProcessor)
+registerProcessor('sw-patch-soft-square', SwPatchSoftSquareProcessor)
+registerProcessor('sw-patch-soft-parabolic', SwPatchSoftParabolicProcessor)
 registerProcessor('sw-patch-random', SwPatchRandomProcessor)
 `
 
@@ -583,6 +611,9 @@ export class PatchRuntime {
     this.root.set('TimeNode', () => this.createUtilitySource('sw-patch-time'))
     this.root.set('PhaserNode', (...args: unknown[]) => this.createUtilitySource('sw-patch-phaser', args))
     this.root.set('SoftTriangleNode', (...args: unknown[]) => this.createUtilitySource('sw-patch-soft-triangle', args))
+    this.root.set('SoftSawtoothNode', (...args: unknown[]) => this.createUtilitySource('sw-patch-soft-sawtooth', args))
+    this.root.set('SoftSquareNode', (...args: unknown[]) => this.createUtilitySource('sw-patch-soft-square', args))
+    this.root.set('SoftParabolicNode', (...args: unknown[]) => this.createUtilitySource('sw-patch-soft-parabolic', args))
     this.root.set('RandomNode', () => this.createUtilitySource('sw-patch-random'))
     this.root.set('where', (...values: unknown[]) => this.where(values))
     this.root.set('atodb', (value: unknown) => this.convertMath('sw-patch-atodb', atodb, value))

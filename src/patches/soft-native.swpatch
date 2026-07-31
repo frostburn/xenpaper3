@@ -1,3 +1,6 @@
+config oscillatorType:
+    'triangle' | 'sawtooth' | 'square' | 'parabolic' = 'triangle'
+
 fn on(
     destination: AudioNode,
     start: Instant,
@@ -8,7 +11,14 @@ fn on(
     sustain: Level = 70%,  # Ignored
     release: Duration = 50ms,
 ):
-    osc = SoftTriangleNode(bite=100%)
+    if oscillatorType == 'triangle':
+        osc = SoftTriangleNode(bite = 100%)
+    elif oscillatorType == 'sawtooth':
+        osc = SoftSawtoothNode(bite = 100%)
+    elif oscillatorType == 'square':
+        osc = SoftSquareNode(bite = 100%)
+    else:
+        osc = SoftParabolicNode(bite = 100%)
     osc.start(start)
     @start osc.bite = 100%
     @(start;target decay) osc.bite = 0%

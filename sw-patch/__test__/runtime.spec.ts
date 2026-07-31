@@ -230,6 +230,40 @@ describe('SW Patch runtime', () => {
     expect(worklets.at(-3)?.port.postMessage).toHaveBeenCalledTimes(completedSourceMessages!)
   })
 
+  it('provides every native soft oscillator with an automatable bite', () => {
+    const worklets: MockAudioWorkletNode[] = []
+    class MockAudioWorkletNode extends EventTarget {
+      port = { onmessage: null, postMessage: vi.fn<(message: unknown) => void>() }
+      parameters = new Map<string, { value: number }>([
+        ['frequency', { value: 440 }], ['detune', { value: 0 }], ['bite', { value: 0.5 }],
+      ])
+      connect = vi.fn<(target: unknown) => void>()
+      disconnect = vi.fn<(target?: unknown) => void>()
+      constructor(_context: BaseAudioContext, readonly name: string) {
+        super()
+        worklets.push(this)
+      }
+    }
+    vi.stubGlobal('AudioWorkletNode', MockAudioWorkletNode)
+    const patch = createPatch(
+      'fn sources():\n'
+      + '    triangle = SoftTriangleNode(bite = 10%)\n'
+      + '    sawtooth = SoftSawtoothNode(bite = 20%)\n'
+      + '    square = SoftSquareNode(bite = 30%)\n'
+      + '    parabolic = SoftParabolicNode(bite = 40%)\n',
+      { currentTime: 0 } as BaseAudioContext,
+    )
+
+    ;(patch.sources as PatchFunction)()
+
+    expect(worklets.map(({ name }) => name)).toEqual([
+      'sw-patch-soft-triangle', 'sw-patch-soft-sawtooth',
+      'sw-patch-soft-square', 'sw-patch-soft-parabolic',
+    ])
+    expect(worklets.map((node) => node.parameters.get('bite')?.value)).toEqual([0.1, 0.2, 0.3, 0.4])
+    expect(worklets.every((node) => 'bite' in node)).toBe(true)
+  })
+
   it('uses worklets for signal comparisons, Python modulo, and where()', () => {
     const worklets: MockAudioWorkletNode[] = []
     class MockAudioWorkletNode {
