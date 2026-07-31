@@ -1,6 +1,7 @@
 import { parse } from './parser.generated.js'
 import type {
   Argument,
+  AssignmentStatement,
   Automation,
   Expression,
   FunctionDeclaration,
@@ -843,17 +844,7 @@ export class PatchRuntime {
         if (exports) this.topLevelBindings.add(statement.name)
         return undefined
       case 'AssignmentStatement':
-        this.assign(
-          statement.target,
-          statement.operator === '='
-            ? this.expression(statement.value, scope)
-            : this.binary(
-                statement.operator.slice(0, -1),
-                this.expression(statement.target, scope),
-                () => this.expression(statement.value, scope),
-              ),
-          scope,
-        )
+        this.assign(statement, scope)
         if (exports && statement.target.type === 'Identifier') {
           this.topLevelBindings.add(statement.target.name)
         }
@@ -943,12 +934,12 @@ export class PatchRuntime {
       }
       return
     }
-    const target = this.expression(statement.target, scope) as AudioParameter
+    const target = this.assignmentReference(statement.target, scope).get() as AudioParameter
     const value = Number(statement.operator === '='
       ? this.expression(statement.value, scope)
       : this.binary(
           statement.operator.slice(0, -1),
-          this.expression(statement.target, scope),
+          target.value,
           () => this.expression(statement.value, scope),
         ))
     switch (automation?.type) {
@@ -1000,13 +991,35 @@ export class PatchRuntime {
     return cleanups
   }
 
-  private assign(target: Expression, value: unknown, scope: Scope): void {
-    if (target.type === 'Identifier') scope.set(target.name, value)
-    else if (target.type === 'MemberExpression') {
+  private assign(statement: AssignmentStatement, scope: Scope): void {
+    const reference = this.assignmentReference(statement.target, scope)
+    const value = statement.operator === '='
+      ? this.expression(statement.value, scope)
+      : this.binary(
+          statement.operator.slice(0, -1),
+          reference.get(),
+          () => this.expression(statement.value, scope),
+        )
+    reference.set(value)
+  }
+
+  private assignmentReference(target: Expression, scope: Scope): {
+    get(): unknown
+    set(value: unknown): void
+  } {
+    if (target.type === 'Identifier') return {
+      get: () => this.expression(target, scope),
+      set: (value) => scope.set(target.name, value),
+    }
+    if (target.type === 'MemberExpression') {
       this.assertSafeMember(target.property)
       const object = this.expression(target.object, scope) as Record<string, unknown>
-      object[target.property] = value
-    } else throw new Error('Invalid assignment target')
+      return {
+        get: () => object[target.property],
+        set: (value) => { object[target.property] = value },
+      }
+    }
+    throw new Error('Invalid assignment target')
   }
 
   private expression(expression: Expression, scope: Scope): unknown {
