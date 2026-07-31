@@ -43,8 +43,13 @@ type AudioParameter = {
 }
 
 const RETURN = Symbol('sw-patch return')
+const BREAK = Symbol('sw-patch break')
+const CONTINUE = Symbol('sw-patch continue')
 const FORBIDDEN_MEMBERS = new Set(['constructor', 'prototype', '__proto__'])
 interface Returned { [RETURN]: true; value: unknown }
+interface Broken { [BREAK]: true }
+interface Continued { [CONTINUE]: true }
+type Completion = Returned | Broken | Continued
 
 /** A scalar expressed in canonical units together with its physical dimensions. */
 export class Quantity {
@@ -499,7 +504,9 @@ export class PatchRuntime {
   evaluate(program: Program): SynthPatch {
     this.topLevelBindings.clear()
     const patch: SynthPatch = { dispose: () => { this.dispose() } }
-    this.statements(program.body, this.root, undefined, patch)
+    const result = this.statements(program.body, this.root, undefined, patch)
+    if (result && BREAK in result) throw new Error('`break` used outside a loop')
+    if (result && CONTINUE in result) throw new Error('`continue` used outside a loop')
     return this.effectNode(patch)
   }
 
@@ -570,8 +577,26 @@ export class PatchRuntime {
     }
     for (const name of MATH_CONSTANTS) this.root.set(name, Quantity.scalar(Math[name]))
     this.root.set('random', () => Quantity.scalar(Math.random()))
+    this.root.set('range', (...args: unknown[]) => this.range(args))
     this.root.set('print', console.log)
     this.root.set('context', this.context)
+  }
+
+  private range(args: unknown[]): Quantity[] {
+    if (args.length < 1 || args.length > 3) throw new Error('range() expects one to three arguments')
+    const values = args.map(Number)
+    if (values.some((value) => !Number.isInteger(value))) {
+      throw new Error('range() arguments must be integers')
+    }
+    const [start, stop, step] = args.length === 1
+      ? [0, values[0]!, 1]
+      : [values[0]!, values[1]!, values[2] ?? 1]
+    if (step === 0) throw new Error('range() step must not be zero')
+    const result: Quantity[] = []
+    for (let value = start; step > 0 ? value < stop : value > stop; value += step) {
+      result.push(Quantity.scalar(value))
+    }
+    return result
   }
 
   private createUtilitySource(name: string, args: unknown[] = []): AudioWorkletNode {
@@ -749,6 +774,8 @@ export class PatchRuntime {
         scope.set(parameter.name, value)
       })
       const result = this.statements(declaration.body, scope)
+      if (result && BREAK in result) throw new Error('`break` used outside a loop')
+      if (result && CONTINUE in result) throw new Error('`continue` used outside a loop')
       return result && RETURN in result ? result.value : undefined
     }
   }
@@ -758,7 +785,7 @@ export class PatchRuntime {
     scope: Scope,
     connectionCleanups?: Array<() => void>,
     exports?: SynthPatch,
-  ): Returned | undefined {
+  ): Completion | undefined {
     const previousCleanups = this.activeConnectionCleanups
     this.activeConnectionCleanups = connectionCleanups ?? previousCleanups
     try {
@@ -802,7 +829,7 @@ export class PatchRuntime {
     scope: Scope,
     connectionCleanups?: Array<() => void>,
     exports?: SynthPatch,
-  ): Returned | undefined {
+  ): Completion | undefined {
     switch (statement.type) {
       case 'FunctionDeclaration': {
         const fn = this.function(statement, scope)
@@ -841,18 +868,28 @@ export class PatchRuntime {
         for (const item of value as Iterable<unknown>) {
           scope.set(statement.target, item)
           const result = this.statements(statement.body, scope, connectionCleanups, exports)
-          if (result) return result
+          if (result && RETURN in result) return result
+          if (result && BREAK in result) break
+          if (result && CONTINUE in result) continue
         }
         return undefined
       }
       case 'WhileStatement':
         while (Quantity.truthy(this.expression(statement.test, scope))) {
           const result = this.statements(statement.body, scope, connectionCleanups, exports)
-          if (result) return result
+          if (result && RETURN in result) return result
+          if (result && BREAK in result) break
+          if (result && CONTINUE in result) continue
         }
         return undefined
       case 'ReturnStatement':
         return { [RETURN]: true, value: this.expression(statement.value, scope) }
+      case 'BreakStatement':
+        return { [BREAK]: true }
+      case 'ContinueStatement':
+        return { [CONTINUE]: true }
+      case 'PassStatement':
+        return undefined
       case 'ElifStatement':
       case 'ElseStatement':
         throw new Error(`${statement.type} must immediately follow an if statement`)
@@ -912,7 +949,10 @@ export class PatchRuntime {
   private until(emitterExpression: Expression, event: string, body: Statement[], scope: Scope): void {
     // Connections in an `until` suite are established now and torn down by the event.
     const cleanups: Array<() => void> = []
-    this.statements(body, scope, cleanups)
+    const result = this.statements(body, scope, cleanups)
+    if (result && (BREAK in result || CONTINUE in result)) {
+      throw new Error(`\`${BREAK in result ? 'break' : 'continue'}\` cannot leave an until suite`)
+    }
     const emitter = this.expression(emitterExpression, scope) as EventTarget
     emitter.addEventListener(event, () => {
       for (const cleanup of cleanups.reverse()) cleanup()

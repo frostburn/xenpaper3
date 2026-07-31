@@ -202,7 +202,15 @@ if true:
   })
 
   it('parses Python-style for and while loops', () => {
-    const ast = parse('for item in [1, 2]:\n    while item > 0:\n        item = item - 1\n')
+    const ast = parse(
+      'for item in [1, 2]:\n'
+      + '    while item > 0:\n'
+      + '        if item == 2:\n'
+      + '            continue\n'
+      + '        break\n'
+      + 'if true:\n'
+      + '    pass\n',
+    )
 
     expect(ast.body[0]).toMatchObject({
       type: 'ForStatement',
@@ -211,8 +219,15 @@ if true:
       body: [{
         type: 'WhileStatement',
         test: { type: 'BinaryExpression', operator: '>' },
-        body: [{ type: 'AssignmentStatement' }],
+        body: [
+          { type: 'IfStatement', body: [{ type: 'ContinueStatement' }] },
+          { type: 'BreakStatement' },
+        ],
       }],
+    })
+    expect(ast.body[1]).toMatchObject({
+      type: 'IfStatement',
+      body: [{ type: 'PassStatement' }],
     })
   })
 })

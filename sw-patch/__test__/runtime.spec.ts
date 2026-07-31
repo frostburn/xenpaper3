@@ -48,6 +48,36 @@ describe('SW Patch runtime', () => {
     expect(() => (patch.invalid as PatchFunction)()).toThrow('requires an iterable')
   })
 
+  it('provides range and supports break, continue, and pass', () => {
+    const patch = createPatch(
+      'fn loops():\n'
+      + '    total = 0\n'
+      + '    for value in range(1, 10):\n'
+      + '        if value == 3:\n'
+      + '            continue\n'
+      + '        if value == 7:\n'
+      + '            break\n'
+      + '        total = total + value\n'
+      + '    while true:\n'
+      + '        pass\n'
+      + '        break\n'
+      + '    for value in range(5, 0, -2):\n'
+      + '        total = total + value\n'
+      + '    ret total\n',
+      {} as BaseAudioContext,
+    )
+
+    expect(Number((patch.loops as PatchFunction)())).toBe(27)
+  })
+
+  it('validates range arguments and loop-control placement', () => {
+    const context = {} as BaseAudioContext
+    expect(() => createPatch('for value in range(0, 3, 0):\n    pass\n', context))
+      .toThrow('step must not be zero')
+    expect(() => createPatch('break\n', context)).toThrow('outside a loop')
+    expect(() => createPatch('continue\n', context)).toThrow('outside a loop')
+  })
+
   it('provides classic amplitude and decibel conversion utilities', () => {
     expect(dbtoa(20)).toBe(10)
     expect(atodb(10)).toBe(20)

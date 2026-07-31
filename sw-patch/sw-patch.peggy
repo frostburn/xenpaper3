@@ -193,6 +193,9 @@ SimpleStatement
   / ConnectionStatement
   / AssignmentStatement
   / ReturnStatement
+  / BreakStatement
+  / ContinueStatement
+  / PassStatement
   / DocStringStatement
   / CommentStatement
   / ExpressionStatement
@@ -287,6 +290,15 @@ ReturnStatement
   = KeywordRet __ value:Expression {
       return node("ReturnStatement", { value });
     }
+
+BreakStatement
+  = KeywordBreak { return node("BreakStatement"); }
+
+ContinueStatement
+  = KeywordContinue { return node("ContinueStatement"); }
+
+PassStatement
+  = KeywordPass { return node("PassStatement"); }
 
 Assignable
   = value:PostfixExpression &{
@@ -590,7 +602,8 @@ Identifier
   = !ReservedWord value:Name { return value; }
 
 ReservedWord
-  = ("type" / "config" / "fn" / "once" / "until" / "for" / "in" / "while" / "ret" / "if" / "elif" / "else"
+  = ("type" / "config" / "fn" / "once" / "until" / "for" / "in" / "while" / "ret"
+    / "break" / "continue" / "pass" / "if" / "elif" / "else"
     / "and" / "or" / "not" / "true" / "false" / "null"
     / "linear" / "exponential" / "hold" / "cancel" / "target") !IdentifierContinue
 
@@ -606,6 +619,9 @@ KeywordFor = "for" !IdentifierContinue
 KeywordIn = "in" !IdentifierContinue
 KeywordWhile = "while" !IdentifierContinue
 KeywordRet = "ret" !IdentifierContinue
+KeywordBreak = "break" !IdentifierContinue
+KeywordContinue = "continue" !IdentifierContinue
+KeywordPass = "pass" !IdentifierContinue
 KeywordIf = "if" !IdentifierContinue
 KeywordElif = "elif" !IdentifierContinue
 KeywordElse = "else" !IdentifierContinue

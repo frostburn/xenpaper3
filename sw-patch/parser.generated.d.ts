@@ -25,6 +25,9 @@ export type Statement =
   | ConnectionStatement
   | AssignmentStatement
   | ReturnStatement
+  | BreakStatement
+  | ContinueStatement
+  | PassStatement
   | DocStringStatement
   | CommentStatement
   | ExpressionStatement
@@ -159,6 +162,18 @@ export interface AssignmentStatement extends Node {
 export interface ReturnStatement extends Node {
   type: 'ReturnStatement'
   value: Expression
+}
+
+export interface BreakStatement extends Node {
+  type: 'BreakStatement'
+}
+
+export interface ContinueStatement extends Node {
+  type: 'ContinueStatement'
+}
+
+export interface PassStatement extends Node {
+  type: 'PassStatement'
 }
 
 export interface DocStringStatement extends Node {

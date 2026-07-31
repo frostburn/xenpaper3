@@ -24,6 +24,11 @@ while total < 10:
     total = total + 1
 ```
 
+The built-in `range(stop)`, `range(start, stop)`, and
+`range(start, stop, step)` forms produce integer sequences. As in Python,
+`break` exits the nearest loop, `continue` advances it to its next iteration,
+and `pass` is an explicit no-op for otherwise empty suites.
+
 ## Runtime
 
 `createPatch` parses a patch and returns its public configuration and functions.
