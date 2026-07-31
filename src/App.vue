@@ -6,6 +6,7 @@ import DEFAULT_PATCH from './patches/default.swpatch?raw'
 import PING_PONG_DELAY_PATCH from './patches/ping-pong-delay.swpatch?raw'
 import PTOLEMY_PATCH from './patches/ptolemy.swpatch?raw'
 import SOFTSAW_PATCH from './patches/softsaw.swpatch?raw'
+import SOFT_NATIVE_PATCH from './patches/soft-native.swpatch?raw'
 
 type NoteOff = (end: number) => number
 interface Synth {
@@ -39,6 +40,7 @@ const synthPatches: Record<SynthPatch, string> = {
   default: DEFAULT_PATCH,
   ptolemy: PTOLEMY_PATCH,
   softsaw: SOFTSAW_PATCH,
+  soft: SOFT_NATIVE_PATCH,
 }
 
 const createSynth = (patch: SynthPatch, oscillatorType: OscillatorType) =>
@@ -203,6 +205,7 @@ onUnmounted(() => {
     <option value="bass">Bass</option>
     <option value="ptolemy">Ptolemy</option>
     <option value="softsaw">Softsaw</option>
+    <option value="soft">Native Soft</option>
   </select>
   <label for="oscillator-type">Oscillator type</label>
   <select id="oscillator-type" v-model="oscillatorTypeModel">

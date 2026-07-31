@@ -418,11 +418,32 @@ class SwPatchPhaserProcessor extends SwPatchScheduledSourceProcessor {
     return value
   }
 }
+class SwPatchSoftTriangleProcessor extends SwPatchPhaserProcessor {
+  static get parameterDescriptors() {
+    return [
+      { name: 'frequency', defaultValue: 440 },
+      { name: 'detune', defaultValue: 0 },
+      { name: 'bite', defaultValue: 0.5 },
+    ]
+  }
+  valueAt(_time, sample, parameters) {
+    super.valueAt(_time, sample, parameters)
+    const bite = Math.sqrt(parameters.bite.length === 1 ? parameters.bite[0] : parameters.bite[sample])
+    const sine = Math.sin(2 * Math.PI * this.phase)
+    if (bite < 1e-6) {
+      return sine
+    } else if (bite > 1) {
+      return Math.asin(sine)
+    }
+    return Math.asin(bite * sine) / Math.asin(bite)
+  }
+}
 class SwPatchRandomProcessor extends SwPatchScheduledSourceProcessor {
   valueAt() { return Math.random() }
 }
 registerProcessor('sw-patch-time', SwPatchTimeProcessor)
 registerProcessor('sw-patch-phaser', SwPatchPhaserProcessor)
+registerProcessor('sw-patch-soft-triangle', SwPatchSoftTriangleProcessor)
 registerProcessor('sw-patch-random', SwPatchRandomProcessor)
 `
 
@@ -561,6 +582,7 @@ export class PatchRuntime {
     this.root.set('AudioSignal', this.createAndStartAudioSignal.bind(this))
     this.root.set('TimeNode', () => this.createUtilitySource('sw-patch-time'))
     this.root.set('PhaserNode', (...args: unknown[]) => this.createUtilitySource('sw-patch-phaser', args))
+    this.root.set('SoftTriangleNode', (...args: unknown[]) => this.createUtilitySource('sw-patch-soft-triangle', args))
     this.root.set('RandomNode', () => this.createUtilitySource('sw-patch-random'))
     this.root.set('where', (...values: unknown[]) => this.where(values))
     this.root.set('atodb', (value: unknown) => this.convertMath('sw-patch-atodb', atodb, value))
@@ -605,13 +627,16 @@ export class PatchRuntime {
     const options = (args[0] ?? {}) as Record<string, unknown>
     const frequency = node.parameters?.get('frequency')
     const detune = node.parameters?.get('detune')
+    const bite = node.parameters?.get('bite')
     if (frequency && options.frequency !== undefined) frequency.value = Number(options.frequency)
     if (detune && options.detune !== undefined) detune.value = Number(options.detune)
+    if (bite && options.bite !== undefined) bite.value = Number(options.bite)
     Object.defineProperties(node, {
       start: { value: (when = this.context.currentTime) => node.port.postMessage({ type: 'start', when: Number(when) }) },
       stop: { value: (when = this.context.currentTime) => node.port.postMessage({ type: 'stop', when: Number(when) }) },
       ...(frequency ? { frequency: { value: frequency } } : {}),
       ...(detune ? { detune: { value: detune } } : {}),
+      ...(bite ? { bite: { value: bite } } : {}),
     })
     let cleanup = () => {}
     node.port.onmessage = ({ data }) => {
