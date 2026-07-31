@@ -463,9 +463,11 @@ class SwPatchSoftParabolicProcessor extends SwPatchSoftOscillatorProcessor {
     const [rawBite, angle] = this.phaseAndBite(sample, parameters)
     const bite = Math.sqrt(rawBite)
     const cosine = Math.cos(angle)
-    const inverseCosine = Math.asin(bite * cosine)
+    const shapedCosine = Math.asin(bite * cosine)
     const inverseBite = Math.asin(bite)
-    return (inverseCosine - (inverseCosine ** 2 + inverseBite ** 2) / Math.PI) / inverseBite
+    // Adding the squared normalization term offsets the parabola so cosine
+    // values of +1 and -1 map to output values of +1 and -1 respectively.
+    return (shapedCosine - (shapedCosine ** 2 - inverseBite ** 2) / Math.PI) / inverseBite
   }
 }
 class SwPatchRandomProcessor extends SwPatchScheduledSourceProcessor {

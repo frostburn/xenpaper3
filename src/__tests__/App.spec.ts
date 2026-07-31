@@ -207,6 +207,23 @@ describe('App', () => {
     wrapper.unmount()
   })
 
+  it('shows oscillator types supported by the selected synth patch', async () => {
+    const wrapper = mount(App)
+    await flushPromises()
+    const optionValues = () =>
+      wrapper.findAll('#oscillator-type option').map((option) => option.attributes('value'))
+
+    expect(optionValues()).toEqual(['sine', 'square', 'sawtooth', 'triangle'])
+    await wrapper.get('#oscillator-type').setValue('sine')
+    await wrapper.get('#synth-patch').setValue('soft')
+    await flushPromises()
+
+    expect(optionValues()).toEqual(['triangle', 'sawtooth', 'square', 'parabolic'])
+    expect((wrapper.get('#oscillator-type').element as HTMLSelectElement).value).toBe('triangle')
+    expect(createPatch.mock.lastCall?.[2]).toEqual({ config: { oscillatorType: 'triangle' } })
+    wrapper.unmount()
+  })
+
   it('removes listeners, releases notes, and closes its context on unmount', async () => {
     const off = vi.fn<NoteOff>(() => 2)
     synthOn.mockReturnValue(off)
