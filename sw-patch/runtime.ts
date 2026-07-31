@@ -429,35 +429,40 @@ class SwPatchSoftOscillatorProcessor extends SwPatchPhaserProcessor {
   phaseAndBite(sample, parameters) {
     super.valueAt(0, sample, parameters)
     const rawBite = parameters.bite.length === 1 ? parameters.bite[0] : parameters.bite[sample]
-    // Keep inverse-trigonometric inputs in their domains and denominators away
-    // from their singular limits. The square root gives the bite automation a
-    // more perceptually even transition, particularly near zero.
-    const bite = Math.min(1 - 1e-6, Math.max(1e-6, Math.sqrt(Math.max(0, rawBite))))
-    const angle = 2 * Math.PI * this.phase
-    return [bite, Math.sin(angle), Math.cos(angle)]
+    // Keep inverse-trigonometric inputs and the square transform away from
+    // their singular limits. Individual shapes apply their own bite mapping.
+    const bite = Math.min(1 - 1e-6, Math.max(1e-6, rawBite))
+    return [bite, 2 * Math.PI * this.phase]
   }
 }
 class SwPatchSoftTriangleProcessor extends SwPatchSoftOscillatorProcessor {
   valueAt(_time, sample, parameters) {
-    const [bite, sine] = this.phaseAndBite(sample, parameters)
+    const [rawBite, angle] = this.phaseAndBite(sample, parameters)
+    const bite = Math.sqrt(rawBite)
+    const sine = Math.sin(angle)
     return Math.asin(bite * sine) / Math.asin(bite)
   }
 }
 class SwPatchSoftSawtoothProcessor extends SwPatchSoftOscillatorProcessor {
   valueAt(_time, sample, parameters) {
-    const [bite, sine, cosine] = this.phaseAndBite(sample, parameters)
+    const [bite, angle] = this.phaseAndBite(sample, parameters)
+    const sine = Math.sin(angle)
+    const cosine = Math.cos(angle)
     return Math.atan(bite * sine / (1 + bite * cosine)) / Math.asin(bite)
   }
 }
 class SwPatchSoftSquareProcessor extends SwPatchSoftOscillatorProcessor {
   valueAt(_time, sample, parameters) {
-    const [bite, sine] = this.phaseAndBite(sample, parameters)
-    return Math.atan(bite * sine) / Math.atan(bite)
+    const [bite, angle] = this.phaseAndBite(sample, parameters)
+    const shapedBite = 2 * bite / (1 - bite ** 2)
+    return Math.atan(shapedBite * Math.sin(angle)) / (2 * Math.atan(bite))
   }
 }
 class SwPatchSoftParabolicProcessor extends SwPatchSoftOscillatorProcessor {
   valueAt(_time, sample, parameters) {
-    const [bite, _sine, cosine] = this.phaseAndBite(sample, parameters)
+    const [rawBite, angle] = this.phaseAndBite(sample, parameters)
+    const bite = Math.sqrt(rawBite)
+    const cosine = Math.cos(angle)
     const inverseCosine = Math.asin(bite * cosine)
     const inverseBite = Math.asin(bite)
     return (inverseCosine - (inverseCosine ** 2 + inverseBite ** 2) / Math.PI) / inverseBite
