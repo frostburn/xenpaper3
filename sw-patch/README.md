@@ -10,6 +10,25 @@ The code herein is intended to be split into a dedicated package published on np
 
 We're just pretending to be a monorepo while Xenpaper 3 is being developed.
 
+Control flow uses Python-style indentation. `for` accepts any iterable value,
+including list literals and arrays passed to patch functions, and `while` repeats
+while its expression is truthy. A `ret` inside either loop immediately returns
+from the enclosing function.
+
+```swpatch
+total = 0
+for value in [1, 2, 3]:
+    total = total + value
+
+while total < 10:
+    total = total + 1
+```
+
+The built-in `range(stop)`, `range(start, stop)`, and
+`range(start, stop, step)` forms produce integer sequences. As in Python,
+`break` exits the nearest loop, `continue` advances it to its next iteration,
+and `pass` is an explicit no-op for otherwise empty suites.
+
 ## Runtime
 
 `createPatch` parses a patch and returns its public configuration and functions.

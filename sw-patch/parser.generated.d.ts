@@ -13,6 +13,8 @@ export interface Program extends Node {
 export type Statement =
   | FunctionDeclaration
   | UntilStatement
+  | ForStatement
+  | WhileStatement
   | IfStatement
   | ElifStatement
   | ElseStatement
@@ -23,6 +25,9 @@ export type Statement =
   | ConnectionStatement
   | AssignmentStatement
   | ReturnStatement
+  | BreakStatement
+  | ContinueStatement
+  | PassStatement
   | DocStringStatement
   | CommentStatement
   | ExpressionStatement
@@ -47,6 +52,19 @@ export interface UntilStatement extends Node {
   type: 'UntilStatement'
   emitter: Expression
   event: string
+  body: Statement[]
+}
+
+export interface ForStatement extends Node {
+  type: 'ForStatement'
+  target: string
+  iterable: Expression
+  body: Statement[]
+}
+
+export interface WhileStatement extends Node {
+  type: 'WhileStatement'
+  test: Expression
   body: Statement[]
 }
 
@@ -144,6 +162,18 @@ export interface AssignmentStatement extends Node {
 export interface ReturnStatement extends Node {
   type: 'ReturnStatement'
   value: Expression
+}
+
+export interface BreakStatement extends Node {
+  type: 'BreakStatement'
+}
+
+export interface ContinueStatement extends Node {
+  type: 'ContinueStatement'
+}
+
+export interface PassStatement extends Node {
+  type: 'PassStatement'
 }
 
 export interface DocStringStatement extends Node {
