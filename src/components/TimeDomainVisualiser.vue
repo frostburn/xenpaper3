@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, onUnmounted, useTemplateRef } from 'vue'
+import { onMounted, onUnmounted, useTemplateRef, watch } from 'vue'
 
 const props = defineProps<{
   analyser: AnalyserNode | null
@@ -17,6 +17,7 @@ let activeAnalyser: AnalyserNode | undefined
 let buffer: Float32Array<ArrayBuffer> | undefined
 let context: CanvasRenderingContext2D | null = null
 let contextIsTranslated = false
+let usesPropAnalyser = true
 
 function stopDrawing() {
   if (animationFrame !== undefined) {
@@ -50,6 +51,7 @@ function draw() {
 }
 
 function initialize(analyser?: AnalyserNode) {
+  usesPropAnalyser = analyser === undefined
   const resolvedAnalyser = analyser ?? props.analyser ?? undefined
   stopDrawing()
   activeAnalyser = resolvedAnalyser
@@ -72,6 +74,13 @@ function initialize(analyser?: AnalyserNode) {
 }
 
 onMounted(initialize)
+
+watch(
+  () => props.analyser,
+  () => {
+    if (usesPropAnalyser) initialize()
+  },
+)
 
 onUnmounted(() => {
   stopDrawing()
