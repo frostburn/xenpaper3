@@ -13,50 +13,60 @@ defineExpose({ initialize })
 
 const canvas = useTemplateRef('canvas')
 let animationFrame: number | undefined
-let buffer: Float32Array<ArrayBuffer>
+let activeAnalyser: AnalyserNode | undefined
+let buffer: Float32Array<ArrayBuffer> | undefined
+let context: CanvasRenderingContext2D | null = null
+let contextIsTranslated = false
+
+function stopDrawing() {
+  if (animationFrame !== undefined) {
+    window.cancelAnimationFrame(animationFrame)
+    animationFrame = undefined
+  }
+}
 
 function draw() {
-  const ctx = canvas.value!.getContext('2d')
-  if (ctx === null) {
-    animationFrame = window.requestAnimationFrame(draw)
-    return
-  }
-  const offsetWidth = canvas.value!.offsetWidth
+  if (context === null || activeAnalyser === undefined || buffer === undefined) return
 
-  const analyser = props.analyser!
-  const numSamples = analyser.fftSize
+  const numSamples = activeAnalyser.fftSize
+  if (buffer.length !== numSamples) buffer = new Float32Array(numSamples)
+  const offsetWidth = canvas.value?.offsetWidth || props.width
 
-  ctx.lineWidth = (props.lineWidth * props.width) / offsetWidth
-  ctx.strokeStyle = props.strokeStyle
-  ctx.clearRect(-0.5, -0.5, props.width + 1, props.height + 1)
-  ctx.beginPath()
+  context.lineWidth = (props.lineWidth * props.width) / offsetWidth
+  context.strokeStyle = props.strokeStyle
+  context.clearRect(-0.5, -0.5, props.width + 1, props.height + 1)
+  context.beginPath()
 
   const dx = props.width / numSamples
-  props.analyser!.getFloatTimeDomainData(buffer)
-  ctx.moveTo(0, props.height * 0.5 * (1 - buffer[0]!))
+  activeAnalyser.getFloatTimeDomainData(buffer)
+  context.moveTo(0, props.height * 0.5 * (1 - buffer[0]!))
   for (let i = 1; i < numSamples; ++i) {
     const x = dx * i
     const y = props.height * 0.5 * (1 - buffer[i]!)
-    ctx.lineTo(x, y)
+    context.lineTo(x, y)
   }
-  ctx.stroke()
+  context.stroke()
   animationFrame = window.requestAnimationFrame(draw)
 }
 
 function initialize(analyser?: AnalyserNode) {
-  if (analyser === undefined) {
-    if (props.analyser === null) {
-      return
-    }
-    analyser = props.analyser
+  const resolvedAnalyser = analyser ?? props.analyser ?? undefined
+  stopDrawing()
+  activeAnalyser = resolvedAnalyser
+
+  if (resolvedAnalyser === undefined) {
+    buffer = undefined
+    return
   }
+  buffer = new Float32Array(resolvedAnalyser.fftSize)
 
-  buffer = new Float32Array(analyser.fftSize)
-
-  const ctx = canvas.value!.getContext('2d')
-  if (ctx !== null) {
+  context = canvas.value?.getContext('2d') ?? null
+  if (context !== null) {
     // Move origin to the middle of a pixel
-    ctx.translate(0.5, 0.5)
+    if (!contextIsTranslated) {
+      context.translate(0.5, 0.5)
+      contextIsTranslated = true
+    }
     animationFrame = window.requestAnimationFrame(draw)
   }
 }
@@ -64,9 +74,7 @@ function initialize(analyser?: AnalyserNode) {
 onMounted(initialize)
 
 onUnmounted(() => {
-  if (animationFrame !== undefined) {
-    window.cancelAnimationFrame(animationFrame)
-  }
+  stopDrawing()
 })
 </script>
 

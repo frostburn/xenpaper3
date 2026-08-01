@@ -13,7 +13,11 @@ class MockGainNodeConstructor {
 }
 
 class MockAnalyserNodeConstructor {
+  fftSize = 2048
   connect = vi.fn<(to: AudioNode) => MockAnalyserNodeConstructor>(() => this)
+  getFloatTimeDomainData = vi.fn<(buffer: Float32Array<ArrayBuffer>) => void>((buffer) =>
+    buffer.fill(0),
+  )
 }
 
 const { createPatch, effectConnect, registerMathWorklets, synthDisposes, synthOn } = vi.hoisted(
