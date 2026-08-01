@@ -438,7 +438,7 @@ class SwPatchSoftOscillatorProcessor extends SwPatchPhaserProcessor {
 class SwPatchSoftTriangleProcessor extends SwPatchSoftOscillatorProcessor {
   valueAt(_time, sample, parameters) {
     const [rawBite, angle] = this.phaseAndBite(sample, parameters)
-    const bite = Math.sqrt(rawBite)
+    const bite = rawBite ** 0.4
     const sine = Math.sin(angle)
     return Math.asin(bite * sine) / Math.asin(bite)
   }
@@ -461,13 +461,11 @@ class SwPatchSoftSquareProcessor extends SwPatchSoftOscillatorProcessor {
 class SwPatchSoftParabolicProcessor extends SwPatchSoftOscillatorProcessor {
   valueAt(_time, sample, parameters) {
     const [rawBite, angle] = this.phaseAndBite(sample, parameters)
-    const bite = Math.sqrt(rawBite)
+    const bite = rawBite ** 0.4
     const cosine = Math.cos(angle)
     const shapedCosine = Math.asin(bite * cosine)
-    const inverseBite = Math.asin(bite)
-    // Adding the squared normalization term offsets the parabola so cosine
-    // values of +1 and -1 map to output values of +1 and -1 respectively.
-    return (shapedCosine - (shapedCosine ** 2 - inverseBite ** 2) / Math.PI) / inverseBite
+    const shapedBite = Math.asin(bite)
+    return (shapedCosine - (shapedCosine ** 2 - shapedBite ** 2) / Math.PI) / shapedBite
   }
 }
 class SwPatchRandomProcessor extends SwPatchScheduledSourceProcessor {

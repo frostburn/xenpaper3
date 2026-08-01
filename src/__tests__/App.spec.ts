@@ -12,6 +12,10 @@ class MockGainNodeConstructor {
   connect = vi.fn<(to: AudioNode) => MockGainNodeConstructor>(() => this)
 }
 
+class MockAnalyserNodeConstructor {
+  connect = vi.fn<(to: AudioNode) => MockAnalyserNodeConstructor>(() => this)
+}
+
 const { createPatch, effectConnect, registerMathWorklets, synthDisposes, synthOn } = vi.hoisted(
   () => ({
     createPatch: vi.fn<(source: string, ...args: unknown[]) => unknown>(),
@@ -89,6 +93,7 @@ beforeEach(() => {
   synthOn.mockReturnValue(vi.fn<NoteOff>(() => 2))
   vi.stubGlobal('AudioContext', MockAudioContext)
   vi.stubGlobal('GainNode', MockGainNodeConstructor)
+  vi.stubGlobal('AnalyserNode', MockAnalyserNodeConstructor)
   vi.stubGlobal('ConstantSourceNode', MockConstantSourceNode)
 })
 

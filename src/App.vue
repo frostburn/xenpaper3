@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { createPatch, registerMathWorklets, type RuntimeOptions } from '../sw-patch'
+import TimeDomainVisualiser from './components/TimeDomainVisualiser.vue'
 import BASS_PATCH from './patches/adr-bass.swpatch?raw'
 import DEFAULT_PATCH from './patches/default.swpatch?raw'
 import PING_PONG_DELAY_PATCH from './patches/ping-pong-delay.swpatch?raw'
@@ -23,7 +24,8 @@ const softOscillatorTypes = ['triangle', 'sawtooth', 'square', 'parabolic'] as c
 // Dummy audio code just to get something going
 const ctx = new AudioContext({ latencyHint: 'interactive' })
 const output = new GainNode(ctx, { gain: 0.4 })
-output.connect(ctx.destination)
+const analyser = new AnalyserNode(ctx)
+output.connect(analyser).connect(ctx.destination)
 const delayTime = new ConstantSourceNode(ctx, { offset: 0.25 })
 const feedback = new ConstantSourceNode(ctx, { offset: 0.55 })
 const wet = new ConstantSourceNode(ctx, { offset: 0.35 })
@@ -233,6 +235,14 @@ onUnmounted(() => {
   <input id="wet" type="range" v-model="wetModel" min="0" max="1" step="any" />
   <label for="filter-q">Filter Q</label>
   <input id="filter-q" type="range" v-model="qModel" min="0" max="20" step="any" />
+  <br />
+  <TimeDomainVisualiser
+    :analyser="analyser"
+    :width="600"
+    :height="300"
+    :lineWidth="2"
+    strokeStyle="black"
+  />
 </template>
 
 <style scoped></style>

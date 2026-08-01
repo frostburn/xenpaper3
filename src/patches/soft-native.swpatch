@@ -6,7 +6,7 @@ fn on(
     start: Instant,
     pitch: AudioSignal<Pitch>,
     velocity: Level,
-    attack: Duration = 100ms,  # Ignored
+    attack: Duration = 1ms,
     decay: Duration = 200ms,
     sustain: Level = 70%,  # Ignored
     release: Duration = 50ms,
@@ -23,12 +23,15 @@ fn on(
     @start osc.bite = 100%
     @(start;target decay) osc.bite = 0%
 
-    env = GainNode(gain = velocity)
-    @start env.gain = velocity
+    attackEnv = GainNode(gain = 0)
+    @start attackEnv.gain = 0
+    @(start + attack; linear) attackEnv.gain = velocity
+    env = GainNode(gain = 1)
+    @start env.gain = 1
     @(start;target decay) env.gain = 0
 
     until osc:ended:
-        osc -> env -> destination
+        osc -> attackEnv -> env -> destination
         pitch -> osc.detune
 
     ret once fn off(end: Instant):
