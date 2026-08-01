@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, onUnmounted, ref, watch } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { createPatch, registerMathWorklets, type RuntimeOptions } from '../sw-patch'
 import BASS_PATCH from './patches/adr-bass.swpatch?raw'
 import DEFAULT_PATCH from './patches/default.swpatch?raw'
@@ -14,8 +14,11 @@ interface Synth {
   dispose: () => void
 }
 
-type SynthPatch = 'default' | 'bass' | 'ptolemy' | 'softsaw'
-type OscillatorType = 'sine' | 'square' | 'sawtooth' | 'triangle'
+type SynthPatch = 'default' | 'bass' | 'ptolemy' | 'softsaw' | 'soft'
+type OscillatorType = 'sine' | 'triangle' | 'sawtooth' | 'square' | 'parabolic'
+
+const standardOscillatorTypes = ['sine', 'square', 'sawtooth', 'triangle'] as const
+const softOscillatorTypes = ['triangle', 'sawtooth', 'square', 'parabolic'] as const
 
 // Dummy audio code just to get something going
 const ctx = new AudioContext({ latencyHint: 'interactive' })
@@ -33,7 +36,16 @@ let synth: Synth | undefined
 let activeSynthPatch: SynthPatch
 const synthPatchModel = ref<SynthPatch>('bass')
 const oscillatorTypeModel = ref<OscillatorType>('sawtooth')
+const oscillatorTypeOptions = computed<readonly OscillatorType[]>(() =>
+  synthPatchModel.value === 'soft' ? softOscillatorTypes : standardOscillatorTypes,
+)
 const retiredSynths = new Map<Synth, ReturnType<typeof setTimeout>>()
+
+watch(synthPatchModel, () => {
+  if (!oscillatorTypeOptions.value.includes(oscillatorTypeModel.value)) {
+    oscillatorTypeModel.value = oscillatorTypeOptions.value[0]!
+  }
+})
 
 const synthPatches: Record<SynthPatch, string> = {
   bass: BASS_PATCH,
@@ -209,10 +221,9 @@ onUnmounted(() => {
   </select>
   <label for="oscillator-type">Oscillator type</label>
   <select id="oscillator-type" v-model="oscillatorTypeModel">
-    <option value="sine">Sine</option>
-    <option value="square">Square</option>
-    <option value="sawtooth">Sawtooth</option>
-    <option value="triangle">Triangle</option>
+    <option v-for="type in oscillatorTypeOptions" :key="type" :value="type">
+      {{ type.charAt(0).toUpperCase() + type.slice(1) }}
+    </option>
   </select>
   <label for="delay-time">Delay time</label>
   <input id="delay-time" type="range" v-model="delayTimeModel" min="0" max="2" step="any" />
