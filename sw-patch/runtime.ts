@@ -418,11 +418,65 @@ class SwPatchPhaserProcessor extends SwPatchScheduledSourceProcessor {
     return value
   }
 }
+class SwPatchSoftOscillatorProcessor extends SwPatchPhaserProcessor {
+  static get parameterDescriptors() {
+    return [
+      { name: 'frequency', defaultValue: 440 },
+      { name: 'detune', defaultValue: 0 },
+      { name: 'bite', defaultValue: 0.5 },
+    ]
+  }
+  phaseAndBite(sample, parameters) {
+    super.valueAt(0, sample, parameters)
+    const rawBite = parameters.bite.length === 1 ? parameters.bite[0] : parameters.bite[sample]
+    // Keep inverse-trigonometric inputs and the square transform away from
+    // their singular limits. Individual shapes apply their own bite mapping.
+    const bite = Math.min(1 - 1e-6, Math.max(1e-6, rawBite))
+    return [bite, 2 * Math.PI * this.phase]
+  }
+}
+class SwPatchSoftTriangleProcessor extends SwPatchSoftOscillatorProcessor {
+  valueAt(_time, sample, parameters) {
+    const [rawBite, angle] = this.phaseAndBite(sample, parameters)
+    const bite = rawBite ** 0.4
+    const sine = Math.sin(angle)
+    return Math.asin(bite * sine) / Math.asin(bite)
+  }
+}
+class SwPatchSoftSawtoothProcessor extends SwPatchSoftOscillatorProcessor {
+  valueAt(_time, sample, parameters) {
+    const [bite, angle] = this.phaseAndBite(sample, parameters)
+    const sine = Math.sin(angle)
+    const cosine = Math.cos(angle)
+    return Math.atan(bite * sine / (1 + bite * cosine)) / Math.asin(bite)
+  }
+}
+class SwPatchSoftSquareProcessor extends SwPatchSoftOscillatorProcessor {
+  valueAt(_time, sample, parameters) {
+    const [bite, angle] = this.phaseAndBite(sample, parameters)
+    const shapedBite = 2 * bite / (1 - bite ** 2)
+    return Math.atan(shapedBite * Math.sin(angle)) / (2 * Math.atan(bite))
+  }
+}
+class SwPatchSoftParabolicProcessor extends SwPatchSoftOscillatorProcessor {
+  valueAt(_time, sample, parameters) {
+    const [rawBite, angle] = this.phaseAndBite(sample, parameters)
+    const bite = rawBite ** 0.4
+    const cosine = Math.cos(angle)
+    const shapedCosine = Math.asin(bite * cosine)
+    const shapedBite = Math.asin(bite)
+    return (shapedCosine - (shapedCosine ** 2 - shapedBite ** 2) / Math.PI) / shapedBite
+  }
+}
 class SwPatchRandomProcessor extends SwPatchScheduledSourceProcessor {
   valueAt() { return Math.random() }
 }
 registerProcessor('sw-patch-time', SwPatchTimeProcessor)
 registerProcessor('sw-patch-phaser', SwPatchPhaserProcessor)
+registerProcessor('sw-patch-soft-triangle', SwPatchSoftTriangleProcessor)
+registerProcessor('sw-patch-soft-sawtooth', SwPatchSoftSawtoothProcessor)
+registerProcessor('sw-patch-soft-square', SwPatchSoftSquareProcessor)
+registerProcessor('sw-patch-soft-parabolic', SwPatchSoftParabolicProcessor)
 registerProcessor('sw-patch-random', SwPatchRandomProcessor)
 `
 
@@ -561,6 +615,10 @@ export class PatchRuntime {
     this.root.set('AudioSignal', this.createAndStartAudioSignal.bind(this))
     this.root.set('TimeNode', () => this.createUtilitySource('sw-patch-time'))
     this.root.set('PhaserNode', (...args: unknown[]) => this.createUtilitySource('sw-patch-phaser', args))
+    this.root.set('SoftTriangleNode', (...args: unknown[]) => this.createUtilitySource('sw-patch-soft-triangle', args))
+    this.root.set('SoftSawtoothNode', (...args: unknown[]) => this.createUtilitySource('sw-patch-soft-sawtooth', args))
+    this.root.set('SoftSquareNode', (...args: unknown[]) => this.createUtilitySource('sw-patch-soft-square', args))
+    this.root.set('SoftParabolicNode', (...args: unknown[]) => this.createUtilitySource('sw-patch-soft-parabolic', args))
     this.root.set('RandomNode', () => this.createUtilitySource('sw-patch-random'))
     this.root.set('where', (...values: unknown[]) => this.where(values))
     this.root.set('atodb', (value: unknown) => this.convertMath('sw-patch-atodb', atodb, value))
@@ -605,13 +663,16 @@ export class PatchRuntime {
     const options = (args[0] ?? {}) as Record<string, unknown>
     const frequency = node.parameters?.get('frequency')
     const detune = node.parameters?.get('detune')
+    const bite = node.parameters?.get('bite')
     if (frequency && options.frequency !== undefined) frequency.value = Number(options.frequency)
     if (detune && options.detune !== undefined) detune.value = Number(options.detune)
+    if (bite && options.bite !== undefined) bite.value = Number(options.bite)
     Object.defineProperties(node, {
       start: { value: (when = this.context.currentTime) => node.port.postMessage({ type: 'start', when: Number(when) }) },
       stop: { value: (when = this.context.currentTime) => node.port.postMessage({ type: 'stop', when: Number(when) }) },
       ...(frequency ? { frequency: { value: frequency } } : {}),
       ...(detune ? { detune: { value: detune } } : {}),
+      ...(bite ? { bite: { value: bite } } : {}),
     })
     let cleanup = () => {}
     node.port.onmessage = ({ data }) => {

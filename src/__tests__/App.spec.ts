@@ -12,6 +12,14 @@ class MockGainNodeConstructor {
   connect = vi.fn<(to: AudioNode) => MockGainNodeConstructor>(() => this)
 }
 
+class MockAnalyserNodeConstructor {
+  fftSize = 2048
+  connect = vi.fn<(to: AudioNode) => MockAnalyserNodeConstructor>(() => this)
+  getFloatTimeDomainData = vi.fn<(buffer: Float32Array<ArrayBuffer>) => void>((buffer) =>
+    buffer.fill(0),
+  )
+}
+
 const { createPatch, effectConnect, registerMathWorklets, synthDisposes, synthOn } = vi.hoisted(
   () => ({
     createPatch: vi.fn<(source: string, ...args: unknown[]) => unknown>(),
@@ -89,6 +97,7 @@ beforeEach(() => {
   synthOn.mockReturnValue(vi.fn<NoteOff>(() => 2))
   vi.stubGlobal('AudioContext', MockAudioContext)
   vi.stubGlobal('GainNode', MockGainNodeConstructor)
+  vi.stubGlobal('AnalyserNode', MockAnalyserNodeConstructor)
   vi.stubGlobal('ConstantSourceNode', MockConstantSourceNode)
 })
 
@@ -204,6 +213,23 @@ describe('App', () => {
 
     expect(synthDisposes[0]).toHaveBeenCalledOnce()
     expect(createPatch.mock.calls[2]?.[2]).toEqual({ config: { oscillatorType: 'square' } })
+    wrapper.unmount()
+  })
+
+  it('shows oscillator types supported by the selected synth patch', async () => {
+    const wrapper = mount(App)
+    await flushPromises()
+    const optionValues = () =>
+      wrapper.findAll('#oscillator-type option').map((option) => option.attributes('value'))
+
+    expect(optionValues()).toEqual(['sine', 'square', 'sawtooth', 'triangle'])
+    await wrapper.get('#oscillator-type').setValue('sine')
+    await wrapper.get('#synth-patch').setValue('soft')
+    await flushPromises()
+
+    expect(optionValues()).toEqual(['triangle', 'sawtooth', 'square', 'parabolic'])
+    expect((wrapper.get('#oscillator-type').element as HTMLSelectElement).value).toBe('triangle')
+    expect(createPatch.mock.lastCall?.[2]).toEqual({ config: { oscillatorType: 'triangle' } })
     wrapper.unmount()
   })
 

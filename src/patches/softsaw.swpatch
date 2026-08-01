@@ -19,9 +19,9 @@ fn on(
     until t:ended:
         pitch -> phase.detune
         decayEnv = exp(-t / decay)
-        sharpness = 0.05 + 0.9 * decayEnv
+        bite = 0.05 + 0.9 * decayEnv
         theta = 2 * PI * phase
-        waveform = atan(sharpness * sin(theta) / (1 + sharpness * cos(theta))) / asin(sharpness)
+        waveform = atan(bite * sin(theta) / (1 + bite * cos(theta))) / asin(bite)
 
         env = velocity * tanh(t / attack) * (sustain + (1 - sustain) * decayEnv)
         releaseEnv = exp(-r / release)

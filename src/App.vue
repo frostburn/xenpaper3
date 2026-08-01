@@ -1,11 +1,13 @@
 <script setup lang="ts">
-import { onMounted, onUnmounted, ref, watch } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { createPatch, registerMathWorklets, type RuntimeOptions } from '../sw-patch'
+import TimeDomainVisualiser from './components/TimeDomainVisualiser.vue'
 import BASS_PATCH from './patches/adr-bass.swpatch?raw'
 import DEFAULT_PATCH from './patches/default.swpatch?raw'
 import PING_PONG_DELAY_PATCH from './patches/ping-pong-delay.swpatch?raw'
 import PTOLEMY_PATCH from './patches/ptolemy.swpatch?raw'
 import SOFTSAW_PATCH from './patches/softsaw.swpatch?raw'
+import SOFT_NATIVE_PATCH from './patches/soft-native.swpatch?raw'
 
 type NoteOff = (end: number) => number
 interface Synth {
@@ -13,13 +15,17 @@ interface Synth {
   dispose: () => void
 }
 
-type SynthPatch = 'default' | 'bass' | 'ptolemy' | 'softsaw'
-type OscillatorType = 'sine' | 'square' | 'sawtooth' | 'triangle'
+type SynthPatch = 'default' | 'bass' | 'ptolemy' | 'softsaw' | 'soft'
+type OscillatorType = 'sine' | 'triangle' | 'sawtooth' | 'square' | 'parabolic'
+
+const standardOscillatorTypes = ['sine', 'square', 'sawtooth', 'triangle'] as const
+const softOscillatorTypes = ['triangle', 'sawtooth', 'square', 'parabolic'] as const
 
 // Dummy audio code just to get something going
 const ctx = new AudioContext({ latencyHint: 'interactive' })
 const output = new GainNode(ctx, { gain: 0.4 })
-output.connect(ctx.destination)
+const analyser = new AnalyserNode(ctx)
+output.connect(analyser).connect(ctx.destination)
 const delayTime = new ConstantSourceNode(ctx, { offset: 0.25 })
 const feedback = new ConstantSourceNode(ctx, { offset: 0.55 })
 const wet = new ConstantSourceNode(ctx, { offset: 0.35 })
@@ -32,13 +38,23 @@ let synth: Synth | undefined
 let activeSynthPatch: SynthPatch
 const synthPatchModel = ref<SynthPatch>('bass')
 const oscillatorTypeModel = ref<OscillatorType>('sawtooth')
+const oscillatorTypeOptions = computed<readonly OscillatorType[]>(() =>
+  synthPatchModel.value === 'soft' ? softOscillatorTypes : standardOscillatorTypes,
+)
 const retiredSynths = new Map<Synth, ReturnType<typeof setTimeout>>()
+
+watch(synthPatchModel, () => {
+  if (!oscillatorTypeOptions.value.includes(oscillatorTypeModel.value)) {
+    oscillatorTypeModel.value = oscillatorTypeOptions.value[0]!
+  }
+})
 
 const synthPatches: Record<SynthPatch, string> = {
   bass: BASS_PATCH,
   default: DEFAULT_PATCH,
   ptolemy: PTOLEMY_PATCH,
   softsaw: SOFTSAW_PATCH,
+  soft: SOFT_NATIVE_PATCH,
 }
 
 const createSynth = (patch: SynthPatch, oscillatorType: OscillatorType) =>
@@ -203,13 +219,13 @@ onUnmounted(() => {
     <option value="bass">Bass</option>
     <option value="ptolemy">Ptolemy</option>
     <option value="softsaw">Softsaw</option>
+    <option value="soft">Native Soft</option>
   </select>
   <label for="oscillator-type">Oscillator type</label>
   <select id="oscillator-type" v-model="oscillatorTypeModel">
-    <option value="sine">Sine</option>
-    <option value="square">Square</option>
-    <option value="sawtooth">Sawtooth</option>
-    <option value="triangle">Triangle</option>
+    <option v-for="type in oscillatorTypeOptions" :key="type" :value="type">
+      {{ type.charAt(0).toUpperCase() + type.slice(1) }}
+    </option>
   </select>
   <label for="delay-time">Delay time</label>
   <input id="delay-time" type="range" v-model="delayTimeModel" min="0" max="2" step="any" />
@@ -219,6 +235,14 @@ onUnmounted(() => {
   <input id="wet" type="range" v-model="wetModel" min="0" max="1" step="any" />
   <label for="filter-q">Filter Q</label>
   <input id="filter-q" type="range" v-model="qModel" min="0" max="20" step="any" />
+  <br />
+  <TimeDomainVisualiser
+    :analyser="analyser"
+    :width="600"
+    :height="300"
+    :lineWidth="2"
+    strokeStyle="black"
+  />
 </template>
 
 <style scoped></style>
