@@ -1,0 +1,93 @@
+import { describe, expect, it } from 'vitest'
+import { Fraction } from 'xen-dev-utils/fraction'
+import { Value } from '../value'
+
+describe('Xenpaper value arithmetic', () => {
+  it('adds integers exactly', () => {
+    expect(new Value(5).add(7).equals(new Value(12))).toBe(true)
+  })
+
+  it('divides fractions exactly', () => {
+    const majorThird = new Value(new Fraction(81, 64))
+    const syntonicComma = new Value(new Fraction(81, 80))
+    expect(majorThird.div(syntonicComma).equals(new Value(new Fraction(5, 4)))).toBe(true)
+  })
+
+  it('cancels huge exact interval stacks', () => {
+    const archytas = new Value(new Fraction(64, 63))
+    const unity = archytas
+      .pow(100)
+      .div(new Value(2).pow(600))
+      .mul(new Value(7).pow(100))
+      .mul(new Value(3).pow(200))
+    expect(unity.equals(1)).toBe(true)
+  })
+
+  it('adds beat fractions to exact bar boundaries', () => {
+    const cell = Value.beats(new Fraction(1, 12))
+    expect(cell.mul(48).equals(Value.beats(4))).toBe(true)
+  })
+
+  it('converts beats through exact tempo dimensions', () => {
+    const tempo = Value.beats(2).div(Value.seconds(1))
+    expect(Value.beats(3).div(tempo).equals(Value.seconds(new Fraction(3, 2)))).toBe(true)
+  })
+
+  it('falls back instead of constructing a symbolic radical sum', () => {
+    const sum = new Value(2).pow(new Fraction(1, 2)).add(
+      new Value(3).pow(new Fraction(1, 2)),
+    )
+    expect(sum.isExact()).toBe(false)
+    expect(sum.valueOf()).toBeCloseTo(Math.sqrt(2) + Math.sqrt(3))
+  })
+})
+
+describe('Pitch displacement arithmetic', () => {
+  it('uses ordinary addition for cents', () => {
+    expect(Value.cents(600).add(Value.cents(600)).equals(Value.cents(1200))).toBe(true)
+  })
+
+  it('normalizes pitch(2) and 7\\12 to rational cents', () => {
+    expect(Value.pitch(2).equals(Value.cents(1200))).toBe(true)
+    expect(Value.equalDivision(7, 12).equals(Value.cents(700))).toBe(true)
+  })
+
+  it('stacks thirteen equal tritave steps exactly', () => {
+    const step = Value.equalDivision(1, 13, 3)
+    expect(step.mul(13).equals(Value.pitch(3))).toBe(true)
+    expect(Value.ratio(step).pow(13).equals(3)).toBe(true)
+  })
+
+  it('keeps huge non-octave equal-division stacks exact', () => {
+    const stack = Value.equalDivision(1, 13, 3).mul(13_000)
+    expect(Value.ratio(stack).equals(new Value(3).pow(1000))).toBe(true)
+  })
+
+  it('mixes rational cents with non-octave logarithmic terms exactly', () => {
+    const mixed = Value.cents(700).add(Value.equalDivision(1, 13, 3))
+    const expected = new Value(2)
+      .pow(new Fraction(7, 12))
+      .mul(new Value(3).pow(new Fraction(1, 13)))
+    expect(Value.ratio(mixed).equals(expected)).toBe(true)
+  })
+
+  it('keeps the Pythagorean-vs-12EDO fifth error exact', () => {
+    const error = Value.pitch(new Value(new Fraction(3, 2))).sub(Value.cents(700))
+    expect(error.isExact()).toBe(true)
+    expect(error.valueOf()).toBeCloseTo(1.955000865)
+  })
+})
+
+describe('Other quantities', () => {
+  it('keeps decibels unitful until explicitly divided', () => {
+    const exponent = Value.decibels(2).div(Value.decibels(20))
+    expect(new Value(10).pow(exponent).valueOf()).toBeCloseTo(1.2589254118)
+  })
+
+  it('does not use epsilon equality', () => {
+    const exact = Value.cents(700)
+    const approximate = Value.real(700.0000000001, { pitch: 1 })
+    expect(exact.equals(approximate)).toBe(false)
+    expect(exact.approximatelyEquals(approximate, Value.cents(new Fraction(1, 1_000_000)))).toBe(true)
+  })
+})
