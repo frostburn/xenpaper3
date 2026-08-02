@@ -147,46 +147,38 @@ class ExactMonomial {
 }
 
 class ExactPitch {
-  readonly cents: Fraction
   readonly logPrimes: ProtoFractionalMonzo
 
-  constructor(cents: FractionInput = 0, logPrimes: ProtoFractionalMonzo = []) {
-    const terms = logPrimes.map((value) => new Fraction(value))
-    this.cents = new Fraction(cents).add((terms[0] ?? new Fraction(0)).mul(1200))
-    terms[0] = new Fraction(0)
-    this.logPrimes = terms
+  constructor(logPrimes: ProtoFractionalMonzo = []) {
+    this.logPrimes = logPrimes.map((value) => new Fraction(value))
+  }
+
+  static fromCents(cents: FractionInput): ExactPitch {
+    return new ExactPitch([new Fraction(cents).div(1200)])
   }
 
   static fromRatio(ratio: ExactMonomial): ExactPitch {
     if (!ratio.isPositive)
       throw new RangeError('Pitch conversion requires a positive dimensionless ratio.')
-    return new ExactPitch(0, ratio.exponents)
+    return new ExactPitch(ratio.exponents)
   }
 
   add(other: ExactPitch): ExactPitch {
-    return new ExactPitch(
-      this.cents.add(other.cents),
-      fractionalAdd(this.logPrimes, other.logPrimes),
-    )
+    return new ExactPitch(fractionalAdd(this.logPrimes, other.logPrimes))
   }
   sub(other: ExactPitch): ExactPitch {
-    return new ExactPitch(
-      this.cents.sub(other.cents),
-      fractionalSub(this.logPrimes, other.logPrimes),
-    )
+    return new ExactPitch(fractionalSub(this.logPrimes, other.logPrimes))
   }
   scale(factor: FractionInput): ExactPitch {
-    return new ExactPitch(this.cents.mul(factor), fractionalScale(this.logPrimes, factor))
+    return new ExactPitch(fractionalScale(this.logPrimes, factor))
   }
 
   toRatio(): ExactMonomial {
-    const terms = this.logPrimes.map((value) => new Fraction(value))
-    terms[0] = (terms[0] ?? new Fraction(0)).add(this.cents.div(1200))
-    return new ExactMonomial(1, terms)
+    return new ExactMonomial(1, this.logPrimes)
   }
 
   equals(other: ExactPitch): boolean {
-    return this.cents.equals(other.cents) && fractionalMonzosEqual(this.logPrimes, other.logPrimes)
+    return fractionalMonzosEqual(this.logPrimes, other.logPrimes)
   }
 
   valueOf(): number {
@@ -230,7 +222,7 @@ export class Value {
   }
   static cents(value: FractionInput): Value {
     return Value.fromMagnitude(
-      { kind: 'pitch', value: new ExactPitch(value) },
+      { kind: 'pitch', value: ExactPitch.fromCents(value) },
       new Dimensions({ pitch: 1 }),
     )
   }
