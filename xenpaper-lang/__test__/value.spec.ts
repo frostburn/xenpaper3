@@ -64,6 +64,12 @@ describe('Xenpaper value arithmetic', () => {
     expect(sum.isExact()).toBe(false)
     expect(sum.valueOf()).toBeCloseTo(Math.sqrt(2) + Math.sqrt(3))
   })
+
+  it('falls back instead of constructing a non-algebraic radical', () => {
+    const rad = new Value(2).pow(new Value(2).pow(new Fraction(1, 2)))
+    expect(rad.isExact()).toBe(false)
+    expect(rad.valueOf()).toBeCloseTo(2**2**0.5)
+  })
 })
 
 describe('Pitch displacement arithmetic', () => {

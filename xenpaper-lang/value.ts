@@ -1,69 +1,5 @@
-import { Fraction, gcd, type FractionValue } from 'xen-dev-utils/fraction'
-import { bigAbs, primeFactorize } from 'xen-dev-utils/monzo'
-import { BIG_INT_PRIMES, PRIMES } from 'xen-dev-utils/primes'
-
-export function primeFactorizeX(value: bigint, denominator?: bigint): Map<number, number>
-export function primeFactorizeX(value: FractionValue, denominator?: number): Map<number, number>
-export function primeFactorizeX(
-  value: FractionValue | bigint,
-  denominator?: number | bigint,
-): Map<number, number> {
-  if (typeof value === 'bigint' || typeof denominator === 'bigint') {
-    if (typeof value !== 'bigint' || typeof denominator === 'number') {
-      throw new TypeError('BigInt numerator and denominator must both be BigInts.')
-    }
-    let numerator = value
-    let divisor = denominator ?? 1n
-    if (divisor === 0n) throw new RangeError('Division by zero.')
-
-    const commonFactor = bigAbs(gcd(numerator, divisor))
-    numerator /= commonFactor
-    divisor /= commonFactor
-    const result = new Map<number, number>()
-    if (numerator === 0n) {
-      result.set(0, 1)
-      return result
-    }
-    if (numerator < 0n !== divisor < 0n) result.set(-1, 1)
-    numerator = bigAbs(numerator)
-    divisor = bigAbs(divisor)
-
-    for (let i = 0; i < BIG_INT_PRIMES.length; ++i) {
-      const prime = BIG_INT_PRIMES[i]
-      let exponent = 0
-      while (numerator % prime === 0n) {
-        numerator /= prime
-        ++exponent
-      }
-      while (divisor % prime === 0n) {
-        divisor /= prime
-        --exponent
-      }
-      if (exponent) result.set(PRIMES[i], exponent)
-      if (
-        numerator <= BigInt(Number.MAX_SAFE_INTEGER) &&
-        divisor <= BigInt(Number.MAX_SAFE_INTEGER)
-      )
-        break
-    }
-
-    if (numerator > BigInt(Number.MAX_SAFE_INTEGER) || divisor > BigInt(Number.MAX_SAFE_INTEGER))
-      throw new Error(
-        `Factorization not implemented for residuals above ${Number.MAX_SAFE_INTEGER}.`,
-      )
-
-    for (const [prime, exponent] of primeFactorize(Number(numerator))) {
-      result.set(prime, (result.get(prime) ?? 0) + exponent)
-    }
-    for (const [prime, exponent] of primeFactorize(Number(divisor))) {
-      const combined = (result.get(prime) ?? 0) - exponent
-      if (combined) result.set(prime, combined)
-      else result.delete(prime)
-    }
-    return result
-  }
-  return primeFactorize(denominator === undefined ? value : new Fraction(value, denominator))
-}
+import { Fraction, type FractionValue } from 'xen-dev-utils/fraction'
+import { primeFactorize } from 'xen-dev-utils/monzo'
 
 type SparseMonzo = ReadonlyMap<number, FractionValue>
 
@@ -151,22 +87,18 @@ export class Dimensions {
 
 class ExactMonomial {
   constructor(
-    readonly sign: -1 | 0 | 1,
     readonly exponents: SparseMonzo = new Map(),
   ) {}
 
   static fromFraction(input: FractionValue | bigint, denominator?: bigint): ExactMonomial {
     const factors =
-      typeof input === 'bigint' ? primeFactorizeX(input, denominator) : primeFactorizeX(input)
-    if (factors.has(0)) return ExactMonomial.ZERO
-    const sign = factors.delete(-1) ? -1 : 1
-    return new ExactMonomial(sign, factors)
+      typeof input === 'bigint' ? primeFactorize(input, denominator) : primeFactorize(input)
+    return new ExactMonomial(factors)
   }
 
   mul(other: ExactMonomial): ExactMonomial {
     if (!this.sign || !other.sign) return ExactMonomial.ZERO
     return new ExactMonomial(
-      (this.sign * other.sign) as -1 | 1,
       addMonzos(this.exponents, other.exponents),
     )
   }
@@ -175,7 +107,6 @@ class ExactMonomial {
     if (!other.sign) throw new RangeError('Division by zero.')
     if (!this.sign) return ExactMonomial.ZERO
     return new ExactMonomial(
-      (this.sign * other.sign) as -1 | 1,
       addMonzos(this.exponents, other.exponents, true),
     )
   }
@@ -188,8 +119,7 @@ class ExactMonomial {
       return ExactMonomial.ZERO
     }
     if (this.sign < 0 && exponent.d % 2 === 0) return null
-    const sign = this.sign < 0 && exponent.n % 2 ? -1 : 1
-    return new ExactMonomial(sign, scaleMonzo(this.exponents, exponent))
+    return new ExactMonomial(scaleMonzo(this.exponents, exponent))
   }
 
   addIfClosed(other: ExactMonomial): ExactMonomial | null {
@@ -222,10 +152,21 @@ class ExactMonomial {
   valueOf(): number {
     if (!this.sign) return 0
     let result = this.sign
+    // TODO: Exp(precise sum of log primes)
     for (const [prime, exponent] of this.exponents) {
       result *= Math.pow(prime, new Fraction(exponent).valueOf())
     }
     return result
+  }
+
+  get sign(): -1 | 1 | 0 {
+    if (this.exponents.has(0)) {
+      return 0
+    }
+    if (this.exponents.get(-1) % 2) {
+      return -1
+    }
+    return 1
   }
 
   get isPositive(): boolean {
@@ -263,7 +204,7 @@ class ExactPitch {
   }
 
   toRatio(): ExactMonomial {
-    return new ExactMonomial(1, this.logPrimes)
+    return new ExactMonomial(this.logPrimes)
   }
 
   equals(other: ExactPitch): boolean {
@@ -408,10 +349,7 @@ export class Value {
       return Value.fromMagnitude(
         {
           kind: 'exact',
-          value: new ExactMonomial(
-            this.magnitude.value.sign ? (-this.magnitude.value.sign as -1 | 1) : 0,
-            this.magnitude.value.exponents,
-          ),
+          value: new ExactMonomial(this.magnitude.value.exponents),
         },
         this.dimensions,
       )
