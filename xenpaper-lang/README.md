@@ -2,8 +2,6 @@
 
 The grammar, parser and interfaces for quantities in the microtonal music composition language of Xenpaper 3.
 
-(Sol prototype sketch stuff below)
-
 # Xenpaper value prototype
 
 This prototype deliberately avoids becoming a computer algebra system.
@@ -28,13 +26,3 @@ ratio(13 * (1\\13<3>)) = 3
 ```
 
 Anything outside the closed forms, such as `sqrt(2) + sqrt(3)`, falls back to a floating-point `real` magnitude while retaining its dimensions. Exact equality never uses an epsilon; approximate comparison is explicit.
-
-## Commands
-
-```bash
-npm run build
-npm run test:smoke
-npm test             # requires Vitest to be installed
-```
-
-The included dependency-free smoke runner exercises the same core semantics as the Vitest suite.

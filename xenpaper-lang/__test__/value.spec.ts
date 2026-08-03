@@ -2,6 +2,11 @@ import { describe, expect, it } from 'vitest'
 import { Fraction } from 'xen-dev-utils/fraction'
 import { Value } from '../value'
 
+function exactExponents(value: Value): ReadonlyMap<number, unknown> {
+  if (value.magnitude.kind !== 'exact') throw new TypeError('Expected an exact value.')
+  return value.magnitude.value.exponents
+}
+
 describe('Xenpaper value arithmetic', () => {
   it('adds integers exactly', () => {
     expect(new Value(5).add(7).equals(new Value(12))).toBe(true)
@@ -23,6 +28,23 @@ describe('Xenpaper value arithmetic', () => {
     expect(unity.equals(1)).toBe(true)
   })
 
+  it('accepts bigint integers without retaining bigint state', () => {
+    const huge = 2n ** 100n * 3n
+    const value = new Value(huge)
+    expect(value.equals(new Value(2).pow(100).mul(3))).toBe(true)
+    expect(exactExponents(value)).toBeInstanceOf(Map)
+  })
+
+  it('accepts rational input as two bigints', () => {
+    expect(new Value(81n, 64n).div(new Value(81n, 80n)).equals(new Fraction(5, 4))).toBe(true)
+    expect(() => new Value(1n, 0n)).toThrow('Division by zero.')
+  })
+
+  it('stores high-prime factors sparsely', () => {
+    const value = new Value(7919)
+    expect(exactExponents(value)).toEqual(new Map([[7919, 1]]))
+  })
+
   it('adds beat fractions to exact bar boundaries', () => {
     const cell = Value.beats(new Fraction(1, 12))
     expect(cell.mul(48).equals(Value.beats(4))).toBe(true)
@@ -30,15 +52,23 @@ describe('Xenpaper value arithmetic', () => {
 
   it('converts beats through exact tempo dimensions', () => {
     const tempo = Value.beats(2).div(Value.seconds(1))
-    expect(Value.beats(3).div(tempo).equals(Value.seconds(new Fraction(3, 2)))).toBe(true)
+    expect(
+      Value.beats(3)
+        .div(tempo)
+        .equals(Value.seconds(new Fraction(3, 2))),
+    ).toBe(true)
   })
 
   it('falls back instead of constructing a symbolic radical sum', () => {
-    const sum = new Value(2).pow(new Fraction(1, 2)).add(
-      new Value(3).pow(new Fraction(1, 2)),
-    )
+    const sum = new Value(2).pow(new Fraction(1, 2)).add(new Value(3).pow(new Fraction(1, 2)))
     expect(sum.isExact()).toBe(false)
     expect(sum.valueOf()).toBeCloseTo(Math.sqrt(2) + Math.sqrt(3))
+  })
+
+  it('falls back instead of constructing a non-algebraic radical', () => {
+    const rad = new Value(2).pow(new Value(2).pow(new Fraction(1, 2)))
+    expect(rad.isExact()).toBe(false)
+    expect(rad.valueOf()).toBeCloseTo(2**2**0.5)
   })
 })
 
@@ -49,6 +79,8 @@ describe('Pitch displacement arithmetic', () => {
 
   it('normalizes pitch(2) and 7\\12 to rational cents', () => {
     expect(Value.pitch(2).equals(Value.cents(1200))).toBe(true)
+    expect(Value.cents(1200).equals(new Fraction(2, 1))).toBe(true)
+    expect(Value.cents(1200).strictEquals(new Fraction(2, 1))).toBe(false)
     expect(Value.equalDivision(7, 12).equals(Value.cents(700))).toBe(true)
   })
 
@@ -88,6 +120,36 @@ describe('Other quantities', () => {
     const exact = Value.cents(700)
     const approximate = Value.real(700.0000000001, { pitch: 1 })
     expect(exact.equals(approximate)).toBe(false)
-    expect(exact.approximatelyEquals(approximate, Value.cents(new Fraction(1, 1_000_000)))).toBe(true)
+    expect(exact.approximatelyEquals(approximate, Value.cents(new Fraction(1, 1_000_000)))).toBe(
+      true,
+    )
+  })
+})
+
+describe('Nonsense', () => {
+  it('throws when adding seconds to cents', () => {
+    const duration = Value.seconds(2)
+    const fourth = Value.cents(500)
+    expect(() => duration.add(fourth)).toThrow(
+      'Cannot add incompatible dimensions seconds and pitch.',
+    )
+    expect(() => fourth.add(duration)).toThrow(
+      'Cannot add incompatible dimensions pitch and seconds.',
+    )
+  })
+
+  it('throws when adding integers and cents', () => {
+    const tritone = Value.cents(600)
+    const three = new Value(3)
+    expect(() => tritone.add(three)).toThrow('Cannot add incompatible dimensions pitch and 1.')
+    expect(() => three.add(tritone)).toThrow('Cannot add incompatible dimensions 1 and pitch.')
+  })
+
+  it('refuses to produce square cents', () => {
+    const semitone = Value.cents(100)
+    expect(() => semitone.mul(semitone)).toThrow(
+      'Pitch displacements cannot be multiplied together.',
+    )
+    expect(() => semitone.pow(2)).toThrow('Pitch displacements cannot be exponentiated.')
   })
 })
