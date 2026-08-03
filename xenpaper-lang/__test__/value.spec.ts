@@ -12,6 +12,31 @@ describe('Xenpaper value arithmetic', () => {
     expect(new Value(5).add(7).equals(new Value(12))).toBe(true)
   })
 
+  it('negates and subtracts exact values', () => {
+    expect(new Value(2).neg().valueOf()).toBe(-2)
+    expect(new Value(5).sub(2).equals(3)).toBe(true)
+    expect(new Value(-2).neg().equals(2)).toBe(true)
+  })
+
+  it('evaluates negative exact values with one sign application', () => {
+    expect(new Value(-2).valueOf()).toBe(-2)
+    expect(new Value(-5).add(2).equals(-3)).toBe(true)
+  })
+
+  it('keeps exact zero and one identities usable', () => {
+    const one = new Value(7).pow(0)
+    const zero = new Value(7).mul(0)
+    expect(one.valueOf()).toBe(1)
+    expect(one.equals(1)).toBe(true)
+    expect(zero.valueOf()).toBe(0)
+    expect(zero.equals(0)).toBe(true)
+  })
+
+  it('handles the sign of odd-denominator rational powers separately', () => {
+    expect(new Value(-8).pow(new Fraction(1, 3)).valueOf()).toBeCloseTo(-2)
+    expect(new Value(-8).pow(new Fraction(2, 3)).valueOf()).toBeCloseTo(4)
+  })
+
   it('divides fractions exactly', () => {
     const majorThird = new Value(new Fraction(81, 64))
     const syntonicComma = new Value(new Fraction(81, 80))
@@ -75,6 +100,10 @@ describe('Xenpaper value arithmetic', () => {
 describe('Pitch displacement arithmetic', () => {
   it('uses ordinary addition for cents', () => {
     expect(Value.cents(600).add(Value.cents(600)).equals(Value.cents(1200))).toBe(true)
+  })
+
+  it('evaluates huge exact pitch displacements in logarithmic space', () => {
+    expect(Value.cents(2_400_000).valueOf()).toBe(2_400_000)
   })
 
   it('normalizes pitch(2) and 7\\12 to rational cents', () => {

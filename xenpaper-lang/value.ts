@@ -111,6 +111,14 @@ class ExactMonomial {
     )
   }
 
+  neg(): ExactMonomial {
+    if (!this.sign) return ExactMonomial.ZERO
+    const exponents = new Map(this.exponents)
+    if (this.sign < 0) exponents.delete(-1)
+    else exponents.set(-1, new Fraction(1))
+    return new ExactMonomial(exponents)
+  }
+
   pow(exponent: Fraction): ExactMonomial | null {
     if (!exponent.n) return ExactMonomial.ONE
     if (!this.sign) {
@@ -119,7 +127,17 @@ class ExactMonomial {
       return ExactMonomial.ZERO
     }
     if (this.sign < 0 && exponent.d % 2 === 0) return null
-    return new ExactMonomial(scaleMonzo(this.exponents, exponent))
+    const exponents = new Map<number, Fraction>()
+    for (const [prime, component] of this.exponents) {
+      if (prime <= 0) continue
+      const scaled = new Fraction(component).mul(exponent)
+      if (scaled.n) exponents.set(prime, scaled)
+    }
+    // A negative base with an odd-denominator exponent stays negative exactly
+    // when the exponent's numerator is odd. The sign is not itself a prime
+    // factor and must therefore never be scaled to a fractional exponent.
+    if (this.sign < 0 && exponent.n % 2) exponents.set(-1, new Fraction(1))
+    return new ExactMonomial(exponents)
   }
 
   addIfClosed(other: ExactMonomial): ExactMonomial | null {
@@ -134,15 +152,16 @@ class ExactMonomial {
 
   toFraction(): Fraction | null {
     if (!this.sign) return new Fraction(0)
-    let result = new Fraction(1)
+    let result = new Fraction(this.sign)
     for (const [prime, component] of this.exponents) {
+      if (prime <= 0) continue
       const exponent = new Fraction(component)
       if (exponent.d !== 1) return null
       const factor = new Fraction(prime).pow(exponent)
       if (!factor) return null
       result = result.mul(factor)
     }
-    return this.sign < 0 ? result.neg() : result
+    return result
   }
 
   equals(other: ExactMonomial): boolean {
@@ -152,8 +171,8 @@ class ExactMonomial {
   valueOf(): number {
     if (!this.sign) return 0
     let result = this.sign
-    // TODO: Exp(precise sum of log primes)
     for (const [prime, exponent] of this.exponents) {
+      if (prime <= 0) continue
       result *= Math.pow(prime, new Fraction(exponent).valueOf())
     }
     return result
@@ -172,8 +191,8 @@ class ExactMonomial {
   get isPositive(): boolean {
     return this.sign > 0
   }
-  static readonly ZERO = new ExactMonomial(0)
-  static readonly ONE = new ExactMonomial(1)
+  static readonly ZERO = new ExactMonomial(new Map([[0, new Fraction(1)]]))
+  static readonly ONE = new ExactMonomial(new Map())
 }
 
 class ExactPitch {
@@ -212,7 +231,11 @@ class ExactPitch {
   }
 
   valueOf(): number {
-    return 1200 * Math.log2(this.toRatio().valueOf())
+    let octaves = 0
+    for (const [prime, exponent] of this.logPrimes) {
+      octaves += Math.log2(prime) * new Fraction(exponent).valueOf()
+    }
+    return 1200 * octaves
   }
 }
 
@@ -349,7 +372,7 @@ export class Value {
       return Value.fromMagnitude(
         {
           kind: 'exact',
-          value: new ExactMonomial(this.magnitude.value.exponents),
+          value: this.magnitude.value.neg(),
         },
         this.dimensions,
       )
