@@ -155,8 +155,9 @@ class ExactMonomial {
     readonly exponents: SparseMonzo = new Map(),
   ) {}
 
-  static fromFraction(input: FractionValue | bigint): ExactMonomial {
-    const factors = typeof input === 'bigint' ? primeFactorizeX(input) : primeFactorizeX(input)
+  static fromFraction(input: FractionValue | bigint, denominator?: bigint): ExactMonomial {
+    const factors =
+      typeof input === 'bigint' ? primeFactorizeX(input, denominator) : primeFactorizeX(input)
     if (factors.has(0)) return ExactMonomial.ZERO
     const sign = factors.delete(-1) ? -1 : 1
     return new ExactMonomial(sign, factors)
@@ -287,9 +288,19 @@ export class Value {
   readonly magnitude: Magnitude
   readonly dimensions: Dimensions
 
-  constructor(value: FractionValue | bigint = 0, dimensions: DimensionInput = {}) {
-    this.magnitude = { kind: 'exact', value: ExactMonomial.fromFraction(value) }
-    this.dimensions = new Dimensions(dimensions)
+  constructor(value?: FractionValue | bigint, dimensions?: DimensionInput)
+  constructor(numerator: bigint, denominator: bigint, dimensions?: DimensionInput)
+  constructor(
+    value: FractionValue | bigint = 0,
+    denominatorOrDimensions: bigint | DimensionInput = {},
+    dimensions: DimensionInput = {},
+  ) {
+    const denominator =
+      typeof denominatorOrDimensions === 'bigint' ? denominatorOrDimensions : undefined
+    const dimensionInput =
+      typeof denominatorOrDimensions === 'bigint' ? dimensions : denominatorOrDimensions
+    this.magnitude = { kind: 'exact', value: ExactMonomial.fromFraction(value, denominator) }
+    this.dimensions = new Dimensions(dimensionInput)
   }
 
   private static fromMagnitude(magnitude: Magnitude, dimensions: Dimensions): Value {
@@ -409,6 +420,9 @@ export class Value {
 
   mul(input: ValueInput): Value {
     const other = coerceValue(input)
+    if (this.magnitude.kind === 'pitch' && other.magnitude.kind === 'pitch') {
+      throw new TypeError('Pitch displacements cannot be multiplied together.')
+    }
     const dimensions = this.dimensions.add(other.dimensions)
     const scaled = this.scalePitch(other) ?? other.scalePitch(this)
     if (scaled) return scaled
@@ -440,6 +454,9 @@ export class Value {
   }
 
   pow(input: ValueInput): Value {
+    if (this.magnitude.kind === 'pitch') {
+      throw new TypeError('Pitch displacements cannot be exponentiated.')
+    }
     const exponentValue = coerceValue(input)
     if (!exponentValue.dimensions.isDimensionless)
       throw new TypeError('Exponent must be dimensionless.')

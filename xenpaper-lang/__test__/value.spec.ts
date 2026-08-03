@@ -35,6 +35,11 @@ describe('Xenpaper value arithmetic', () => {
     expect(exactExponents(value)).toBeInstanceOf(Map)
   })
 
+  it('accepts rational input as two bigints', () => {
+    expect(new Value(81n, 64n).div(new Value(81n, 80n)).equals(new Fraction(5, 4))).toBe(true)
+    expect(() => new Value(1n, 0n)).toThrow('Division by zero.')
+  })
+
   it('stores high-prime factors sparsely', () => {
     const value = new Value(7919)
     expect(exactExponents(value)).toEqual(new Map([[7919, 1]]))
@@ -112,5 +117,33 @@ describe('Other quantities', () => {
     expect(exact.approximatelyEquals(approximate, Value.cents(new Fraction(1, 1_000_000)))).toBe(
       true,
     )
+  })
+})
+
+describe('Nonsense', () => {
+  it('throws when adding seconds to cents', () => {
+    const duration = Value.seconds(2)
+    const fourth = Value.cents(500)
+    expect(() => duration.add(fourth)).toThrow(
+      'Cannot add incompatible dimensions seconds and pitch.',
+    )
+    expect(() => fourth.add(duration)).toThrow(
+      'Cannot add incompatible dimensions pitch and seconds.',
+    )
+  })
+
+  it('throws when adding integers and cents', () => {
+    const tritone = Value.cents(600)
+    const three = new Value(3)
+    expect(() => tritone.add(three)).toThrow('Cannot add incompatible dimensions pitch and 1.')
+    expect(() => three.add(tritone)).toThrow('Cannot add incompatible dimensions 1 and pitch.')
+  })
+
+  it('refuses to produce square cents', () => {
+    const semitone = Value.cents(100)
+    expect(() => semitone.mul(semitone)).toThrow(
+      'Pitch displacements cannot be multiplied together.',
+    )
+    expect(() => semitone.pow(2)).toThrow('Pitch displacements cannot be exponentiated.')
   })
 })
