@@ -1,16 +1,101 @@
-import { Fraction, type FractionValue } from 'xen-dev-utils/fraction'
-import {
-  fractionalAdd,
-  fractionalMonzosEqual,
-  fractionalScale,
-  fractionalSub,
-  monzoToFraction,
-  toMonzo,
-  type ProtoFractionalMonzo,
-} from 'xen-dev-utils/monzo'
-import { PRIMES } from 'xen-dev-utils/primes'
+import { Fraction, gcd, type FractionValue } from 'xen-dev-utils/fraction'
+import { bigAbs, primeFactorize } from 'xen-dev-utils/monzo'
+import { BIG_INT_PRIMES, PRIMES } from 'xen-dev-utils/primes'
 
-type FractionInput = FractionValue
+export function primeFactorizeX(value: bigint, denominator?: bigint): Map<number, number>
+export function primeFactorizeX(value: FractionValue, denominator?: number): Map<number, number>
+export function primeFactorizeX(
+  value: FractionValue | bigint,
+  denominator?: number | bigint,
+): Map<number, number> {
+  if (typeof value === 'bigint' || typeof denominator === 'bigint') {
+    if (typeof value !== 'bigint' || typeof denominator === 'number') {
+      throw new TypeError('BigInt numerator and denominator must both be BigInts.')
+    }
+    let numerator = value
+    let divisor = denominator ?? 1n
+    if (divisor === 0n) throw new RangeError('Division by zero.')
+
+    const commonFactor = bigAbs(gcd(numerator, divisor))
+    numerator /= commonFactor
+    divisor /= commonFactor
+    const result = new Map<number, number>()
+    if (numerator === 0n) {
+      result.set(0, 1)
+      return result
+    }
+    if (numerator < 0n !== divisor < 0n) result.set(-1, 1)
+    numerator = bigAbs(numerator)
+    divisor = bigAbs(divisor)
+
+    for (let i = 0; i < BIG_INT_PRIMES.length; ++i) {
+      const prime = BIG_INT_PRIMES[i]
+      let exponent = 0
+      while (numerator % prime === 0n) {
+        numerator /= prime
+        ++exponent
+      }
+      while (divisor % prime === 0n) {
+        divisor /= prime
+        --exponent
+      }
+      if (exponent) result.set(PRIMES[i], exponent)
+      if (
+        numerator <= BigInt(Number.MAX_SAFE_INTEGER) &&
+        divisor <= BigInt(Number.MAX_SAFE_INTEGER)
+      )
+        break
+    }
+
+    if (numerator > BigInt(Number.MAX_SAFE_INTEGER) || divisor > BigInt(Number.MAX_SAFE_INTEGER))
+      throw new Error(
+        `Factorization not implemented for residuals above ${Number.MAX_SAFE_INTEGER}.`,
+      )
+
+    for (const [prime, exponent] of primeFactorize(Number(numerator))) {
+      result.set(prime, (result.get(prime) ?? 0) + exponent)
+    }
+    for (const [prime, exponent] of primeFactorize(Number(divisor))) {
+      const combined = (result.get(prime) ?? 0) - exponent
+      if (combined) result.set(prime, combined)
+      else result.delete(prime)
+    }
+    return result
+  }
+  return primeFactorize(denominator === undefined ? value : new Fraction(value, denominator))
+}
+
+type SparseMonzo = ReadonlyMap<number, FractionValue>
+
+function addMonzos(left: SparseMonzo, right: SparseMonzo, subtract = false): Map<number, Fraction> {
+  const result = new Map<number, Fraction>()
+  for (const [prime, exponent] of left) result.set(prime, new Fraction(exponent))
+  for (const [prime, exponent] of right) {
+    const current = result.get(prime) ?? new Fraction(0)
+    const combined = subtract ? current.sub(exponent) : current.add(exponent)
+    if (combined.n) result.set(prime, combined)
+    else result.delete(prime)
+  }
+  return result
+}
+
+function scaleMonzo(monzo: SparseMonzo, factor: FractionValue): Map<number, Fraction> {
+  const result = new Map<number, Fraction>()
+  for (const [prime, exponent] of monzo) {
+    const scaled = new Fraction(exponent).mul(factor)
+    if (scaled.n) result.set(prime, scaled)
+  }
+  return result
+}
+
+function monzosEqual(left: SparseMonzo, right: SparseMonzo): boolean {
+  if (left.size !== right.size) return false
+  for (const [prime, exponent] of left) {
+    const other = right.get(prime)
+    if (other === undefined || !new Fraction(exponent).equals(other)) return false
+  }
+  return true
+}
 
 /** Dimension exponents are deliberately numbers: they are hot, mundane state. */
 export type DimensionInput = Readonly<Record<string, number>>
@@ -39,7 +124,7 @@ export class Dimensions {
     return new Dimensions(result)
   }
 
-  scale(factor: FractionInput): Dimensions {
+  scale(factor: FractionValue): Dimensions {
     const scalar = new Fraction(factor).valueOf()
     return new Dimensions(new Map([...this.powers].map(([key, power]) => [key, power * scalar])))
   }
@@ -67,20 +152,21 @@ export class Dimensions {
 class ExactMonomial {
   constructor(
     readonly sign: -1 | 0 | 1,
-    readonly exponents: ProtoFractionalMonzo = [],
+    readonly exponents: SparseMonzo = new Map(),
   ) {}
 
-  static fromFraction(input: FractionInput): ExactMonomial {
-    const value = new Fraction(input)
-    if (!value.n) return ExactMonomial.ZERO
-    return new ExactMonomial(value.s as -1 | 1, toMonzo(value))
+  static fromFraction(input: FractionValue | bigint): ExactMonomial {
+    const factors = typeof input === 'bigint' ? primeFactorizeX(input) : primeFactorizeX(input)
+    if (factors.has(0)) return ExactMonomial.ZERO
+    const sign = factors.delete(-1) ? -1 : 1
+    return new ExactMonomial(sign, factors)
   }
 
   mul(other: ExactMonomial): ExactMonomial {
     if (!this.sign || !other.sign) return ExactMonomial.ZERO
     return new ExactMonomial(
       (this.sign * other.sign) as -1 | 1,
-      fractionalAdd(this.exponents, other.exponents),
+      addMonzos(this.exponents, other.exponents),
     )
   }
 
@@ -89,7 +175,7 @@ class ExactMonomial {
     if (!this.sign) return ExactMonomial.ZERO
     return new ExactMonomial(
       (this.sign * other.sign) as -1 | 1,
-      fractionalSub(this.exponents, other.exponents),
+      addMonzos(this.exponents, other.exponents, true),
     )
   }
 
@@ -102,7 +188,7 @@ class ExactMonomial {
     }
     if (this.sign < 0 && exponent.d % 2 === 0) return null
     const sign = this.sign < 0 && exponent.n % 2 ? -1 : 1
-    return new ExactMonomial(sign, fractionalScale(this.exponents, exponent))
+    return new ExactMonomial(sign, scaleMonzo(this.exponents, exponent))
   }
 
   addIfClosed(other: ExactMonomial): ExactMonomial | null {
@@ -117,24 +203,26 @@ class ExactMonomial {
 
   toFraction(): Fraction | null {
     if (!this.sign) return new Fraction(0)
-    const integral = this.exponents.map((component) => {
-      const fraction = new Fraction(component)
-      return fraction.d === 1 ? fraction.s * fraction.n : NaN
-    })
-    if (integral.some(Number.isNaN)) return null
-    const result = monzoToFraction(integral)
+    let result = new Fraction(1)
+    for (const [prime, component] of this.exponents) {
+      const exponent = new Fraction(component)
+      if (exponent.d !== 1) return null
+      const factor = new Fraction(prime).pow(exponent)
+      if (!factor) return null
+      result = result.mul(factor)
+    }
     return this.sign < 0 ? result.neg() : result
   }
 
   equals(other: ExactMonomial): boolean {
-    return this.sign === other.sign && fractionalMonzosEqual(this.exponents, other.exponents)
+    return this.sign === other.sign && monzosEqual(this.exponents, other.exponents)
   }
 
   valueOf(): number {
     if (!this.sign) return 0
     let result = this.sign
-    for (let i = 0; i < this.exponents.length; ++i) {
-      result *= Math.pow(PRIMES[i], new Fraction(this.exponents[i]).valueOf())
+    for (const [prime, exponent] of this.exponents) {
+      result *= Math.pow(prime, new Fraction(exponent).valueOf())
     }
     return result
   }
@@ -147,14 +235,14 @@ class ExactMonomial {
 }
 
 class ExactPitch {
-  readonly logPrimes: ProtoFractionalMonzo
+  readonly logPrimes: SparseMonzo
 
-  constructor(logPrimes: ProtoFractionalMonzo = []) {
-    this.logPrimes = logPrimes.map((value) => new Fraction(value))
+  constructor(logPrimes: SparseMonzo = new Map()) {
+    this.logPrimes = new Map(logPrimes)
   }
 
-  static fromCents(cents: FractionInput): ExactPitch {
-    return new ExactPitch([new Fraction(cents).div(1200)])
+  static fromCents(cents: FractionValue): ExactPitch {
+    return new ExactPitch(new Map([[2, new Fraction(cents).div(1200)]]))
   }
 
   static fromRatio(ratio: ExactMonomial): ExactPitch {
@@ -164,13 +252,13 @@ class ExactPitch {
   }
 
   add(other: ExactPitch): ExactPitch {
-    return new ExactPitch(fractionalAdd(this.logPrimes, other.logPrimes))
+    return new ExactPitch(addMonzos(this.logPrimes, other.logPrimes))
   }
   sub(other: ExactPitch): ExactPitch {
-    return new ExactPitch(fractionalSub(this.logPrimes, other.logPrimes))
+    return new ExactPitch(addMonzos(this.logPrimes, other.logPrimes, true))
   }
-  scale(factor: FractionInput): ExactPitch {
-    return new ExactPitch(fractionalScale(this.logPrimes, factor))
+  scale(factor: FractionValue): ExactPitch {
+    return new ExactPitch(scaleMonzo(this.logPrimes, factor))
   }
 
   toRatio(): ExactMonomial {
@@ -178,7 +266,7 @@ class ExactPitch {
   }
 
   equals(other: ExactPitch): boolean {
-    return fractionalMonzosEqual(this.logPrimes, other.logPrimes)
+    return monzosEqual(this.logPrimes, other.logPrimes)
   }
 
   valueOf(): number {
@@ -191,7 +279,7 @@ type Magnitude =
   | { readonly kind: 'pitch'; readonly value: ExactPitch }
   | { readonly kind: 'real'; readonly value: number }
 
-export type ValueInput = Value | FractionInput
+export type ValueInput = Value | FractionValue | bigint
 const coerceValue = (value: ValueInput): Value =>
   value instanceof Value ? value : new Value(value)
 
@@ -199,7 +287,7 @@ export class Value {
   readonly magnitude: Magnitude
   readonly dimensions: Dimensions
 
-  constructor(value: FractionInput = 0, dimensions: DimensionInput = {}) {
+  constructor(value: FractionValue | bigint = 0, dimensions: DimensionInput = {}) {
     this.magnitude = { kind: 'exact', value: ExactMonomial.fromFraction(value) }
     this.dimensions = new Dimensions(dimensions)
   }
@@ -220,22 +308,22 @@ export class Value {
       dimensions instanceof Dimensions ? dimensions : new Dimensions(dimensions),
     )
   }
-  static cents(value: FractionInput): Value {
+  static cents(value: FractionValue): Value {
     return Value.fromMagnitude(
       { kind: 'pitch', value: ExactPitch.fromCents(value) },
       new Dimensions({ pitch: 1 }),
     )
   }
-  static decibels(value: FractionInput): Value {
+  static decibels(value: FractionValue): Value {
     return new Value(value, { level: 1 })
   }
-  static beats(value: FractionInput): Value {
+  static beats(value: FractionValue): Value {
     return new Value(value, { beats: 1 })
   }
-  static seconds(value: FractionInput): Value {
+  static seconds(value: FractionValue): Value {
     return new Value(value, { seconds: 1 })
   }
-  static hertz(value: FractionInput): Value {
+  static hertz(value: FractionValue): Value {
     return new Value(value, { seconds: -1 })
   }
 
@@ -264,8 +352,8 @@ export class Value {
   }
 
   static equalDivision(
-    steps: FractionInput,
-    divisions: FractionInput,
+    steps: FractionValue,
+    divisions: FractionValue,
     equave: ValueInput = 2,
   ): Value {
     const count = new Fraction(divisions)
@@ -391,6 +479,26 @@ export class Value {
   }
 
   equals(input: ValueInput): boolean {
+    const other = coerceValue(input)
+    if (this.strictEquals(other)) return true
+    if (this.magnitude.kind === 'pitch' && other.magnitude.kind === 'exact') {
+      return (
+        other.dimensions.isDimensionless &&
+        other.magnitude.value.sign === 1 &&
+        monzosEqual(this.magnitude.value.logPrimes, other.magnitude.value.exponents)
+      )
+    }
+    if (this.magnitude.kind === 'exact' && other.magnitude.kind === 'pitch') {
+      return (
+        this.dimensions.isDimensionless &&
+        this.magnitude.value.sign === 1 &&
+        monzosEqual(this.magnitude.value.exponents, other.magnitude.value.logPrimes)
+      )
+    }
+    return false
+  }
+
+  strictEquals(input: ValueInput): boolean {
     const other = coerceValue(input)
     if (!this.dimensions.equals(other.dimensions) || this.magnitude.kind !== other.magnitude.kind)
       return false
