@@ -113,6 +113,14 @@ describe('Pitch displacement arithmetic', () => {
     expect(Value.equalDivision(7, 12).equals(Value.cents(700))).toBe(true)
   })
 
+  it('compares cents and ratios as pitch displacement', () => {
+    expect(Value.cents(1200).equals(new Value(2))).toBe(true)
+    expect(Value.cents(1201).equals(new Value(2))).toBe(false)
+    expect(Value.cents(1200).compare(new Value(2))).toBe(0)
+    expect(Value.cents(1199).compare(new Value(2))).toBeLessThan(0)
+    expect(Value.cents(1201).compare(new Value(2))).toBeGreaterThan(0)
+  })
+
   it('stacks thirteen equal tritave steps exactly', () => {
     const step = Value.equalDivision(1, 13, 3)
     expect(step.mul(13).equals(Value.pitch(3))).toBe(true)

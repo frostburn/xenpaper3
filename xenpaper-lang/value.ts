@@ -502,6 +502,26 @@ export class Value {
 
   compare(input: ValueInput): number {
     const other = coerceValue(input)
+    if (
+      this.magnitude.kind === 'pitch' &&
+      other.magnitude.kind === 'exact' &&
+      other.dimensions.isDimensionless &&
+      other.magnitude.value.isPositive
+    ) {
+      if (monzosEqual(this.magnitude.value.logPrimes, other.magnitude.value.exponents)) return 0
+      const difference = this.valueOf() - ExactPitch.fromRatio(other.magnitude.value).valueOf()
+      return difference < 0 ? -1 : difference > 0 ? 1 : 0
+    }
+    if (
+      this.magnitude.kind === 'exact' &&
+      this.dimensions.isDimensionless &&
+      this.magnitude.value.isPositive &&
+      other.magnitude.kind === 'pitch'
+    ) {
+      if (monzosEqual(this.magnitude.value.exponents, other.magnitude.value.logPrimes)) return 0
+      const difference = ExactPitch.fromRatio(this.magnitude.value).valueOf() - other.valueOf()
+      return difference < 0 ? -1 : difference > 0 ? 1 : 0
+    }
     this.assertCompatible(other, 'compare')
     const difference = this.valueOf() - other.valueOf()
     return difference < 0 ? -1 : difference > 0 ? 1 : 0
