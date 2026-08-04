@@ -128,9 +128,14 @@ MultiplicativeExpression
 
 MultiplicativeOperator
   = "*" { return "*"; }
-  / "/" { return "/"; }
+  / BinaryDivide
   / "div"i !IdentifierContinue { return "div"; }
   / "mod"i !IdentifierContinue { return "mod"; }
+
+// A slash attached to a pitch-like token is a lift modifier belonging to the
+// following sequence item, not division (for example `Cv5 /'C`).
+BinaryDivide
+  = "/" !(PitchModifier / PitchNominal / [0-9]) { return "/"; }
 
 PowerExpression
   = left:UnaryExpression
@@ -248,18 +253,18 @@ NumericDirectiveBody
     }
 
 NamedDirectiveBody
-  = name:Identifier arguments:DirectiveArguments? {
+  = name:Identifier args:DirectiveArguments? {
       return {
         name: name.toLowerCase(),
         rawName: name,
-        arguments: arguments ?? [],
+        arguments: args ?? [],
         graceCount: 0,
       };
     }
 
 DirectiveArguments
-  = "(" Spacing arguments:DirectiveArgumentList? Spacing ")" {
-      return arguments ?? [];
+  = "(" Spacing args:DirectiveArgumentList? Spacing ")" {
+      return args ?? [];
     }
 
 DirectiveArgumentList
@@ -336,8 +341,8 @@ ContextPreset
     }
 
 CallExpression
-  = callee:Identifier Spacing "(" Spacing arguments:CallArgumentList? Spacing ")" {
-      return node('CallExpression', { callee, arguments: arguments ?? [] });
+  = callee:Identifier Spacing "(" Spacing args:CallArgumentList? Spacing ")" {
+      return node('CallExpression', { callee, arguments: args ?? [] });
     }
 
 CallArgumentList
