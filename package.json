@@ -20,7 +20,8 @@
     "peggy": "^5.1.0",
     "pinia": "^4.0.2",
     "vue": "^3.5.40",
-    "vue-router": "^5.2.0"
+    "vue-router": "^5.2.0",
+    "xen-dev-utils": "^0.16.0"
   },
   "devDependencies": {
     "@tsconfig/node24": "^24.0.4",
