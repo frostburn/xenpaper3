@@ -124,8 +124,14 @@ AdditiveExpression
     }
 
 AdditiveOperator
-  = "+" { return "+"; }
+  = BinaryPlus
   / BinaryMinus
+
+// A plus immediately followed by a digit belongs to the following signed
+// integer. This mirrors binary minus so `0 +5` is a sequence item while
+// `0 + 5` remains addition.
+BinaryPlus
+  = "+" &([ \t\r\n#] / ![0-9]) { return "+"; }
 
 // A minus immediately followed by a digit belongs to the following signed
 // integer. This makes `-1 -2` a sequence of two negative integer leaves.
@@ -416,13 +422,16 @@ PitchLiteral
 // remains an integer subtraction expression while `2 -3` remains a sequence of
 // degrees.
 ScaleDegreeLiteral
-  = sign:Sign? degree:UnsignedInteger !IdentifierContinue !BinaryOperatorAfterSpacing {
+  = sign:Sign? degree:UnsignedInteger !NumericLiteralSuffix !IdentifierContinue !BinaryOperatorAfterSpacing {
       return node('DegreeLiteral', {
         modifiers: [],
         degree: sign === '-' ? sign + degree : degree,
         raw: text(),
       });
     }
+
+NumericLiteralSuffix
+  = "/" / "\\" / "."
 
 BinaryOperatorAfterSpacing
   = Spacing (AdditiveOperator / MultiplicativeOperator / "^")
