@@ -96,11 +96,27 @@ describe("Xenpaper surface grammar", () => {
   });
 
   it("admits equave shifts with negative degrees", () => {
-    expect(parse('"-2').body[0].type).toBe("DegreeLiteral");
+    const expression = parse('"-2').body[0];
+
+    expect(expression.type).toBe("UnaryExpression");
+    expect(expression.operator).toBe('"');
+    expect((expression.operand as SyntaxNode).type).toBe("DegreeLiteral");
+    expect((expression.operand as SyntaxNode).degree).toBe("-2");
   });
 
   it("admits equave shifts with ratios", () => {
-    expect(parse('"3/2').body[0].type).toBe("ShiftedRatioLiteral");
+    const expression = parse('"3/2').body[0];
+
+    expect(expression.type).toBe("UnaryExpression");
+    expect(expression.operator).toBe('"');
+    expect((expression.operand as SyntaxNode).type).toBe("RatioLiteral");
+  });
+
+  it("parses unary plus degrees like unary minus degrees", () => {
+    const expression = parse("+5").body[0];
+
+    expect(expression.type).toBe("DegreeLiteral");
+    expect(expression.degree).toBe("5");
   });
 
   it("parses a sequence of degrees", () => {

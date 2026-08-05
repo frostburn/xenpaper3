@@ -100,8 +100,18 @@ SequenceExpression
     }
 
 SequenceItem
-  = ScaleDegreeLiteral
+  = ShiftedValueExpression
+  / ScaleDegreeLiteral
   / AdditiveExpression
+
+ShiftedValueExpression
+  = modifiers:PitchModifier+ operand:(RatioLiteral / EqualDivisionLiteral / ScaleDegreeLiteral) {
+      let result = operand;
+      for (let index = modifiers.length - 1; index >= 0; index -= 1) {
+        result = unary(modifiers[index].raw, result);
+      }
+      return result;
+    }
 
 AdditiveExpression
   = first:MultiplicativeExpression
@@ -397,27 +407,6 @@ PitchLiteral
         raw: text(),
       });
     }
-  / modifiers:PitchModifier+ ratio:UnsignedRatioLiteral {
-      return node('ShiftedRatioLiteral', {
-        modifiers,
-        ratio,
-        raw: text(),
-      });
-    }
-  / modifiers:PitchModifier+ division:UnsignedEqualDivisionLiteral {
-      return node('ShiftedEqualDivisionLiteral', {
-        modifiers,
-        division,
-        raw: text(),
-      });
-    }
-  / modifiers:PitchModifier+ degree:SignedInteger !IdentifierContinue {
-      return node('DegreeLiteral', {
-        modifiers,
-        degree,
-        raw: text(),
-      });
-    }
 
 // Bare integer tokens in score position are scale degrees, not scalar integer
 // expressions. They intentionally stop before binary operators so `2 - 3`
@@ -427,7 +416,7 @@ ScaleDegreeLiteral
   = sign:Sign? degree:UnsignedInteger !IdentifierContinue !BinaryOperatorAfterSpacing {
       return node('DegreeLiteral', {
         modifiers: [],
-        degree: sign ? sign + degree : degree,
+        degree: sign === '-' ? sign + degree : degree,
         raw: text(),
       });
     }
@@ -565,9 +554,6 @@ UnsignedDecimalOrInteger
 
 UnsignedInteger
   = $([0-9]+)
-
-SignedInteger
-  = sign:Sign? value:UnsignedInteger { return sign ? sign + value : value; }
 
 Sign
   = $("+" / "-")
