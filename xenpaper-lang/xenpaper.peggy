@@ -94,9 +94,25 @@ ParallelExpression
     }
 
 SequenceExpression
-  = first:AdditiveExpression
-    rest:(SequenceGap item:AdditiveExpression { return item; })* {
+  = first:SequenceItem
+    rest:(SequenceGap item:SequenceItem { return item; })* {
       return sequence([first, ...rest]);
+    }
+
+SequenceItem
+  = expression:(ShiftedValueExpression / ScaleDegreeLiteral / AdditiveExpression)
+    marks:AttachedPostfixMark* {
+      if (!marks.length) return expression;
+      return node('PostfixExpression', { expression, marks });
+    }
+
+ShiftedValueExpression
+  = modifiers:PitchModifier+ operand:(RatioLiteral / EqualDivisionLiteral / ScaleDegreeLiteral) {
+      let result = operand;
+      for (let index = modifiers.length - 1; index >= 0; index -= 1) {
+        result = unary(modifiers[index].raw, result);
+      }
+      return result;
     }
 
 AdditiveExpression
@@ -128,9 +144,14 @@ MultiplicativeExpression
 
 MultiplicativeOperator
   = "*" { return "*"; }
-  / "/" { return "/"; }
+  / BinaryDivide
   / "div"i !IdentifierContinue { return "div"; }
   / "mod"i !IdentifierContinue { return "mod"; }
+
+// A slash attached to a pitch-like token is a lift modifier belonging to the
+// following sequence item, not division (for example `Cv5 /'C`).
+BinaryDivide
+  = "/" !(PitchModifier / PitchNominal / [0-9]) { return "/"; }
 
 PowerExpression
   = left:UnaryExpression
@@ -155,7 +176,7 @@ PostfixExpression
     }
 
 AttachedPostfixMark
-  = "=" { return node('AttachedContinue', { raw: "=" }); }
+  = "=" { return node('DetachedContinue', { raw: "=", attached: true }); }
   / marks:$("?"+) {
       return node('TailElimination', { count: marks.length, raw: marks });
     }
@@ -248,18 +269,18 @@ NumericDirectiveBody
     }
 
 NamedDirectiveBody
-  = name:Identifier arguments:DirectiveArguments? {
+  = name:Identifier args:DirectiveArguments? {
       return {
         name: name.toLowerCase(),
         rawName: name,
-        arguments: arguments ?? [],
+        arguments: args ?? [],
         graceCount: 0,
       };
     }
 
 DirectiveArguments
-  = "(" Spacing arguments:DirectiveArgumentList? Spacing ")" {
-      return arguments ?? [];
+  = "(" Spacing args:DirectiveArgumentList? Spacing ")" {
+      return args ?? [];
     }
 
 DirectiveArgumentList
@@ -336,8 +357,8 @@ ContextPreset
     }
 
 CallExpression
-  = callee:Identifier Spacing "(" Spacing arguments:CallArgumentList? Spacing ")" {
-      return node('CallExpression', { callee, arguments: arguments ?? [] });
+  = callee:Identifier Spacing "(" Spacing args:CallArgumentList? Spacing ")" {
+      return node('CallExpression', { callee, arguments: args ?? [] });
     }
 
 CallArgumentList
@@ -352,9 +373,10 @@ IdentifierExpression
     }
 
 IntervalLiteral
-  = quality:IntervalQuality number:UnsignedInteger
+  = modifiers:PitchModifier* quality:IntervalQuality number:UnsignedInteger
     inflections:FjsInflection* !IdentifierContinue {
       return node('IntervalLiteral', {
+        modifiers,
         quality,
         number,
         inflections,
@@ -363,7 +385,7 @@ IntervalLiteral
     }
 
 IntervalQuality
-  = $("P" / "M" / "m" / "A" / "d")
+  = $("A"+ / "d"+ / "P" / "M" / "m")
 
 PitchLiteral
   = nominal:PitchNominal
@@ -388,27 +410,22 @@ PitchLiteral
         raw: text(),
       });
     }
-  / modifiers:PitchModifier+ degree:UnsignedInteger {
+
+// Bare integer tokens in score position are scale degrees, not scalar integer
+// expressions. They intentionally stop before binary operators so `2 - 3`
+// remains an integer subtraction expression while `2 -3` remains a sequence of
+// degrees.
+ScaleDegreeLiteral
+  = sign:Sign? degree:UnsignedInteger !IdentifierContinue !BinaryOperatorAfterSpacing {
       return node('DegreeLiteral', {
-        modifiers,
-        degree,
+        modifiers: [],
+        degree: sign === '-' ? sign + degree : degree,
         raw: text(),
       });
     }
-  / modifiers:PitchModifier+ ratio:UnsignedRatioLiteral {
-      return node('ShiftedRatioLiteral', {
-        modifiers,
-        ratio,
-        raw: text(),
-      });
-    }
-  / modifiers:PitchModifier+ division:UnsignedEqualDivisionLiteral {
-      return node('ShiftedEqualDivisionLiteral', {
-        modifiers,
-        division,
-        raw: text(),
-      });
-    }
+
+BinaryOperatorAfterSpacing
+  = Spacing (AdditiveOperator / MultiplicativeOperator / "^")
 
 PitchModifier
   = raw:$("'" / '"' / "`" / "^" / "v" / "/" / "\\") {
