@@ -1,7 +1,5 @@
-import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
-import peggy from "peggy";
-import { beforeAll, describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
+import { parse } from "../parser.generated.js";
 
 const score = String.raw`# FJS and prefix modifiers
 E^5 Eb_5 P1_5 Cv5
@@ -34,13 +32,6 @@ type SyntaxNode = {
   type: string;
   [property: string]: unknown;
 };
-
-let parse: (source: string) => SyntaxNode;
-
-beforeAll(() => {
-  const grammar = readFileSync(resolve("xenpaper-lang/xenpaper.peggy"), "utf8");
-  parse = peggy.generate(grammar).parse;
-});
 
 describe("Xenpaper surface grammar", () => {
   it("compiles and parses the representative score syntax", () => {
