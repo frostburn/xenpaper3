@@ -19,7 +19,6 @@ export interface Comment extends Node {
 }
 
 export type Expression =
-  | AttachedContinue
   | Barline
   | BinaryExpression
   | CallExpression
@@ -53,11 +52,6 @@ export type Expression =
   | Sequence
   | TailElimination
   | UnaryExpression;
-
-export interface AttachedContinue extends Node {
-  type: "AttachedContinue";
-  raw: "=";
-}
 
 export interface Barline extends Node {
   type: "Barline";
@@ -134,6 +128,7 @@ export interface Directive extends Node {
 export interface DetachedContinue extends Node {
   type: "DetachedContinue";
   raw: "=";
+  attached?: boolean;
 }
 
 export interface EqualDivisionLiteral extends Node {
@@ -205,7 +200,7 @@ export interface PitchContextChange extends Node {
 export interface PostfixExpression extends Node {
   type: "PostfixExpression";
   expression: Expression;
-  marks: (AttachedContinue | TailElimination)[];
+  marks: (DetachedContinue | TailElimination)[];
 }
 
 export interface PitchLiteral extends Node {

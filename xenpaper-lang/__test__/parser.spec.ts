@@ -165,4 +165,17 @@ describe("Xenpaper surface grammar", () => {
     expect(expression.type).toBe("Parallel");
     expect(branches.map((branch) => branch.degree)).toEqual(["1", "-2", "3"]);
   });
+
+  it("parses holds", () => {
+    const program = parse("0= = | =");
+    const items = (program.body[0] as SyntaxNode).items as SyntaxNode[];
+
+    expect(items.map((item) => item.type)).toEqual([
+      "PostfixExpression",
+      "DetachedContinue",
+      "Barline",
+      "DetachedContinue",
+    ]);
+    expect(((items[0].marks as SyntaxNode[])[0] as SyntaxNode).type).toBe("DetachedContinue");
+  });
 });

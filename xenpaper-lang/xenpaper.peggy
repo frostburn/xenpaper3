@@ -100,9 +100,11 @@ SequenceExpression
     }
 
 SequenceItem
-  = ShiftedValueExpression
-  / ScaleDegreeLiteral
-  / AdditiveExpression
+  = expression:(ShiftedValueExpression / ScaleDegreeLiteral / AdditiveExpression)
+    marks:AttachedPostfixMark* {
+      if (!marks.length) return expression;
+      return node('PostfixExpression', { expression, marks });
+    }
 
 ShiftedValueExpression
   = modifiers:PitchModifier+ operand:(RatioLiteral / EqualDivisionLiteral / ScaleDegreeLiteral) {
@@ -174,7 +176,7 @@ PostfixExpression
     }
 
 AttachedPostfixMark
-  = "=" { return node('AttachedContinue', { raw: "=" }); }
+  = "=" { return node('DetachedContinue', { raw: "=", attached: true }); }
   / marks:$("?"+) {
       return node('TailElimination', { count: marks.length, raw: marks });
     }
