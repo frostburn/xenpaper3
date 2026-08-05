@@ -373,9 +373,10 @@ IdentifierExpression
     }
 
 IntervalLiteral
-  = quality:IntervalQuality number:UnsignedInteger
+  = modifiers:PitchModifier* quality:IntervalQuality number:UnsignedInteger
     inflections:FjsInflection* !IdentifierContinue {
       return node('IntervalLiteral', {
+        modifiers,
         quality,
         number,
         inflections,
@@ -384,7 +385,7 @@ IntervalLiteral
     }
 
 IntervalQuality
-  = $("P" / "M" / "m" / "A" / "d")
+  = $("A"+ / "d"+ / "P" / "M" / "m")
 
 PitchLiteral
   = nominal:PitchNominal

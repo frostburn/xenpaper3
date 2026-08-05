@@ -178,4 +178,23 @@ describe("Xenpaper surface grammar", () => {
     ]);
     expect(((items[0].marks as SyntaxNode[])[0] as SyntaxNode).type).toBe("DetachedContinue");
   });
+
+  it("supports prefixes with relative pitch offset literals", () => {
+    const program = parse("^M2 'P4");
+    const items = (program.body[0] as SyntaxNode).items as SyntaxNode[];
+
+    expect(items.map((item) => item.type)).toEqual(["IntervalLiteral", "IntervalLiteral"]);
+    expect(items.map((item) => item.quality)).toEqual(["M", "P"]);
+    expect((items[0].modifiers as SyntaxNode[]).map((modifier) => modifier.raw)).toEqual(["^"]);
+    expect((items[1].modifiers as SyntaxNode[]).map((modifier) => modifier.raw)).toEqual(["'"]);
+  });
+
+  it("supports multiple augmentation and diminution of pitch offsets", () => {
+    const program = parse("AAA4 dd5");
+    const items = (program.body[0] as SyntaxNode).items as SyntaxNode[];
+
+    expect(items.map((item) => item.type)).toEqual(["IntervalLiteral", "IntervalLiteral"]);
+    expect(items.map((item) => item.quality)).toEqual(["AAA", "dd"]);
+    expect(items.map((item) => item.number)).toEqual(["4", "5"]);
+  });
 });

@@ -164,6 +164,7 @@ export interface IntegerLiteral extends Node {
 
 export interface IntervalLiteral extends Node {
   type: "IntervalLiteral";
+  modifiers: PitchModifier[];
   quality: string;
   number: string;
   inflections: FjsInflection[];
