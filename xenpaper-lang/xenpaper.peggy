@@ -94,10 +94,14 @@ ParallelExpression
     }
 
 SequenceExpression
-  = first:AdditiveExpression
-    rest:(SequenceGap item:AdditiveExpression { return item; })* {
+  = first:SequenceItem
+    rest:(SequenceGap item:SequenceItem { return item; })* {
       return sequence([first, ...rest]);
     }
+
+SequenceItem
+  = ScaleDegreeLiteral
+  / AdditiveExpression
 
 AdditiveExpression
   = first:MultiplicativeExpression
@@ -393,13 +397,6 @@ PitchLiteral
         raw: text(),
       });
     }
-  / modifiers:PitchModifier+ degree:UnsignedInteger {
-      return node('DegreeLiteral', {
-        modifiers,
-        degree,
-        raw: text(),
-      });
-    }
   / modifiers:PitchModifier+ ratio:UnsignedRatioLiteral {
       return node('ShiftedRatioLiteral', {
         modifiers,
@@ -414,6 +411,29 @@ PitchLiteral
         raw: text(),
       });
     }
+  / modifiers:PitchModifier+ degree:SignedInteger !IdentifierContinue {
+      return node('DegreeLiteral', {
+        modifiers,
+        degree,
+        raw: text(),
+      });
+    }
+
+// Bare integer tokens in score position are scale degrees, not scalar integer
+// expressions. They intentionally stop before binary operators so `2 - 3`
+// remains an integer subtraction expression while `2 -3` remains a sequence of
+// degrees.
+ScaleDegreeLiteral
+  = sign:Sign? degree:UnsignedInteger !IdentifierContinue !BinaryOperatorAfterSpacing {
+      return node('DegreeLiteral', {
+        modifiers: [],
+        degree: sign ? sign + degree : degree,
+        raw: text(),
+      });
+    }
+
+BinaryOperatorAfterSpacing
+  = Spacing (AdditiveOperator / MultiplicativeOperator / "^")
 
 PitchModifier
   = raw:$("'" / '"' / "`" / "^" / "v" / "/" / "\\") {
@@ -545,6 +565,9 @@ UnsignedDecimalOrInteger
 
 UnsignedInteger
   = $([0-9]+)
+
+SignedInteger
+  = sign:Sign? value:UnsignedInteger { return sign ? sign + value : value; }
 
 Sign
   = $("+" / "-")

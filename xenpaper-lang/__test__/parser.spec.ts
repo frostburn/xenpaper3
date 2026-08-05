@@ -1,7 +1,7 @@
-import { readFileSync } from 'node:fs'
-import { resolve } from 'node:path'
-import peggy from 'peggy'
-import { beforeAll, describe, expect, it } from 'vitest'
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
+import peggy from "peggy";
+import { beforeAll, describe, expect, it } from "vitest";
 
 const score = String.raw`# FJS and prefix modifiers
 E^5 Eb_5 P1_5 Cv5
@@ -20,78 +20,142 @@ A B . ||
 
 # Repeat remains an AST macro
 {root = 220Hz}
-{${'`'}A = root}
+{${"`"}A = root}
 {41edo}
 |:(x10)
-[${'`'}A, Cv5, E]
+[${"`"}A, Cv5, E]
 [Cv5, E, Gv5]
-[${'`'}B, Dv5, Gv5]
-[${'`'}Av5, Dv5, F#]
-{root = ${'`'}Av5}
-:|`
+[${"`"}B, Dv5, Gv5]
+[${"`"}Av5, Dv5, F#]
+{root = ${"`"}Av5}
+:|`;
 
 type SyntaxNode = {
-  type: string
-  [property: string]: unknown
-}
+  type: string;
+  [property: string]: unknown;
+};
 
-let parse: (source: string) => SyntaxNode
+let parse: (source: string) => SyntaxNode;
 
 beforeAll(() => {
-  const grammar = readFileSync(resolve('xenpaper-lang/xenpaper.peggy'), 'utf8')
-  parse = peggy.generate(grammar).parse
-})
+  const grammar = readFileSync(resolve("xenpaper-lang/xenpaper.peggy"), "utf8");
+  parse = peggy.generate(grammar).parse;
+});
 
-describe('Xenpaper surface grammar', () => {
-  it('compiles and parses the representative score syntax', () => {
-    const program = parse(score)
+describe("Xenpaper surface grammar", () => {
+  it("compiles and parses the representative score syntax", () => {
+    const program = parse(score);
 
-    expect(program.type).toBe('Program')
-    expect(program.source).toBe(score)
+    expect(program.type).toBe("Program");
+    expect(program.source).toBe(score);
     expect((program.comments as SyntaxNode[]).map((comment) => comment.value)).toEqual([
-      ' FJS and prefix modifiers',
-      ' Context changes',
-      ' Parallel composition; duration checks happen after parsing',
-      ' Repeat remains an AST macro',
-    ])
-  })
+      " FJS and prefix modifiers",
+      " Context changes",
+      " Parallel composition; duration checks happen after parsing",
+      " Repeat remains an AST macro",
+    ]);
+  });
 
-  it('distinguishes attached FJS inflections and prefix pitch modifiers', () => {
-    const program = parse("E^5 Eb_5 P1_5 Cv5 /'C '/C vDb C#")
-    const items = (program.body as SyntaxNode[])[0].items as SyntaxNode[]
+  it("distinguishes attached FJS inflections and prefix pitch modifiers", () => {
+    const program = parse("E^5 Eb_5 P1_5 Cv5 /'C '/C vDb C#");
+    const items = (program.body as SyntaxNode[])[0].items as SyntaxNode[];
 
     expect(items.map((item) => item.type)).toEqual([
-      'PitchLiteral',
-      'PitchLiteral',
-      'IntervalLiteral',
-      'PitchLiteral',
-      'PitchLiteral',
-      'PitchLiteral',
-      'PitchLiteral',
-      'PitchLiteral',
-    ])
+      "PitchLiteral",
+      "PitchLiteral",
+      "IntervalLiteral",
+      "PitchLiteral",
+      "PitchLiteral",
+      "PitchLiteral",
+      "PitchLiteral",
+      "PitchLiteral",
+    ]);
     expect(items.map((item) => item.raw)).toEqual([
-      'E^5',
-      'Eb_5',
-      'P1_5',
-      'Cv5',
+      "E^5",
+      "Eb_5",
+      "P1_5",
+      "Cv5",
       "/'C",
       "'/C",
-      'vDb',
-      'C#',
-    ])
-  })
+      "vDb",
+      "C#",
+    ]);
+  });
 
-  it('keeps parallel branches and repeats as syntax-tree nodes', () => {
-    const program = parse('C D,\nE F G,\nA B . ||\n|:(x10) [C, E, G] :|')
-    const body = program.body as SyntaxNode[]
+  it("keeps parallel branches and repeats as syntax-tree nodes", () => {
+    const program = parse("C D,\nE F G,\nA B . ||\n|:(x10) [C, E, G] :|");
+    const body = program.body as SyntaxNode[];
 
-    expect(body.map((item) => item.type)).toEqual(['Parallel', 'HardBoundary', 'Repeat'])
+    expect(body.map((item) => item.type)).toEqual(["Parallel", "HardBoundary", "Repeat"]);
     expect((body[0].branches as SyntaxNode[]).map((branch) => branch.type)).toEqual([
-      'Sequence',
-      'Sequence',
-      'Sequence',
-    ])
-    expect((body[2].count as SyntaxNode).value).toBe('10')
-  })
-})
+      "Sequence",
+      "Sequence",
+      "Sequence",
+    ]);
+    expect((body[2].count as SyntaxNode).value).toBe("10");
+  });
+
+  it("admits equave shifts with negative degrees", () => {
+    expect(parse('"-2').body[0].type).toBe("DegreeLiteral");
+  });
+
+  it("admits equave shifts with ratios", () => {
+    expect(parse('"3/2').body[0].type).toBe("ShiftedRatioLiteral");
+  });
+
+  it("parses a sequence of degrees", () => {
+    const program = parse("0 1 2 -3");
+    const items = (program.body[0] as SyntaxNode).items as SyntaxNode[];
+
+    expect(items.map((item) => item.type)).toEqual([
+      "DegreeLiteral",
+      "DegreeLiteral",
+      "DegreeLiteral",
+      "DegreeLiteral",
+    ]);
+    expect(items.map((item) => item.degree)).toEqual(["0", "1", "2", "-3"]);
+  });
+
+  it("parses a sequence of degrees followed by binary operation of integers", () => {
+    const program = parse("0 1 2 - 3");
+    const items = (program.body[0] as SyntaxNode).items as SyntaxNode[];
+
+    expect(items.map((item) => item.type)).toEqual([
+      "DegreeLiteral",
+      "DegreeLiteral",
+      "BinaryExpression",
+    ]);
+    expect(items[2].operator).toBe("-");
+  });
+
+  it("parses a parallel composition of degrees", () => {
+    const program = parse("0, 1, 2, -3");
+    const branches = (program.body[0] as SyntaxNode).branches as SyntaxNode[];
+
+    expect(branches.map((branch) => branch.type)).toEqual([
+      "DegreeLiteral",
+      "DegreeLiteral",
+      "DegreeLiteral",
+      "DegreeLiteral",
+    ]);
+    expect(branches.map((branch) => branch.degree)).toEqual(["0", "1", "2", "-3"]);
+  });
+
+  it("parses a slotted triplet of degrees", () => {
+    const program = parse("[1 -2 3]");
+    const expression = (program.body[0] as SyntaxNode).expression as SyntaxNode;
+    const items = expression.items as SyntaxNode[];
+
+    expect(expression.type).toBe("Sequence");
+    expect(items.map((item) => item.degree)).toEqual(["1", "-2", "3"]);
+  });
+
+  it("parses a slotted chord of degrees", () => {
+    const program = parse("[1, -2, 3]");
+    const expression = (program.body[0] as SyntaxNode).expression as SyntaxNode;
+    const branches = expression.branches as SyntaxNode[];
+
+    expect(expression.type).toBe("Parallel");
+    expect(branches.map((branch) => branch.degree)).toEqual(["1", "-2", "3"]);
+  });
+});
