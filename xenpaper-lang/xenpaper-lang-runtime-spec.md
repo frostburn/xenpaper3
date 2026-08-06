@@ -670,7 +670,7 @@ Required initial semantics:
 
 The grammar accepts additional historical accidental glyphs. Until their mappings are defined, emit `XP_UNSUPPORTED_ACCIDENTAL` and do not invent a value.
 
-Accidentals are applied before FJS inflections. Thus `Eb_5` is valid and `E_5b` is not parsed as the same pitch.
+Accidentals are applied before FJS inflections. `_` is always the natural accidental and never an FJS denominator marker.
 
 ### 7.6 FJS inflections
 
@@ -704,14 +704,14 @@ comma(7) = 64/63
 Apply inflections to the untempered formula:
 
 - `^p` means the prime occurs in the numerator: multiply by `1 / comma(p)`;
-- `_p` and postfix `vp` mean the prime occurs in the denominator: multiply by `comma(p)`.
+- postfix `vp` means the prime occurs in the denominator: multiply by `comma(p)`.
 
 Examples in the untempered context:
 
 ```text
 E^5  = 5/4
-Eb_5 = 6/5
-P1_5 = 81/80
+Ebv5 = 6/5
+P1v5 = 81/80
 ```
 
 The resulting prime formula is then passed through the active mapping, so a temperament may temper the comma out.
@@ -1390,7 +1390,7 @@ C = =
 m7 / 2
 7\12
 1\13<3>
-E^5 Eb_5 P1_5
+E^5 Ebv5 P1v5
 /'C '/C
 @gliss(linear) F= C?
 |:(x10) C {root = C^5} :|
@@ -1416,8 +1416,8 @@ D     = 9/8
 E     = 81/64
 G     = 3/2
 E^5   = 5/4
-Eb_5  = 6/5
-P1_5  = 81/80
+Ebv5  = 6/5
+P1v5  = 81/80
 ```
 
 Compare exact ratios by dividing note frequency by root frequency.
@@ -1425,13 +1425,13 @@ Compare exact ratios by dividing note frequency by root frequency.
 ### 14.4 Temperament
 
 ```xenpaper
-{31edo} P1_5
+{31edo} P1v5
 ```
 
 The mapped syntonic comma must be unison in 31-EDO. Equivalently, `{31edo} E^5` must sound the same as `{31edo} E`.
 
 ```xenpaper
-{41edo} P1_5
+{41edo} P1v5
 ```
 
 The mapped syntonic comma must be exactly one step of 41-EDO.

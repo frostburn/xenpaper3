@@ -291,7 +291,7 @@ function spellIntervalFormula(input: PrimeMonzo): IntervalSpelling | undefined {
   else if (chromaticSteps === -1) quality = 'm'
   else if (chromaticSteps > 0) quality = 'A'.repeat(chromaticSteps)
   else quality = 'd'.repeat(-chromaticSteps - 1)
-  const suffix = inflections.map(({ direction, prime }) => `${direction === 'numerator' ? '^' : '_'}${prime}`).join('')
+  const suffix = inflections.map(({ direction, prime }) => `${direction === 'numerator' ? '^' : 'v'}${prime}`).join('')
   return { quality, number, inflections, raw: `${quality}${number}${suffix}` }
 }
 

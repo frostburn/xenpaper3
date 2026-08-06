@@ -164,15 +164,15 @@ describe('arithmetic expression evaluation', () => {
     if (e5.kind !== 'absolutePitch') throw new Error('Expected a pitch.')
     expect(e5.rootOffset.equals(Value.pitch(new Value(5n, 4n)))).toBe(true)
 
-    const doubled = evaluate('2 * m3_5')
+    const doubled = evaluate('2 * m3v5')
     expect(doubled.kind).toBe('pitchOffset')
     if (doubled.kind !== 'pitchOffset') throw new Error('Expected an interval.')
     expect(doubled.value.equals(Value.pitch(new Value(36n, 25n)))).toBe(true)
-    expect(doubled.spelling?.raw).toBe('d5_5_5')
+    expect(doubled.spelling?.raw).toBe('d5v5v5')
   })
 
   it('factors FJS labels, ignores 2- and 3-limit factors, and supports neutral FJS', () => {
-    const fraction = evaluate('Eb^6_5')
+    const fraction = evaluate('Eb^6v5')
     if (fraction.kind !== 'absolutePitch') throw new Error('Expected a pitch.')
     expect(fraction.rootOffset.equals(Value.pitch(new Value(6n, 5n)))).toBe(true)
 

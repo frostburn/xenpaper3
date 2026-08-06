@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { parse } from "../parser.generated.js";
 
 const score = String.raw`# FJS and prefix modifiers
-E^5 Eb_5 P1_5 Cv5
+E^5 Ebv5 P1v5 Cv5 E_
 /'C '/C vDb C#
 
 # Context changes
@@ -48,7 +48,7 @@ describe("Xenpaper surface grammar", () => {
   });
 
   it("distinguishes attached FJS inflections and prefix pitch modifiers", () => {
-    const program = parse("E^5 Eb_5 P1_5 Cv5 /'C '/C vDb C#");
+    const program = parse("E^5 Ebv5 P1v5 Cv5 E_ /'C '/C vDb C#");
     const items = (program.body as SyntaxNode[])[0].items as SyntaxNode[];
 
     expect(items.map((item) => item.type)).toEqual([
@@ -60,17 +60,21 @@ describe("Xenpaper surface grammar", () => {
       "PitchLiteral",
       "PitchLiteral",
       "PitchLiteral",
+      "PitchLiteral",
     ]);
     expect(items.map((item) => item.raw)).toEqual([
       "E^5",
-      "Eb_5",
-      "P1_5",
+      "Ebv5",
+      "P1v5",
       "Cv5",
+      "E_",
       "/'C",
       "'/C",
       "vDb",
       "C#",
     ]);
+    expect((items[4].accidentals as SyntaxNode[]).map((accidental) => accidental.value)).toEqual(["_"]);
+    expect(parse("E_5").body[0]).toMatchObject({ type: "Identifier", name: "E_5" });
   });
 
   it("keeps parallel branches and repeats as syntax-tree nodes", () => {

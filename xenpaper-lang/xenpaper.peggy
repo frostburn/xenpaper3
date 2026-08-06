@@ -458,8 +458,8 @@ PitchNominal
       return node('PitchNominal', { system: 'greek', value });
     }
 
-// Pythagorean accidentals are consumed before FJS inflections, enforcing
-// spellings such as `Eb_5` rather than `E_5b`.
+// The underscore belongs exclusively to the Pythagorean natural accidental;
+// denominator FJS inflections use the postfix `v` marker.
 PythagoreanAccidental
   = value:$("𝄪" / "𝄫" / "𝄲" / "𝄳" / "𝄬" / "𝄭" / "𝄮" / "𝄯" / "𝄰" / "𝄱" / [x♯#‡t♮d♭bpq]) {
       return node('Accidental', { value });
@@ -467,7 +467,7 @@ PythagoreanAccidental
   / "_" ![0-9] { return node('Accidental', { value: '_' }); }
 
 FjsInflection
-  = marker:$("^" / "_" / "v") prime:UnsignedInteger flavor:$([cnqthm])? {
+  = marker:$("^" / "v") prime:UnsignedInteger flavor:$([cnqthm])? {
       return node('FjsInflection', {
         direction: marker === '^' ? 'numerator' : 'denominator',
         marker,
