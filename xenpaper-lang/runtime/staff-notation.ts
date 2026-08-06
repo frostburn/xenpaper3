@@ -1,4 +1,3 @@
-import { Fraction } from 'xen-dev-utils/fraction'
 import { Value } from '../value'
 import type { EvaluatedLiteral, FjsSpelling, PrimeMonzo, ScoreShape, StaffInflection, StaffNotationShape, StaffPitch } from './types'
 
@@ -9,25 +8,10 @@ const GREEK_RANK: Readonly<Record<string, number>> = {
   'Η': 0.5, 'Α': 1.5, 'Β': 2.5, 'Γ': 3.5, 'Δ': 4.5, 'Ε': 5.5, 'Ζ': 6.5,
 }
 
-function factor(integer: number, direction: number, result: Map<number, Fraction>) {
-  let remainder = integer
-  for (let prime = 2; prime * prime <= remainder; prime++) {
-    while (remainder % prime === 0) {
-      result.set(prime, (result.get(prime) ?? new Fraction(0)).add(direction))
-      remainder /= prime
-    }
-  }
-  if (remainder > 1) result.set(remainder, (result.get(remainder) ?? new Fraction(0)).add(direction))
-}
-
 function formulaOf(value: EvaluatedLiteral): PrimeMonzo | undefined {
-  if ('formula' in value && value.formula) return value.formula
-  const ratio = value.kind === 'scalar' ? value.value.exactRational() : undefined
-  if (!ratio || ratio.compare(0) <= 0 || !Number.isSafeInteger(ratio.n) || !Number.isSafeInteger(ratio.d)) return undefined
-  const result = new Map<number, Fraction>()
-  factor(ratio.n, 1, result)
-  factor(ratio.d, -1, result)
-  return result
+  if (value.kind === 'absolutePitch') return value.formula
+  if (value.kind === 'pitchOffset' && value.formula) return value.formula
+  return value.value.primeExponents()
 }
 
 function fjsInflections(formula: PrimeMonzo | undefined): FjsSpelling[] | undefined {
@@ -128,7 +112,6 @@ export function constructStaffNotation(value: EvaluatedLiteral, options: StaffNo
       const position = Math.ceil(greekRank) + octaveOffset * 7
       return {
         staffPosition: position,
-        nominal: LETTERS[((position % 7) + 7) % 7]!,
         ...decorations(value),
         notehead: 'triangle-down',
         cents,
@@ -141,7 +124,6 @@ export function constructStaffNotation(value: EvaluatedLiteral, options: StaffNo
       const chromatic = Math.round((cents - (soundingOctave * 1200 + SEMITONES[latin]! * 100)) / 100)
       return {
         staffPosition: position,
-        nominal: LETTERS[latin]!,
         ...decorations(value, chromatic),
         notehead: 'normal',
         cents,
@@ -153,11 +135,9 @@ export function constructStaffNotation(value: EvaluatedLiteral, options: StaffNo
     const numericNumber = Number(value.spelling.number.valueOf())
     const zeroBased = numericNumber - 1
     const position = rootPosition + Math.ceil(zeroBased) + equaveStaffShift(value.spelling.modifiers)
-    const letter = ((position % 7) + 7) % 7
     const chromatic = Math.round((naturalCents(rootPosition) + cents - naturalCents(position)) / 100)
     return {
       staffPosition: position,
-      nominal: LETTERS[letter]!,
       ...decorations(value, chromatic),
       notehead: Number.isInteger(zeroBased) ? 'normal' : 'triangle-down',
       cents,
@@ -180,7 +160,6 @@ export function constructStaffNotation(value: EvaluatedLiteral, options: StaffNo
   const inflections = fjsInflections(formulaOf(value))
   return {
     staffPosition: position,
-    nominal: LETTERS[letter]!,
     accidentals: accidental ? [accidental] : [],
     ...(inflections ? { inflections } : {}),
     notehead: 'normal',

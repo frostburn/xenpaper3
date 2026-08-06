@@ -535,6 +535,12 @@ export class Value {
   isExact(): boolean {
     return this.magnitude.kind !== 'real'
   }
+  /** Exact prime exponents for a scalar monomial or logarithmic pitch. */
+  primeExponents(): ReadonlyMap<number, Fraction> | undefined {
+    if (this.magnitude.kind === 'real') return undefined
+    const source = this.magnitude.kind === 'pitch' ? this.magnitude.value.logPrimes : this.magnitude.value.exponents
+    return new Map([...source].filter(([prime]) => prime > 0).map(([prime, exponent]) => [prime, new Fraction(exponent)]))
+  }
   valueOf(): number {
     return this.magnitude.value.valueOf()
   }
