@@ -1,6 +1,6 @@
 import { Fraction } from 'xen-dev-utils/fraction'
 import { Value } from '../value'
-import type { EvaluatedLiteral, FjsSpelling, PrimeMonzo, ScoreShape, StaffNotationShape, StaffPitch } from './types'
+import type { EvaluatedLiteral, FjsSpelling, PrimeMonzo, ScoreShape, StaffInflection, StaffNotationShape, StaffPitch } from './types'
 
 const LETTERS = ['C', 'D', 'E', 'F', 'G', 'A', 'B'] as const
 const SEMITONES = [0, 2, 4, 5, 7, 9, 11] as const
@@ -63,15 +63,27 @@ function writtenAccidental(token: string): string {
 
 function decorations(value: EvaluatedLiteral, chromatic?: number) {
   const written = value.kind === 'absolutePitch' ? value.spelling.accidentals : undefined
-  const inflections = value.kind === 'absolutePitch'
+  const fjs = value.kind === 'absolutePitch'
     ? value.spelling.inflections
     : value.kind === 'pitchOffset'
       ? value.spelling?.inflections
       : undefined
-  const accidental = written?.length === 1 ? writtenAccidental(written[0]!) : chromatic === undefined ? undefined : inferredAccidental(chromatic)
+  const modifiers = value.kind === 'absolutePitch'
+    ? value.spelling.modifiers
+    : value.kind === 'pitchOffset'
+      ? value.spelling?.modifiers
+      : undefined
+  const operatorInflections: StaffInflection[] = (modifiers ?? [])
+    .filter((kind): kind is 'up' | 'down' | 'lift' | 'drop' => ['up', 'down', 'lift', 'drop'].includes(kind))
+    .map((kind) => ({ kind }))
+  const accidental = written?.length
+    ? written.map(writtenAccidental).join('+')
+    : chromatic === undefined
+      ? undefined
+      : inferredAccidental(chromatic)
+  const inflections: StaffInflection[] = [...operatorInflections, ...(fjs ?? [])]
   return {
-    ...(accidental ? { accidental } : {}),
-    ...(written?.length ? { accidentals: written } : {}),
+    accidentals: accidental ? [accidental] : [],
     ...(inflections?.length ? { inflections } : {}),
   }
 }
@@ -93,6 +105,13 @@ function naturalCents(position: number): number {
   const octave = Math.floor(position / 7)
   const letter = ((position % 7) + 7) % 7
   return octave * 1200 + SEMITONES[letter]! * 100
+}
+
+function equaveStaffShift(modifiers: readonly string[] | undefined): number {
+  return (modifiers ?? []).reduce(
+    (total, kind) => total + (kind === 'equaveUp' ? 7 : kind === 'doubleEquaveUp' ? 14 : kind === 'equaveDown' ? -7 : 0),
+    0,
+  )
 }
 
 export function constructStaffNotation(value: EvaluatedLiteral, options: StaffNotationOptions = {}): StaffPitch {
@@ -133,7 +152,7 @@ export function constructStaffNotation(value: EvaluatedLiteral, options: StaffNo
   if (value.kind === 'pitchOffset' && value.spelling) {
     const numericNumber = Number(value.spelling.number.valueOf())
     const zeroBased = numericNumber - 1
-    const position = rootPosition + Math.ceil(zeroBased)
+    const position = rootPosition + Math.ceil(zeroBased) + equaveStaffShift(value.spelling.modifiers)
     const letter = ((position % 7) + 7) % 7
     const chromatic = Math.round((naturalCents(rootPosition) + cents - naturalCents(position)) / 100)
     return {
@@ -150,7 +169,7 @@ export function constructStaffNotation(value: EvaluatedLiteral, options: StaffNo
   const octaveOffset = Math.floor(midiOffset / 12)
   const pitchClass = ((midiOffset % 12) + 12) % 12
   let letter = 0
-  let accidental: StaffPitch['accidental']
+  let accidental: string | undefined
   let best = Infinity
   for (let index = 0; index < SEMITONES.length; index++) {
     const distance = Math.abs(SEMITONES[index]! - pitchClass)
@@ -162,7 +181,7 @@ export function constructStaffNotation(value: EvaluatedLiteral, options: StaffNo
   return {
     staffPosition: position,
     nominal: LETTERS[letter]!,
-    ...(accidental ? { accidental } : {}),
+    accidentals: accidental ? [accidental] : [],
     ...(inflections ? { inflections } : {}),
     notehead: 'normal',
     cents,

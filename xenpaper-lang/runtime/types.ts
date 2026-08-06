@@ -60,6 +60,7 @@ export interface IntervalSpelling {
   readonly number: bigint | Fraction
   readonly raw: string
   readonly inflections?: readonly FjsSpelling[]
+  readonly modifiers?: readonly string[]
 }
 
 export interface FjsSpelling {
@@ -74,7 +75,14 @@ export interface PitchSpelling {
   readonly system?: 'latin' | 'greek'
   readonly accidentals?: readonly string[]
   readonly inflections?: readonly FjsSpelling[]
+  readonly modifiers?: readonly string[]
 }
+
+export interface StaffOperatorInflection {
+  readonly kind: 'up' | 'down' | 'lift' | 'drop'
+}
+
+export type StaffInflection = FjsSpelling | StaffOperatorInflection
 
 export interface PrimeMapping {
   readonly id: string
@@ -97,12 +105,10 @@ export interface StaffPitch {
   /** Diatonic steps from middle C (C4). */
   readonly staffPosition: number
   readonly nominal: 'C' | 'D' | 'E' | 'F' | 'G' | 'A' | 'B'
-  /** Conventional 12-EDO accidental used for an otherwise unspelled value. */
-  readonly accidental?: string
-  /** Exact written accidental tokens, when the source supplied a spelling. */
-  readonly accidentals?: readonly string[]
+  /** Zero or one normalized accidental for the note. */
+  readonly accidentals: readonly string[]
   /** FJS suffixes, such as the `^5` in A^5. */
-  readonly inflections?: readonly FjsSpelling[]
+  readonly inflections?: readonly StaffInflection[]
   /** Greek/interordinal pitches use a triangular head pointing at the other neighbouring line/space. */
   readonly notehead: 'normal' | 'triangle-up' | 'triangle-down'
   /** Sounding distance above middle C, retained for positioning refinements by a renderer. */
