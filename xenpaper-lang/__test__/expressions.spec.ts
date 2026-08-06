@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { Fraction } from 'xen-dev-utils/fraction'
 import { parse, type Expression } from '../parser.generated.js'
 import { evaluateExpression } from '../runtime/expressions'
-import { edoMapping } from '../runtime/pitches'
+import { DEFAULT_PITCH_CONTEXT, applyPitchContextChange, edoMapping } from '../runtime/pitches'
 import { Value } from '../value'
 
 function expression(source: string): Expression {
@@ -138,5 +138,24 @@ describe('arithmetic expression evaluation', () => {
     const halfSharp = evaluate('Ct')
     if (halfSharp.kind !== 'absolutePitch') throw new Error('Expected a pitch.')
     expect(halfSharp.rootOffset.equals(Value.pitch(new Value(2187n, 2048n)).div(new Value(2)))).toBe(true)
+  })
+
+  it('applies the Xenpaper 2 default up and lift offsets', () => {
+    const up = evaluate('^C')
+    const lift = evaluate('/C')
+    if (up.kind !== 'absolutePitch' || lift.kind !== 'absolutePitch') throw new Error('Expected pitches.')
+    expect(up.rootOffset.equals(Value.pitch(new Value(243n, 242n)).div(2))).toBe(true)
+    expect(lift.rootOffset.equals(Value.pitch(new Value(50n, 49n)).div(2))).toBe(true)
+  })
+
+  it('reassociates a spelled pitch with the root', () => {
+    const change = parse('{A = root}').body[0]
+    if (change.type !== 'PitchContextChange') throw new Error('Expected a context change.')
+    const context = applyPitchContextChange(change, DEFAULT_PITCH_CONTEXT)
+    const a = evaluateExpression(expression('A'), context)
+    const b = evaluateExpression(expression('B'), context)
+    if (!('value' in a) || a.value.kind !== 'absolutePitch' || !('value' in b) || b.value.kind !== 'absolutePitch') throw new Error('Expected pitches.')
+    expect(a.value.rootOffset.equals(Value.cents(0))).toBe(true)
+    expect(b.value.rootOffset.equals(Value.pitch(new Value(9n, 8n)))).toBe(true)
   })
 })

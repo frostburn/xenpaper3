@@ -71,6 +71,13 @@ export interface PrimeMapping {
   readonly mapPrime: (prime: number) => Value
 }
 
+export interface PitchContext {
+  readonly mapping: PrimeMapping
+  readonly rootFormula: PrimeMonzo
+  readonly up: Value
+  readonly lift: Value
+}
+
 export type EvaluatedLiteral = ScalarValue | PitchOffsetValue | AbsolutePitchValue
 
 export interface SourceOrigin {
