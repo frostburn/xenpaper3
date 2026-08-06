@@ -47,4 +47,19 @@ describe('XenpaperLangTestingView', () => {
       pitch: { staffPosition: 0 },
     })
   })
+
+  it('logs the current staff notation', async () => {
+    const log = vi.spyOn(console, 'log').mockImplementation(() => undefined)
+    const wrapper = mount(XenpaperLangTestingView)
+    await wrapper.findAll('button')[1]!.trigger('click')
+    await wrapper.findAll('button')[2]!.trigger('click')
+
+    expect(log).toHaveBeenCalledWith(
+      expect.objectContaining({
+        kind: 'note',
+        pitch: expect.objectContaining({ staffPosition: 0 }),
+      }),
+    )
+    log.mockRestore()
+  })
 })
