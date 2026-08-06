@@ -59,6 +59,12 @@ export interface IntervalSpelling {
   readonly quality: string
   readonly number: bigint | Fraction
   readonly raw: string
+  readonly inflections?: readonly FjsSpelling[]
+}
+
+export interface FjsSpelling {
+  readonly direction: 'numerator' | 'denominator'
+  readonly prime: bigint
 }
 
 export interface PitchSpelling {

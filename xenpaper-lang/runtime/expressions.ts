@@ -1,10 +1,11 @@
 import type { Expression } from '../parser.generated.js'
+import { Fraction } from 'xen-dev-utils/fraction'
 import type { Diagnostic } from '../diagnostics'
 import { Value } from '../value'
 import { evaluateLiteral, type NumericLiteralNode } from './literals'
 import type { EvaluatedLiteral, SourceOrigin } from './types'
 import type { PitchContext, PrimeMapping } from './types'
-import { DEFAULT_PITCH_CONTEXT, evaluateIntervalLiteral, evaluatePitchLiteral, spellPitchDifference } from './pitches'
+import { DEFAULT_PITCH_CONTEXT, evaluateIntervalLiteral, evaluatePitchLiteral, scalePitchOffset, spellPitchDifference } from './pitches'
 
 export type ExpressionEvaluationResult =
   | { readonly value: EvaluatedLiteral; readonly diagnostics: readonly Diagnostic[] }
@@ -93,6 +94,17 @@ function multiplyOrDivide(
   }
   if (divide && right.kind === 'pitchOffset') {
     throw new TypeError('A scalar cannot be divided by a pitch offset.')
+  }
+  if (left.kind === 'pitchOffset' || right.kind === 'pitchOffset') {
+    const scalar = left.kind === 'pitchOffset' ? right : left
+    const offset = left.kind === 'pitchOffset' ? left : right
+    if (scalar.kind !== 'scalar' || offset.kind !== 'pitchOffset') throw new TypeError('Pitch offsets require a scalar factor.')
+    const factor = scalar.value.exactRational()
+    if (!factor) throw new TypeError('Pitch offsets can only be scaled by exact rational scalars.')
+    return {
+      ...scalePitchOffset(offset, divide ? new Fraction(1).div(factor) : factor),
+      origins: operatorOrigins(left, right, node),
+    }
   }
   const kind = left.kind === 'pitchOffset' || right.kind === 'pitchOffset' ? 'pitchOffset' : 'scalar'
   return result(

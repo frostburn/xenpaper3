@@ -4,6 +4,7 @@ import type { Diagnostic } from '../diagnostics'
 import { Value } from '../value'
 import type {
   AbsolutePitchValue,
+  IntervalSpelling,
   PitchOffsetValue,
   PrimeMapping,
   PrimeMonzo,
@@ -27,6 +28,55 @@ export function edoMapping(divisions: number): PrimeMapping {
 
 function formula(entries: readonly (readonly [number, number])[]): Map<number, Fraction> {
   return new Map(entries.filter(([, exponent]) => exponent).map(([prime, exponent]) => [prime, new Fraction(exponent)]))
+}
+
+function addExponent(target: Map<number, Fraction>, prime: number, amount: Fraction | number) {
+  const combined = (target.get(prime) ?? new Fraction(0)).add(amount)
+  if (combined.n) target.set(prime, combined)
+  else target.delete(prime)
+}
+
+const commaCache = new Map<number, PrimeMonzo>()
+
+/** Return the nearest 3-limit representative divided by an odd prime. */
+export function fjsComma(prime: number): PrimeMonzo {
+  const cached = commaCache.get(prime)
+  if (cached) return cached
+  if (!Number.isSafeInteger(prime) || prime < 5 || !isPrime(prime)) throw new TypeError(`Invalid FJS prime ${prime}.`)
+  // Canonical low-prime FJS commas; unconstrained Diophantine searches would
+  // prefer impractically complex ratios such as 3^45/(2^69*5).
+  if (prime === 5) {
+    const result = formula([[2, -4], [3, 4], [5, -1]])
+    commaCache.set(prime, result)
+    return result
+  }
+  if (prime === 7) {
+    const result = formula([[2, 6], [3, -2], [7, -1]])
+    commaCache.set(prime, result)
+    return result
+  }
+  let best: { a: number; b: number; distance: number } | undefined
+  for (let b = -64; b <= 64; b++) {
+    const a = Math.round(Math.log2(prime) - b * Math.log2(3))
+    const distance = Math.abs(a + b * Math.log2(3) - Math.log2(prime))
+    if (!best || distance < best.distance - 1e-14 || (Math.abs(distance - best.distance) < 1e-14 && (Math.abs(b) < Math.abs(best.b) || (Math.abs(b) === Math.abs(best.b) && b < best.b)))) best = { a, b, distance }
+  }
+  const result = formula([[2, best!.a], [3, best!.b], [prime, -1]])
+  commaCache.set(prime, result)
+  return result
+}
+
+function isPrime(value: number) {
+  for (let divisor = 2; divisor * divisor <= value; divisor++) if (value % divisor === 0) return false
+  return true
+}
+
+function applyInflections(result: Map<number, Fraction>, inflections: readonly { direction: string; prime: string }[]) {
+  for (const inflection of inflections) {
+    const prime = Number(inflection.prime)
+    const sign = inflection.direction === 'numerator' ? -1 : 1
+    for (const [componentPrime, exponent] of fjsComma(prime)) addExponent(result, componentPrime, new Fraction(exponent).mul(sign))
+  }
 }
 
 const NOMINALS: Readonly<Record<string, readonly (readonly [number, number])[]>> = {
@@ -176,6 +226,7 @@ export function evaluatePitchLiteral(node: PitchLiteral, input: PrimeMapping | P
     result.set(2, (result.get(2) ?? new Fraction(0)).sub(11 * chromatic))
     result.set(3, (result.get(3) ?? new Fraction(0)).add(7 * chromatic))
   }
+  applyInflections(result, node.inflections)
   let rootOffset = mapFormula(result, context.mapping)
   if (context.rootFormula.size) rootOffset = rootOffset.sub(mapFormula(context.rootFormula, context.mapping))
   for (const modifier of node.modifiers) {
@@ -215,6 +266,7 @@ export function evaluateIntervalLiteral(node: IntervalLiteral, input: PrimeMappi
     result.set(2, (result.get(2) ?? new Fraction(0)).sub(11 * chromatic))
     result.set(3, (result.get(3) ?? new Fraction(0)).add(7 * chromatic))
   }
+  applyInflections(result, node.inflections)
   const spellingNumber = number.d === 1 ? BigInt(number.n) : number
   let value = mapFormula(result, context.mapping)
   for (const modifier of node.modifiers) {
@@ -223,7 +275,65 @@ export function evaluateIntervalLiteral(node: IntervalLiteral, input: PrimeMappi
     else if (modifier.kind === 'lift') value = value.add(context.lift)
     else if (modifier.kind === 'drop') value = value.sub(context.lift)
   }
-  return { kind: 'pitchOffset', value, formula: result, spelling: { quality: node.quality, number: spellingNumber, raw: node.raw }, origins: origin(node) }
+  return {
+    kind: 'pitchOffset', value, formula: result,
+    spelling: {
+      quality: node.quality, number: spellingNumber, raw: node.raw,
+      inflections: node.inflections.map((inflection) => ({ direction: inflection.direction, prime: BigInt(inflection.prime) })),
+    },
+    origins: origin(node),
+  }
+}
+
+/** Scale both the sounding displacement and its exact FJS formula. */
+export function scalePitchOffset(offset: PitchOffsetValue, factor: Fraction): PitchOffsetValue {
+  const scaledFormula = offset.formula
+    ? new Map([...offset.formula].map(([prime, exponent]) => [prime, new Fraction(exponent).mul(factor)]))
+    : undefined
+  return {
+    ...offset,
+    value: offset.value.mul(new Value(factor)),
+    formula: scaledFormula,
+    spelling: scaledFormula ? spellIntervalFormula(scaledFormula) : undefined,
+  }
+}
+
+function spellIntervalFormula(input: PrimeMonzo): IntervalSpelling | undefined {
+  const base = new Map([...input].map(([prime, exponent]) => [prime, new Fraction(exponent)]))
+  const inflections: { direction: 'numerator' | 'denominator'; prime: bigint }[] = []
+  for (const [prime, exponent] of input) {
+    if (prime < 5) continue
+    if (exponent.d !== 1) return undefined
+    const direction = exponent.compare(0) > 0 ? 'numerator' : 'denominator'
+    const count = Math.abs(exponent.n)
+    const sign = direction === 'numerator' ? -1 : 1
+    for (let index = 0; index < count; index++) {
+      inflections.push({ direction, prime: BigInt(prime) })
+      for (const [componentPrime, component] of fjsComma(prime)) addExponent(base, componentPrime, new Fraction(component).mul(-sign))
+    }
+  }
+  const twos = base.get(2) ?? new Fraction(0)
+  const threes = base.get(3) ?? new Fraction(0)
+  if ([...base].some(([prime, exponent]) => prime > 3 && exponent.n)) return undefined
+  const stepspan = twos.mul(7).add(threes.mul(11))
+  if (stepspan.d !== 1 || stepspan.compare(0) < 0) return undefined
+  const span = stepspan.n
+  const simple = (span % 7) + 1
+  const number = BigInt(simple + 7 * Math.floor(span / 7))
+  const natural = formula(NOMINALS[['C', 'D', 'E', 'F', 'G', 'A', 'B'][simple - 1]!]!)
+  addExponent(natural, 2, Math.floor(span / 7))
+  const chromatic = threes.sub(natural.get(3) ?? 0).div(7)
+  if (chromatic.d !== 1) return undefined
+  const chromaticSteps = chromatic.s * chromatic.n
+  const perfect = simple === 1 || simple === 4 || simple === 5
+  let quality: string
+  if (perfect) quality = chromaticSteps === 0 ? 'P' : chromaticSteps > 0 ? 'A'.repeat(chromaticSteps) : 'd'.repeat(-chromaticSteps)
+  else if (chromaticSteps === 0) quality = 'M'
+  else if (chromaticSteps === -1) quality = 'm'
+  else if (chromaticSteps > 0) quality = 'A'.repeat(chromaticSteps)
+  else quality = 'd'.repeat(-chromaticSteps - 1)
+  const suffix = inflections.map(({ direction, prime }) => `${direction === 'numerator' ? '^' : '_'}${prime}`).join('')
+  return { quality, number, inflections, raw: `${quality}${number}${suffix}` }
 }
 
 export type PitchEvaluationResult = { readonly value: AbsolutePitchValue | PitchOffsetValue; readonly diagnostics: readonly Diagnostic[] }
