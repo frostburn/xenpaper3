@@ -140,7 +140,7 @@ export interface ShapeBase {
 
 export interface AttackShape extends ShapeBase {
   readonly kind: 'attack'
-  readonly pitch: PitchOffsetValue
+  readonly pitch: PitchOffsetValue | (AbsolutePitchValue & { readonly value: Value })
   readonly rootStaffPosition: number
 }
 
