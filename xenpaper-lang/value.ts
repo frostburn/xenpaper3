@@ -182,7 +182,8 @@ class ExactMonomial {
     if (this.exponents.has(0)) {
       return 0
     }
-    if (this.exponents.get(-1) % 2) {
+    const signExponent = this.exponents.get(-1)
+    if (signExponent !== undefined && new Fraction(signExponent).n % 2) {
       return -1
     }
     return 1
