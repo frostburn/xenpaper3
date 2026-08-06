@@ -86,6 +86,8 @@ export interface PitchContext {
   readonly rootFormula: PrimeMonzo
   readonly up: Value
   readonly lift: Value
+  /** Diatonic staff steps from middle C occupied by the context root. */
+  readonly rootStaffPosition: number
 }
 
 export type EvaluatedLiteral = ScalarValue | PitchOffsetValue | AbsolutePitchValue
@@ -95,7 +97,6 @@ export interface StaffPitch {
   /** Diatonic steps from middle C (C4). */
   readonly staffPosition: number
   readonly nominal: 'C' | 'D' | 'E' | 'F' | 'G' | 'A' | 'B'
-  readonly octave: number
   /** Conventional 12-EDO accidental used for an otherwise unspelled value. */
   readonly accidental?: string
   /** Exact written accidental tokens, when the source supplied a spelling. */
@@ -107,6 +108,13 @@ export interface StaffPitch {
   /** Sounding distance above middle C, retained for positioning refinements by a renderer. */
   readonly cents: number
 }
+
+export type StaffNotationShape =
+  | { readonly kind: 'note'; readonly pitch: StaffPitch; readonly duration: Fraction }
+  | { readonly kind: 'rest'; readonly duration: Fraction; readonly generated: boolean }
+  | { readonly kind: 'continue'; readonly duration: Fraction }
+  | { readonly kind: 'sequence'; readonly duration: Fraction; readonly children: readonly StaffNotationShape[] }
+  | { readonly kind: 'parallel'; readonly duration: Fraction; readonly branches: readonly StaffNotationShape[] }
 
 export interface SourceOrigin {
   readonly location: LocationRange
@@ -128,6 +136,7 @@ export interface ShapeBase {
 export interface AttackShape extends ShapeBase {
   readonly kind: 'attack'
   readonly pitch: PitchOffsetValue
+  readonly rootStaffPosition: number
 }
 
 export interface RestShape extends ShapeBase {

@@ -1,6 +1,6 @@
 import { Fraction } from 'xen-dev-utils/fraction'
 import { Value } from '../value'
-import type { EvaluatedLiteral, FjsSpelling, PrimeMonzo, StaffPitch } from './types'
+import type { EvaluatedLiteral, FjsSpelling, PrimeMonzo, ScoreShape, StaffNotationShape, StaffPitch } from './types'
 
 const LETTERS = ['C', 'D', 'E', 'F', 'G', 'A', 'B'] as const
 const SEMITONES = [0, 2, 4, 5, 7, 9, 11] as const
@@ -85,8 +85,19 @@ function soundingValue(value: EvaluatedLiteral): Value {
 }
 
 /** Convert an evaluated Xenpaper pitch/interval into renderer-independent staff data. */
-export function constructStaffNotation(value: EvaluatedLiteral): StaffPitch {
+export interface StaffNotationOptions {
+  readonly rootStaffPosition?: number
+}
+
+function naturalCents(position: number): number {
+  const octave = Math.floor(position / 7)
+  const letter = ((position % 7) + 7) % 7
+  return octave * 1200 + SEMITONES[letter]! * 100
+}
+
+export function constructStaffNotation(value: EvaluatedLiteral, options: StaffNotationOptions = {}): StaffPitch {
   const cents = soundingValue(value).valueOf()
+  const rootPosition = options.rootStaffPosition ?? 0
   if (!Number.isFinite(cents)) throw new RangeError('Staff pitch must be finite.')
 
   if (value.kind === 'absolutePitch') {
@@ -96,11 +107,9 @@ export function constructStaffNotation(value: EvaluatedLiteral): StaffPitch {
     if (greekRank !== undefined) {
       const octaveOffset = Math.floor(cents / 1200)
       const position = Math.ceil(greekRank) + octaveOffset * 7
-      const octave = 4 + Math.floor(position / 7)
       return {
         staffPosition: position,
         nominal: LETTERS[((position % 7) + 7) % 7]!,
-        octave,
         ...decorations(value),
         notehead: 'triangle-down',
         cents,
@@ -114,7 +123,6 @@ export function constructStaffNotation(value: EvaluatedLiteral): StaffPitch {
       return {
         staffPosition: position,
         nominal: LETTERS[latin]!,
-        octave: 4 + Math.floor(position / 7),
         ...decorations(value, chromatic),
         notehead: 'normal',
         cents,
@@ -125,23 +133,20 @@ export function constructStaffNotation(value: EvaluatedLiteral): StaffPitch {
   if (value.kind === 'pitchOffset' && value.spelling) {
     const numericNumber = Number(value.spelling.number.valueOf())
     const zeroBased = numericNumber - 1
-    const lowerPosition = Math.floor(zeroBased)
-    const position = Math.ceil(zeroBased)
+    const position = rootPosition + Math.ceil(zeroBased)
     const letter = ((position % 7) + 7) % 7
-    const octaveOffset = Math.floor(position / 7)
-    const naturalCents = octaveOffset * 1200 + SEMITONES[letter]! * 100
-    const chromatic = Math.round((cents - naturalCents) / 100)
+    const chromatic = Math.round((naturalCents(rootPosition) + cents - naturalCents(position)) / 100)
     return {
       staffPosition: position,
       nominal: LETTERS[letter]!,
-      octave: 4 + octaveOffset,
       ...decorations(value, chromatic),
-      notehead: lowerPosition === position ? 'normal' : 'triangle-down',
+      notehead: Number.isInteger(zeroBased) ? 'normal' : 'triangle-down',
       cents,
     }
   }
 
-  const midiOffset = Math.round(cents / 100)
+  const absoluteCents = cents + naturalCents(rootPosition)
+  const midiOffset = Math.round(absoluteCents / 100)
   const octaveOffset = Math.floor(midiOffset / 12)
   const pitchClass = ((midiOffset % 12) + 12) % 12
   let letter = 0
@@ -157,11 +162,26 @@ export function constructStaffNotation(value: EvaluatedLiteral): StaffPitch {
   return {
     staffPosition: position,
     nominal: LETTERS[letter]!,
-    octave: 4 + Math.floor(position / 7),
     ...(accidental ? { accidental } : {}),
     ...(inflections ? { inflections } : {}),
     notehead: 'normal',
     cents,
+  }
+}
+
+/** Project a duration-bearing score tree, including rests, into staff data. */
+export function constructStaffNotationShape(shape: ScoreShape): StaffNotationShape {
+  switch (shape.kind) {
+    case 'attack':
+      return { kind: 'note', pitch: constructStaffNotation(shape.pitch, { rootStaffPosition: shape.rootStaffPosition }), duration: shape.duration }
+    case 'rest':
+      return { kind: 'rest', duration: shape.duration, generated: shape.generated }
+    case 'continue':
+      return { kind: 'continue', duration: shape.duration }
+    case 'sequence':
+      return { kind: 'sequence', duration: shape.duration, children: shape.children.map(constructStaffNotationShape) }
+    case 'parallel':
+      return { kind: 'parallel', duration: shape.duration, branches: shape.branches.map(constructStaffNotationShape) }
   }
 }
 
