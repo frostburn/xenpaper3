@@ -6,20 +6,29 @@ const props = defineProps<{
   notation?: StaffNotationShape
 }>()
 
-type StaffItem = { kind: 'note'; pitch: StaffPitch; tiedFromPrevious: boolean } | { kind: 'rest' }
+type StaffItem =
+  | { kind: 'note'; pitch: StaffPitch; tiedFromIndex?: number }
+  | { kind: 'rest' }
+  | { kind: 'barline' }
 
 const items = computed(() => {
   const result: StaffItem[] = []
   let activePitch: StaffPitch | undefined
+  let activeNoteIndex: number | undefined
   const visit = (shape: StaffNotationShape) => {
     if (shape.kind === 'note') {
       activePitch = shape.pitch
-      result.push({ kind: 'note', pitch: shape.pitch, tiedFromPrevious: false })
+      activeNoteIndex = result.length
+      result.push({ kind: 'note', pitch: shape.pitch })
     } else if (shape.kind === 'continue' && activePitch) {
-      result.push({ kind: 'note', pitch: activePitch, tiedFromPrevious: true })
+      result.push({ kind: 'note', pitch: activePitch, tiedFromIndex: activeNoteIndex })
+      activeNoteIndex = result.length - 1
     } else if (shape.kind === 'rest') {
       activePitch = undefined
+      activeNoteIndex = undefined
       result.push({ kind: 'rest' })
+    } else if (shape.kind === 'barline') {
+      result.push({ kind: 'barline' })
     } else if (shape.kind === 'sequence') shape.children.forEach(visit)
     else if (shape.kind === 'parallel') shape.branches.forEach(visit)
   }
@@ -72,11 +81,19 @@ const ledgerPositions = (position: number) => {
     <text v-if="!items.length" class="empty-message" x="70" y="126">No notation loaded</text>
     <g v-for="(item, index) in items" :key="index">
       <text v-if="item.kind === 'rest'" class="rest" :x="x(index)" y="79">𝄽</text>
+      <line
+        v-else-if="item.kind === 'barline'"
+        class="barline"
+        :x1="x(index)"
+        :x2="x(index)"
+        y1="52"
+        y2="100"
+      />
       <template v-else>
         <path
-          v-if="item.tiedFromPrevious"
+          v-if="item.tiedFromIndex !== undefined"
           class="tie"
-          :d="`M ${x(index - 1) + 6} ${y(item.pitch.staffPosition) + 7} Q ${x(index) - 26} ${y(item.pitch.staffPosition) + 17} ${x(index) - 6} ${y(item.pitch.staffPosition) + 7}`"
+          :d="`M ${x(item.tiedFromIndex) + 6} ${y(item.pitch.staffPosition) + 7} Q ${(x(item.tiedFromIndex) + x(index)) / 2} ${y(item.pitch.staffPosition) + 17} ${x(index) - 6} ${y(item.pitch.staffPosition) + 7}`"
         />
         <line
           v-for="position in ledgerPositions(item.pitch.staffPosition)"
@@ -88,7 +105,7 @@ const ledgerPositions = (position: number) => {
           :y2="y(position)"
         />
         <text
-          v-if="(item.pitch.inflections?.length || item.pitch.accidentals.length) && !item.tiedFromPrevious"
+          v-if="(item.pitch.inflections?.length || item.pitch.accidentals.length) && item.tiedFromIndex === undefined"
           class="pitch-decorations"
           :x="x(index) - 11"
           :y="y(item.pitch.staffPosition) + 5"
@@ -140,6 +157,7 @@ const ledgerPositions = (position: number) => {
 .staff-lines line,
 .ledger-line,
 .stem,
+.barline,
 .tie {
   stroke: currentColor;
   stroke-width: 1.5;

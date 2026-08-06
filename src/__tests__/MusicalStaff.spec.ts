@@ -53,6 +53,24 @@ describe('MusicalStaff', () => {
     expect(wrapper.findAll('.accidental')).toHaveLength(1)
   })
 
+  it('renders barlines without interrupting continued notes', () => {
+    const barred: StaffNotationShape = {
+      kind: 'sequence',
+      duration: notation.duration,
+      children: [
+        notation.children[0]!,
+        { kind: 'barline', duration: { n: 0, d: 1 } as StaffNotationShape['duration'] },
+        { kind: 'continue', duration: notation.duration },
+      ],
+    }
+    const wrapper = mount(MusicalStaff, { props: { notation: barred } })
+
+    expect(wrapper.findAll('.barline')).toHaveLength(1)
+    expect(wrapper.findAll('.notehead')).toHaveLength(2)
+    expect(wrapper.findAll('.tie')).toHaveLength(1)
+    expect(wrapper.get('.tie').attributes('d')).toMatch(/^M 66 /)
+  })
+
   it('renders ASCII-style operators and flavored numeric FJS inflections before accidentals', () => {
     const decorated: StaffNotationShape = {
       kind: 'note',
