@@ -69,6 +69,20 @@ describe('staff notation construction', () => {
     })
   })
 
+  it('retains source nominal spelling while constructing a score staff', () => {
+    const node = parse('Eb Gam').body[0] as Expression
+    const evaluated = evaluateScoreShape(node)
+    if (!('shape' in evaluated)) throw new Error('Expected shape.')
+
+    expect(constructStaffNotationShape(evaluated.shape)).toMatchObject({
+      kind: 'sequence',
+      children: [
+        { kind: 'note', pitch: { staffPosition: 2, accidentals: ['flat'], notehead: 'normal' } },
+        { kind: 'note', pitch: { staffPosition: 4, accidentals: [], notehead: 'triangle-down' } },
+      ],
+    })
+  })
+
   it('places a unison ratio on the active staff root', () => {
     const node = parse('{D = root} 1/1').body[0] as Expression
     const evaluated = evaluateScoreShape(node)

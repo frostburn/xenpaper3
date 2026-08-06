@@ -6,6 +6,7 @@ import { evaluateExpression } from './expressions'
 import { DEFAULT_PITCH_CONTEXT, applyPitchContextChange } from './pitches'
 import type {
   AttackShape,
+  AbsolutePitchValue,
   ContinueShape,
   ParallelShape,
   PitchOffsetValue,
@@ -69,7 +70,7 @@ function scaleShape(shape: ScoreShape, factor: Fraction): ScoreShape {
 }
 
 function playablePitch(node: Expression, context: PitchContext):
-  | { readonly pitch: PitchOffsetValue; readonly diagnostics: readonly Diagnostic[] }
+  | { readonly pitch: PitchOffsetValue | (AbsolutePitchValue & { readonly value: Value }); readonly diagnostics: readonly Diagnostic[] }
   | { readonly diagnostics: readonly Diagnostic[] } {
   const evaluated = evaluateExpression(node, context)
   if (!('value' in evaluated)) return evaluated
@@ -78,7 +79,7 @@ function playablePitch(node: Expression, context: PitchContext):
   }
   if (evaluated.value.kind === 'absolutePitch') {
     return {
-      pitch: { kind: 'pitchOffset', value: evaluated.value.rootOffset, formula: evaluated.value.formula, origins: evaluated.value.origins },
+      pitch: { ...evaluated.value, value: evaluated.value.rootOffset },
       diagnostics: evaluated.diagnostics,
     }
   }
