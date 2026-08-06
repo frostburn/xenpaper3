@@ -2,6 +2,7 @@ import type { Program } from '../parser.generated.js'
 import type { Diagnostic } from '../diagnostics'
 import type { Value } from '../value'
 import type { LocationRange } from 'peggy'
+import type { Fraction } from 'xen-dev-utils/fraction'
 
 export interface ExpansionStep {
   readonly repeatOffset: number
@@ -55,3 +56,39 @@ export interface SourceOrigin {
     | 'structural'
     | 'generated'
 }
+
+export interface ShapeBase {
+  readonly duration: Fraction
+  readonly origins: readonly SourceOrigin[]
+}
+
+export interface AttackShape extends ShapeBase {
+  readonly kind: 'attack'
+  readonly pitch: PitchOffsetValue
+}
+
+export interface RestShape extends ShapeBase {
+  readonly kind: 'rest'
+  readonly generated: boolean
+}
+
+export interface ContinueShape extends ShapeBase {
+  readonly kind: 'continue'
+}
+
+export interface SequenceShape extends ShapeBase {
+  readonly kind: 'sequence'
+  readonly children: readonly ScoreShape[]
+}
+
+export interface ParallelShape extends ShapeBase {
+  readonly kind: 'parallel'
+  readonly branches: readonly ScoreShape[]
+}
+
+export type ScoreShape =
+  | AttackShape
+  | RestShape
+  | ContinueShape
+  | SequenceShape
+  | ParallelShape
