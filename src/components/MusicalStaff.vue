@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import type { StaffNotationShape, StaffPitch } from '../../xenpaper-lang'
+import type { StaffInflection, StaffNotationShape, StaffPitch } from '../../xenpaper-lang'
 
 const props = defineProps<{
   notation?: StaffNotationShape
@@ -40,6 +40,13 @@ const accidental = (value: string) =>
     'half-flat': '𝄳',
     'half-sharp': '𝄲',
   })[value] ?? value
+
+const inflection = (value: StaffInflection) => {
+  if ('kind' in value) {
+    return { up: '^', down: 'v', lift: '/', drop: '\\' }[value.kind]
+  }
+  return `${value.direction === 'denominator' ? '/' : ''}${value.prime}`
+}
 
 const ledgerPositions = (position: number) => {
   const positions: number[] = []
@@ -81,12 +88,16 @@ const ledgerPositions = (position: number) => {
           :y2="y(position)"
         />
         <text
-          v-if="item.pitch.accidentals.length && !item.tiedFromPrevious"
-          class="accidental"
-          :x="x(index) - 17"
+          v-if="(item.pitch.inflections?.length || item.pitch.accidentals.length) && !item.tiedFromPrevious"
+          class="pitch-decorations"
+          :x="x(index) - 11"
           :y="y(item.pitch.staffPosition) + 5"
         >
-          {{ item.pitch.accidentals.map(accidental).join('') }}
+          <tspan
+            v-for="(value, inflectionIndex) in item.pitch.inflections"
+            :key="`inflection-${inflectionIndex}`"
+            class="inflection"
+          >{{ inflection(value) }}</tspan><tspan v-if="item.pitch.accidentals.length" class="accidental">{{ item.pitch.accidentals.map(accidental).join('') }}</tspan>
         </text>
         <polygon
           v-if="item.pitch.notehead === 'triangle-down'"
@@ -146,10 +157,13 @@ const ledgerPositions = (position: number) => {
   fill: currentColor;
 }
 
-.accidental,
+.pitch-decorations,
 .rest {
   font-size: 18px;
-  text-anchor: middle;
+}
+
+.pitch-decorations {
+  text-anchor: end;
 }
 
 .empty-message {
