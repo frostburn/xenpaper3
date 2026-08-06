@@ -220,6 +220,7 @@ export function evaluateScoreShape(
       pitch: evaluated.pitch,
       duration: pulse,
       origins: evaluated.pitch.origins,
+      rootStaffPosition: context.rootStaffPosition,
     }
     return { shape, diagnostics: evaluated.diagnostics }
   }
