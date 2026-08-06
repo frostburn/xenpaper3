@@ -27,6 +27,8 @@ describe('staff notation construction', () => {
 
   it('uses directed triangular noteheads for Greek nominals', () => {
     expect(notation('Gam')).toMatchObject({ staffPosition: 4, notehead: 'triangle-down' })
+    expect(notation('Bet')).toMatchObject({ staffPosition: 3, notehead: 'triangle-up' })
+    expect(notation('Β')).toMatchObject({ staffPosition: 3, notehead: 'triangle-up' })
     expect(notation("'Gam")).toMatchObject({ staffPosition: 11, notehead: 'triangle-down' })
     expect(notation('Gam#^5c')).toMatchObject({
       accidentals: ['sharp'],
