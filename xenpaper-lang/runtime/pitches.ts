@@ -194,7 +194,17 @@ export function evaluatePitchLiteral(node: PitchLiteral, input: PrimeMapping | P
     else if (modifier.kind === 'lift') rootOffset = rootOffset.add(context.lift)
     else if (modifier.kind === 'drop') rootOffset = rootOffset.sub(context.lift)
   }
-  return { kind: 'absolutePitch', rootOffset, formula: result, spelling: { nominal: node.nominal.value, raw: node.raw }, origins: origin(node) }
+  return {
+    kind: 'absolutePitch', rootOffset, formula: result,
+    spelling: {
+      nominal: node.nominal.value,
+      raw: node.raw,
+      system: node.nominal.system,
+      accidentals: node.accidentals.map((accidental) => accidental.value),
+      inflections: node.inflections.map((inflection) => ({ direction: inflection.direction, prime: BigInt(inflection.prime), flavor: inflection.flavor })),
+    },
+    origins: origin(node),
+  }
 }
 
 export function evaluateIntervalLiteral(node: IntervalLiteral, input: PrimeMapping | PitchContext): PitchOffsetValue {
