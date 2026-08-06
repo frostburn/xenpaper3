@@ -71,6 +71,23 @@ describe('staff notation construction', () => {
     })
   })
 
+  it('carries zero-duration barlines from score construction', () => {
+    const node = parse('C | D').body[0] as Expression
+    const evaluated = evaluateScoreShape(node)
+    if (!('shape' in evaluated)) throw new Error('Expected shape.')
+
+    expect(evaluated.diagnostics).toEqual([])
+    expect(constructStaffNotationShape(evaluated.shape)).toMatchObject({
+      kind: 'sequence',
+      duration: { n: 2, d: 1 },
+      children: [
+        { kind: 'note' },
+        { kind: 'barline', duration: { n: 0, d: 1 } },
+        { kind: 'note' },
+      ],
+    })
+  })
+
   it('retains source nominal spelling while constructing a score staff', () => {
     const node = parse('Eb Gam').body[0] as Expression
     const evaluated = evaluateScoreShape(node)

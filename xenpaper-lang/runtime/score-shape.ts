@@ -7,6 +7,7 @@ import { DEFAULT_PITCH_CONTEXT, applyPitchContextChange, mapFormula } from './pi
 import type {
   AttackShape,
   AbsolutePitchValue,
+  BarlineShape,
   ContinueShape,
   ParallelShape,
   PitchOffsetValue,
@@ -61,6 +62,7 @@ function scaleShape(shape: ScoreShape, factor: Fraction): ScoreShape {
     case 'attack':
     case 'rest':
     case 'continue':
+    case 'barline':
       return { ...shape, duration }
     case 'sequence':
       return { ...shape, duration, children: shape.children.map((child) => scaleShape(child, factor)) }
@@ -124,6 +126,14 @@ export function evaluateScoreShape(
         kind: 'continue',
         duration: pulse,
         origins: [origin(current, 'duration')],
+      }
+      return { shape, diagnostics: [] }
+    }
+    if (current.type === 'Barline') {
+      const shape: BarlineShape = {
+        kind: 'barline',
+        duration: new Fraction(0),
+        origins: [origin(current)],
       }
       return { shape, diagnostics: [] }
     }

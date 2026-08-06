@@ -118,6 +118,7 @@ export type StaffNotationShape =
   | { readonly kind: 'note'; readonly pitch: StaffPitch; readonly duration: Fraction }
   | { readonly kind: 'rest'; readonly duration: Fraction; readonly generated: boolean }
   | { readonly kind: 'continue'; readonly duration: Fraction }
+  | { readonly kind: 'barline'; readonly duration: Fraction }
   | { readonly kind: 'sequence'; readonly duration: Fraction; readonly children: readonly StaffNotationShape[] }
   | { readonly kind: 'parallel'; readonly duration: Fraction; readonly branches: readonly StaffNotationShape[] }
 
@@ -153,6 +154,10 @@ export interface ContinueShape extends ShapeBase {
   readonly kind: 'continue'
 }
 
+export interface BarlineShape extends ShapeBase {
+  readonly kind: 'barline'
+}
+
 export interface SequenceShape extends ShapeBase {
   readonly kind: 'sequence'
   readonly children: readonly ScoreShape[]
@@ -167,5 +172,6 @@ export type ScoreShape =
   | AttackShape
   | RestShape
   | ContinueShape
+  | BarlineShape
   | SequenceShape
   | ParallelShape
