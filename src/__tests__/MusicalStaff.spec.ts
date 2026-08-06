@@ -59,7 +59,7 @@ describe('MusicalStaff', () => {
       duration: notation.duration,
       children: [
         notation.children[0]!,
-        { kind: 'barline', duration: { n: 0, d: 1 } as StaffNotationShape['duration'] },
+        { kind: 'barline', style: 'single', duration: { n: 0, d: 1 } as StaffNotationShape['duration'] },
         { kind: 'continue', duration: notation.duration },
       ],
     }
@@ -69,6 +69,24 @@ describe('MusicalStaff', () => {
     expect(wrapper.findAll('.notehead')).toHaveLength(2)
     expect(wrapper.findAll('.tie')).toHaveLength(1)
     expect(wrapper.get('.tie').attributes('d')).toMatch(/^M 66 /)
+  })
+
+  it('renders double and repeat barlines with repeat dots', () => {
+    const duration = { n: 0, d: 1 } as StaffNotationShape['duration']
+    const structural: StaffNotationShape = {
+      kind: 'sequence',
+      duration,
+      children: [
+        { kind: 'barline', style: 'double', duration },
+        { kind: 'barline', style: 'repeat-start', duration },
+        { kind: 'barline', style: 'repeat-end', duration },
+      ],
+    }
+    const wrapper = mount(MusicalStaff, { props: { notation: structural } })
+
+    expect(wrapper.findAll('.barline--double line')).toHaveLength(2)
+    expect(wrapper.findAll('.barline--repeat-start circle')).toHaveLength(2)
+    expect(wrapper.findAll('.barline--repeat-end circle')).toHaveLength(2)
   })
 
   it('renders ASCII-style operators and flavored numeric FJS inflections before accidentals', () => {

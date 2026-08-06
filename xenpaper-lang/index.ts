@@ -15,6 +15,8 @@ export type { ScoreShapeEvaluationResult, ScoreShapeOptions } from './runtime/sc
 export type {
   AttackShape,
   AbsolutePitchValue,
+  BarlineShape,
+  BarlineStyle,
   ContinueShape,
   EvaluatedLiteral,
   ExpandedNode,

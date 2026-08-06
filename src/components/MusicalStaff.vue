@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import type { StaffInflection, StaffNotationShape, StaffPitch } from '../../xenpaper-lang'
+import type { BarlineStyle, StaffInflection, StaffNotationShape, StaffPitch } from '../../xenpaper-lang'
 
 const props = defineProps<{
   notation?: StaffNotationShape
@@ -9,7 +9,7 @@ const props = defineProps<{
 type StaffItem =
   | { kind: 'note'; pitch: StaffPitch; tiedFromIndex?: number }
   | { kind: 'rest' }
-  | { kind: 'barline' }
+  | { kind: 'barline'; style: BarlineStyle }
 
 const items = computed(() => {
   const result: StaffItem[] = []
@@ -28,7 +28,7 @@ const items = computed(() => {
       activeNoteIndex = undefined
       result.push({ kind: 'rest' })
     } else if (shape.kind === 'barline') {
-      result.push({ kind: 'barline' })
+      result.push({ kind: 'barline', style: shape.style })
     } else if (shape.kind === 'sequence') shape.children.forEach(visit)
     else if (shape.kind === 'parallel') shape.branches.forEach(visit)
   }
@@ -81,14 +81,18 @@ const ledgerPositions = (position: number) => {
     <text v-if="!items.length" class="empty-message" x="70" y="126">No notation loaded</text>
     <g v-for="(item, index) in items" :key="index">
       <text v-if="item.kind === 'rest'" class="rest" :x="x(index)" y="79">𝄽</text>
-      <line
+      <g
         v-else-if="item.kind === 'barline'"
         class="barline"
-        :x1="x(index)"
-        :x2="x(index)"
-        y1="52"
-        y2="100"
-      />
+        :class="`barline--${item.style}`"
+      >
+        <line :x1="x(index) - (item.style === 'single' ? 0 : 3)" :x2="x(index) - (item.style === 'single' ? 0 : 3)" y1="52" y2="100" />
+        <line v-if="item.style !== 'single'" :x1="x(index) + 3" :x2="x(index) + 3" y1="52" y2="100" />
+        <template v-if="item.style === 'repeat-start' || item.style === 'repeat-end'">
+          <circle :cx="x(index) + (item.style === 'repeat-start' ? 10 : -10)" cy="70" r="2.5" />
+          <circle :cx="x(index) + (item.style === 'repeat-start' ? 10 : -10)" cy="82" r="2.5" />
+        </template>
+      </g>
       <template v-else>
         <path
           v-if="item.tiedFromIndex !== undefined"
@@ -157,10 +161,14 @@ const ledgerPositions = (position: number) => {
 .staff-lines line,
 .ledger-line,
 .stem,
-.barline,
+.barline line,
 .tie {
   stroke: currentColor;
   stroke-width: 1.5;
+}
+
+.barline circle {
+  fill: currentColor;
 }
 
 .tie {

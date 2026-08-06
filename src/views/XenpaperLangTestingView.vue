@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref } from 'vue'
+import { Fraction } from 'xen-dev-utils/fraction'
 import {
   constructStaffNotationShape,
   evaluateScoreShape,
@@ -17,14 +18,24 @@ const logParsedOutput = () => {
 
 const populateStaff = () => {
   const program = parse(source.value)
-  const expression = program.body[0]
-  if (!expression) {
+  if (!program.body.length) {
     notation.value = undefined
     return
   }
-  const result = evaluateScoreShape(expression)
-  notation.value = 'shape' in result ? constructStaffNotationShape(result.shape) : undefined
-  if (result.diagnostics.length) console.warn(result.diagnostics)
+  const results = program.body.map((expression) => evaluateScoreShape(expression))
+  const diagnostics = results.flatMap((result) => result.diagnostics)
+  const shapes = results.flatMap((result) => 'shape' in result ? [result.shape] : [])
+  const children = shapes.map((shape) => constructStaffNotationShape(shape))
+  notation.value = children.length === results.length
+    ? children.length === 1
+      ? children[0]
+      : {
+          kind: 'sequence',
+          duration: shapes.reduce((duration, shape) => duration.add(shape.duration), new Fraction(0)),
+          children,
+        }
+    : undefined
+  if (diagnostics.length) console.warn(diagnostics)
 }
 
 const logStaffNotation = () => {
