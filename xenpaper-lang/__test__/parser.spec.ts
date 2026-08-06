@@ -123,6 +123,32 @@ describe("Xenpaper surface grammar", () => {
     expect(items.map((item) => item.degree)).toEqual(["0", "1", "2", "-3"]);
   });
 
+  it("preserves attached plus signs as degree signs after sequence gaps", () => {
+    const program = parse("0 +5");
+    const items = (program.body[0] as SyntaxNode).items as SyntaxNode[];
+
+    expect(items.map((item) => item.type)).toEqual(["DegreeLiteral", "DegreeLiteral"]);
+    expect(items.map((item) => item.degree)).toEqual(["0", "5"]);
+  });
+
+  it("keeps spaced plus signs as binary addition", () => {
+    const expression = parse("0 + 5").body[0];
+
+    expect(expression.type).toBe("BinaryExpression");
+    expect(expression.operator).toBe("+");
+  });
+
+  it("parses full numeric literals as sequence items before degrees", () => {
+    const program = parse(String.raw`3/2 1\12 3.5`);
+    const items = (program.body[0] as SyntaxNode).items as SyntaxNode[];
+
+    expect(items.map((item) => item.type)).toEqual([
+      "RatioLiteral",
+      "EqualDivisionLiteral",
+      "DecimalLiteral",
+    ]);
+  });
+
   it("parses a sequence of degrees followed by binary operation of integers", () => {
     const program = parse("0 1 2 - 3");
     const items = (program.body[0] as SyntaxNode).items as SyntaxNode[];
