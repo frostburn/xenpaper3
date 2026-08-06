@@ -1,5 +1,5 @@
 import { Fraction } from 'xen-dev-utils/fraction'
-import type { IntervalLiteral, PitchLiteral } from '../parser.generated.js'
+import type { IntervalLiteral, PitchContextChange, PitchLiteral } from '../parser.generated.js'
 import type { Diagnostic } from '../diagnostics'
 import { Value } from '../value'
 import type {
@@ -7,6 +7,7 @@ import type {
   PitchOffsetValue,
   PrimeMapping,
   PrimeMonzo,
+  PitchContext,
   SourceOrigin,
 } from './types'
 
@@ -60,6 +61,54 @@ export function mapFormula(monzo: PrimeMonzo, mapping: PrimeMapping): Value {
   return result
 }
 
+export function createPitchContext(mapping: PrimeMapping = DEFAULT_MAPPING): PitchContext {
+  return {
+    mapping,
+    rootFormula: new Map(),
+    up: mapFormula(new Map([[2, new Fraction(-1, 2)], [3, new Fraction(5, 2)], [11, new Fraction(-1)]]), mapping),
+    lift: mapFormula(new Map([[2, new Fraction(1, 2)], [5, new Fraction(1)], [7, new Fraction(-1)]]), mapping),
+  }
+}
+
+export const DEFAULT_PITCH_CONTEXT = createPitchContext()
+
+function asContext(input: PrimeMapping | PitchContext): PitchContext {
+  return 'rootFormula' in input ? input : createPitchContext(input)
+}
+
+/** Apply the stateful subset of a pitch-context block to an immutable context. */
+export function applyPitchContextChange(node: PitchContextChange, input: PitchContext = DEFAULT_PITCH_CONTEXT): PitchContext {
+  let context = input
+  for (const statement of node.statements) {
+    if (statement.type === 'ContextPreset') {
+      const match = /^(\d+)(?:edo|p)$/i.exec(statement.raw)
+      if (!match) throw new TypeError(`Unsupported pitch preset ${statement.raw}.`)
+      const mapping = edoMapping(Number(match[1]))
+      context = { ...createPitchContext(mapping), rootFormula: context.rootFormula }
+      continue
+    }
+    if (statement.type !== 'ContextAssignment') throw new TypeError('Unsupported pitch-context statement.')
+    if (statement.target.type === 'ContextPitchTarget' && statement.value.type === 'Identifier' && statement.value.name === 'root') {
+      const target = evaluatePitchLiteral(statement.target.pitch, { ...context, rootFormula: new Map() })
+      context = { ...context, rootFormula: target.formula }
+      continue
+    }
+    if (statement.target.type === 'ContextOperatorTarget') {
+      const evaluated = statement.value.type === 'IntervalLiteral'
+        ? evaluateIntervalLiteral(statement.value, context)
+        : undefined
+      if (!evaluated) throw new TypeError('Pitch operator assignment requires an interval literal.')
+      if (statement.target.operator === '^') context = { ...context, up: evaluated.value }
+      else if (statement.target.operator === 'v') context = { ...context, up: evaluated.value.neg() }
+      else if (statement.target.operator === '/') context = { ...context, lift: evaluated.value }
+      else context = { ...context, lift: evaluated.value.neg() }
+      continue
+    }
+    throw new TypeError('Unsupported pitch-context assignment.')
+  }
+  return context
+}
+
 const origin = (node: PitchLiteral | IntervalLiteral): readonly SourceOrigin[] => [{ location: node.location, role: 'literal' }]
 
 function shifts(modifiers: readonly { kind: string }[]): number {
@@ -86,7 +135,8 @@ export function spellPitchDifference(left: AbsolutePitchValue, right: AbsolutePi
   return { quality, number, raw: `${quality}${numericNumber}` }
 }
 
-export function evaluatePitchLiteral(node: PitchLiteral, mapping: PrimeMapping): AbsolutePitchValue {
+export function evaluatePitchLiteral(node: PitchLiteral, input: PrimeMapping | PitchContext): AbsolutePitchValue {
+  const context = asContext(input)
   const upper = node.nominal.value.toUpperCase()
   const greekKey = GREEK_SCRIPT[upper] ?? upper
   const entries = node.nominal.system === 'latin' ? NOMINALS[upper] : GREEK_NOMINALS[greekKey]
@@ -126,10 +176,19 @@ export function evaluatePitchLiteral(node: PitchLiteral, mapping: PrimeMapping):
     result.set(2, (result.get(2) ?? new Fraction(0)).sub(11 * chromatic))
     result.set(3, (result.get(3) ?? new Fraction(0)).add(7 * chromatic))
   }
-  return { kind: 'absolutePitch', rootOffset: mapFormula(result, mapping), formula: result, spelling: { nominal: node.nominal.value, raw: node.raw }, origins: origin(node) }
+  let rootOffset = mapFormula(result, context.mapping)
+  if (context.rootFormula.size) rootOffset = rootOffset.sub(mapFormula(context.rootFormula, context.mapping))
+  for (const modifier of node.modifiers) {
+    if (modifier.kind === 'up') rootOffset = rootOffset.add(context.up)
+    else if (modifier.kind === 'down') rootOffset = rootOffset.sub(context.up)
+    else if (modifier.kind === 'lift') rootOffset = rootOffset.add(context.lift)
+    else if (modifier.kind === 'drop') rootOffset = rootOffset.sub(context.lift)
+  }
+  return { kind: 'absolutePitch', rootOffset, formula: result, spelling: { nominal: node.nominal.value, raw: node.raw }, origins: origin(node) }
 }
 
-export function evaluateIntervalLiteral(node: IntervalLiteral, mapping: PrimeMapping): PitchOffsetValue {
+export function evaluateIntervalLiteral(node: IntervalLiteral, input: PrimeMapping | PitchContext): PitchOffsetValue {
+  const context = asContext(input)
   const number = new Fraction(node.number.replace('½', '.5'))
   if (number.compare(1) < 0) throw new TypeError('Interval number must be positive.')
   if (number.mul(2).d !== 1) throw new TypeError('Interval number must be an integer or half-integer.')
@@ -157,7 +216,14 @@ export function evaluateIntervalLiteral(node: IntervalLiteral, mapping: PrimeMap
     result.set(3, (result.get(3) ?? new Fraction(0)).add(7 * chromatic))
   }
   const spellingNumber = number.d === 1 ? BigInt(number.n) : number
-  return { kind: 'pitchOffset', value: mapFormula(result, mapping), formula: result, spelling: { quality: node.quality, number: spellingNumber, raw: node.raw }, origins: origin(node) }
+  let value = mapFormula(result, context.mapping)
+  for (const modifier of node.modifiers) {
+    if (modifier.kind === 'up') value = value.add(context.up)
+    else if (modifier.kind === 'down') value = value.sub(context.up)
+    else if (modifier.kind === 'lift') value = value.add(context.lift)
+    else if (modifier.kind === 'drop') value = value.sub(context.lift)
+  }
+  return { kind: 'pitchOffset', value, formula: result, spelling: { quality: node.quality, number: spellingNumber, raw: node.raw }, origins: origin(node) }
 }
 
 export type PitchEvaluationResult = { readonly value: AbsolutePitchValue | PitchOffsetValue; readonly diagnostics: readonly Diagnostic[] }

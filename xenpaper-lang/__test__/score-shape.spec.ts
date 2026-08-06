@@ -3,6 +3,7 @@ import { Fraction } from 'xen-dev-utils/fraction'
 import { parse, type Expression } from '../parser.generated.js'
 import { evaluateScoreShape } from '../runtime/score-shape'
 import type { ParallelShape, ScoreShape, SequenceShape } from '../runtime/types'
+import { Value } from '../value'
 
 function shape(source: string, pulse: Fraction | number = 1): ScoreShape {
   const node = parse(source).body[0] as Expression
@@ -13,6 +14,15 @@ function shape(source: string, pulse: Fraction | number = 1): ScoreShape {
 }
 
 describe('score-shape timing', () => {
+  it('flows root reassociation through an ordinary sequence', () => {
+    const result = shape('{A = root} A B') as SequenceShape
+    expect(result.children).toHaveLength(2)
+    expect(result.children[0]).toMatchObject({ kind: 'attack' })
+    expect(result.children[1]).toMatchObject({ kind: 'attack' })
+    if (result.children[0]?.kind !== 'attack' || result.children[1]?.kind !== 'attack') throw new Error('Expected attacks.')
+    expect(result.children[0].pitch.value.equals(Value.cents(0))).toBe(true)
+    expect(result.children[1].pitch.value.equals(Value.pitch(new Value(9n, 8n)))).toBe(true)
+  })
   it('sequences atoms in exact pulse-sized beats', () => {
     const result = shape('3/2 4/3 5/4', new Fraction(1, 4)) as SequenceShape
 

@@ -3,6 +3,7 @@ import type { Expression } from '../parser.generated.js'
 import type { Diagnostic } from '../diagnostics'
 import { Value } from '../value'
 import { evaluateExpression } from './expressions'
+import { DEFAULT_PITCH_CONTEXT, applyPitchContextChange } from './pitches'
 import type {
   AttackShape,
   ContinueShape,
@@ -12,10 +13,12 @@ import type {
   ScoreShape,
   SequenceShape,
   SourceOrigin,
+  PitchContext,
 } from './types'
 
 export interface ScoreShapeOptions {
   readonly pulse?: FractionValue
+  readonly pitchContext?: PitchContext
 }
 
 export type ScoreShapeEvaluationResult =
@@ -65,13 +68,19 @@ function scaleShape(shape: ScoreShape, factor: Fraction): ScoreShape {
   }
 }
 
-function playablePitch(node: Expression):
+function playablePitch(node: Expression, context: PitchContext):
   | { readonly pitch: PitchOffsetValue; readonly diagnostics: readonly Diagnostic[] }
   | { readonly diagnostics: readonly Diagnostic[] } {
-  const evaluated = evaluateExpression(node)
+  const evaluated = evaluateExpression(node, context)
   if (!('value' in evaluated)) return evaluated
   if (evaluated.value.kind === 'pitchOffset') {
     return { pitch: evaluated.value, diagnostics: evaluated.diagnostics }
+  }
+  if (evaluated.value.kind === 'absolutePitch') {
+    return {
+      pitch: { kind: 'pitchOffset', value: evaluated.value.rootOffset, formula: evaluated.value.formula, origins: evaluated.value.origins },
+      diagnostics: evaluated.diagnostics,
+    }
   }
   const ratio = evaluated.value.value.exactRational()
   if (!ratio || ratio.compare(0) <= 0) {
@@ -101,7 +110,7 @@ export function evaluateScoreShape(
   const pulse = new Fraction(options.pulse ?? 1)
   if (pulse.compare(0) <= 0) throw new RangeError('pulse must be positive.')
 
-  const visit = (current: Expression): ScoreShapeEvaluationResult => {
+  const visit = (current: Expression, context: PitchContext): ScoreShapeEvaluationResult => {
     if (current.type === 'Rest') {
       return {
         shape: { kind: 'rest', duration: pulse, generated: false, origins: [origin(current)] },
@@ -117,7 +126,17 @@ export function evaluateScoreShape(
       return { shape, diagnostics: [] }
     }
     if (current.type === 'Sequence') {
-      const results = current.items.map(visit)
+      let activeContext = context
+      const results: ScoreShapeEvaluationResult[] = []
+      for (const item of current.items) {
+        if (item.type === 'PitchContextChange') {
+          try {
+            activeContext = applyPitchContextChange(item, activeContext)
+          } catch (error) {
+            results.push({ diagnostics: [{ code: 'XP_CONTEXT', severity: 'error', message: error instanceof Error ? error.message : 'Invalid pitch context.', locations: [item.location] }] })
+          }
+        } else results.push(visit(item, activeContext))
+      }
       const diagnostics = results.flatMap((result) => result.diagnostics)
       if (!results.every(hasShape)) return { diagnostics }
       return {
@@ -126,7 +145,7 @@ export function evaluateScoreShape(
       }
     }
     if (current.type === 'Parallel') {
-      const results = current.branches.map(visit)
+      const results = current.branches.map((branch) => visit(branch, context))
       const diagnostics = results.flatMap((result) => result.diagnostics)
       if (!results.every(hasShape)) return { diagnostics }
       const branches = results.map((result) => result.shape)
@@ -142,7 +161,7 @@ export function evaluateScoreShape(
       }
       return { shape, diagnostics }
     }
-    if (current.type === 'Group') return visit(current.expression)
+    if (current.type === 'Group') return visit(current.expression, context)
     if (current.type === 'NormalizeToSlot') {
       if (!current.expression) {
         return {
@@ -150,7 +169,7 @@ export function evaluateScoreShape(
           diagnostics: [],
         }
       }
-      const evaluated = visit(current.expression)
+      const evaluated = visit(current.expression, context)
       if (!('shape' in evaluated)) return evaluated
       if (!evaluated.shape.duration.n) {
         return {
@@ -171,7 +190,7 @@ export function evaluateScoreShape(
       }
     }
     if (current.type === 'PostfixExpression') {
-      const evaluated = visit(current.expression)
+      const evaluated = visit(current.expression, context)
       if (!('shape' in evaluated)) return evaluated
       const continuations = current.marks.filter((mark) => mark.type === 'DetachedContinue')
       if (!continuations.length) return evaluated
@@ -191,7 +210,10 @@ export function evaluateScoreShape(
       }
     }
 
-    const evaluated = playablePitch(current)
+    if (current.type === 'PitchContextChange') {
+      return { shape: sequence([], [origin(current, 'context')]), diagnostics: [] }
+    }
+    const evaluated = playablePitch(current, context)
     if (!('pitch' in evaluated)) return evaluated
     const shape: AttackShape = {
       kind: 'attack',
@@ -202,5 +224,5 @@ export function evaluateScoreShape(
     return { shape, diagnostics: evaluated.diagnostics }
   }
 
-  return visit(node)
+  return visit(node, options.pitchContext ?? DEFAULT_PITCH_CONTEXT)
 }

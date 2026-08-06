@@ -200,7 +200,11 @@ class ExactPitch {
   readonly logPrimes: SparseMonzo
 
   constructor(logPrimes: SparseMonzo = new Map()) {
-    this.logPrimes = new Map(logPrimes)
+    const normalized = new Map(logPrimes)
+    for (const [prime, exponent] of normalized) {
+      if (!new Fraction(exponent).n) normalized.delete(prime)
+    }
+    this.logPrimes = normalized
   }
 
   static fromCents(cents: FractionValue): ExactPitch {

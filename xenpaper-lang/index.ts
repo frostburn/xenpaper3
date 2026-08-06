@@ -4,7 +4,7 @@ export { expandRepeats } from './runtime/repeat-expansion'
 export { decimalFraction, evaluateLiteral } from './runtime/literals'
 export type { LiteralEvaluationResult, NumericLiteralNode } from './runtime/literals'
 export { evaluateExpression } from './runtime/expressions'
-export { DEFAULT_MAPPING, edoMapping, evaluateIntervalLiteral, evaluatePitchLiteral, mapFormula, spellPitchDifference } from './runtime/pitches'
+export { DEFAULT_MAPPING, DEFAULT_PITCH_CONTEXT, applyPitchContextChange, createPitchContext, edoMapping, evaluateIntervalLiteral, evaluatePitchLiteral, mapFormula, spellPitchDifference } from './runtime/pitches'
 export type { ExpressionEvaluationResult } from './runtime/expressions'
 export { evaluateScoreShape } from './runtime/score-shape'
 export type { ScoreShapeEvaluationResult, ScoreShapeOptions } from './runtime/score-shape'
@@ -25,6 +25,7 @@ export type {
   IntervalSpelling,
   PrimeMapping,
   PrimeMonzo,
+  PitchContext,
   ParallelShape,
   RestShape,
   ScoreShape,

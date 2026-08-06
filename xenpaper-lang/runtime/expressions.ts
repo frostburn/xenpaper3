@@ -3,8 +3,8 @@ import type { Diagnostic } from '../diagnostics'
 import { Value } from '../value'
 import { evaluateLiteral, type NumericLiteralNode } from './literals'
 import type { EvaluatedLiteral, SourceOrigin } from './types'
-import type { PrimeMapping } from './types'
-import { DEFAULT_MAPPING, evaluateIntervalLiteral, evaluatePitchLiteral, spellPitchDifference } from './pitches'
+import type { PitchContext, PrimeMapping } from './types'
+import { DEFAULT_PITCH_CONTEXT, evaluateIntervalLiteral, evaluatePitchLiteral, spellPitchDifference } from './pitches'
 
 export type ExpressionEvaluationResult =
   | { readonly value: EvaluatedLiteral; readonly diagnostics: readonly Diagnostic[] }
@@ -147,7 +147,7 @@ function binary(
 }
 
 /** Evaluate the arithmetic subset of the parser AST without throwing for source errors. */
-export function evaluateExpression(node: Expression, mapping: PrimeMapping = DEFAULT_MAPPING): ExpressionEvaluationResult {
+export function evaluateExpression(node: Expression, mapping: PrimeMapping | PitchContext = DEFAULT_PITCH_CONTEXT): ExpressionEvaluationResult {
   try {
     if (isNumericLiteral(node)) {
       if (node.type === 'EqualDivisionLiteral' && node.equave) {
