@@ -52,4 +52,37 @@ describe('MusicalStaff', () => {
     expect(wrapper.findAll('.tie')).toHaveLength(2)
     expect(wrapper.findAll('.accidental')).toHaveLength(1)
   })
+
+  it('renders ASCII-style operator and numeric FJS inflections before accidentals', () => {
+    const decorated: StaffNotationShape = {
+      kind: 'note',
+      duration: notation.duration,
+      pitch: {
+        staffPosition: 2,
+        inflections: [
+          { kind: 'up' },
+          { kind: 'down' },
+          { kind: 'lift' },
+          { kind: 'drop' },
+          { direction: 'numerator', prime: 5n },
+          { direction: 'denominator', prime: 7n },
+        ],
+        accidentals: ['flat'],
+        notehead: 'normal',
+        cents: 0,
+      },
+    }
+    const wrapper = mount(MusicalStaff, { props: { notation: decorated } })
+
+    expect(wrapper.findAll('.inflection').map((element) => element.text())).toEqual([
+      '^',
+      'v',
+      '/',
+      '\\',
+      '5',
+      '/7',
+    ])
+    expect(wrapper.get('.pitch-decorations').text()).toBe('^v/\\5/7♭')
+    expect(wrapper.get('.pitch-decorations').element.lastElementChild?.classList.contains('accidental')).toBe(true)
+  })
 })
