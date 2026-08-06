@@ -158,4 +158,16 @@ describe('arithmetic expression evaluation', () => {
     expect(a.value.rootOffset.equals(Value.cents(0))).toBe(true)
     expect(b.value.rootOffset.equals(Value.pitch(new Value(9n, 8n)))).toBe(true)
   })
+
+  it('applies FJS inflections and normalizes scaled interval spelling', () => {
+    const e5 = evaluate('E^5')
+    if (e5.kind !== 'absolutePitch') throw new Error('Expected a pitch.')
+    expect(e5.rootOffset.equals(Value.pitch(new Value(5n, 4n)))).toBe(true)
+
+    const doubled = evaluate('2 * m3_5')
+    expect(doubled.kind).toBe('pitchOffset')
+    if (doubled.kind !== 'pitchOffset') throw new Error('Expected an interval.')
+    expect(doubled.value.equals(Value.pitch(new Value(36n, 25n)))).toBe(true)
+    expect(doubled.spelling?.raw).toBe('d5_5_5')
+  })
 })
