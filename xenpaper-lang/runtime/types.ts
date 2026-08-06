@@ -87,6 +87,22 @@ export interface PitchContext {
 
 export type EvaluatedLiteral = ScalarValue | PitchOffsetValue | AbsolutePitchValue
 
+/** Renderer-independent description of a note on a treble/bass staff. */
+export interface StaffPitch {
+  /** Diatonic steps from middle C (C4). */
+  readonly staffPosition: number
+  readonly nominal: 'C' | 'D' | 'E' | 'F' | 'G' | 'A' | 'B'
+  readonly octave: number
+  /** Conventional 12-EDO accidental used for an otherwise unspelled value. */
+  readonly accidental?: 'sharp' | 'flat'
+  /** FJS suffixes, such as the `^5` in A^5. */
+  readonly inflections?: readonly FjsSpelling[]
+  /** Greek/interordinal pitches use a triangular head pointing at the other neighbouring line/space. */
+  readonly notehead: 'normal' | 'triangle-up' | 'triangle-down'
+  /** Sounding distance above middle C, retained for positioning refinements by a renderer. */
+  readonly cents: number
+}
+
 export interface SourceOrigin {
   readonly location: LocationRange
   readonly role:
