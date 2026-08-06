@@ -219,6 +219,15 @@ describe("Xenpaper surface grammar", () => {
     expect((items[1].modifiers as SyntaxNode[]).map((modifier) => modifier.raw)).toEqual(["'"]);
   });
 
+  it("sequences a pitch with an attached up modifier instead of treating it as power", () => {
+    const expression = parse("C ^D").body[0];
+    const items = expression.items as SyntaxNode[];
+
+    expect(expression.type).toBe("Sequence");
+    expect(items.map((item) => item.type)).toEqual(["PitchLiteral", "PitchLiteral"]);
+    expect((items[1].modifiers as SyntaxNode[]).map((modifier) => modifier.raw)).toEqual(["^"]);
+  });
+
   it("supports multiple augmentation and diminution of pitch offsets", () => {
     const program = parse("AAA4 dd5");
     const items = (program.body[0] as SyntaxNode).items as SyntaxNode[];
