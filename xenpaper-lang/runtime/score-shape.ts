@@ -3,7 +3,7 @@ import type { Expression } from '../parser.generated.js'
 import type { Diagnostic } from '../diagnostics'
 import { Value } from '../value'
 import { evaluateExpression } from './expressions'
-import { DEFAULT_PITCH_CONTEXT, applyPitchContextChange } from './pitches'
+import { DEFAULT_PITCH_CONTEXT, applyPitchContextChange, mapFormula } from './pitches'
 import type {
   AttackShape,
   AbsolutePitchValue,
@@ -78,8 +78,9 @@ function playablePitch(node: Expression, context: PitchContext):
     return { pitch: evaluated.value, diagnostics: evaluated.diagnostics }
   }
   if (evaluated.value.kind === 'absolutePitch') {
+    const absoluteRootOffset = evaluated.value.rootOffset.add(mapFormula(context.rootFormula, context.mapping))
     return {
-      pitch: { ...evaluated.value, value: evaluated.value.rootOffset },
+      pitch: { ...evaluated.value, rootOffset: absoluteRootOffset, value: evaluated.value.rootOffset },
       diagnostics: evaluated.diagnostics,
     }
   }

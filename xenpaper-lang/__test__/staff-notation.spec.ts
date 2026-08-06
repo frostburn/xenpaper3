@@ -92,4 +92,15 @@ describe('staff notation construction', () => {
     const staff = constructStaffNotationShape(evaluated.shape)
     expect(staff).toMatchObject({ kind: 'sequence', children: [{ kind: 'note', pitch: { staffPosition: 1 } }] })
   })
+
+  it('restores the active root when engraving a spelled nominal', () => {
+    const node = parse('{A = root} A').body[0] as Expression
+    const evaluated = evaluateScoreShape(node)
+    if (!('shape' in evaluated)) throw new Error('Expected shape.')
+
+    expect(constructStaffNotationShape(evaluated.shape)).toMatchObject({
+      kind: 'sequence',
+      children: [{ kind: 'note', pitch: { staffPosition: 5, accidentals: [], notehead: 'normal' } }],
+    })
+  })
 })
