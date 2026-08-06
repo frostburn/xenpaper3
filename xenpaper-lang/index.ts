@@ -9,6 +9,7 @@ export type { FjsFlavor, FjsInflectionInput } from './runtime/fjs'
 export { DEFAULT_MAPPING, DEFAULT_PITCH_CONTEXT, applyPitchContextChange, createPitchContext, edoMapping, evaluateIntervalLiteral, evaluatePitchLiteral, mapFormula, scalePitchOffset, spellPitchDifference } from './runtime/pitches'
 export type { ExpressionEvaluationResult } from './runtime/expressions'
 export { evaluateScoreShape } from './runtime/score-shape'
+export { constructStaffNotation, toStaffPitch } from './runtime/staff-notation'
 export type { ScoreShapeEvaluationResult, ScoreShapeOptions } from './runtime/score-shape'
 export type {
   AttackShape,
@@ -35,5 +36,6 @@ export type {
   SequenceShape,
   ShapeBase,
   SourceOrigin,
+  StaffPitch,
 } from './runtime/types'
 export { Dimensions, Value } from './value'
