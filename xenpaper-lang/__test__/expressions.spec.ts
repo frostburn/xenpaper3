@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { Fraction } from 'xen-dev-utils/fraction'
 import { parse, type Expression } from '../parser.generated.js'
 import { evaluateExpression } from '../runtime/expressions'
+import { edoMapping } from '../runtime/pitches'
 import { Value } from '../value'
 
 function expression(source: string): Expression {
@@ -73,5 +74,37 @@ describe('arithmetic expression evaluation', () => {
     expect(evaluateExpression(expression('1 mod 0'))).toMatchObject({
       diagnostics: [{ code: 'XP_DIVISION_BY_ZERO' }],
     })
+  })
+
+  it('evaluates Pythagorean Latin nominals as absolute pitches', () => {
+    const c = evaluate('C')
+    const g = evaluate('G')
+    expect(c.kind).toBe('absolutePitch')
+    expect(g.kind).toBe('absolutePitch')
+    if (c.kind !== 'absolutePitch' || g.kind !== 'absolutePitch') throw new Error('Expected pitches.')
+    expect(c.rootOffset.equals(Value.cents(0))).toBe(true)
+    expect(g.rootOffset.equals(Value.pitch(new Value(3n, 2n)))).toBe(true)
+  })
+
+  it('applies active mappings to formulas without moving C', () => {
+    const evaluated = evaluateExpression(expression('G'), edoMapping(12))
+    expect(evaluated.diagnostics).toEqual([])
+    if (!('value' in evaluated) || evaluated.value.kind !== 'absolutePitch') throw new Error('Expected a pitch.')
+    expect(evaluated.value.rootOffset.equals(Value.cents(700))).toBe(true)
+  })
+
+  it('subtracts absolute pitches as a named relative interval and rejects their sum', () => {
+    const difference = evaluate('G - D')
+    expect(difference.kind).toBe('pitchOffset')
+    if (difference.kind !== 'pitchOffset') throw new Error('Expected an interval.')
+    expect(difference.value.equals(Value.pitch(new Value(4n, 3n)))).toBe(true)
+    expect(difference.spelling).toMatchObject({ quality: 'P', number: 4n, raw: 'P4' })
+    expect(evaluateExpression(expression('G + D'))).toMatchObject({ diagnostics: [{ code: 'XP_TYPE_MISMATCH' }] })
+  })
+
+  it('evaluates compound and chromatically altered relative intervals', () => {
+    expect(evaluate('P4').value.equals(Value.pitch(new Value(4n, 3n)))).toBe(true)
+    expect(evaluate('m10').value.equals(Value.pitch(new Value(64n, 27n)))).toBe(true)
+    expect(evaluate('A1').value.equals(Value.pitch(new Value(2187n, 2048n)))).toBe(true)
   })
 })

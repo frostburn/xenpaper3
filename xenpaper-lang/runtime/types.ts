@@ -40,10 +40,38 @@ export interface ScalarValue {
 export interface PitchOffsetValue {
   readonly kind: 'pitchOffset'
   readonly value: Value
+  readonly formula?: PrimeMonzo
+  readonly spelling?: IntervalSpelling
   readonly origins: readonly SourceOrigin[]
 }
 
-export type EvaluatedLiteral = ScalarValue | PitchOffsetValue
+export interface AbsolutePitchValue {
+  readonly kind: 'absolutePitch'
+  readonly rootOffset: Value
+  readonly formula: PrimeMonzo
+  readonly spelling: PitchSpelling
+  readonly origins: readonly SourceOrigin[]
+}
+
+export type PrimeMonzo = ReadonlyMap<number, Fraction>
+
+export interface IntervalSpelling {
+  readonly quality: string
+  readonly number: bigint
+  readonly raw: string
+}
+
+export interface PitchSpelling {
+  readonly nominal: string
+  readonly raw: string
+}
+
+export interface PrimeMapping {
+  readonly id: string
+  readonly mapPrime: (prime: number) => Value
+}
+
+export type EvaluatedLiteral = ScalarValue | PitchOffsetValue | AbsolutePitchValue
 
 export interface SourceOrigin {
   readonly location: LocationRange

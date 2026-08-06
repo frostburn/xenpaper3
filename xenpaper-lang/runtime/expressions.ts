@@ -3,6 +3,8 @@ import type { Diagnostic } from '../diagnostics'
 import { Value } from '../value'
 import { evaluateLiteral, type NumericLiteralNode } from './literals'
 import type { EvaluatedLiteral, SourceOrigin } from './types'
+import type { PrimeMapping } from './types'
+import { DEFAULT_MAPPING, evaluateIntervalLiteral, evaluatePitchLiteral, spellPitchDifference } from './pitches'
 
 export type ExpressionEvaluationResult =
   | { readonly value: EvaluatedLiteral; readonly diagnostics: readonly Diagnostic[] }
@@ -58,6 +60,15 @@ function addOrSubtract(
   node: Expression,
 ): EvaluatedLiteral {
   const origins = operatorOrigins(left, right, node)
+  if (left.kind === 'absolutePitch' || right.kind === 'absolutePitch') {
+    if (left.kind === 'absolutePitch' && right.kind === 'absolutePitch') {
+      if (!subtract) throw new TypeError('Absolute pitches cannot be added together.')
+      return { kind: 'pitchOffset', value: left.rootOffset.sub(right.rootOffset), spelling: spellPitchDifference(left, right), origins }
+    }
+    if (left.kind !== 'absolutePitch') throw new TypeError('A pitch offset cannot subtract an absolute pitch.')
+    const offset = pitchCoercion(right)
+    return { ...left, rootOffset: subtract ? left.rootOffset.sub(offset.value) : left.rootOffset.add(offset.value), origins }
+  }
   if (left.kind === 'pitchOffset' || right.kind === 'pitchOffset') {
     const lhs = pitchCoercion(left)
     const rhs = pitchCoercion(right)
@@ -76,6 +87,7 @@ function multiplyOrDivide(
   divide: boolean,
   node: Expression,
 ): EvaluatedLiteral {
+  if (left.kind === 'absolutePitch' || right.kind === 'absolutePitch') throw new TypeError('Absolute pitches cannot be multiplied or divided.')
   if (left.kind === 'pitchOffset' && right.kind === 'pitchOffset') {
     throw new TypeError('Pitch offsets cannot be multiplied or divided together.')
   }
@@ -135,11 +147,11 @@ function binary(
 }
 
 /** Evaluate the arithmetic subset of the parser AST without throwing for source errors. */
-export function evaluateExpression(node: Expression): ExpressionEvaluationResult {
+export function evaluateExpression(node: Expression, mapping: PrimeMapping = DEFAULT_MAPPING): ExpressionEvaluationResult {
   try {
     if (isNumericLiteral(node)) {
       if (node.type === 'EqualDivisionLiteral' && node.equave) {
-        const equave = evaluateExpression(node.equave)
+        const equave = evaluateExpression(node.equave, mapping)
         if (!('value' in equave)) return equave
         if (equave.value.kind !== 'scalar') {
           throw new TypeError('Equal-division equave must be a scalar ratio.')
@@ -148,9 +160,11 @@ export function evaluateExpression(node: Expression): ExpressionEvaluationResult
       }
       return evaluateLiteral(node)
     }
-    if (node.type === 'Group') return evaluateExpression(node.expression)
+    if (node.type === 'PitchLiteral') return { value: evaluatePitchLiteral(node, mapping), diagnostics: [] }
+    if (node.type === 'IntervalLiteral') return { value: evaluateIntervalLiteral(node, mapping), diagnostics: [] }
+    if (node.type === 'Group') return evaluateExpression(node.expression, mapping)
     if (node.type === 'UnaryExpression') {
-      const operand = evaluateExpression(node.operand)
+      const operand = evaluateExpression(node.operand, mapping)
       if (!('value' in operand)) return operand
       if (node.operator === '+') return operand
       if (node.operator !== '-') throw new TypeError(`Unknown unary operator ${node.operator}.`)
@@ -163,8 +177,8 @@ export function evaluateExpression(node: Expression): ExpressionEvaluationResult
       }
     }
     if (node.type === 'BinaryExpression') {
-      const left = evaluateExpression(node.left)
-      const right = evaluateExpression(node.right)
+      const left = evaluateExpression(node.left, mapping)
+      const right = evaluateExpression(node.right, mapping)
       const diagnostics = [...left.diagnostics, ...right.diagnostics]
       if (!('value' in left) || !('value' in right)) return { diagnostics }
       return { value: binary(node.operator, left.value, right.value, node), diagnostics }
@@ -172,7 +186,7 @@ export function evaluateExpression(node: Expression): ExpressionEvaluationResult
     if (node.type === 'CallExpression') {
       if (node.arguments.length !== 1) throw new TypeError(`${node.callee}() expects one argument.`)
       const argumentNode = node.arguments[0]!
-      const argument = evaluateExpression(argumentNode)
+      const argument = evaluateExpression(argumentNode, mapping)
       if (!('value' in argument)) return argument
       if (node.callee === 'pitch') {
         if (argument.value.kind !== 'scalar') throw new TypeError('pitch() expects a scalar ratio.')
@@ -195,4 +209,3 @@ export function evaluateExpression(node: Expression): ExpressionEvaluationResult
     return { diagnostics: [diagnostic(node, error)] }
   }
 }
-
