@@ -391,7 +391,7 @@ IntervalLiteral
     }
 
 IntervalQuality
-  = $("A"+ / "d"+ / "P" / "M" / "m")
+  = $("A"+ / "d"+ / "P" / "M" / "m" / "n")
 
 PitchLiteral
   = nominal:PitchNominal
@@ -442,7 +442,13 @@ PitchModifier
     }
 
 PitchNominal
-  = value:$([A-Ga-g]) {
+  = value:$("alp"i / "bet"i / "gam"i / "del"i / "eps"i / "zet"i / "eta"i
+      / "phi"i / "chi"i / "psi"i / "ome"i / "the"i / "iot"i / "kap"i
+      / "lam"i / "muu"i / "nuu"i / "xii"i / "omi"i / "pii"i / "rho"i
+      / "fsi"i / "sig"i / "tau"i / "ups"i) {
+      return node('PitchNominal', { system: 'greek', value });
+    }
+  / value:$([A-Ga-g]) {
       return node('PitchNominal', { system: 'latin', value });
     }
   / value:$([J-Zj-z]) {
