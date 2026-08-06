@@ -45,7 +45,7 @@ const inflection = (value: StaffInflection) => {
   if ('kind' in value) {
     return { up: '^', down: 'v', lift: '/', drop: '\\' }[value.kind]
   }
-  return `${value.direction === 'denominator' ? '/' : ''}${value.prime}`
+  return `${value.direction === 'denominator' ? '/' : ''}${value.prime}${value.flavor ?? ''}`
 }
 
 const ledgerPositions = (position: number) => {

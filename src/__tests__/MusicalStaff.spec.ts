@@ -53,7 +53,7 @@ describe('MusicalStaff', () => {
     expect(wrapper.findAll('.accidental')).toHaveLength(1)
   })
 
-  it('renders ASCII-style operator and numeric FJS inflections before accidentals', () => {
+  it('renders ASCII-style operators and flavored numeric FJS inflections before accidentals', () => {
     const decorated: StaffNotationShape = {
       kind: 'note',
       duration: notation.duration,
@@ -64,8 +64,8 @@ describe('MusicalStaff', () => {
           { kind: 'down' },
           { kind: 'lift' },
           { kind: 'drop' },
-          { direction: 'numerator', prime: 5n },
-          { direction: 'denominator', prime: 7n },
+          { direction: 'numerator', prime: 5n, flavor: 'c' },
+          { direction: 'denominator', prime: 7n, flavor: 'n' },
         ],
         accidentals: ['flat'],
         notehead: 'normal',
@@ -79,10 +79,10 @@ describe('MusicalStaff', () => {
       'v',
       '/',
       '\\',
-      '5',
-      '/7',
+      '5c',
+      '/7n',
     ])
-    expect(wrapper.get('.pitch-decorations').text()).toBe('^v/\\5/7♭')
+    expect(wrapper.get('.pitch-decorations').text()).toBe('^v/\\5c/7n♭')
     expect(wrapper.get('.pitch-decorations').element.lastElementChild?.classList.contains('accidental')).toBe(true)
   })
 })
