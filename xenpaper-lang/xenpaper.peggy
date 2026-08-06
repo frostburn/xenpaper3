@@ -161,7 +161,10 @@ BinaryDivide
 
 PowerExpression
   = left:UnaryExpression
-    tail:(Spacing "^" Spacing right:PowerExpression { return right; })? {
+    tail:(
+      "^" Spacing right:PowerExpression { return right; }
+      / RequiredSpacing "^" RequiredSpacing right:PowerExpression { return right; }
+    )? {
       return tail ? binary("^", left, tail) : left;
     }
 
