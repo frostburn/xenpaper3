@@ -39,5 +39,7 @@ export type {
   SourceOrigin,
   StaffPitch,
   StaffNotationShape,
+  StaffInflection,
+  StaffOperatorInflection,
 } from './runtime/types'
 export { Dimensions, Value } from './value'

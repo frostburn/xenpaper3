@@ -209,6 +209,7 @@ export function evaluatePitchLiteral(node: PitchLiteral, input: PrimeMapping | P
       system: node.nominal.system,
       accidentals: node.accidentals.map((accidental) => accidental.value),
       inflections: node.inflections.map((inflection) => ({ direction: inflection.direction, prime: BigInt(inflection.prime), flavor: inflection.flavor })),
+      modifiers: node.modifiers.map((modifier) => modifier.kind),
     },
     origins: origin(node),
   }
@@ -256,6 +257,7 @@ export function evaluateIntervalLiteral(node: IntervalLiteral, input: PrimeMappi
     spelling: {
       quality: node.quality, number: spellingNumber, raw: node.raw,
       inflections: node.inflections.map((inflection) => ({ direction: inflection.direction, prime: BigInt(inflection.prime), flavor: inflection.flavor })),
+      modifiers: node.modifiers.map((modifier) => modifier.kind),
     },
     origins: origin(node),
   }
