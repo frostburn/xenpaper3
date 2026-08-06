@@ -41,6 +41,41 @@ function fjsInflections(formula: PrimeMonzo | undefined): FjsSpelling[] | undefi
   return result.length ? result : undefined
 }
 
+function inferredAccidental(chromatic: number): string | undefined {
+  if (!chromatic) return undefined
+  if (chromatic === 1) return 'sharp'
+  if (chromatic === -1) return 'flat'
+  if (chromatic === 2) return 'double-sharp'
+  if (chromatic === -2) return 'double-flat'
+  return chromatic > 0 ? `${chromatic}-sharp` : `${-chromatic}-flat`
+}
+
+function writtenAccidental(token: string): string {
+  if (token === 'b' || token === '♭') return 'flat'
+  if (token === '#' || token === '♯') return 'sharp'
+  if (token === 'x' || token === '𝄪') return 'double-sharp'
+  if (token === '𝄫') return 'double-flat'
+  if (token === 't' || token === '𝄲' || token === '‡') return 'half-sharp'
+  if (token === 'd' || token === '𝄳') return 'half-flat'
+  if (token === '_' || token === '♮') return 'natural'
+  return token
+}
+
+function decorations(value: EvaluatedLiteral, chromatic?: number) {
+  const written = value.kind === 'absolutePitch' ? value.spelling.accidentals : undefined
+  const inflections = value.kind === 'absolutePitch'
+    ? value.spelling.inflections
+    : value.kind === 'pitchOffset'
+      ? value.spelling?.inflections
+      : undefined
+  const accidental = written?.length === 1 ? writtenAccidental(written[0]!) : chromatic === undefined ? undefined : inferredAccidental(chromatic)
+  return {
+    ...(accidental ? { accidental } : {}),
+    ...(written?.length ? { accidentals: written } : {}),
+    ...(inflections?.length ? { inflections } : {}),
+  }
+}
+
 function soundingValue(value: EvaluatedLiteral): Value {
   if (value.kind === 'absolutePitch') return value.rootOffset
   if (value.kind === 'pitchOffset') return value.value
@@ -59,33 +94,50 @@ export function constructStaffNotation(value: EvaluatedLiteral): StaffPitch {
     const key = rawNominal.toUpperCase()
     const greekRank = GREEK_RANK[key]
     if (greekRank !== undefined) {
-      const lowerCaseOctave = rawNominal === rawNominal.toLowerCase() ? 7 : 0
-      const position = Math.ceil(greekRank) + lowerCaseOctave
+      const octaveOffset = Math.floor(cents / 1200)
+      const position = Math.ceil(greekRank) + octaveOffset * 7
       const octave = 4 + Math.floor(position / 7)
-      return { staffPosition: position, nominal: LETTERS[((position % 7) + 7) % 7]!, octave, notehead: 'triangle-down', cents }
+      return {
+        staffPosition: position,
+        nominal: LETTERS[((position % 7) + 7) % 7]!,
+        octave,
+        ...decorations(value),
+        notehead: 'triangle-down',
+        cents,
+      }
     }
     const latin = LETTERS.indexOf(key as (typeof LETTERS)[number])
     if (latin >= 0) {
-      const writtenOctave = rawNominal === rawNominal.toLowerCase() ? 1 : 0
-      const soundingOctave = Math.round((cents - SEMITONES[latin]!) / 1200)
-      const position = (writtenOctave || soundingOctave) * 7 + latin
-      const chromatic = Math.round((cents - (soundingOctave * 1200 + SEMITONES[latin]!)) / 100)
-      const writtenFlat = /(?:b|♭)/.test(value.spelling.raw)
-      const writtenSharp = /(?:#|♯)/.test(value.spelling.raw)
-      const inflections = fjsInflections(value.formula)
+      const soundingOctave = Math.round((cents - SEMITONES[latin]! * 100) / 1200)
+      const position = soundingOctave * 7 + latin
+      const chromatic = Math.round((cents - (soundingOctave * 1200 + SEMITONES[latin]! * 100)) / 100)
       return {
         staffPosition: position,
         nominal: LETTERS[latin]!,
         octave: 4 + Math.floor(position / 7),
-        ...(writtenFlat || chromatic < 0
-          ? { accidental: 'flat' as const }
-          : writtenSharp || chromatic > 0
-            ? { accidental: 'sharp' as const }
-            : {}),
-        ...(inflections ? { inflections } : {}),
+        ...decorations(value, chromatic),
         notehead: 'normal',
         cents,
       }
+    }
+  }
+
+  if (value.kind === 'pitchOffset' && value.spelling) {
+    const numericNumber = Number(value.spelling.number.valueOf())
+    const zeroBased = numericNumber - 1
+    const lowerPosition = Math.floor(zeroBased)
+    const position = Math.ceil(zeroBased)
+    const letter = ((position % 7) + 7) % 7
+    const octaveOffset = Math.floor(position / 7)
+    const naturalCents = octaveOffset * 1200 + SEMITONES[letter]! * 100
+    const chromatic = Math.round((cents - naturalCents) / 100)
+    return {
+      staffPosition: position,
+      nominal: LETTERS[letter]!,
+      octave: 4 + octaveOffset,
+      ...decorations(value, chromatic),
+      notehead: lowerPosition === position ? 'normal' : 'triangle-down',
+      cents,
     }
   }
 

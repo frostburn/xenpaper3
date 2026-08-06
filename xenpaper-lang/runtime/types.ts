@@ -71,6 +71,9 @@ export interface FjsSpelling {
 export interface PitchSpelling {
   readonly nominal: string
   readonly raw: string
+  readonly system?: 'latin' | 'greek'
+  readonly accidentals?: readonly string[]
+  readonly inflections?: readonly FjsSpelling[]
 }
 
 export interface PrimeMapping {
@@ -94,7 +97,9 @@ export interface StaffPitch {
   readonly nominal: 'C' | 'D' | 'E' | 'F' | 'G' | 'A' | 'B'
   readonly octave: number
   /** Conventional 12-EDO accidental used for an otherwise unspelled value. */
-  readonly accidental?: 'sharp' | 'flat'
+  readonly accidental?: string
+  /** Exact written accidental tokens, when the source supplied a spelling. */
+  readonly accidentals?: readonly string[]
   /** FJS suffixes, such as the `^5` in A^5. */
   readonly inflections?: readonly FjsSpelling[]
   /** Greek/interordinal pitches use a triangular head pointing at the other neighbouring line/space. */
