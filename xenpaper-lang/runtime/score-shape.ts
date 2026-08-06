@@ -8,6 +8,7 @@ import type {
   AttackShape,
   AbsolutePitchValue,
   BarlineShape,
+  BarlineStyle,
   ContinueShape,
   ParallelShape,
   PitchOffsetValue,
@@ -48,6 +49,10 @@ function sequence(children: readonly ScoreShape[], origins: readonly SourceOrigi
 
 function generatedRest(duration: Fraction): RestShape {
   return { kind: 'rest', duration, generated: true, origins: [] }
+}
+
+function barline(node: Expression, style: BarlineStyle): BarlineShape {
+  return { kind: 'barline', style, duration: new Fraction(0), origins: [origin(node)] }
 }
 
 function pad(shape: ScoreShape, duration: Fraction): ScoreShape {
@@ -130,12 +135,26 @@ export function evaluateScoreShape(
       return { shape, diagnostics: [] }
     }
     if (current.type === 'Barline') {
-      const shape: BarlineShape = {
-        kind: 'barline',
-        duration: new Fraction(0),
-        origins: [origin(current)],
+      return { shape: barline(current, 'single'), diagnostics: [] }
+    }
+    if (current.type === 'HardBoundary') {
+      return { shape: barline(current, 'double'), diagnostics: [] }
+    }
+    if (current.type === 'Repeat') {
+      const results = current.body.map((item) => visit(item, context))
+      const diagnostics = results.flatMap((result) => result.diagnostics)
+      if (!results.every(hasShape)) return { diagnostics }
+      return {
+        shape: sequence(
+          [
+            barline(current, 'repeat-start'),
+            ...results.map((result) => result.shape),
+            barline(current, 'repeat-end'),
+          ],
+          [origin(current)],
+        ),
+        diagnostics,
       }
-      return { shape, diagnostics: [] }
     }
     if (current.type === 'Sequence') {
       let activeContext = context

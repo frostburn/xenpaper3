@@ -82,10 +82,32 @@ describe('staff notation construction', () => {
       duration: { n: 2, d: 1 },
       children: [
         { kind: 'note' },
-        { kind: 'barline', duration: { n: 0, d: 1 } },
+        { kind: 'barline', style: 'single', duration: { n: 0, d: 1 } },
         { kind: 'note' },
       ],
     })
+  })
+
+  it('carries double barlines and repeat markers', () => {
+    const nodes = parse('C || |: D E :|').body as Expression[]
+    const staff = nodes.map((node) => {
+      const evaluated = evaluateScoreShape(node)
+      if (!('shape' in evaluated)) throw new Error('Expected shape.')
+      expect(evaluated.diagnostics).toEqual([])
+      return constructStaffNotationShape(evaluated.shape)
+    })
+    expect(staff).toMatchObject([
+      { kind: 'note' },
+      { kind: 'barline', style: 'double' },
+      {
+        kind: 'sequence',
+        children: [
+          { kind: 'barline', style: 'repeat-start' },
+          { kind: 'sequence', children: [{ kind: 'note' }, { kind: 'note' }] },
+          { kind: 'barline', style: 'repeat-end' },
+        ],
+      },
+    ])
   })
 
   it('retains source nominal spelling while constructing a score staff', () => {
