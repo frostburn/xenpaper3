@@ -1,5 +1,7 @@
 import type { Program } from '../parser.generated.js'
 import type { Diagnostic } from '../diagnostics'
+import type { Value } from '../value'
+import type { LocationRange } from 'peggy'
 
 export interface ExpansionStep {
   readonly repeatOffset: number
@@ -28,3 +30,28 @@ export interface RepeatExpansionResult {
   readonly diagnostics: readonly Diagnostic[]
 }
 
+export interface ScalarValue {
+  readonly kind: 'scalar'
+  readonly value: Value
+  readonly origins: readonly SourceOrigin[]
+}
+
+export interface PitchOffsetValue {
+  readonly kind: 'pitchOffset'
+  readonly value: Value
+  readonly origins: readonly SourceOrigin[]
+}
+
+export type EvaluatedLiteral = ScalarValue | PitchOffsetValue
+
+export interface SourceOrigin {
+  readonly location: LocationRange
+  readonly role:
+    | 'literal'
+    | 'operator'
+    | 'duration'
+    | 'context'
+    | 'directive'
+    | 'structural'
+    | 'generated'
+}
