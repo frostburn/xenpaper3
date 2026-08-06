@@ -120,9 +120,16 @@ describe('arithmetic expression evaluation', () => {
       if (pitch.kind !== 'absolutePitch') throw new Error('Expected a pitch.')
       expect(pitch.rootOffset.equals(Value.cents(600))).toBe(true)
     }
-    const phi = evaluate('φ')
-    if (phi.kind !== 'absolutePitch') throw new Error('Expected a pitch.')
-    expect(phi.rootOffset.equals(Value.pitch(new Value(4).div(new Value(3).pow(new Value(1n, 2n)))))).toBe(true)
+  })
+
+  it('evaluates and derives interordinal intervals', () => {
+    const direct = evaluate('P4.5')
+    expect(direct.value.equals(Value.equalDivision(1, 2, new Value(2)))).toBe(true)
+    const difference = evaluate('Gam - C')
+    expect(difference.kind).toBe('pitchOffset')
+    if (difference.kind !== 'pitchOffset') throw new Error('Expected an interval.')
+    expect(difference.value.equals(direct.value)).toBe(true)
+    expect(difference.spelling?.raw).toBe('P4.5')
   })
 
   it('supports neutral intervals and half accidentals', () => {

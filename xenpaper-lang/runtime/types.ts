@@ -57,7 +57,7 @@ export type PrimeMonzo = ReadonlyMap<number, Fraction>
 
 export interface IntervalSpelling {
   readonly quality: string
-  readonly number: bigint
+  readonly number: bigint | Fraction
   readonly raw: string
 }
 

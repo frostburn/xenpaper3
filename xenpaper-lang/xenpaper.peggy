@@ -379,7 +379,7 @@ IdentifierExpression
     }
 
 IntervalLiteral
-  = modifiers:PitchModifier* quality:IntervalQuality number:UnsignedInteger
+  = modifiers:PitchModifier* quality:IntervalQuality number:IntervalNumber
     inflections:FjsInflection* !IdentifierContinue {
       return node('IntervalLiteral', {
         modifiers,
@@ -392,6 +392,9 @@ IntervalLiteral
 
 IntervalQuality
   = $("A"+ / "d"+ / "P" / "M" / "m" / "n")
+
+IntervalNumber
+  = $(UnsignedInteger (".5" / "½")?)
 
 PitchLiteral
   = nominal:PitchNominal
@@ -442,10 +445,7 @@ PitchModifier
     }
 
 PitchNominal
-  = value:$("alp"i / "bet"i / "gam"i / "del"i / "eps"i / "zet"i / "eta"i
-      / "phi"i / "chi"i / "psi"i / "ome"i / "the"i / "iot"i / "kap"i
-      / "lam"i / "muu"i / "nuu"i / "xii"i / "omi"i / "pii"i / "rho"i
-      / "fsi"i / "sig"i / "tau"i / "ups"i) {
+  = value:$("alp"i / "bet"i / "gam"i / "del"i / "eps"i / "zet"i / "eta"i) {
       return node('PitchNominal', { system: 'greek', value });
     }
   / value:$([A-Ga-g]) {
@@ -454,7 +454,7 @@ PitchNominal
   / value:$([J-Zj-z]) {
       return node('PitchNominal', { system: 'mos', value });
     }
-  / value:$([Α-Ωα-ω]) {
+  / value:$([Α-Ηα-η]) {
       return node('PitchNominal', { system: 'greek', value });
     }
 
