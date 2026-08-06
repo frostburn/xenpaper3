@@ -4,17 +4,18 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "npm run compile:sw-patch && vite",
-    "build": "npm run compile:sw-patch && run-p type-check \"build-only {@}\" --",
+    "dev": "run-s compile:sw-patch compile:xenpaper-lang && vite",
+    "build": "run-s compile:sw-patch compile:xenpaper-lang && run-p type-check \"build-only {@}\" --",
     "preview": "vite preview",
-    "test:unit": "npm run compile:sw-patch && vitest",
+    "test:unit": "run-s compile:sw-patch compile:xenpaper-lang && vitest",
     "build-only": "vite build",
     "type-check": "vue-tsc --build",
     "lint": "run-s \"lint:*\"",
     "lint:oxlint": "oxlint . --fix",
     "lint:eslint": "eslint . --fix --cache",
     "format": "oxfmt src/",
-    "compile:sw-patch": "peggy --format es sw-patch/sw-patch.peggy -o sw-patch/parser.generated.js"
+    "compile:sw-patch": "peggy --format es sw-patch/sw-patch.peggy -o sw-patch/parser.generated.js",
+    "compile:xenpaper-lang": "peggy --format es xenpaper-lang/xenpaper.peggy -o xenpaper-lang/parser.generated.js"
   },
   "dependencies": {
     "peggy": "^5.1.0",
