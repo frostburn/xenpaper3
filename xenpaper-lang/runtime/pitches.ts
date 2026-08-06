@@ -33,6 +33,22 @@ const NOMINALS: Readonly<Record<string, readonly (readonly [number, number])[]>>
   G: [[2, -1], [3, 1]], A: [[2, -4], [3, 3]], B: [[2, -7], [3, 5]],
 }
 
+// Greek nominals interleave the diatonic chain at half-octave positions.  The
+// final four are manual semiquartal spellings retained by the historical
+// Xenpaper notation.
+const GREEK_NOMINALS: Readonly<Record<string, readonly (readonly [number, number])[]>> = {
+  ALP: [[2, -4.5], [3, 3]], BET: [[2, -7.5], [3, 5]], GAM: [[2, 0.5]],
+  DEL: [[2, -2.5], [3, 2]], EPS: [[2, -5.5], [3, 4]],
+  ZET: [[2, 2.5], [3, -1]], ETA: [[2, -1.5], [3, 1]],
+  PHI: [[2, 1], [3, -0.5]], CHI: [[2, -2], [3, 1.5]],
+  PSI: [[3, 0.5]], OME: [[2, -3], [3, 2.5]],
+}
+
+const GREEK_SCRIPT: Readonly<Record<string, string>> = {
+  Α: 'ALP', Β: 'BET', Γ: 'GAM', Δ: 'DEL', Ε: 'EPS', Ζ: 'ZET', Η: 'ETA',
+  Φ: 'PHI', Χ: 'CHI', Ψ: 'PSI', Ω: 'OME',
+}
+
 export function mapFormula(monzo: PrimeMonzo, mapping: PrimeMapping): Value {
   let result = Value.cents(0)
   for (const [prime, exponent] of monzo) result = result.add(mapping.mapPrime(prime).mul(new Value(exponent)))
@@ -59,9 +75,9 @@ export function spellPitchDifference(left: AbsolutePitchValue, right: AbsolutePi
 }
 
 export function evaluatePitchLiteral(node: PitchLiteral, mapping: PrimeMapping): AbsolutePitchValue {
-  if (node.nominal.system !== 'latin') throw new TypeError(`Unsupported ${node.nominal.system} nominal ${node.nominal.value}.`)
   const upper = node.nominal.value.toUpperCase()
-  const entries = NOMINALS[upper]
+  const greekKey = GREEK_SCRIPT[upper] ?? upper
+  const entries = node.nominal.system === 'latin' ? NOMINALS[upper] : GREEK_NOMINALS[greekKey]
   if (!entries) throw new TypeError(`Undefined nominal ${node.nominal.value}.`)
   const result = formula(entries)
   const octave = (node.nominal.value === node.nominal.value.toLowerCase() ? 1 : 0) + shifts(node.modifiers)
@@ -72,7 +88,27 @@ export function evaluatePitchLiteral(node: PitchLiteral, mapping: PrimeMapping):
     else if (accidental.value === 'b' || accidental.value === '♭') chromatic--
     else if (accidental.value === 'x' || accidental.value === '𝄪') chromatic += 2
     else if (accidental.value === '𝄫') chromatic -= 2
-    else if (accidental.value !== '♮' && accidental.value !== '_') throw new TypeError(`Unsupported accidental ${accidental.value}.`)
+    else if (accidental.value === '𝄲' || accidental.value === '‡' || accidental.value === 't') chromatic += 0.5
+    else if (accidental.value === '𝄳' || accidental.value === 'd') chromatic -= 0.5
+    else if (accidental.value === 'p') {
+      result.set(2, (result.get(2) ?? new Fraction(0)).sub(19))
+      result.set(3, (result.get(3) ?? new Fraction(0)).add(12))
+    } else if (accidental.value === 'q') {
+      result.set(2, (result.get(2) ?? new Fraction(0)).add(19))
+      result.set(3, (result.get(3) ?? new Fraction(0)).sub(12))
+    } else if (accidental.value === '𝄬') {
+      result.set(2, (result.get(2) ?? new Fraction(0)).add(7)); result.set(3, (result.get(3) ?? new Fraction(0)).sub(3)); result.set(5, (result.get(5) ?? new Fraction(0)).sub(1))
+    } else if (accidental.value === '𝄭') {
+      result.set(2, (result.get(2) ?? new Fraction(0)).add(15)); result.set(3, (result.get(3) ?? new Fraction(0)).sub(11)); result.set(5, (result.get(5) ?? new Fraction(0)).add(1))
+    } else if (accidental.value === '𝄮') {
+      result.set(2, (result.get(2) ?? new Fraction(0)).sub(4)); result.set(3, (result.get(3) ?? new Fraction(0)).add(4)); result.set(5, (result.get(5) ?? new Fraction(0)).sub(1))
+    } else if (accidental.value === '𝄯') {
+      result.set(2, (result.get(2) ?? new Fraction(0)).add(4)); result.set(3, (result.get(3) ?? new Fraction(0)).sub(4)); result.set(5, (result.get(5) ?? new Fraction(0)).add(1))
+    } else if (accidental.value === '𝄰') {
+      result.set(2, (result.get(2) ?? new Fraction(0)).sub(15)); result.set(3, (result.get(3) ?? new Fraction(0)).add(11)); result.set(5, (result.get(5) ?? new Fraction(0)).sub(1))
+    } else if (accidental.value === '𝄱') {
+      result.set(2, (result.get(2) ?? new Fraction(0)).sub(7)); result.set(3, (result.get(3) ?? new Fraction(0)).add(3)); result.set(5, (result.get(5) ?? new Fraction(0)).add(1))
+    } else if (accidental.value !== '♮' && accidental.value !== '_') throw new TypeError(`Unsupported accidental ${accidental.value}.`)
   }
   if (chromatic) {
     result.set(2, (result.get(2) ?? new Fraction(0)).sub(11 * chromatic))
@@ -93,6 +129,9 @@ export function evaluateIntervalLiteral(node: IntervalLiteral, mapping: PrimeMap
   else if (node.quality === 'P' && perfect) chromatic = 0
   else if (node.quality === 'M' && !perfect) chromatic = 0
   else if (node.quality === 'm' && !perfect) chromatic = -1
+  else if (node.quality === 'n' && !perfect) chromatic = -0.5
+  else if (node.quality === 'n' && simple === 4) chromatic = 0.5
+  else if (node.quality === 'n' && simple === 5) chromatic = -0.5
   else throw new TypeError(`Quality ${node.quality} is invalid for interval ${node.number}.`)
   const result = formula(NOMINALS[['C', 'D', 'E', 'F', 'G', 'A', 'B'][simple - 1]!]!)
   if (octaves) result.set(2, (result.get(2) ?? new Fraction(0)).add(octaves))

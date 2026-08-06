@@ -107,4 +107,29 @@ describe('arithmetic expression evaluation', () => {
     expect(evaluate('m10').value.equals(Value.pitch(new Value(64n, 27n)))).toBe(true)
     expect(evaluate('A1').value.equals(Value.pitch(new Value(2187n, 2048n)))).toBe(true)
   })
+
+  it('evaluates Greek and ASCII semioctave nominals', () => {
+    for (const source of ['γ', 'gam']) {
+      const pitch = evaluate(source)
+      expect(pitch.kind).toBe('absolutePitch')
+      if (pitch.kind !== 'absolutePitch') throw new Error('Expected a pitch.')
+      expect(pitch.rootOffset.equals(Value.cents(1800))).toBe(true)
+    }
+    for (const source of ['Γ', 'Gam']) {
+      const pitch = evaluate(source)
+      if (pitch.kind !== 'absolutePitch') throw new Error('Expected a pitch.')
+      expect(pitch.rootOffset.equals(Value.cents(600))).toBe(true)
+    }
+    const phi = evaluate('φ')
+    if (phi.kind !== 'absolutePitch') throw new Error('Expected a pitch.')
+    expect(phi.rootOffset.equals(Value.pitch(new Value(4).div(new Value(3).pow(new Value(1n, 2n)))))).toBe(true)
+  })
+
+  it('supports neutral intervals and half accidentals', () => {
+    expect(evaluate('n3').value.equals(Value.pitch(new Value(3n, 2n)).div(new Value(2)))).toBe(true)
+    expect(evaluate('n4').value.equals(Value.pitch(new Value(3).pow(new Value(5n, 2n)).div(new Value(2).pow(new Value(7n, 2n)))))).toBe(true)
+    const halfSharp = evaluate('Ct')
+    if (halfSharp.kind !== 'absolutePitch') throw new Error('Expected a pitch.')
+    expect(halfSharp.rootOffset.equals(Value.pitch(new Value(2187n, 2048n)).div(new Value(2)))).toBe(true)
+  })
 })
