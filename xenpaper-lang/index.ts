@@ -3,6 +3,8 @@ export { parse } from './parser.generated.js'
 export { expandRepeats } from './runtime/repeat-expansion'
 export { decimalFraction, evaluateLiteral } from './runtime/literals'
 export type { LiteralEvaluationResult, NumericLiteralNode } from './runtime/literals'
+export { evaluateExpression } from './runtime/expressions'
+export type { ExpressionEvaluationResult } from './runtime/expressions'
 export type {
   EvaluatedLiteral,
   ExpandedNode,
