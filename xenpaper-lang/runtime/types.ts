@@ -65,6 +65,7 @@ export interface IntervalSpelling {
 export interface FjsSpelling {
   readonly direction: 'numerator' | 'denominator'
   readonly prime: bigint
+  readonly flavor?: string
 }
 
 export interface PitchSpelling {

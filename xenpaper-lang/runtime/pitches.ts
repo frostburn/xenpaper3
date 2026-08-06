@@ -2,6 +2,7 @@ import { Fraction } from 'xen-dev-utils/fraction'
 import type { IntervalLiteral, PitchContextChange, PitchLiteral } from '../parser.generated.js'
 import type { Diagnostic } from '../diagnostics'
 import { Value } from '../value'
+import { applyFjsInflections, fjsPrimeComma } from './fjs'
 import type {
   AbsolutePitchValue,
   IntervalSpelling,
@@ -36,48 +37,6 @@ function addExponent(target: Map<number, Fraction>, prime: number, amount: Fract
   else target.delete(prime)
 }
 
-const commaCache = new Map<number, PrimeMonzo>()
-
-/** Return the nearest 3-limit representative divided by an odd prime. */
-export function fjsComma(prime: number): PrimeMonzo {
-  const cached = commaCache.get(prime)
-  if (cached) return cached
-  if (!Number.isSafeInteger(prime) || prime < 5 || !isPrime(prime)) throw new TypeError(`Invalid FJS prime ${prime}.`)
-  // Canonical low-prime FJS commas; unconstrained Diophantine searches would
-  // prefer impractically complex ratios such as 3^45/(2^69*5).
-  if (prime === 5) {
-    const result = formula([[2, -4], [3, 4], [5, -1]])
-    commaCache.set(prime, result)
-    return result
-  }
-  if (prime === 7) {
-    const result = formula([[2, 6], [3, -2], [7, -1]])
-    commaCache.set(prime, result)
-    return result
-  }
-  let best: { a: number; b: number; distance: number } | undefined
-  for (let b = -64; b <= 64; b++) {
-    const a = Math.round(Math.log2(prime) - b * Math.log2(3))
-    const distance = Math.abs(a + b * Math.log2(3) - Math.log2(prime))
-    if (!best || distance < best.distance - 1e-14 || (Math.abs(distance - best.distance) < 1e-14 && (Math.abs(b) < Math.abs(best.b) || (Math.abs(b) === Math.abs(best.b) && b < best.b)))) best = { a, b, distance }
-  }
-  const result = formula([[2, best!.a], [3, best!.b], [prime, -1]])
-  commaCache.set(prime, result)
-  return result
-}
-
-function isPrime(value: number) {
-  for (let divisor = 2; divisor * divisor <= value; divisor++) if (value % divisor === 0) return false
-  return true
-}
-
-function applyInflections(result: Map<number, Fraction>, inflections: readonly { direction: string; prime: string }[]) {
-  for (const inflection of inflections) {
-    const prime = Number(inflection.prime)
-    const sign = inflection.direction === 'numerator' ? -1 : 1
-    for (const [componentPrime, exponent] of fjsComma(prime)) addExponent(result, componentPrime, new Fraction(exponent).mul(sign))
-  }
-}
 
 const NOMINALS: Readonly<Record<string, readonly (readonly [number, number])[]>> = {
   C: [], D: [[2, -3], [3, 2]], E: [[2, -6], [3, 4]], F: [[2, 2], [3, -1]],
@@ -226,7 +185,7 @@ export function evaluatePitchLiteral(node: PitchLiteral, input: PrimeMapping | P
     result.set(2, (result.get(2) ?? new Fraction(0)).sub(11 * chromatic))
     result.set(3, (result.get(3) ?? new Fraction(0)).add(7 * chromatic))
   }
-  applyInflections(result, node.inflections)
+  applyFjsInflections(result, node.inflections)
   let rootOffset = mapFormula(result, context.mapping)
   if (context.rootFormula.size) rootOffset = rootOffset.sub(mapFormula(context.rootFormula, context.mapping))
   for (const modifier of node.modifiers) {
@@ -266,7 +225,7 @@ export function evaluateIntervalLiteral(node: IntervalLiteral, input: PrimeMappi
     result.set(2, (result.get(2) ?? new Fraction(0)).sub(11 * chromatic))
     result.set(3, (result.get(3) ?? new Fraction(0)).add(7 * chromatic))
   }
-  applyInflections(result, node.inflections)
+  applyFjsInflections(result, node.inflections)
   const spellingNumber = number.d === 1 ? BigInt(number.n) : number
   let value = mapFormula(result, context.mapping)
   for (const modifier of node.modifiers) {
@@ -279,7 +238,7 @@ export function evaluateIntervalLiteral(node: IntervalLiteral, input: PrimeMappi
     kind: 'pitchOffset', value, formula: result,
     spelling: {
       quality: node.quality, number: spellingNumber, raw: node.raw,
-      inflections: node.inflections.map((inflection) => ({ direction: inflection.direction, prime: BigInt(inflection.prime) })),
+      inflections: node.inflections.map((inflection) => ({ direction: inflection.direction, prime: BigInt(inflection.prime), flavor: inflection.flavor })),
     },
     origins: origin(node),
   }
@@ -306,10 +265,10 @@ function spellIntervalFormula(input: PrimeMonzo): IntervalSpelling | undefined {
     if (exponent.d !== 1) return undefined
     const direction = exponent.compare(0) > 0 ? 'numerator' : 'denominator'
     const count = Math.abs(exponent.n)
-    const sign = direction === 'numerator' ? -1 : 1
+    const sign = direction === 'numerator' ? 1 : -1
     for (let index = 0; index < count; index++) {
       inflections.push({ direction, prime: BigInt(prime) })
-      for (const [componentPrime, component] of fjsComma(prime)) addExponent(base, componentPrime, new Fraction(component).mul(-sign))
+      for (const [componentPrime, component] of fjsPrimeComma(prime)) addExponent(base, componentPrime, new Fraction(component).mul(-sign))
     }
   }
   const twos = base.get(2) ?? new Fraction(0)

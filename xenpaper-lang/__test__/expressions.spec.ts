@@ -170,4 +170,20 @@ describe('arithmetic expression evaluation', () => {
     expect(doubled.value.equals(Value.pitch(new Value(36n, 25n)))).toBe(true)
     expect(doubled.spelling?.raw).toBe('d5_5_5')
   })
+
+  it('factors FJS labels, ignores 2- and 3-limit factors, and supports neutral FJS', () => {
+    const fraction = evaluate('Eb^6_5')
+    if (fraction.kind !== 'absolutePitch') throw new Error('Expected a pitch.')
+    expect(fraction.rootOffset.equals(Value.pitch(new Value(6n, 5n)))).toBe(true)
+
+    expect(evaluate('n3^11n').value.equals(Value.pitch(new Value(11n, 9n)))).toBe(true)
+    const absolute = evaluate('Ed^11n')
+    if (absolute.kind !== 'absolutePitch') throw new Error('Expected a pitch.')
+    expect(absolute.rootOffset.equals(Value.pitch(new Value(11n, 9n)))).toBe(true)
+
+    const highPrime = evaluate('P1^101')
+    expect(highPrime.kind).toBe('pitchOffset')
+    if (highPrime.kind !== 'pitchOffset') throw new Error('Expected an interval.')
+    expect(highPrime.formula?.get(101)?.equals(1)).toBe(true)
+  })
 })
