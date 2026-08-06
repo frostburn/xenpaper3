@@ -5,7 +5,11 @@ export { decimalFraction, evaluateLiteral } from './runtime/literals'
 export type { LiteralEvaluationResult, NumericLiteralNode } from './runtime/literals'
 export { evaluateExpression } from './runtime/expressions'
 export type { ExpressionEvaluationResult } from './runtime/expressions'
+export { evaluateScoreShape } from './runtime/score-shape'
+export type { ScoreShapeEvaluationResult, ScoreShapeOptions } from './runtime/score-shape'
 export type {
+  AttackShape,
+  ContinueShape,
   EvaluatedLiteral,
   ExpandedNode,
   ExpandedProgram,
@@ -15,6 +19,11 @@ export type {
   RepeatExpansionResult,
   ScalarValue,
   PitchOffsetValue,
+  ParallelShape,
+  RestShape,
+  ScoreShape,
+  SequenceShape,
+  ShapeBase,
   SourceOrigin,
 } from './runtime/types'
 export { Dimensions, Value } from './value'
