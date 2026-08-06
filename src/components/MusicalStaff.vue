@@ -6,14 +6,21 @@ const props = defineProps<{
   notation?: StaffNotationShape
 }>()
 
-type StaffItem = { kind: 'note'; pitch: StaffPitch } | { kind: 'rest' }
+type StaffItem = { kind: 'note'; pitch: StaffPitch; tiedFromPrevious: boolean } | { kind: 'rest' }
 
 const items = computed(() => {
   const result: StaffItem[] = []
+  let activePitch: StaffPitch | undefined
   const visit = (shape: StaffNotationShape) => {
-    if (shape.kind === 'note') result.push({ kind: 'note', pitch: shape.pitch })
-    else if (shape.kind === 'rest') result.push({ kind: 'rest' })
-    else if (shape.kind === 'sequence') shape.children.forEach(visit)
+    if (shape.kind === 'note') {
+      activePitch = shape.pitch
+      result.push({ kind: 'note', pitch: shape.pitch, tiedFromPrevious: false })
+    } else if (shape.kind === 'continue' && activePitch) {
+      result.push({ kind: 'note', pitch: activePitch, tiedFromPrevious: true })
+    } else if (shape.kind === 'rest') {
+      activePitch = undefined
+      result.push({ kind: 'rest' })
+    } else if (shape.kind === 'sequence') shape.children.forEach(visit)
     else if (shape.kind === 'parallel') shape.branches.forEach(visit)
   }
   if (props.notation) visit(props.notation)
@@ -59,6 +66,11 @@ const ledgerPositions = (position: number) => {
     <g v-for="(item, index) in items" :key="index">
       <text v-if="item.kind === 'rest'" class="rest" :x="x(index)" y="79">𝄽</text>
       <template v-else>
+        <path
+          v-if="item.tiedFromPrevious"
+          class="tie"
+          :d="`M ${x(index - 1) + 6} ${y(item.pitch.staffPosition) + 7} Q ${x(index) - 26} ${y(item.pitch.staffPosition) + 17} ${x(index) - 6} ${y(item.pitch.staffPosition) + 7}`"
+        />
         <line
           v-for="position in ledgerPositions(item.pitch.staffPosition)"
           :key="position"
@@ -69,7 +81,7 @@ const ledgerPositions = (position: number) => {
           :y2="y(position)"
         />
         <text
-          v-if="item.pitch.accidentals.length"
+          v-if="item.pitch.accidentals.length && !item.tiedFromPrevious"
           class="accidental"
           :x="x(index) - 17"
           :y="y(item.pitch.staffPosition) + 5"
@@ -80,6 +92,11 @@ const ledgerPositions = (position: number) => {
           v-if="item.pitch.notehead === 'triangle-down'"
           class="notehead"
           :points="`${x(index) - 7},${y(item.pitch.staffPosition) - 5} ${x(index) + 7},${y(item.pitch.staffPosition) - 5} ${x(index)},${y(item.pitch.staffPosition) + 6}`"
+        />
+        <polygon
+          v-else-if="item.pitch.notehead === 'triangle-up'"
+          class="notehead"
+          :points="`${x(index)},${y(item.pitch.staffPosition) - 6} ${x(index) + 7},${y(item.pitch.staffPosition) + 5} ${x(index) - 7},${y(item.pitch.staffPosition) + 5}`"
         />
         <ellipse
           v-else
@@ -111,9 +128,14 @@ const ledgerPositions = (position: number) => {
 
 .staff-lines line,
 .ledger-line,
-.stem {
+.stem,
+.tie {
   stroke: currentColor;
   stroke-width: 1.5;
+}
+
+.tie {
+  fill: none;
 }
 
 .clef {

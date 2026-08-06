@@ -35,4 +35,21 @@ describe('MusicalStaff', () => {
   it('shows an empty state before notation is populated', () => {
     expect(mount(MusicalStaff).get('.empty-message').text()).toBe('No notation loaded')
   })
+
+  it('renders continues as repeated noteheads joined by ties', () => {
+    const continued: StaffNotationShape = {
+      kind: 'sequence',
+      duration: notation.duration,
+      children: [
+        notation.children[0]!,
+        { kind: 'continue', duration: notation.duration },
+        { kind: 'continue', duration: notation.duration },
+      ],
+    }
+    const wrapper = mount(MusicalStaff, { props: { notation: continued } })
+
+    expect(wrapper.findAll('.notehead')).toHaveLength(3)
+    expect(wrapper.findAll('.tie')).toHaveLength(2)
+    expect(wrapper.findAll('.accidental')).toHaveLength(1)
+  })
 })

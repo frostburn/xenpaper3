@@ -8,6 +8,8 @@ const GREEK_RANK: Readonly<Record<string, number>> = {
   'Η': 0.5, 'Α': 1.5, 'Β': 2.5, 'Γ': 3.5, 'Δ': 4.5, 'Ε': 5.5, 'Ζ': 6.5,
 }
 
+const UPWARD_GREEK_NOMINALS = new Set(['BET', 'Β'])
+
 function formulaOf(value: EvaluatedLiteral): PrimeMonzo | undefined {
   if (value.kind === 'absolutePitch') return value.formula
   if (value.kind === 'pitchOffset' && value.formula) return value.formula
@@ -113,7 +115,7 @@ export function constructStaffNotation(value: EvaluatedLiteral, options: StaffNo
       return {
         staffPosition: position,
         ...decorations(value),
-        notehead: 'triangle-down',
+        notehead: UPWARD_GREEK_NOMINALS.has(key) ? 'triangle-up' : 'triangle-down',
         cents,
       }
     }
