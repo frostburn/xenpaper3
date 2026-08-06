@@ -104,7 +104,6 @@ export type EvaluatedLiteral = ScalarValue | PitchOffsetValue | AbsolutePitchVal
 export interface StaffPitch {
   /** Diatonic steps from middle C (C4). */
   readonly staffPosition: number
-  readonly nominal: 'C' | 'D' | 'E' | 'F' | 'G' | 'A' | 'B'
   /** Zero or one normalized accidental for the note. */
   readonly accidentals: readonly string[]
   /** FJS suffixes, such as the `^5` in A^5. */

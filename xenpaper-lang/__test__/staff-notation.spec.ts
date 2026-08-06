@@ -15,19 +15,19 @@ function notation(source: string) {
 
 describe('staff notation construction', () => {
   it('places just ratios relative to middle C and retains FJS inflections', () => {
-    expect(notation('1/1')).toMatchObject({ nominal: 'C', staffPosition: 0 })
-    expect(notation('3/2')).toMatchObject({ nominal: 'G', staffPosition: 4 })
-    expect(notation('5/3')).toMatchObject({ nominal: 'A', inflections: [{ direction: 'numerator', prime: 5n }] })
+    expect(notation('1/1')).toMatchObject({ staffPosition: 0 })
+    expect(notation('3/2')).toMatchObject({ staffPosition: 4 })
+    expect(notation('5/3')).toMatchObject({ staffPosition: 5, inflections: [{ direction: 'numerator', prime: 5n }] })
   })
 
   it('converts relative intervals into absolute staff positions', () => {
-    expect(notation('M3')).toMatchObject({ nominal: 'E', staffPosition: 2 })
-    expect(notation('Eb')).toMatchObject({ nominal: 'E', accidentals: ['flat'], staffPosition: 2 })
+    expect(notation('M3')).toMatchObject({ staffPosition: 2 })
+    expect(notation('Eb')).toMatchObject({ accidentals: ['flat'], staffPosition: 2 })
   })
 
   it('uses directed triangular noteheads for Greek nominals', () => {
-    expect(notation('Gam')).toMatchObject({ nominal: 'G', staffPosition: 4, notehead: 'triangle-down' })
-    expect(notation("'Gam")).toMatchObject({ nominal: 'G', staffPosition: 11, notehead: 'triangle-down' })
+    expect(notation('Gam')).toMatchObject({ staffPosition: 4, notehead: 'triangle-down' })
+    expect(notation("'Gam")).toMatchObject({ staffPosition: 11, notehead: 'triangle-down' })
     expect(notation('Gam#^5c')).toMatchObject({
       accidentals: ['sharp'],
       inflections: [{ direction: 'numerator', prime: 5n, flavor: 'c' }],
@@ -35,12 +35,12 @@ describe('staff notation construction', () => {
   })
 
   it('retains named interval spelling, FJS flavor, and exact accidentals', () => {
-    expect(notation('m2')).toMatchObject({ nominal: 'D', accidentals: ['flat'], staffPosition: 1 })
+    expect(notation('m2')).toMatchObject({ accidentals: ['flat'], staffPosition: 1 })
     expect(notation('P1^5c')).toMatchObject({ inflections: [{ prime: 5n, flavor: 'c' }] })
-    expect(notation('b')).toMatchObject({ nominal: 'B', staffPosition: 13 })
+    expect(notation('b')).toMatchObject({ staffPosition: 13 })
     expect(notation('b')).toMatchObject({ accidentals: [] })
-    expect(notation('Ct')).toMatchObject({ nominal: 'C', accidentals: ['half-sharp'] })
-    expect(notation('Cx')).toMatchObject({ nominal: 'C', accidentals: ['double-sharp'] })
+    expect(notation('Ct')).toMatchObject({ accidentals: ['half-sharp'] })
+    expect(notation('Cx')).toMatchObject({ accidentals: ['double-sharp'] })
   })
 
   it('classifies ups, downs, lifts, and drops as staff inflections', () => {
@@ -52,7 +52,7 @@ describe('staff notation construction', () => {
   })
 
   it('falls back to the closest 12-EDO staff pitch', () => {
-    expect(notation('610c')).toMatchObject({ nominal: 'F', accidentals: ['sharp'] })
+    expect(notation('610c')).toMatchObject({ staffPosition: 3, accidentals: ['sharp'] })
   })
 
   it('carries exact durations and rests from score construction', () => {
@@ -74,6 +74,6 @@ describe('staff notation construction', () => {
     const evaluated = evaluateScoreShape(node)
     if (!('shape' in evaluated)) throw new Error('Expected shape.')
     const staff = constructStaffNotationShape(evaluated.shape)
-    expect(staff).toMatchObject({ kind: 'sequence', children: [{ kind: 'note', pitch: { nominal: 'D', staffPosition: 1 } }] })
+    expect(staff).toMatchObject({ kind: 'sequence', children: [{ kind: 'note', pitch: { staffPosition: 1 } }] })
   })
 })
