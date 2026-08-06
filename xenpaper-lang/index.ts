@@ -4,11 +4,13 @@ export { expandRepeats } from './runtime/repeat-expansion'
 export { decimalFraction, evaluateLiteral } from './runtime/literals'
 export type { LiteralEvaluationResult, NumericLiteralNode } from './runtime/literals'
 export { evaluateExpression } from './runtime/expressions'
+export { DEFAULT_MAPPING, edoMapping, evaluateIntervalLiteral, evaluatePitchLiteral, mapFormula, spellPitchDifference } from './runtime/pitches'
 export type { ExpressionEvaluationResult } from './runtime/expressions'
 export { evaluateScoreShape } from './runtime/score-shape'
 export type { ScoreShapeEvaluationResult, ScoreShapeOptions } from './runtime/score-shape'
 export type {
   AttackShape,
+  AbsolutePitchValue,
   ContinueShape,
   EvaluatedLiteral,
   ExpandedNode,
@@ -19,6 +21,10 @@ export type {
   RepeatExpansionResult,
   ScalarValue,
   PitchOffsetValue,
+  PitchSpelling,
+  IntervalSpelling,
+  PrimeMapping,
+  PrimeMonzo,
   ParallelShape,
   RestShape,
   ScoreShape,
