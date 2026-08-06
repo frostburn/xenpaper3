@@ -33,20 +33,25 @@ const NOMINALS: Readonly<Record<string, readonly (readonly [number, number])[]>>
   G: [[2, -1], [3, 1]], A: [[2, -4], [3, 3]], B: [[2, -7], [3, 5]],
 }
 
-// Greek nominals interleave the diatonic chain at half-octave positions.  The
-// final four are manual semiquartal spellings retained by the historical
-// Xenpaper notation.
+// Greek nominals interleave the diatonic chain at half-octave positions.
 const GREEK_NOMINALS: Readonly<Record<string, readonly (readonly [number, number])[]>> = {
   ALP: [[2, -4.5], [3, 3]], BET: [[2, -7.5], [3, 5]], GAM: [[2, 0.5]],
   DEL: [[2, -2.5], [3, 2]], EPS: [[2, -5.5], [3, 4]],
   ZET: [[2, 2.5], [3, -1]], ETA: [[2, -1.5], [3, 1]],
-  PHI: [[2, 1], [3, -0.5]], CHI: [[2, -2], [3, 1.5]],
-  PSI: [[3, 0.5]], OME: [[2, -3], [3, 2.5]],
 }
 
 const GREEK_SCRIPT: Readonly<Record<string, string>> = {
   Α: 'ALP', Β: 'BET', Γ: 'GAM', Δ: 'DEL', Ε: 'EPS', Ζ: 'ZET', Η: 'ETA',
-  Φ: 'PHI', Χ: 'CHI', Ψ: 'PSI', Ω: 'OME',
+}
+
+const SEMIOCTAVE_INTERVALS: readonly (readonly (readonly [number, number])[])[] = [
+  [[2, -1.5], [3, 1]], [[2, 1], [3, -0.5]], [[2, -2], [3, 1.5]],
+  [[2, 0.5]], [[2, 3], [3, -1.5]], [[3, 0.5]], [[2, 2.5], [3, -1]],
+]
+
+const NOMINAL_RANK: Readonly<Record<string, number>> = {
+  C: 1, D: 2, E: 3, F: 4, G: 5, A: 6, B: 7,
+  ETA: 1.5, ALP: 2.5, BET: 3.5, GAM: 4.5, DEL: 5.5, EPS: 6.5, ZET: 7.5,
 }
 
 export function mapFormula(monzo: PrimeMonzo, mapping: PrimeMapping): Value {
@@ -63,15 +68,22 @@ function shifts(modifiers: readonly { kind: string }[]): number {
 
 /** Preserve the diatonic meaning of subtracting two naturally spelled pitches. */
 export function spellPitchDifference(left: AbsolutePitchValue, right: AbsolutePitchValue) {
-  const letters = 'CDEFGAB'
-  const leftStep = letters.indexOf(left.spelling.nominal.toUpperCase()) + (left.spelling.nominal === left.spelling.nominal.toLowerCase() ? 7 : 0)
-  const rightStep = letters.indexOf(right.spelling.nominal.toUpperCase()) + (right.spelling.nominal === right.spelling.nominal.toLowerCase() ? 7 : 0)
+  const rank = (nominal: string) => {
+    const upper = nominal.toUpperCase()
+    const key = GREEK_SCRIPT[upper] ?? upper
+    const base = NOMINAL_RANK[key]
+    return base === undefined ? undefined : base + (nominal === nominal.toLowerCase() ? 7 : 0)
+  }
+  const leftStep = rank(left.spelling.nominal)
+  const rightStep = rank(right.spelling.nominal)
+  if (leftStep === undefined || rightStep === undefined) return undefined
   const distance = leftStep - rightStep
   if (distance < 0) return undefined
-  const number = BigInt(distance + 1)
-  const simple = distance % 7 + 1
-  const quality = simple === 1 || simple === 4 || simple === 5 ? 'P' : 'M'
-  return { quality, number, raw: `${quality}${number}` }
+  const numericNumber = distance + 1
+  const simple = (distance % 7) + 1
+  const quality = [1, 4, 5, 1.5, 4.5, 7.5].includes(simple) ? 'P' : 'M'
+  const number = Number.isInteger(numericNumber) ? BigInt(numericNumber) : new Fraction(numericNumber)
+  return { quality, number, raw: `${quality}${numericNumber}` }
 }
 
 export function evaluatePitchLiteral(node: PitchLiteral, mapping: PrimeMapping): AbsolutePitchValue {
@@ -118,28 +130,34 @@ export function evaluatePitchLiteral(node: PitchLiteral, mapping: PrimeMapping):
 }
 
 export function evaluateIntervalLiteral(node: IntervalLiteral, mapping: PrimeMapping): PitchOffsetValue {
-  const number = BigInt(node.number)
-  if (number < 1n) throw new TypeError('Interval number must be positive.')
-  const simple = Number((number - 1n) % 7n) + 1
-  const octaves = Number((number - 1n) / 7n) + shifts(node.modifiers)
-  const perfect = simple === 1 || simple === 4 || simple === 5
+  const number = new Fraction(node.number.replace('½', '.5'))
+  if (number.compare(1) < 0) throw new TypeError('Interval number must be positive.')
+  if (number.mul(2).d !== 1) throw new TypeError('Interval number must be an integer or half-integer.')
+  const zeroBased = number.sub(1)
+  const octaves = Math.floor(zeroBased.div(7).valueOf()) + shifts(node.modifiers)
+  const simple = zeroBased.mmod(7).add(1).valueOf()
+  const interordinal = !Number.isInteger(simple)
+  const perfect = [1, 4, 5, 1.5, 4.5, 7.5].includes(simple)
   let chromatic: number
-  if (node.quality.startsWith('A')) chromatic = node.quality.length
-  else if (node.quality.startsWith('d')) chromatic = -(node.quality.length + (perfect ? 0 : 1))
+  if (node.quality.startsWith('A')) chromatic = node.quality.length + (interordinal && !perfect ? 0.5 : 0)
+  else if (node.quality.startsWith('d')) chromatic = -(node.quality.length + (perfect ? 0 : interordinal ? 0.5 : 1))
   else if (node.quality === 'P' && perfect) chromatic = 0
-  else if (node.quality === 'M' && !perfect) chromatic = 0
-  else if (node.quality === 'm' && !perfect) chromatic = -1
-  else if (node.quality === 'n' && !perfect) chromatic = -0.5
+  else if (node.quality === 'M' && !perfect) chromatic = interordinal ? 0.5 : 0
+  else if (node.quality === 'm' && !perfect) chromatic = interordinal ? -0.5 : -1
+  else if (node.quality === 'n' && !perfect) chromatic = interordinal ? 0 : -0.5
   else if (node.quality === 'n' && simple === 4) chromatic = 0.5
   else if (node.quality === 'n' && simple === 5) chromatic = -0.5
   else throw new TypeError(`Quality ${node.quality} is invalid for interval ${node.number}.`)
-  const result = formula(NOMINALS[['C', 'D', 'E', 'F', 'G', 'A', 'B'][simple - 1]!]!)
+  const result = interordinal
+    ? formula(SEMIOCTAVE_INTERVALS[simple - 1.5]!)
+    : formula(NOMINALS[['C', 'D', 'E', 'F', 'G', 'A', 'B'][simple - 1]!]!)
   if (octaves) result.set(2, (result.get(2) ?? new Fraction(0)).add(octaves))
   if (chromatic) {
     result.set(2, (result.get(2) ?? new Fraction(0)).sub(11 * chromatic))
     result.set(3, (result.get(3) ?? new Fraction(0)).add(7 * chromatic))
   }
-  return { kind: 'pitchOffset', value: mapFormula(result, mapping), formula: result, spelling: { quality: node.quality, number, raw: node.raw }, origins: origin(node) }
+  const spellingNumber = number.d === 1 ? BigInt(number.n) : number
+  return { kind: 'pitchOffset', value: mapFormula(result, mapping), formula: result, spelling: { quality: node.quality, number: spellingNumber, raw: node.raw }, origins: origin(node) }
 }
 
 export type PitchEvaluationResult = { readonly value: AbsolutePitchValue | PitchOffsetValue; readonly diagnostics: readonly Diagnostic[] }
