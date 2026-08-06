@@ -267,6 +267,7 @@ export interface FjsInflection extends Node {
   direction: "numerator" | "denominator";
   marker: string;
   prime: string;
+  flavor: string;
   raw: string;
 }
 

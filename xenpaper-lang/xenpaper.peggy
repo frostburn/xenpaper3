@@ -467,12 +467,13 @@ PythagoreanAccidental
   / "_" ![0-9] { return node('Accidental', { value: '_' }); }
 
 FjsInflection
-  = marker:$("^" / "_" / "v") prime:UnsignedInteger {
+  = marker:$("^" / "_" / "v") prime:UnsignedInteger flavor:$([cnqthm])? {
       return node('FjsInflection', {
         direction: marker === '^' ? 'numerator' : 'denominator',
         marker,
         prime,
-        raw: marker + prime,
+        flavor: flavor ?? '',
+        raw: marker + prime + (flavor ?? ''),
       });
     }
 
