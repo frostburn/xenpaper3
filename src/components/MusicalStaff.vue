@@ -6,7 +6,7 @@ import type {
   StaffNotationShape,
   StaffPitch,
 } from '../../xenpaper-lang'
-import type { Fraction } from 'xen-dev-utils/fraction'
+import { Fraction } from 'xen-dev-utils/fraction'
 
 const props = defineProps<{
   notation?: StaffNotationShape
@@ -19,81 +19,101 @@ type TupletItem = {
   tupletEndColumn?: number
 }
 
-type StaffItem = TupletItem &
-  (
-    | {
-        kind: 'note'
-        pitch: StaffPitch
-        duration: Fraction
-        soundingLabel?: string
-        tiedFromColumn?: number
-      }
-    | { kind: 'rest'; duration: Fraction }
-    | { kind: 'barline'; style: BarlineStyle }
-    | { kind: 'annotation'; text: string }
-  ) & { column: number }
+type StaffItemContent =
+  | { kind: 'note'; pitch: StaffPitch; duration: Fraction; soundingLabel?: string }
+  | { kind: 'rest'; duration: Fraction }
+  | { kind: 'barline'; style: BarlineStyle }
+  | { kind: 'annotation'; text: string }
+
+type StaffItem = TupletItem & StaffItemContent & { column: number; tiedFromColumn?: number }
+
+type LayoutItem = StaffItemContent & {
+  tupletPosition?: number
+  tupletCount?: number
+  offset: Fraction
+  tiedFromOffset?: Fraction
+  tupletStartOffset?: Fraction
+  tupletEndOffset?: Fraction
+}
 
 const durationValue = (duration: Fraction) => Number(duration.n) / Number(duration.d)
 
 const items = computed(() => {
-  const result: StaffItem[] = []
-  type VisitState = { activePitch?: StaffPitch; activeNoteColumn?: number }
-  const visit = (shape: StaffNotationShape, column: number, state: VisitState): number => {
+  const layout: LayoutItem[] = []
+  type VisitState = { activePitch?: StaffPitch; activeNoteOffset?: Fraction }
+  const visit = (shape: StaffNotationShape, offset: Fraction, state: VisitState): Fraction => {
     if (shape.kind === 'note') {
       state.activePitch = shape.pitch
-      state.activeNoteColumn = column
-      result.push({
+      state.activeNoteOffset = offset
+      layout.push({
         kind: 'note',
-        column,
+        offset,
         pitch: shape.pitch,
         duration: shape.duration,
         soundingLabel: shape.soundingLabel,
       })
     } else if (shape.kind === 'continue' && state.activePitch) {
-      result.push({
+      layout.push({
         kind: 'note',
-        column,
+        offset,
         pitch: state.activePitch,
         duration: shape.duration,
-        tiedFromColumn: state.activeNoteColumn,
+        tiedFromOffset: state.activeNoteOffset,
       })
-      state.activeNoteColumn = column
+      state.activeNoteOffset = offset
     } else if (shape.kind === 'rest') {
       state.activePitch = undefined
-      state.activeNoteColumn = undefined
-      result.push({ kind: 'rest', column, duration: shape.duration })
+      state.activeNoteOffset = undefined
+      layout.push({ kind: 'rest', offset, duration: shape.duration })
     } else if (shape.kind === 'barline') {
-      result.push({ kind: 'barline', column, style: shape.style })
+      layout.push({ kind: 'barline', offset, style: shape.style })
     } else if (shape.kind === 'annotation') {
-      result.push({ kind: 'annotation', column, text: shape.text })
+      layout.push({ kind: 'annotation', offset, text: shape.text })
     } else if (shape.kind === 'sequence') {
-      const startColumn = column
-      const startIndex = result.length
+      const startOffset = offset
+      const startIndex = layout.length
       shape.children.forEach((child) => {
-        column = visit(child, column, state)
+        offset = visit(child, offset, state)
       })
       if (shape.tuplet) {
-        const rhythmicItems = result
+        const rhythmicItems = layout
           .slice(startIndex)
           .filter((item) => item.kind === 'note' || item.kind === 'rest')
         rhythmicItems.forEach((item, position) =>
           Object.assign(item, {
             tupletPosition: position,
             tupletCount: shape.tuplet,
-            tupletStartColumn: startColumn,
-            tupletEndColumn: column - 1,
+            tupletStartOffset: startOffset,
+            tupletEndOffset: rhythmicItems[rhythmicItems.length - 1]?.offset ?? startOffset,
           }),
         )
       }
-      return column
+      return offset
     } else if (shape.kind === 'parallel') {
-      const branchEnds = shape.branches.map((branch) => visit(branch, column, { ...state }))
-      return Math.max(column, ...branchEnds)
+      const branchEnds = shape.branches.map((branch) => visit(branch, offset, { ...state }))
+      return branchEnds.reduce((latest, end) => (end.compare(latest) > 0 ? end : latest), offset)
     }
-    return column + 1
+    return shape.duration ? offset.add(shape.duration) : offset
   }
-  if (props.notation) visit(props.notation, 0, {})
-  return result
+  if (props.notation) visit(props.notation, new Fraction(0), {})
+
+  const offsets = [
+    ...layout.map((item) => item.offset),
+    ...layout.flatMap((item) => (item.tupletEndOffset ? [item.tupletEndOffset] : [])),
+  ].sort((a, b) => a.compare(b))
+  const uniqueOffsets = offsets.filter(
+    (offset, index) => !index || !offset.equals(offsets[index - 1]!),
+  )
+  const column = (offset: Fraction) =>
+    uniqueOffsets.findIndex((candidate) => candidate.equals(offset))
+
+  return layout.map(({ offset, tiedFromOffset, tupletStartOffset, tupletEndOffset, ...item }) => ({
+    ...item,
+    column: column(offset),
+    tiedFromColumn: tiedFromOffset ? column(tiedFromOffset) : undefined,
+    tupletStartColumn: tupletStartOffset ? column(tupletStartOffset) : undefined,
+    tupletEndColumn: tupletEndOffset ? column(tupletEndOffset) : undefined,
+  })) as StaffItem[]
 })
 
 const width = computed(() =>

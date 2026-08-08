@@ -134,6 +134,24 @@ describe('MusicalStaff', () => {
     ])
   })
 
+  it('aligns parallel branches by rhythmic offset across different subdivisions', () => {
+    const expression = parse('C D, [E F] [G A]').body[0]!
+    const evaluated = evaluateScoreShape(expression)
+    if (!('shape' in evaluated)) throw new Error('Expected a score shape.')
+    const wrapper = mount(MusicalStaff, {
+      props: { notation: constructStaffNotationShape(evaluated.shape) },
+    })
+
+    expect(wrapper.findAll('ellipse.notehead').map((note) => note.attributes('cx'))).toEqual([
+      '60',
+      '164',
+      '60',
+      '112',
+      '164',
+      '216',
+    ])
+  })
+
   it('renders staff lines, notes, accidentals, ledger lines, and rests', () => {
     const wrapper = mount(MusicalStaff, { props: { notation } })
 
