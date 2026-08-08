@@ -21,7 +21,7 @@ describe('beat event expansion', () => {
     expect(notes[3]!.origins.map((origin) => origin.role)).toEqual(['literal', 'duration'])
   })
 
-  it('diagnoses a continuation without an active note while retaining exact timing', () => {
+  it('rejects a continuation without an active note', () => {
     const result = expandToBeatEvents(parse('= C'))
 
     expect(result.diagnostics).toMatchObject([
@@ -31,19 +31,14 @@ describe('beat event expansion', () => {
         locations: [{ start: { offset: 0 }, end: { offset: 1 } }],
       },
     ])
-    if (!('score' in result)) throw new Error('Expected a beat-timed score.')
-    const note = result.score.events.find((event) => event.kind === 'note')
-    expect(note?.start.equals(1)).toBe(true)
+    expect('score' in result).toBe(false)
   })
 
   it('clears the active note at a rest before resolving continuations', () => {
     const result = expandToBeatEvents(parse('C . = D'))
 
     expect(result.diagnostics).toMatchObject([{ code: 'XP_CONTINUE_WITHOUT_ATTACK' }])
-    if (!('score' in result)) throw new Error('Expected a beat-timed score.')
-    const notes = result.score.events.filter((event) => event.kind === 'note')
-    expect(notes.map((note) => note.start.toFraction())).toEqual(['0', '3'])
-    expect(notes[0]!.duration.equals(1)).toBe(true)
+    expect('score' in result).toBe(false)
   })
 
   it('expands repeats and preserves simultaneous branch timing', () => {

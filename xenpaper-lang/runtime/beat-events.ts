@@ -110,5 +110,8 @@ export function expandToBeatEvents(
   const diagnostics = [...expanded.diagnostics, ...evaluated.diagnostics]
   if (!('shape' in evaluated)) return { diagnostics }
   const flattened = flattenScoreShape(evaluated.shape)
-  return { score: flattened.score, diagnostics: [...diagnostics, ...flattened.diagnostics] }
+  const allDiagnostics = [...diagnostics, ...flattened.diagnostics]
+  return allDiagnostics.some((diagnostic) => diagnostic.severity === 'error')
+    ? { diagnostics: allDiagnostics }
+    : { score: flattened.score, diagnostics: allDiagnostics }
 }

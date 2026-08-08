@@ -24,6 +24,11 @@ const populateStaff = () => {
   const program = parse(source.value)
   const expanded = expandToBeatEvents(program)
   pianoRoll.value = 'score' in expanded ? expanded.score : undefined
+  if (!('score' in expanded)) {
+    notation.value = undefined
+    if (expanded.diagnostics.length) console.warn(expanded.diagnostics)
+    return
+  }
   if (!program.body.length) {
     notation.value = undefined
     return

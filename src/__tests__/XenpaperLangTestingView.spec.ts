@@ -69,4 +69,23 @@ describe('XenpaperLangTestingView', () => {
     )
     log.mockRestore()
   })
+
+  it('does not populate either visualiser when beat expansion rejects the score', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+    evaluateScoreShape.mockClear()
+    expandToBeatEvents.mockReturnValueOnce({
+      diagnostics: [{ code: 'XP_CONTINUE_WITHOUT_ATTACK', severity: 'error' }],
+    })
+    const wrapper = mount(XenpaperLangTestingView)
+    await wrapper.get('textarea').setValue('= C D E F G')
+    await wrapper.findAll('button')[1]!.trigger('click')
+
+    expect(evaluateScoreShape).not.toHaveBeenCalled()
+    expect(wrapper.getComponent({ name: 'PianoRoll' }).props('score')).toBeUndefined()
+    expect(wrapper.getComponent({ name: 'MusicalStaff' }).props('notation')).toBeUndefined()
+    expect(warn).toHaveBeenCalledWith([
+      { code: 'XP_CONTINUE_WITHOUT_ATTACK', severity: 'error' },
+    ])
+    warn.mockRestore()
+  })
 })
