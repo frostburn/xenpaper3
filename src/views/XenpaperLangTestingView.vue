@@ -3,14 +3,18 @@ import { ref } from 'vue'
 import { Fraction } from 'xen-dev-utils/fraction'
 import {
   constructStaffNotationShape,
+  expandToBeatEvents,
   evaluateScoreShape,
   parse,
   type StaffNotationShape,
+  type BeatTimedScore,
 } from '../../xenpaper-lang'
 import MusicalStaff from '../components/MusicalStaff.vue'
+import PianoRoll from '../components/PianoRoll.vue'
 
 const source = ref('C D E F G')
 const notation = ref<StaffNotationShape>()
+const pianoRoll = ref<BeatTimedScore>()
 
 const logParsedOutput = () => {
   console.log(parse(source.value))
@@ -18,6 +22,8 @@ const logParsedOutput = () => {
 
 const populateStaff = () => {
   const program = parse(source.value)
+  const expanded = expandToBeatEvents(program)
+  pianoRoll.value = 'score' in expanded ? expanded.score : undefined
   if (!program.body.length) {
     notation.value = undefined
     return
@@ -54,11 +60,12 @@ const logStaffNotation = () => {
     <textarea id="xenpaper-source" v-model="source" rows="16" cols="80" />
     <div class="actions">
       <button type="button" @click="logParsedOutput">Parse and log output</button>
-      <button type="button" @click="populateStaff">Populate staff</button>
+      <button type="button" @click="populateStaff">Populate visualisers</button>
       <button type="button" @click="logStaffNotation">Log staff notation</button>
     </div>
   </div>
   <MusicalStaff :notation="notation" />
+  <PianoRoll :score="pianoRoll" />
 </template>
 
 <style scoped>

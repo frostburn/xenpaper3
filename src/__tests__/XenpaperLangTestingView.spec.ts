@@ -2,13 +2,17 @@ import { mount } from '@vue/test-utils'
 import { describe, expect, it, vi } from 'vitest'
 import XenpaperLangTestingView from '../views/XenpaperLangTestingView.vue'
 
-const { constructStaffNotationShape, evaluateScoreShape, parse } = vi.hoisted(() => ({
+const { constructStaffNotationShape, evaluateScoreShape, expandToBeatEvents, parse } = vi.hoisted(() => ({
   constructStaffNotationShape: vi.fn<(shape: object) => object>(() => ({
     kind: 'note',
     pitch: { staffPosition: 0, accidentals: [], notehead: 'normal', cents: 0 },
   })),
   evaluateScoreShape: vi.fn<(expression: object) => object>(() => ({
     shape: { kind: 'attack' },
+    diagnostics: [],
+  })),
+  expandToBeatEvents: vi.fn<() => object>(() => ({
+    score: { duration: { valueOf: () => 1 }, events: [] },
     diagnostics: [],
   })),
   parse: vi.fn<(source: string) => object>(() => ({
@@ -19,6 +23,7 @@ const { constructStaffNotationShape, evaluateScoreShape, parse } = vi.hoisted(()
 vi.mock('../../xenpaper-lang', () => ({
   constructStaffNotationShape,
   evaluateScoreShape,
+  expandToBeatEvents,
   parse,
 }))
 
@@ -42,6 +47,8 @@ describe('XenpaperLangTestingView', () => {
     expect(parse).toHaveBeenCalledWith('C D E')
     expect(evaluateScoreShape).toHaveBeenCalledWith({ type: 'Sequence' })
     expect(constructStaffNotationShape).toHaveBeenCalledWith({ kind: 'attack' })
+    expect(expandToBeatEvents).toHaveBeenCalled()
+    expect(wrapper.getComponent({ name: 'PianoRoll' }).props('score')).toMatchObject({ events: [] })
     expect(wrapper.getComponent({ name: 'MusicalStaff' }).props('notation')).toMatchObject({
       kind: 'note',
       pitch: { staffPosition: 0 },

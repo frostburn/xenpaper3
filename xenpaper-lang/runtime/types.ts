@@ -198,3 +198,29 @@ export type ScoreShape =
   | AnnotationShape
   | SequenceShape
   | ParallelShape
+
+/** A renderer/audio-engine friendly score whose time axis is still exact beats. */
+export interface BeatTimedNoteEvent {
+  readonly kind: 'note'
+  readonly start: Fraction
+  readonly duration: Fraction
+  readonly pitch: AttackShape['pitch']
+  readonly rootStaffPosition: number
+  readonly label?: string
+  readonly origins: readonly SourceOrigin[]
+}
+
+export interface BeatTimedMarkerEvent {
+  readonly kind: 'marker'
+  readonly start: Fraction
+  readonly marker: 'barline' | 'annotation'
+  readonly label: string
+  readonly origins: readonly SourceOrigin[]
+}
+
+export type BeatTimedEvent = BeatTimedNoteEvent | BeatTimedMarkerEvent
+
+export interface BeatTimedScore {
+  readonly duration: Fraction
+  readonly events: readonly BeatTimedEvent[]
+}
