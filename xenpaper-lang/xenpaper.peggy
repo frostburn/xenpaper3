@@ -588,6 +588,7 @@ IdentifierContinue
 
 SequenceGap
   = RequiredSpacing
+  / &Barline
 
 Spacing
   = (White / Comment)*

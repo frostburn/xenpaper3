@@ -160,10 +160,32 @@ const items = computed(() => {
   })) as StaffItem[]
 })
 
-const width = computed(() =>
-  Math.max(360, 80 + (Math.max(-1, ...items.value.map((item) => item.column)) + 1) * 52),
+const repeatMarkerColumns = computed(() =>
+  new Set(
+    items.value
+      .filter(
+        (item) =>
+          item.kind === 'barline' &&
+          (item.style === 'repeat-start' || item.style === 'repeat-end'),
+      )
+      .map((item) => item.column),
+  ),
 )
-const x = (column: number) => 60 + column * 52
+const repeatMarkerSpace = 24
+const repeatSpaceBefore = (column: number) =>
+  [...repeatMarkerColumns.value].filter((markerColumn) => markerColumn <= column).length *
+  repeatMarkerSpace
+const width = computed(() =>
+  Math.max(
+    360,
+    80 +
+      (Math.max(-1, ...items.value.map((item) => item.column)) + 1) * 52 +
+      repeatMarkerColumns.value.size * repeatMarkerSpace,
+  ),
+)
+const x = (column: number) => 60 + column * 52 + repeatSpaceBefore(column)
+const barlineX = (item: Extract<StaffItem, { kind: 'barline' }>) =>
+  x(item.column) - 26 - (repeatMarkerColumns.value.has(item.column) ? repeatMarkerSpace / 2 : 0)
 const y = (position: number) => 100 - (position - 2) * 6
 const accidental = (value: string) =>
   ({
@@ -315,26 +337,26 @@ const restDotY = (duration: Fraction, tupletCount?: number) =>
       </text>
       <g v-else-if="item.kind === 'barline'" class="barline" :class="`barline--${item.style}`">
         <line
-          :x1="x(item.column) - (item.style === 'single' ? 0 : 3)"
-          :x2="x(item.column) - (item.style === 'single' ? 0 : 3)"
+          :x1="barlineX(item) - (item.style === 'single' ? 0 : 3)"
+          :x2="barlineX(item) - (item.style === 'single' ? 0 : 3)"
           y1="52"
           y2="100"
         />
         <line
           v-if="item.style !== 'single'"
-          :x1="x(item.column) + 3"
-          :x2="x(item.column) + 3"
+          :x1="barlineX(item) + 3"
+          :x2="barlineX(item) + 3"
           y1="52"
           y2="100"
         />
         <template v-if="item.style === 'repeat-start' || item.style === 'repeat-end'">
           <circle
-            :cx="x(item.column) + (item.style === 'repeat-start' ? 10 : -10)"
+            :cx="barlineX(item) + (item.style === 'repeat-start' ? 10 : -10)"
             cy="70"
             r="2.5"
           />
           <circle
-            :cx="x(item.column) + (item.style === 'repeat-start' ? 10 : -10)"
+            :cx="barlineX(item) + (item.style === 'repeat-start' ? 10 : -10)"
             cy="82"
             r="2.5"
           />
