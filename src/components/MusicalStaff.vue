@@ -107,10 +107,14 @@ const items = computed(() => {
             }),
           )
         }
-        state.activeNotes = rhythmicItems.filter(
+        let lastRest = -1
+        rhythmicItems.forEach((item, index) => {
+          if (item.kind === 'rest') lastRest = index
+        })
+        state.activeNotes = rhythmicItems.slice(lastRest + 1).filter(
           (item): item is NoteLayoutItem => item.kind === 'note',
         )
-        state.activeSpan = shape.duration
+        state.activeSpan = state.activeNotes.length ? shape.duration : undefined
       }
       return offset
     } else if (shape.kind === 'parallel') {
