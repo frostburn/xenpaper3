@@ -12,11 +12,19 @@ const props = defineProps<{
   notation?: StaffNotationShape
 }>()
 
-type StaffItem =
-  | { kind: 'note'; pitch: StaffPitch; duration: Fraction; soundingLabel?: string; tiedFromIndex?: number; tupletPosition?: number; tupletCount?: number }
+type TupletItem = {
+  tupletPosition?: number
+  tupletCount?: number
+  tupletStartIndex?: number
+  tupletEndIndex?: number
+}
+
+type StaffItem = TupletItem & (
+  | { kind: 'note'; pitch: StaffPitch; duration: Fraction; soundingLabel?: string; tiedFromIndex?: number }
   | { kind: 'rest'; duration: Fraction }
   | { kind: 'barline'; style: BarlineStyle }
   | { kind: 'annotation'; text: string }
+)
 
 const durationValue = (duration: Fraction) => Number(duration.n) / Number(duration.d)
 
@@ -24,11 +32,11 @@ const items = computed(() => {
   const result: StaffItem[] = []
   let activePitch: StaffPitch | undefined
   let activeNoteIndex: number | undefined
-  const visit = (shape: StaffNotationShape, tupletPosition?: number, tupletCount?: number) => {
+  const visit = (shape: StaffNotationShape) => {
     if (shape.kind === 'note') {
       activePitch = shape.pitch
       activeNoteIndex = result.length
-      result.push({ kind: 'note', pitch: shape.pitch, duration: shape.duration, soundingLabel: shape.soundingLabel, tupletPosition, tupletCount })
+      result.push({ kind: 'note', pitch: shape.pitch, duration: shape.duration, soundingLabel: shape.soundingLabel })
     } else if (shape.kind === 'continue' && activePitch) {
       result.push({ kind: 'note', pitch: activePitch, duration: shape.duration, tiedFromIndex: activeNoteIndex })
       activeNoteIndex = result.length - 1
@@ -41,11 +49,20 @@ const items = computed(() => {
     } else if (shape.kind === 'annotation') {
       result.push({ kind: 'annotation', text: shape.text })
     } else if (shape.kind === 'sequence') {
-      shape.children.forEach((child, index) => visit(
-        child,
-        shape.tuplet ? index : undefined,
-        shape.tuplet,
-      ))
+      const startIndex = result.length
+      shape.children.forEach((child) => visit(child))
+      if (shape.tuplet) {
+        const rhythmicItems = result.slice(startIndex).filter(
+          (item) => item.kind === 'note' || item.kind === 'rest',
+        )
+        const endIndex = result.length - 1
+        rhythmicItems.forEach((item, position) => Object.assign(item, {
+          tupletPosition: position,
+          tupletCount: shape.tuplet,
+          tupletStartIndex: startIndex,
+          tupletEndIndex: endIndex,
+        }))
+      }
     }
     else if (shape.kind === 'parallel') shape.branches.forEach((branch) => visit(branch))
   }
@@ -91,6 +108,11 @@ const flagCount = (duration?: Fraction, tupletCount?: number) => {
   const binaryFlags = Math.log2(binarySubdivision)
   return Number.isInteger(binaryFlags) ? binaryFlags + (subdivision % 3 === 0 ? 1 : 0) : 0
 }
+
+const restSymbol = (duration: Fraction) => {
+  const flags = flagCount(duration)
+  return flags === 1 ? '𝄾' : flags === 2 ? '𝄿' : '𝄽'
+}
 </script>
 
 <template>
@@ -108,7 +130,18 @@ const flagCount = (duration?: Fraction, tupletCount?: number) => {
     <text class="clef" x="25" y="98">𝄞</text>
     <text v-if="!items.length" class="empty-message" x="70" y="126">No notation loaded</text>
     <g v-for="(item, index) in items" :key="index">
-      <text v-if="item.kind === 'rest'" class="rest" :x="x(index)" y="79">𝄽</text>
+      <text
+        v-if="item.tupletPosition === Math.floor((item.tupletCount ?? 0) / 2)"
+        class="tuplet-number"
+        :x="(x(item.tupletStartIndex!) + x(item.tupletEndIndex!)) / 2"
+        y="31"
+      >{{ item.tupletCount }}</text>
+      <path
+        v-if="item.tupletPosition === Math.floor((item.tupletCount ?? 0) / 2)"
+        class="tuplet-bracket"
+        :d="`M ${x(item.tupletStartIndex!) - 10} 40 V 34 H ${(x(item.tupletStartIndex!) + x(item.tupletEndIndex!)) / 2 - 10} M ${(x(item.tupletStartIndex!) + x(item.tupletEndIndex!)) / 2 + 10} 34 H ${x(item.tupletEndIndex!) + 10} V 40`"
+      />
+      <text v-if="item.kind === 'rest'" class="rest" :x="x(index)" y="79">{{ restSymbol(item.duration) }}</text>
       <text v-else-if="item.kind === 'annotation'" class="annotation" :x="x(index)" y="25">
         {{ item.text }}
       </text>
@@ -210,17 +243,6 @@ const flagCount = (duration?: Fraction, tupletCount?: number) => {
           :key="`flag-${flag}`"
           class="flag"
           :d="`M ${x(index) + 6} ${y(item.pitch.staffPosition) - 30 + (flag - 1) * 7} Q ${x(index) + 20} ${y(item.pitch.staffPosition) - 23 + (flag - 1) * 7} ${x(index) + 12} ${y(item.pitch.staffPosition) - 13 + (flag - 1) * 7}`"
-        />
-        <text
-          v-if="item.tupletPosition === Math.floor((item.tupletCount ?? 0) / 2)"
-          class="tuplet-number"
-          :x="x(index)"
-          y="31"
-        >{{ item.tupletCount }}</text>
-        <path
-          v-if="item.tupletPosition === Math.floor((item.tupletCount ?? 0) / 2)"
-          class="tuplet-bracket"
-          :d="`M ${x(index - item.tupletPosition!) - 10} 40 V 34 H ${x(index) - 10} M ${x(index) + 10} 34 H ${x(index - item.tupletPosition! + item.tupletCount! - 1) + 10} V 40`"
         />
         <text
           v-if="item.pitch.notehead === 'x' && item.soundingLabel"
