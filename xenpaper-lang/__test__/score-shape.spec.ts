@@ -38,6 +38,14 @@ describe('score-shape timing', () => {
     expect(result.children.every((child) => child.duration.equals(new Fraction(1, 3)))).toBe(true)
   })
 
+  it('applies subdivision directives to following notes', () => {
+    const result = shape('C @2 D E @1 F G') as SequenceShape
+    const attacks = result.children.filter((child) => child.kind === 'attack')
+
+    expect(attacks.map((attack) => attack.duration.valueOf())).toEqual([1, 0.5, 0.5, 1, 1])
+    expect(result.duration.equals(4)).toBe(true)
+  })
+
   it('normalizes attached continuation as part of the complete fragment', () => {
     const result = shape('[3/2= 4/3]') as SequenceShape
 

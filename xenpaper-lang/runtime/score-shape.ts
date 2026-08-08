@@ -12,6 +12,7 @@ import type {
   BarlineShape,
   BarlineStyle,
   ContinueShape,
+  EvaluatedLiteral,
   ParallelShape,
   PitchOffsetValue,
   RestShape,
@@ -186,17 +187,21 @@ export function evaluateScoreShape(
     return context
   }
 
-  const visit = (current: Expression, context: PitchContext): ScoreShapeEvaluationResult => {
+  const visit = (
+    current: Expression,
+    context: PitchContext,
+    currentPulse: Fraction = pulse,
+  ): ScoreShapeEvaluationResult => {
     if (current.type === 'Rest') {
       return {
-        shape: { kind: 'rest', duration: pulse, generated: false, origins: [origin(current)] },
+        shape: { kind: 'rest', duration: currentPulse, generated: false, origins: [origin(current)] },
         diagnostics: [],
       }
     }
     if (current.type === 'DetachedContinue') {
       const shape: ContinueShape = {
         kind: 'continue',
-        duration: pulse,
+        duration: currentPulse,
         origins: [origin(current, 'duration')],
       }
       return { shape, diagnostics: [] }
@@ -220,7 +225,7 @@ export function evaluateScoreShape(
         let iterationContext = activeContext
         const results: ScoreShapeEvaluationResult[] = []
         for (const item of current.body) {
-          results.push(visit(item, iterationContext))
+          results.push(visit(item, iterationContext, currentPulse))
           iterationContext = contextAfter(item, iterationContext)
         }
         diagnostics.push(...results.flatMap((result) => result.diagnostics))
@@ -260,6 +265,7 @@ export function evaluateScoreShape(
     }
     if (current.type === 'Sequence') {
       let activeContext = context
+      let activePulse = currentPulse
       const results: ScoreShapeEvaluationResult[] = []
       for (const item of current.items) {
         if (item.type === 'PitchContextChange') {
@@ -269,8 +275,25 @@ export function evaluateScoreShape(
           } catch (error) {
             results.push({ diagnostics: [{ code: 'XP_CONTEXT', severity: 'error', message: error instanceof Error ? error.message : 'Invalid pitch context.', locations: [item.location] }] })
           }
+        } else if (item.type === 'Directive' && item.name === 'subdivision' && !item.graceCount) {
+          const argument = item.arguments[0]
+          const evaluated = argument && argument.type !== 'NamedArgument'
+            ? evaluateExpression(argument, activeContext)
+            : undefined
+          let subdivision: Fraction | undefined
+          if (evaluated && 'value' in evaluated) {
+            const value = (evaluated as { readonly value: EvaluatedLiteral }).value
+            const exact = value.kind === 'absolutePitch' ? undefined : value.value.exactRational()
+            if (exact) subdivision = new Fraction(exact)
+          }
+          if (!subdivision || subdivision.compare(0) <= 0) {
+            results.push({ diagnostics: [{ code: 'XP_DIRECTIVE', severity: 'error', message: 'Subdivision must be a positive exact rational.', locations: [item.location] }] })
+          } else {
+            activePulse = new Fraction(1).div(subdivision)
+            results.push({ shape: sequence([], [origin(item)]), diagnostics: evaluated?.diagnostics ?? [] })
+          }
         } else {
-          results.push(visit(item, activeContext))
+          results.push(visit(item, activeContext, activePulse))
           activeContext = contextAfter(item, activeContext)
         }
       }
@@ -282,7 +305,7 @@ export function evaluateScoreShape(
       }
     }
     if (current.type === 'Parallel') {
-      const results = current.branches.map((branch) => visit(branch, context))
+      const results = current.branches.map((branch) => visit(branch, context, currentPulse))
       const diagnostics = results.flatMap((result) => result.diagnostics)
       if (!results.every(hasShape)) return { diagnostics }
       const branches = results.map((result) => result.shape)
@@ -298,15 +321,15 @@ export function evaluateScoreShape(
       }
       return { shape, diagnostics }
     }
-    if (current.type === 'Group') return visit(current.expression, context)
+    if (current.type === 'Group') return visit(current.expression, context, currentPulse)
     if (current.type === 'NormalizeToSlot') {
       if (!current.expression) {
         return {
-          shape: { kind: 'rest', duration: pulse, generated: false, origins: [origin(current)] },
+          shape: { kind: 'rest', duration: currentPulse, generated: false, origins: [origin(current)] },
           diagnostics: [],
         }
       }
-      const evaluated = visit(current.expression, context)
+      const evaluated = visit(current.expression, context, currentPulse)
       if (!('shape' in evaluated)) return evaluated
       if (!evaluated.shape.duration.n) {
         return {
@@ -322,12 +345,12 @@ export function evaluateScoreShape(
         }
       }
       return {
-        shape: scaleShape(evaluated.shape, pulse.div(evaluated.shape.duration)),
+        shape: scaleShape(evaluated.shape, currentPulse.div(evaluated.shape.duration)),
         diagnostics: evaluated.diagnostics,
       }
     }
     if (current.type === 'PostfixExpression') {
-      const evaluated = visit(current.expression, context)
+      const evaluated = visit(current.expression, context, currentPulse)
       if (!('shape' in evaluated)) return evaluated
       const continuations = current.marks.filter((mark) => mark.type === 'DetachedContinue')
       if (!continuations.length) return evaluated
@@ -337,7 +360,7 @@ export function evaluateScoreShape(
             evaluated.shape,
             ...continuations.map<ContinueShape>((mark) => ({
               kind: 'continue',
-              duration: pulse,
+              duration: currentPulse,
               origins: [origin(mark, 'duration')],
             })),
           ],
@@ -355,7 +378,7 @@ export function evaluateScoreShape(
     const shape: AttackShape = {
       kind: 'attack',
       pitch: evaluated.pitch,
-      duration: pulse,
+      duration: currentPulse,
       origins: evaluated.pitch.origins,
       rootStaffPosition: context.rootStaffPosition,
       ...('raw' in current ? { soundingLabel: String(current.raw) } : {}),

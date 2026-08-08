@@ -6,14 +6,15 @@ import type {
   StaffNotationShape,
   StaffPitch,
 } from '../../xenpaper-lang'
+import type { Fraction } from 'xen-dev-utils/fraction'
 
 const props = defineProps<{
   notation?: StaffNotationShape
 }>()
 
 type StaffItem =
-  | { kind: 'note'; pitch: StaffPitch; soundingLabel?: string; tiedFromIndex?: number }
-  | { kind: 'rest' }
+  | { kind: 'note'; pitch: StaffPitch; duration: Fraction; soundingLabel?: string; tiedFromIndex?: number }
+  | { kind: 'rest'; duration: Fraction }
   | { kind: 'barline'; style: BarlineStyle }
   | { kind: 'annotation'; text: string }
 
@@ -25,14 +26,14 @@ const items = computed(() => {
     if (shape.kind === 'note') {
       activePitch = shape.pitch
       activeNoteIndex = result.length
-      result.push({ kind: 'note', pitch: shape.pitch, soundingLabel: shape.soundingLabel })
+      result.push({ kind: 'note', pitch: shape.pitch, duration: shape.duration, soundingLabel: shape.soundingLabel })
     } else if (shape.kind === 'continue' && activePitch) {
-      result.push({ kind: 'note', pitch: activePitch, tiedFromIndex: activeNoteIndex })
+      result.push({ kind: 'note', pitch: activePitch, duration: shape.duration, tiedFromIndex: activeNoteIndex })
       activeNoteIndex = result.length - 1
     } else if (shape.kind === 'rest') {
       activePitch = undefined
       activeNoteIndex = undefined
-      result.push({ kind: 'rest' })
+      result.push({ kind: 'rest', duration: shape.duration })
     } else if (shape.kind === 'barline') {
       result.push({ kind: 'barline', style: shape.style })
     } else if (shape.kind === 'annotation') {
@@ -70,6 +71,12 @@ const ledgerPositions = (position: number) => {
   for (let current = 0; current >= position; current -= 2) positions.push(current)
   for (let current = 12; current <= position; current += 2) positions.push(current)
   return positions
+}
+
+const hasEighthFlag = (duration?: Fraction) => {
+  if (!duration) return false
+  if (typeof duration.compare === 'function') return duration.compare(0.5) === 0
+  return Number(duration.n) / Number(duration.d) === 0.5
 }
 </script>
 
@@ -185,6 +192,11 @@ const ledgerPositions = (position: number) => {
           :y1="y(item.pitch.staffPosition)"
           :y2="y(item.pitch.staffPosition) - 30"
         />
+        <path
+          v-if="hasEighthFlag(item.duration)"
+          class="flag"
+          :d="`M ${x(index) + 6} ${y(item.pitch.staffPosition) - 30} Q ${x(index) + 20} ${y(item.pitch.staffPosition) - 23} ${x(index) + 12} ${y(item.pitch.staffPosition) - 13}`"
+        />
         <text
           v-if="item.pitch.notehead === 'x' && item.soundingLabel"
           class="sounding-label"
@@ -214,6 +226,12 @@ const ledgerPositions = (position: number) => {
 .tie {
   stroke: currentColor;
   stroke-width: 1.5;
+}
+
+.flag {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 3;
 }
 
 .barline circle {
