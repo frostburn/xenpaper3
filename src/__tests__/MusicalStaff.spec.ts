@@ -361,6 +361,29 @@ describe('MusicalStaff', () => {
     expect(wrapper.findAll('.notehead')).toHaveLength(1)
     expect(wrapper.findAll('.notehead--open')).toHaveLength(1)
     expect(wrapper.findAll('.tie')).toHaveLength(0)
+    expect(wrapper.get('.barline line').attributes('x1')).toBe('86')
+  })
+
+  it('positions barlines between notes and reserves room for repeat markers', () => {
+    const evaluated = evaluateScoreShape(parse('C | D |: E :| F').body[0]!)
+    if (!('shape' in evaluated)) throw new Error('Expected a score shape.')
+    const wrapper = mount(MusicalStaff, {
+      props: { notation: constructStaffNotationShape(evaluated.shape) },
+    })
+
+    expect(wrapper.findAll('ellipse.notehead').map((note) => note.attributes('cx'))).toEqual([
+      '60',
+      '112',
+      '188',
+      '264',
+    ])
+    expect(wrapper.findAll('.barline line').map((line) => line.attributes('x1'))).toEqual([
+      '86',
+      '147',
+      '153',
+      '223',
+      '229',
+    ])
   })
 
   it('renders double and repeat barlines with repeat dots', () => {
