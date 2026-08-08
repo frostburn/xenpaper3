@@ -59,7 +59,11 @@ describe('MusicalStaff', () => {
       duration: notation.duration,
       children: [
         notation.children[0]!,
-        { kind: 'barline', style: 'single', duration: { n: 0, d: 1 } as StaffNotationShape['duration'] },
+        {
+          kind: 'barline',
+          style: 'single',
+          duration: { n: 0, d: 1 } as StaffNotationShape['duration'],
+        },
         { kind: 'continue', duration: notation.duration },
       ],
     }
@@ -151,6 +155,8 @@ describe('MusicalStaff', () => {
       '/7n',
     ])
     expect(wrapper.get('.pitch-decorations').text()).toBe('^v/\\5c/7n♭')
-    expect(wrapper.get('.pitch-decorations').element.lastElementChild?.classList.contains('accidental')).toBe(true)
+    expect(
+      wrapper.get('.pitch-decorations').element.lastElementChild?.classList.contains('accidental'),
+    ).toBe(true)
   })
 })

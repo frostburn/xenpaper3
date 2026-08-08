@@ -1,6 +1,11 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import type { BarlineStyle, StaffInflection, StaffNotationShape, StaffPitch } from '../../xenpaper-lang'
+import type {
+  BarlineStyle,
+  StaffInflection,
+  StaffNotationShape,
+  StaffPitch,
+} from '../../xenpaper-lang'
 
 const props = defineProps<{
   notation?: StaffNotationShape
@@ -66,7 +71,6 @@ const ledgerPositions = (position: number) => {
   for (let current = 12; current <= position; current += 2) positions.push(current)
   return positions
 }
-
 </script>
 
 <template>
@@ -85,14 +89,23 @@ const ledgerPositions = (position: number) => {
     <text v-if="!items.length" class="empty-message" x="70" y="126">No notation loaded</text>
     <g v-for="(item, index) in items" :key="index">
       <text v-if="item.kind === 'rest'" class="rest" :x="x(index)" y="79">𝄽</text>
-      <text v-else-if="item.kind === 'annotation'" class="annotation" :x="x(index)" y="25">{{ item.text }}</text>
-      <g
-        v-else-if="item.kind === 'barline'"
-        class="barline"
-        :class="`barline--${item.style}`"
-      >
-        <line :x1="x(index) - (item.style === 'single' ? 0 : 3)" :x2="x(index) - (item.style === 'single' ? 0 : 3)" y1="52" y2="100" />
-        <line v-if="item.style !== 'single'" :x1="x(index) + 3" :x2="x(index) + 3" y1="52" y2="100" />
+      <text v-else-if="item.kind === 'annotation'" class="annotation" :x="x(index)" y="25">
+        {{ item.text }}
+      </text>
+      <g v-else-if="item.kind === 'barline'" class="barline" :class="`barline--${item.style}`">
+        <line
+          :x1="x(index) - (item.style === 'single' ? 0 : 3)"
+          :x2="x(index) - (item.style === 'single' ? 0 : 3)"
+          y1="52"
+          y2="100"
+        />
+        <line
+          v-if="item.style !== 'single'"
+          :x1="x(index) + 3"
+          :x2="x(index) + 3"
+          y1="52"
+          y2="100"
+        />
         <template v-if="item.style === 'repeat-start' || item.style === 'repeat-end'">
           <circle :cx="x(index) + (item.style === 'repeat-start' ? 10 : -10)" cy="70" r="2.5" />
           <circle :cx="x(index) + (item.style === 'repeat-start' ? 10 : -10)" cy="82" r="2.5" />
@@ -114,7 +127,10 @@ const ledgerPositions = (position: number) => {
           :y2="y(position)"
         />
         <text
-          v-if="(item.pitch.inflections?.length || item.pitch.accidentals.length) && item.tiedFromIndex === undefined"
+          v-if="
+            (item.pitch.inflections?.length || item.pitch.accidentals.length) &&
+            item.tiedFromIndex === undefined
+          "
           class="pitch-decorations"
           :x="x(index) - 11"
           :y="y(item.pitch.staffPosition) + 5"
@@ -123,7 +139,12 @@ const ledgerPositions = (position: number) => {
             v-for="(value, inflectionIndex) in item.pitch.inflections"
             :key="`inflection-${inflectionIndex}`"
             class="inflection"
-          >{{ inflection(value) }}</tspan><tspan v-if="item.pitch.accidentals.length" class="accidental">{{ item.pitch.accidentals.map(accidental).join('') }}</tspan>
+          >
+            {{ inflection(value) }}
+          </tspan>
+          <tspan v-if="item.pitch.accidentals.length" class="accidental">
+            {{ item.pitch.accidentals.map(accidental).join('') }}
+          </tspan>
         </text>
         <polygon
           v-if="item.pitch.notehead === 'triangle-down'"
@@ -169,7 +190,9 @@ const ledgerPositions = (position: number) => {
           class="sounding-label"
           :x="x(index)"
           y="130"
-        >{{ item.soundingLabel }}</text>
+        >
+          {{ item.soundingLabel }}
+        </text>
       </template>
     </g>
   </svg>
