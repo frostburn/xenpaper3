@@ -220,7 +220,7 @@ NormalizedGroup
     }
 
 Rest
-  = "." { return node('Rest', { raw: "." }); }
+  = raw:$("."+) { return node('Rest', { raw }); }
 
 DetachedContinue
   = "=" { return node('DetachedContinue', { raw: "=" }); }

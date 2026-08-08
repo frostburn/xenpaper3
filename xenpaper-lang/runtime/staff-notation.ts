@@ -205,6 +205,7 @@ export function constructStaffNotationShape(shape: ScoreShape): StaffNotationSha
         kind: 'sequence',
         duration: shape.duration,
         children: shape.children.map(constructStaffNotationShape),
+        ...(shape.normalized ? { normalized: true } : {}),
         ...(shape.tuplet ? { tuplet: shape.tuplet } : {}),
       }
     case 'parallel':
