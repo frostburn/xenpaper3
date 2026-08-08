@@ -64,6 +64,7 @@ describe('score-shape timing', () => {
     expect(result.duration.equals(1)).toBe(true)
     expect(result.children[0]!.duration.equals(new Fraction(2, 3))).toBe(true)
     expect(result.children[1]!.duration.equals(new Fraction(1, 3))).toBe(true)
+    expect(result.tuplet).toBe(3)
   })
 
   it('makes an empty slot one authored pulse of rest', () => {

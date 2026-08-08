@@ -381,11 +381,13 @@ export function evaluateScoreShape(
           ],
         }
       }
+      const normalizedSlots = evaluated.shape.duration.div(currentPulse)
       const normalized = scaleShape(evaluated.shape, currentPulse.div(evaluated.shape.duration))
-      if (normalized.kind === 'sequence' && normalized.children.length > 1 &&
-        !Number.isInteger(Math.log2(normalized.children.length))) {
+      const tuplet = Number(normalizedSlots.d) === 1 ? Number(normalizedSlots.n) : undefined
+      if (normalized.kind === 'sequence' && tuplet && tuplet > 1 &&
+        !Number.isInteger(Math.log2(tuplet))) {
         return {
-          shape: { ...normalized, tuplet: normalized.children.length },
+          shape: { ...normalized, tuplet },
           diagnostics: evaluated.diagnostics,
         }
       }

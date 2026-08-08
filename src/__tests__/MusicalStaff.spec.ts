@@ -82,6 +82,30 @@ describe('MusicalStaff', () => {
     )
   })
 
+  it('infers a triplet from continuation-weighted slot duration', () => {
+    const expression = parse('C [F G=] F').body[0]!
+    const evaluated = evaluateScoreShape(expression)
+    if (!('shape' in evaluated)) throw new Error('Expected a score shape.')
+    const wrapper = mount(MusicalStaff, {
+      props: { notation: constructStaffNotationShape(evaluated.shape) },
+    })
+
+    expect(wrapper.get('.tuplet-number').text()).toBe('3')
+    expect(wrapper.findAll('.tuplet-bracket')).toHaveLength(1)
+    expect(wrapper.findAll('.flag')).toHaveLength(3)
+  })
+
+  it('uses an eighth-rest glyph in a two-item normalized slot', () => {
+    const expression = parse('C [F .] F').body[0]!
+    const evaluated = evaluateScoreShape(expression)
+    if (!('shape' in evaluated)) throw new Error('Expected a score shape.')
+    const wrapper = mount(MusicalStaff, {
+      props: { notation: constructStaffNotationShape(evaluated.shape) },
+    })
+
+    expect(wrapper.get('.rest').text()).toBe('𝄾')
+  })
+
   it('does not mark an ordinary three-note sequence as a triplet', () => {
     const expression = parse('C D E').body[0]!
     const evaluated = evaluateScoreShape(expression)
