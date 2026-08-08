@@ -237,7 +237,6 @@ export function evaluateScoreShape(
             alternatives[index]!.push({
               pitch: attack.pitch,
               rootStaffPosition: attack.rootStaffPosition,
-              soundingCents: attack.soundingCents,
             })
           }
         }
@@ -359,9 +358,7 @@ export function evaluateScoreShape(
       duration: pulse,
       origins: evaluated.pitch.origins,
       rootStaffPosition: context.rootStaffPosition,
-      soundingCents: evaluated.pitch.kind === 'absolutePitch'
-        ? evaluated.pitch.rootOffset.valueOf()
-        : evaluated.pitch.value.valueOf() + mapFormula(context.rootFormula, context.mapping).valueOf(),
+      ...('raw' in current ? { soundingLabel: String(current.raw) } : {}),
     }
     return { shape, diagnostics: evaluated.diagnostics }
   }
