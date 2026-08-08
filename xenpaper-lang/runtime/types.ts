@@ -91,6 +91,8 @@ export interface PrimeMapping {
 
 export interface PitchContext {
   readonly mapping: PrimeMapping
+  /** Sounding displacement of the current root from the default root frequency. */
+  readonly rootDisplacement: Value
   readonly rootFormula: PrimeMonzo
   readonly up: Value
   readonly lift: Value

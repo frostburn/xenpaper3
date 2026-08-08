@@ -24,6 +24,15 @@ describe('score-shape timing', () => {
     expect(result.children[1].pitch.value.equals(Value.cents(0))).toBe(true)
     expect(result.children[2].pitch.value.equals(Value.pitch(new Value(9n, 8n)))).toBe(true)
   })
+  it('moves the root frequency without reassociating its pitch spelling', () => {
+    const result = shape('{root = D} C 1/1 D') as SequenceShape
+    const attacks = result.children.filter((child) => child.kind === 'attack')
+
+    expect(attacks).toHaveLength(3)
+    expect(attacks[0]!.pitch.value.equals(Value.pitch(new Value(9n, 8n)))).toBe(true)
+    expect(attacks[1]!.pitch.value.equals(Value.pitch(new Value(9n, 8n)))).toBe(true)
+    expect(attacks[2]!.pitch.value.equals(Value.pitch(new Value(81n, 64n)))).toBe(true)
+  })
   it('sequences atoms in exact pulse-sized beats', () => {
     const result = shape('3/2 4/3 5/4', new Fraction(1, 4)) as SequenceShape
 

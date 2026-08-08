@@ -159,6 +159,18 @@ describe('arithmetic expression evaluation', () => {
     expect(b.value.rootOffset.equals(Value.pitch(new Value(9n, 8n)))).toBe(true)
   })
 
+  it('moves the root frequency when assigning a pitch to root', () => {
+    const change = parse('{root = D}').body[0]
+    if (change.type !== 'PitchContextChange') throw new Error('Expected a context change.')
+    const context = applyPitchContextChange(change, DEFAULT_PITCH_CONTEXT)
+    const c = evaluateExpression(expression('C'), context)
+    const d = evaluateExpression(expression('D'), context)
+    if (!('value' in c) || c.value.kind !== 'absolutePitch' || !('value' in d) || d.value.kind !== 'absolutePitch') throw new Error('Expected pitches.')
+    expect(context.rootDisplacement.equals(Value.pitch(new Value(9n, 8n)))).toBe(true)
+    expect(c.value.rootOffset.equals(Value.cents(0))).toBe(true)
+    expect(d.value.rootOffset.equals(Value.pitch(new Value(9n, 8n)))).toBe(true)
+  })
+
   it('applies FJS inflections and normalizes scaled interval spelling', () => {
     const e5 = evaluate('E^5')
     if (e5.kind !== 'absolutePitch') throw new Error('Expected a pitch.')
