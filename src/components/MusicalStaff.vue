@@ -171,6 +171,10 @@ const flagCount = (duration?: Fraction, tupletCount?: number) => {
 
 const isOpenNotehead = (duration: Fraction) => durationValue(duration) >= 2
 const hasStem = (duration: Fraction) => durationValue(duration) < 4
+const isDotted = (duration: Fraction) => {
+  const relativeToDottedHalf = durationValue(duration) / 3
+  return relativeToDottedHalf > 0 && Number.isInteger(Math.log2(relativeToDottedHalf))
+}
 
 const restSymbol = (duration: Fraction) => {
   const flags = flagCount(duration)
@@ -307,6 +311,13 @@ const restSymbol = (duration: Fraction) => {
           rx="7"
           ry="5"
         />
+        <circle
+          v-if="isDotted(item.duration)"
+          class="augmentation-dot"
+          :cx="x(item.column) + 13"
+          :cy="y(item.pitch.staffPosition) - (item.pitch.staffPosition % 2 ? 0 : 3)"
+          r="2"
+        />
         <line
           v-if="hasStem(item.duration)"
           class="stem"
@@ -384,6 +395,10 @@ const restSymbol = (duration: Fraction) => {
   fill: white;
   stroke: currentColor;
   stroke-width: 1.5;
+}
+
+.augmentation-dot {
+  fill: currentColor;
 }
 
 .pitch-decorations,

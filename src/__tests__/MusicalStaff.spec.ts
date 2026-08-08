@@ -196,6 +196,31 @@ describe('MusicalStaff', () => {
     expect(wrapper.findAll('.stem')).toHaveLength(2)
   })
 
+  it('renders two continues as a dotted half note', () => {
+    const evaluated = evaluateScoreShape(parse('C==').body[0]!)
+    if (!('shape' in evaluated)) throw new Error('Expected a score shape.')
+    const wrapper = mount(MusicalStaff, {
+      props: { notation: constructStaffNotationShape(evaluated.shape) },
+    })
+
+    expect(wrapper.findAll('.notehead')).toHaveLength(1)
+    expect(wrapper.findAll('.notehead--open')).toHaveLength(1)
+    expect(wrapper.findAll('.stem')).toHaveLength(1)
+    expect(wrapper.findAll('.augmentation-dot')).toHaveLength(1)
+  })
+
+  it('distinguishes half, dotted-half, and whole-note continues', () => {
+    const evaluated = evaluateScoreShape(parse('C= D== E===').body[0]!)
+    if (!('shape' in evaluated)) throw new Error('Expected a score shape.')
+    const wrapper = mount(MusicalStaff, {
+      props: { notation: constructStaffNotationShape(evaluated.shape) },
+    })
+
+    expect(wrapper.findAll('.notehead--open')).toHaveLength(3)
+    expect(wrapper.findAll('.stem')).toHaveLength(2)
+    expect(wrapper.findAll('.augmentation-dot')).toHaveLength(1)
+  })
+
   it('extends notes and chords through following continues', () => {
     for (const source of ['C=', '[C, E, G]=']) {
       const evaluated = evaluateScoreShape(parse(source).body[0]!)
