@@ -18,16 +18,26 @@ export type BeatEventExpansionResult =
   | { readonly score: BeatTimedScore; readonly diagnostics: readonly Diagnostic[] }
   | { readonly diagnostics: readonly Diagnostic[] }
 
+export interface BeatEventFlatteningResult {
+  readonly score: BeatTimedScore
+  readonly diagnostics: readonly Diagnostic[]
+}
+
 const copy = (value: Fraction) => new Fraction(value.n, value.d)
 
 /** Flatten a score-shape tree without converting its exact beat positions to seconds. */
-export function flattenScoreShape(shape: ScoreShape): BeatTimedScore {
+export function flattenScoreShape(shape: ScoreShape): BeatEventFlatteningResult {
   const events: BeatTimedEvent[] = []
-  type State = { active: BeatTimedNoteEvent[] }
+  const diagnostics: Diagnostic[] = []
+  type MutableNoteEvent = Omit<BeatTimedNoteEvent, 'duration' | 'origins'> & {
+    duration: Fraction
+    origins: readonly BeatTimedNoteEvent['origins'][number][]
+  }
+  type State = { active: MutableNoteEvent[] }
 
   const visit = (current: ScoreShape, start: Fraction, state: State): Fraction => {
     if (current.kind === 'attack') {
-      const event: BeatTimedNoteEvent = {
+      const event: MutableNoteEvent = {
         kind: 'note',
         start: copy(start),
         duration: copy(current.duration),
@@ -39,8 +49,18 @@ export function flattenScoreShape(shape: ScoreShape): BeatTimedScore {
       events.push(event)
       state.active = [event]
     } else if (current.kind === 'continue') {
-      for (const event of state.active) {
-        ;(event as { duration: Fraction }).duration = event.duration.add(current.duration)
+      if (!state.active.length) {
+        diagnostics.push({
+          code: 'XP_CONTINUE_WITHOUT_ATTACK',
+          severity: 'error',
+          message: 'A continuation requires an active note.',
+          locations: current.origins.map((origin) => origin.location),
+        })
+      } else {
+        for (const event of state.active) {
+          event.duration = event.duration.add(current.duration)
+          event.origins = [...event.origins, ...current.origins]
+        }
       }
     } else if (current.kind === 'rest') {
       state.active = []
@@ -67,7 +87,7 @@ export function flattenScoreShape(shape: ScoreShape): BeatTimedScore {
 
   visit(shape, new Fraction(0), { active: [] })
   events.sort((left, right) => left.start.compare(right.start))
-  return { duration: copy(shape.duration), events }
+  return { score: { duration: copy(shape.duration), events }, diagnostics }
 }
 
 /** Expand repeats, evaluate score semantics, then produce exact beat-timed events. */
@@ -88,5 +108,7 @@ export function expandToBeatEvents(
   } as unknown as ExpandedNode
   const evaluated = evaluateScoreShape(node as never, options)
   const diagnostics = [...expanded.diagnostics, ...evaluated.diagnostics]
-  return 'shape' in evaluated ? { score: flattenScoreShape(evaluated.shape), diagnostics } : { diagnostics }
+  if (!('shape' in evaluated)) return { diagnostics }
+  const flattened = flattenScoreShape(evaluated.shape)
+  return { score: flattened.score, diagnostics: [...diagnostics, ...flattened.diagnostics] }
 }

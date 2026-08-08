@@ -10,7 +10,7 @@ export { DEFAULT_MAPPING, DEFAULT_PITCH_CONTEXT, applyPitchContextChange, create
 export type { ExpressionEvaluationResult } from './runtime/expressions'
 export { evaluateScoreShape } from './runtime/score-shape'
 export { expandToBeatEvents, flattenScoreShape } from './runtime/beat-events'
-export type { BeatEventExpansionOptions, BeatEventExpansionResult } from './runtime/beat-events'
+export type { BeatEventExpansionOptions, BeatEventExpansionResult, BeatEventFlatteningResult } from './runtime/beat-events'
 export { constructStaffNotation, constructStaffNotationShape, toStaffPitch } from './runtime/staff-notation'
 export type { StaffNotationOptions } from './runtime/staff-notation'
 export type { ScoreShapeEvaluationResult, ScoreShapeOptions } from './runtime/score-shape'
