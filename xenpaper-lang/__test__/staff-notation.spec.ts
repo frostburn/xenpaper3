@@ -111,20 +111,23 @@ describe('staff notation construction', () => {
   })
 
   it('uses an x notehead when a repeated pitch has inconsistent staff appearances', () => {
-    const node = parse('C |: 1/1 D E {D = root} :| 1/1 C').body[0] as Expression
+    const node = parse('C |: 1/1 D E {root = D} :| 1/1 C').body[0] as Expression
     const evaluated = evaluateScoreShape(node)
     if (!('shape' in evaluated)) throw new Error('Expected shape.')
 
     const staff = constructStaffNotationShape(evaluated.shape)
     const notes: StaffNotationShape[] = []
+    const annotations: string[] = []
     const collect = (shape: StaffNotationShape) => {
       if (shape.kind === 'note') notes.push(shape)
+      else if (shape.kind === 'annotation') annotations.push(shape.text)
       else if (shape.kind === 'sequence') shape.children.forEach(collect)
       else if (shape.kind === 'parallel') shape.branches.forEach(collect)
     }
     collect(staff)
 
     expect(evaluated.diagnostics).toEqual([])
+    expect(annotations).toEqual(['root = D'])
     expect(notes.map((note) => note.kind === 'note' && [note.pitch.staffPosition, note.pitch.notehead])).toEqual([
       [0, 'normal'],
       [0, 'x'],
@@ -154,7 +157,13 @@ describe('staff notation construction', () => {
     const evaluated = evaluateScoreShape(node)
     if (!('shape' in evaluated)) throw new Error('Expected shape.')
     const staff = constructStaffNotationShape(evaluated.shape)
-    expect(staff).toMatchObject({ kind: 'sequence', children: [{ kind: 'note', pitch: { staffPosition: 1 } }] })
+    expect(staff).toMatchObject({
+      kind: 'sequence',
+      children: [
+        { kind: 'annotation', text: 'D = root' },
+        { kind: 'note', pitch: { staffPosition: 1 } },
+      ],
+    })
   })
 
   it('restores the active root when engraving a spelled nominal', () => {
@@ -164,7 +173,10 @@ describe('staff notation construction', () => {
 
     expect(constructStaffNotationShape(evaluated.shape)).toMatchObject({
       kind: 'sequence',
-      children: [{ kind: 'note', pitch: { staffPosition: 5, accidentals: [], notehead: 'normal' } }],
+      children: [
+        { kind: 'annotation', text: 'A = root' },
+        { kind: 'note', pitch: { staffPosition: 5, accidentals: [], notehead: 'normal' } },
+      ],
     })
   })
 })

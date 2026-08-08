@@ -10,6 +10,7 @@ type StaffItem =
   | { kind: 'note'; pitch: StaffPitch; tiedFromIndex?: number }
   | { kind: 'rest' }
   | { kind: 'barline'; style: BarlineStyle }
+  | { kind: 'annotation'; text: string }
 
 const items = computed(() => {
   const result: StaffItem[] = []
@@ -29,6 +30,8 @@ const items = computed(() => {
       result.push({ kind: 'rest' })
     } else if (shape.kind === 'barline') {
       result.push({ kind: 'barline', style: shape.style })
+    } else if (shape.kind === 'annotation') {
+      result.push({ kind: 'annotation', text: shape.text })
     } else if (shape.kind === 'sequence') shape.children.forEach(visit)
     else if (shape.kind === 'parallel') shape.branches.forEach(visit)
   }
@@ -81,6 +84,7 @@ const ledgerPositions = (position: number) => {
     <text v-if="!items.length" class="empty-message" x="70" y="126">No notation loaded</text>
     <g v-for="(item, index) in items" :key="index">
       <text v-if="item.kind === 'rest'" class="rest" :x="x(index)" y="79">𝄽</text>
+      <text v-else-if="item.kind === 'annotation'" class="annotation" :x="x(index)" y="25">{{ item.text }}</text>
       <g
         v-else-if="item.kind === 'barline'"
         class="barline"
@@ -201,6 +205,11 @@ const ledgerPositions = (position: number) => {
 .pitch-decorations,
 .rest {
   font-size: 18px;
+}
+
+.annotation {
+  font-size: 12px;
+  text-anchor: middle;
 }
 
 .pitch-decorations {

@@ -106,6 +106,18 @@ describe('MusicalStaff', () => {
     expect(wrapper.find('ellipse.notehead').exists()).toBe(false)
   })
 
+  it('renders root-change annotations above the staff', () => {
+    const annotated: StaffNotationShape = {
+      kind: 'annotation',
+      text: 'root = D',
+      duration: { n: 0, d: 1 } as StaffNotationShape['duration'],
+    }
+    const wrapper = mount(MusicalStaff, { props: { notation: annotated } })
+
+    expect(wrapper.get('.annotation').text()).toBe('root = D')
+    expect(wrapper.get('.annotation').attributes('y')).toBe('25')
+  })
+
   it('renders ASCII-style operators and flavored numeric FJS inflections before accidentals', () => {
     const decorated: StaffNotationShape = {
       kind: 'note',

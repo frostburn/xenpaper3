@@ -7,6 +7,7 @@ import { DEFAULT_PITCH_CONTEXT, applyPitchContextChange, mapFormula } from './pi
 import type {
   AttackShape,
   AttackAppearance,
+  AnnotationShape,
   AbsolutePitchValue,
   BarlineShape,
   BarlineStyle,
@@ -69,6 +70,7 @@ function scaleShape(shape: ScoreShape, factor: Fraction): ScoreShape {
     case 'rest':
     case 'continue':
     case 'barline':
+    case 'annotation':
       return { ...shape, duration }
     case 'sequence':
       return { ...shape, duration, children: shape.children.map((child) => scaleShape(child, factor)) }
@@ -96,6 +98,24 @@ function attacks(shape: ScoreShape): AttackShape[] {
   if (shape.kind === 'sequence') return shape.children.flatMap(attacks)
   if (shape.kind === 'parallel') return shape.branches.flatMap(attacks)
   return []
+}
+
+function contextAnnotation(node: Extract<Expression, { type: 'PitchContextChange' }>): AnnotationShape {
+  const text = node.statements.map((statement) => {
+    if (statement.type !== 'ContextAssignment') return statement.type === 'ContextPreset' ? statement.raw : 'context'
+    const target = statement.target.type === 'ContextNameTarget'
+      ? statement.target.name
+      : statement.target.type === 'ContextPitchTarget'
+        ? statement.target.pitch.raw
+        : statement.target.operator
+    const value = 'raw' in statement.value
+      ? String(statement.value.raw)
+      : statement.value.type === 'Identifier'
+        ? statement.value.name
+        : statement.value.type
+    return `${target} = ${value}`
+  }).join('; ')
+  return { kind: 'annotation', text, duration: new Fraction(0), origins: [origin(node, 'context')] }
 }
 
 function playablePitch(node: Expression, context: PitchContext):
@@ -242,6 +262,7 @@ export function evaluateScoreShape(
         if (item.type === 'PitchContextChange') {
           try {
             activeContext = applyPitchContextChange(item, activeContext)
+            results.push({ shape: contextAnnotation(item), diagnostics: [] })
           } catch (error) {
             results.push({ diagnostics: [{ code: 'XP_CONTEXT', severity: 'error', message: error instanceof Error ? error.message : 'Invalid pitch context.', locations: [item.location] }] })
           }
@@ -324,7 +345,7 @@ export function evaluateScoreShape(
     }
 
     if (current.type === 'PitchContextChange') {
-      return { shape: sequence([], [origin(current, 'context')]), diagnostics: [] }
+      return { shape: contextAnnotation(current), diagnostics: [] }
     }
     const evaluated = playablePitch(current, context)
     if (!('pitch' in evaluated)) return evaluated

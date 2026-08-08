@@ -16,12 +16,13 @@ function shape(source: string, pulse: Fraction | number = 1): ScoreShape {
 describe('score-shape timing', () => {
   it('flows root reassociation through an ordinary sequence', () => {
     const result = shape('{A = root} A B') as SequenceShape
-    expect(result.children).toHaveLength(2)
-    expect(result.children[0]).toMatchObject({ kind: 'attack' })
+    expect(result.children).toHaveLength(3)
+    expect(result.children[0]).toMatchObject({ kind: 'annotation', text: 'A = root' })
     expect(result.children[1]).toMatchObject({ kind: 'attack' })
-    if (result.children[0]?.kind !== 'attack' || result.children[1]?.kind !== 'attack') throw new Error('Expected attacks.')
-    expect(result.children[0].pitch.value.equals(Value.cents(0))).toBe(true)
-    expect(result.children[1].pitch.value.equals(Value.pitch(new Value(9n, 8n)))).toBe(true)
+    expect(result.children[2]).toMatchObject({ kind: 'attack' })
+    if (result.children[1]?.kind !== 'attack' || result.children[2]?.kind !== 'attack') throw new Error('Expected attacks.')
+    expect(result.children[1].pitch.value.equals(Value.cents(0))).toBe(true)
+    expect(result.children[2].pitch.value.equals(Value.pitch(new Value(9n, 8n)))).toBe(true)
   })
   it('sequences atoms in exact pulse-sized beats', () => {
     const result = shape('3/2 4/3 5/4', new Fraction(1, 4)) as SequenceShape
