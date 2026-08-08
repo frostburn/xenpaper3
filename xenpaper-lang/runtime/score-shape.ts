@@ -82,6 +82,80 @@ function scaleShape(shape: ScoreShape, factor: Fraction): ScoreShape {
   }
 }
 
+/** Trim from the rhythmic tail without moving or rescaling earlier material. */
+function trimShape(shape: ScoreShape, duration: Fraction): ScoreShape {
+  if (duration.compare(0) < 0 || duration.compare(shape.duration) > 0) throw new RangeError('Invalid trimmed duration.')
+  if (shape.kind === 'sequence') {
+    let remaining = duration
+    const children = shape.children.map((child) => {
+      const kept = remaining.compare(child.duration) >= 0 ? child.duration : remaining
+      remaining = remaining.sub(kept)
+      return trimShape(child, kept)
+    })
+    return { ...shape, duration, children }
+  }
+  if (shape.kind === 'parallel') {
+    return { ...shape, duration, branches: shape.branches.map((branch) => trimShape(branch, branch.duration.compare(duration) > 0 ? duration : branch.duration)) }
+  }
+  return { ...shape, duration }
+}
+
+/** Give a zero-duration pitch shape time without dividing by its old duration. */
+function resizeShape(shape: ScoreShape, duration: Fraction): ScoreShape {
+  if (shape.duration.n) return scaleShape(shape, duration.div(shape.duration))
+  if (shape.kind === 'attack') return { ...shape, duration }
+  if (shape.kind === 'parallel') return { ...shape, duration, branches: shape.branches.map((branch) => resizeShape(branch, duration)) }
+  if (shape.kind === 'sequence') {
+    const pitchChild = shape.children.findIndex((child) => attacks(child).length > 0)
+    return { ...shape, duration, children: shape.children.map((child, index) => index === pitchChild ? resizeShape(child, duration) : child) }
+  }
+  return { ...shape, duration }
+}
+
+function mapAttacks(shape: ScoreShape, transform: (attack: AttackShape) => AttackShape): ScoreShape {
+  if (shape.kind === 'attack') return transform(shape)
+  if (shape.kind === 'sequence') return { ...shape, children: shape.children.map((child) => mapAttacks(child, transform)) }
+  if (shape.kind === 'parallel') return { ...shape, branches: shape.branches.map((branch) => mapAttacks(branch, transform)) }
+  return shape
+}
+
+type PitchTree = { kind: 'attack'; attack: AttackShape } | { kind: 'sequence' | 'parallel'; children: PitchTree[] }
+
+function pitchTree(shape: ScoreShape): PitchTree | undefined {
+  if (shape.kind === 'attack') return { kind: 'attack', attack: shape }
+  if (shape.kind !== 'sequence' && shape.kind !== 'parallel') return undefined
+  const children = (shape.kind === 'sequence' ? shape.children : shape.branches)
+    .map(pitchTree).filter((child): child is PitchTree => Boolean(child))
+  if (!children.length) return undefined
+  if (children.length === 1) return children[0]
+  return { kind: shape.kind, children }
+}
+
+function matchingPitchTrees(source: PitchTree, target: PitchTree): boolean {
+  if (source.kind === 'attack' || target.kind === 'attack') return source.kind === target.kind
+  return source.kind === target.kind && source.children.length === target.children.length &&
+    source.children.every((child, index) => matchingPitchTrees(child, target.children[index]!))
+}
+
+/** Sounding span for each attack, including attached continuation shapes. */
+function attackSpans(shape: ScoreShape): Map<AttackShape, Fraction> {
+  const spans = new Map<AttackShape, Fraction>()
+  type State = { active: AttackShape[] }
+  const visit = (current: ScoreShape, state: State) => {
+    if (current.kind === 'attack') { spans.set(current, current.duration); state.active = [current] }
+    else if (current.kind === 'continue') for (const attack of state.active) spans.set(attack, spans.get(attack)!.add(current.duration))
+    else if (current.kind === 'rest') state.active = []
+    else if (current.kind === 'sequence') current.children.forEach((child) => visit(child, state))
+    else if (current.kind === 'parallel') {
+      const states = current.branches.map((): State => ({ active: [] }))
+      current.branches.forEach((branch, index) => visit(branch, states[index]!))
+      state.active = states.flatMap((branch) => branch.active)
+    }
+  }
+  visit(shape, { active: [] })
+  return spans
+}
+
 function annotateRepeatAppearances(shape: ScoreShape, alternatives: readonly (readonly AttackAppearance[])[]): ScoreShape {
   let attackIndex = 0
   const annotate = (current: ScoreShape): ScoreShape => {
@@ -394,9 +468,18 @@ export function evaluateScoreShape(
         if (grace && grace.indices.length === grace.count + 1) {
           const targetIndex = grace.indices[grace.indices.length - 1]!
           const stolen = grace.duration.mul(grace.count)
-          for (const i of grace.indices.slice(0, -1)) { const r = results[i]!; if ('shape' in r) results[i] = { ...r, shape: scaleShape(r.shape, grace.duration.div(r.shape.duration)) } }
+          for (const i of grace.indices.slice(0, -1)) {
+            const r = results[i]!
+            if ('shape' in r) results[i] = { ...r, shape: mapAttacks(resizeShape(r.shape, grace.duration), (attack) => ({ ...attack, grace: true })) }
+          }
           const target = results[targetIndex]!
-          if ('shape' in target && target.shape.duration.compare(stolen) >= 0) results[targetIndex] = { ...target, shape: scaleShape(target.shape, target.shape.duration.sub(stolen).div(target.shape.duration)) }
+          if ('shape' in target && target.shape.duration.compare(stolen) >= 0) {
+            const notatedDuration = target.shape.duration
+            results[targetIndex] = {
+              ...target,
+              shape: mapAttacks(trimShape(target.shape, target.shape.duration.sub(stolen)), (attack) => ({ ...attack, notatedDuration })),
+            }
+          }
           else results.push({ diagnostics: [{ code: 'XP_GRACE_DURATION', severity: 'error', message: 'Grace notes exceed the following item duration.', locations: [item.location] }] })
           grace = undefined
         }
@@ -404,17 +487,22 @@ export function evaluateScoreShape(
           const sourceIndex = gliss[0]!, targetIndex = gliss[1]!, source = results[sourceIndex]!, target = results[targetIndex]!
           if ('shape' in source && 'shape' in target) {
             const from = attacks(source.shape), to = attacks(target.shape)
-            if (target.shape.duration.n || from.length !== to.length) results.push({ diagnostics: [{ code: 'XP_GLISS_SHAPE', severity: 'error', message: 'Glissando requires an equal-shaped zero-duration target.', locations: [item.location] }] })
+            const sourceTree = pitchTree(source.shape)
+            const targetTree = pitchTree(target.shape)
+            if (!sourceTree || !targetTree || !matchingPitchTrees(sourceTree, targetTree)) results.push({ diagnostics: [{ code: 'XP_GLISS_SHAPE', severity: 'error', message: 'Glissando source and target pitch structures must match.', locations: [item.location] }] })
             else {
+              const spans = attackSpans(source.shape)
               let leaf = 0
               const automate = (shape: ScoreShape): ScoreShape => {
-                if (shape.kind === 'attack') { const destination = to[leaf++]!; return { ...shape, automation: { curve: 'linear', from: shape.pitch, to: destination.pitch, duration: shape.duration } } }
+                if (shape.kind === 'attack') { const destination = to[leaf++]!; return { ...shape, automation: { curve: 'linear', from: shape.pitch, to: destination.pitch, duration: spans.get(shape) ?? shape.duration } } }
                 if (shape.kind === 'sequence') return { ...shape, children: shape.children.map(automate) }
                 if (shape.kind === 'parallel') return { ...shape, branches: shape.branches.map(automate) }
                 return shape
               }
               results[sourceIndex] = { ...source, shape: automate(source.shape) }
-              results[targetIndex] = { ...target, shape: sequence([], target.shape.origins) }
+              results[targetIndex] = target.shape.duration.n
+                ? { ...target, shape: { kind: 'continue', duration: target.shape.duration, origins: target.shape.origins } }
+                : { ...target, shape: sequence([], target.shape.origins) }
             }
           }
           gliss = undefined
@@ -490,7 +578,7 @@ export function evaluateScoreShape(
       if (elimination) {
         const removed = currentPulse.mul(elimination.count)
         if (removed.compare(base.duration) > 0) return { diagnostics: [...evaluated.diagnostics, { code: 'XP_TAIL_ELIMINATION', severity: 'error', message: 'Tail elimination exceeds the score item duration.', locations: [elimination.location] }] }
-        base = scaleShape(base, base.duration.n ? base.duration.sub(removed).div(base.duration) : new Fraction(0))
+        base = trimShape(base, base.duration.sub(removed))
       }
       const continuations = current.marks.filter((mark) => mark.type === 'DetachedContinue')
       if (!continuations.length) return { shape: base, diagnostics: evaluated.diagnostics }

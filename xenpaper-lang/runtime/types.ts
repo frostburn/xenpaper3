@@ -123,7 +123,7 @@ export interface StaffPitch {
 }
 
 export type StaffNotationShape =
-  | { readonly kind: 'note'; readonly pitch: StaffPitch; readonly duration: Fraction; readonly displayLabel?: string }
+  | { readonly kind: 'note'; readonly pitch: StaffPitch; readonly duration: Fraction; readonly displayLabel?: string; readonly dynamic?: DynamicMark; readonly velocity?: Fraction; readonly grace?: boolean; readonly notatedDuration?: Fraction }
   | { readonly kind: 'rest'; readonly duration: Fraction; readonly generated: boolean }
   | { readonly kind: 'continue'; readonly duration: Fraction }
   | { readonly kind: 'barline'; readonly style: BarlineStyle; readonly duration: Fraction }
@@ -155,6 +155,10 @@ export interface AttackShape extends ShapeBase {
   readonly dynamic: DynamicMark
   readonly velocity: Fraction
   readonly automation?: PitchAutomation
+  /** Grace attacks are engraved small and lead into the following donor note. */
+  readonly grace?: boolean
+  /** Authored rhythmic value of a grace donor before time was stolen. */
+  readonly notatedDuration?: Fraction
   /** Authored pitch expression to show below the staff. */
   readonly displayLabel?: string
   /** Other contexts in which this source attack occurs after repeat expansion. */
