@@ -72,7 +72,7 @@ export interface FjsSpelling {
 export interface PitchSpelling {
   readonly nominal: string
   readonly raw: string
-  readonly system?: 'latin' | 'greek'
+  readonly system?: 'latin' | 'greek' | 'mos'
   readonly accidentals?: readonly string[]
   readonly inflections?: readonly FjsSpelling[]
   readonly modifiers?: readonly string[]
