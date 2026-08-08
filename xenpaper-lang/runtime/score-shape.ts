@@ -6,6 +6,7 @@ import { evaluateExpression } from './expressions'
 import { DEFAULT_PITCH_CONTEXT, applyPitchContextChange, mapFormula } from './pitches'
 import type {
   AttackShape,
+  AttackAppearance,
   AbsolutePitchValue,
   BarlineShape,
   BarlineStyle,
@@ -76,6 +77,27 @@ function scaleShape(shape: ScoreShape, factor: Fraction): ScoreShape {
   }
 }
 
+function annotateRepeatAppearances(shape: ScoreShape, alternatives: readonly (readonly AttackAppearance[])[]): ScoreShape {
+  let attackIndex = 0
+  const annotate = (current: ScoreShape): ScoreShape => {
+    if (current.kind === 'attack') {
+      const alternateAppearances = alternatives[attackIndex++]
+      return alternateAppearances?.length ? { ...current, alternateAppearances } : current
+    }
+    if (current.kind === 'sequence') return { ...current, children: current.children.map(annotate) }
+    if (current.kind === 'parallel') return { ...current, branches: current.branches.map(annotate) }
+    return current
+  }
+  return annotate(shape)
+}
+
+function attacks(shape: ScoreShape): AttackShape[] {
+  if (shape.kind === 'attack') return [shape]
+  if (shape.kind === 'sequence') return shape.children.flatMap(attacks)
+  if (shape.kind === 'parallel') return shape.branches.flatMap(attacks)
+  return []
+}
+
 function playablePitch(node: Expression, context: PitchContext):
   | { readonly pitch: PitchOffsetValue | (AbsolutePitchValue & { readonly value: Value }); readonly diagnostics: readonly Diagnostic[] }
   | { readonly diagnostics: readonly Diagnostic[] } {
@@ -119,6 +141,31 @@ export function evaluateScoreShape(
   const pulse = new Fraction(options.pulse ?? 1)
   if (pulse.compare(0) <= 0) throw new RangeError('pulse must be positive.')
 
+  const contextAfter = (current: Expression, context: PitchContext): PitchContext => {
+    if (current.type === 'PitchContextChange') {
+      try {
+        return applyPitchContextChange(current, context)
+      } catch {
+        return context
+      }
+    }
+    if (current.type === 'Sequence') {
+      return current.items.reduce((active, item) => contextAfter(item, active), context)
+    }
+    if (current.type === 'Group') return contextAfter(current.expression, context)
+    if (current.type === 'NormalizeToSlot' && current.expression) return contextAfter(current.expression, context)
+    if (current.type === 'PostfixExpression') return contextAfter(current.expression, context)
+    if (current.type === 'Repeat') {
+      let active = context
+      const count = Number(current.count.value)
+      for (let iteration = 0; iteration < count; iteration++) {
+        active = current.body.reduce((bodyContext, item) => contextAfter(item, bodyContext), active)
+      }
+      return active
+    }
+    return context
+  }
+
   const visit = (current: Expression, context: PitchContext): ScoreShapeEvaluationResult => {
     if (current.type === 'Rest') {
       return {
@@ -141,14 +188,46 @@ export function evaluateScoreShape(
       return { shape: barline(current, 'double'), diagnostics: [] }
     }
     if (current.type === 'Repeat') {
-      const results = current.body.map((item) => visit(item, context))
-      const diagnostics = results.flatMap((result) => result.diagnostics)
-      if (!results.every(hasShape)) return { diagnostics }
+      const count = Number(current.count.value)
+      let activeContext = context
+      let displayedShapes: ScoreShape[] | undefined
+      let displayedAttacks: AttackShape[] = []
+      const alternatives: AttackAppearance[][] = []
+      const diagnostics: Diagnostic[] = []
+      // Evaluate the written body once even for x0 so it remains engravable between the markers.
+      const iterations = Math.max(1, count)
+      for (let iteration = 0; iteration < iterations; iteration++) {
+        let iterationContext = activeContext
+        const results: ScoreShapeEvaluationResult[] = []
+        for (const item of current.body) {
+          results.push(visit(item, iterationContext))
+          iterationContext = contextAfter(item, iterationContext)
+        }
+        diagnostics.push(...results.flatMap((result) => result.diagnostics))
+        if (!results.every(hasShape)) return { diagnostics }
+        const iterationShapes = results.map((result) => result.shape)
+        if (!displayedShapes) {
+          displayedShapes = iterationShapes
+          displayedAttacks = iterationShapes.flatMap(attacks)
+          for (const _attack of displayedAttacks) alternatives.push([])
+        } else {
+          const iterationAttacks = iterationShapes.flatMap(attacks)
+          for (let index = 0; index < Math.min(displayedAttacks.length, iterationAttacks.length); index++) {
+            const attack = iterationAttacks[index]!
+            alternatives[index]!.push({ pitch: attack.pitch, rootStaffPosition: attack.rootStaffPosition })
+          }
+        }
+        if (iteration < count) activeContext = iterationContext
+      }
+      const displayed = annotateRepeatAppearances(
+        sequence(displayedShapes ?? [], [origin(current)]),
+        alternatives,
+      ) as SequenceShape
       return {
         shape: sequence(
           [
             barline(current, 'repeat-start'),
-            ...results.map((result) => result.shape),
+            ...displayed.children,
             barline(current, 'repeat-end'),
           ],
           [origin(current)],
@@ -166,7 +245,10 @@ export function evaluateScoreShape(
           } catch (error) {
             results.push({ diagnostics: [{ code: 'XP_CONTEXT', severity: 'error', message: error instanceof Error ? error.message : 'Invalid pitch context.', locations: [item.location] }] })
           }
-        } else results.push(visit(item, activeContext))
+        } else {
+          results.push(visit(item, activeContext))
+          activeContext = contextAfter(item, activeContext)
+        }
       }
       const diagnostics = results.flatMap((result) => result.diagnostics)
       if (!results.every(hasShape)) return { diagnostics }

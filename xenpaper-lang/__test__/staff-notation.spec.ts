@@ -110,6 +110,31 @@ describe('staff notation construction', () => {
     ])
   })
 
+  it('uses an x notehead when a repeated pitch has inconsistent staff appearances', () => {
+    const node = parse('C |: 1/1 D E {D = root} :| 1/1 C').body[0] as Expression
+    const evaluated = evaluateScoreShape(node)
+    if (!('shape' in evaluated)) throw new Error('Expected shape.')
+
+    const staff = constructStaffNotationShape(evaluated.shape)
+    const notes: StaffNotationShape[] = []
+    const collect = (shape: StaffNotationShape) => {
+      if (shape.kind === 'note') notes.push(shape)
+      else if (shape.kind === 'sequence') shape.children.forEach(collect)
+      else if (shape.kind === 'parallel') shape.branches.forEach(collect)
+    }
+    collect(staff)
+
+    expect(evaluated.diagnostics).toEqual([])
+    expect(notes.map((note) => note.kind === 'note' && [note.pitch.staffPosition, note.pitch.notehead])).toEqual([
+      [0, 'normal'],
+      [0, 'x'],
+      [1, 'normal'],
+      [2, 'normal'],
+      [1, 'normal'],
+      [0, 'normal'],
+    ])
+  })
+
   it('retains source nominal spelling while constructing a score staff', () => {
     const node = parse('Eb Gam').body[0] as Expression
     const evaluated = evaluateScoreShape(node)
