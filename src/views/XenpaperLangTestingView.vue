@@ -64,8 +64,8 @@ const logStaffNotation = () => {
       <button type="button" @click="logStaffNotation">Log staff notation</button>
     </div>
   </div>
-  <MusicalStaff :notation="notation" />
   <PianoRoll :score="pianoRoll" />
+  <MusicalStaff :notation="notation" />
 </template>
 
 <style scoped>

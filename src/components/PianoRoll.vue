@@ -1,11 +1,14 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, toRaw } from 'vue'
 import type { BeatTimedScore } from '../../xenpaper-lang'
 
 const props = defineProps<{ score?: BeatTimedScore }>()
 const notes = computed(() => props.score?.events.filter((event) => event.kind === 'note') ?? [])
-const beat = (value: { valueOf(): number }) => value.valueOf()
-const cents = (note: (typeof notes.value)[number]) => note.pitch.value.valueOf()
+// Value deliberately contains frozen exact-form internals. Calling its methods through a
+// deep Vue proxy violates the Proxy invariants for those non-configurable properties.
+const numericValue = (value: { valueOf(): number }) => toRaw(value).valueOf()
+const beat = numericValue
+const cents = (note: (typeof notes.value)[number]) => numericValue(note.pitch.value)
 const low = computed(() => Math.floor((Math.min(0, ...notes.value.map(cents)) - 100) / 100) * 100)
 const high = computed(() => Math.ceil((Math.max(1200, ...notes.value.map(cents)) + 100) / 100) * 100)
 const width = computed(() => Math.max(640, 90 + beat(props.score?.duration ?? { valueOf: () => 0 }) * 100))
