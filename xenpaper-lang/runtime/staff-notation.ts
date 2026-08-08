@@ -201,7 +201,12 @@ export function constructStaffNotationShape(shape: ScoreShape): StaffNotationSha
     case 'annotation':
       return { kind: 'annotation', text: shape.text, duration: shape.duration }
     case 'sequence':
-      return { kind: 'sequence', duration: shape.duration, children: shape.children.map(constructStaffNotationShape) }
+      return {
+        kind: 'sequence',
+        duration: shape.duration,
+        children: shape.children.map(constructStaffNotationShape),
+        ...(shape.tuplet ? { tuplet: shape.tuplet } : {}),
+      }
     case 'parallel':
       return { kind: 'parallel', duration: shape.duration, branches: shape.branches.map(constructStaffNotationShape) }
   }

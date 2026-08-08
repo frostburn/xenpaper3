@@ -187,6 +187,45 @@ export function evaluateScoreShape(
     return context
   }
 
+  const subdivisionPulse = (current: Extract<Expression, { type: 'Directive' }>, context: PitchContext) => {
+    if (current.name !== 'subdivision' || current.graceCount) return undefined
+    const argument = current.arguments[0]
+    const evaluated = argument && argument.type !== 'NamedArgument'
+      ? evaluateExpression(argument, context)
+      : undefined
+    let subdivision: Fraction | undefined
+    if (evaluated && 'value' in evaluated) {
+      const value = (evaluated as { readonly value: EvaluatedLiteral }).value
+      const exact = value.kind === 'absolutePitch' ? undefined : value.value.exactRational()
+      if (exact) subdivision = new Fraction(exact)
+    }
+    return subdivision && subdivision.compare(0) > 0
+      ? { pulse: new Fraction(1).div(subdivision), diagnostics: evaluated?.diagnostics ?? [] }
+      : undefined
+  }
+
+  const pulseAfter = (current: Expression, currentPulse: Fraction, context: PitchContext): Fraction => {
+    if (current.type === 'Directive') return subdivisionPulse(current, context)?.pulse ?? currentPulse
+    if (current.type === 'Sequence') {
+      return current.items.reduce(
+        (active, item) => pulseAfter(item, active, context),
+        currentPulse,
+      )
+    }
+    if (current.type === 'Repeat') {
+      let active = currentPulse
+      for (let iteration = 0; iteration < Number(current.count.value); iteration++) {
+        active = current.body.reduce(
+          (bodyPulse, item) => pulseAfter(item, bodyPulse, context),
+          active,
+        )
+      }
+      return active
+    }
+    // Explicit groups, normalized slots, and parallel branches isolate directive state.
+    return currentPulse
+  }
+
   const visit = (
     current: Expression,
     context: PitchContext,
@@ -215,6 +254,7 @@ export function evaluateScoreShape(
     if (current.type === 'Repeat') {
       const count = Number(current.count.value)
       let activeContext = context
+      let activePulse = currentPulse
       let displayedShapes: ScoreShape[] | undefined
       let displayedAttacks: AttackShape[] = []
       const alternatives: AttackAppearance[][] = []
@@ -223,9 +263,11 @@ export function evaluateScoreShape(
       const iterations = Math.max(1, count)
       for (let iteration = 0; iteration < iterations; iteration++) {
         let iterationContext = activeContext
+        let iterationPulse = activePulse
         const results: ScoreShapeEvaluationResult[] = []
         for (const item of current.body) {
-          results.push(visit(item, iterationContext, currentPulse))
+          results.push(visit(item, iterationContext, iterationPulse))
+          iterationPulse = pulseAfter(item, iterationPulse, iterationContext)
           iterationContext = contextAfter(item, iterationContext)
         }
         diagnostics.push(...results.flatMap((result) => result.diagnostics))
@@ -245,7 +287,10 @@ export function evaluateScoreShape(
             })
           }
         }
-        if (iteration < count) activeContext = iterationContext
+        if (iteration < count) {
+          activeContext = iterationContext
+          activePulse = iterationPulse
+        }
       }
       const displayed = annotateRepeatAppearances(
         sequence(displayedShapes ?? [], [origin(current)]),
@@ -276,25 +321,17 @@ export function evaluateScoreShape(
             results.push({ diagnostics: [{ code: 'XP_CONTEXT', severity: 'error', message: error instanceof Error ? error.message : 'Invalid pitch context.', locations: [item.location] }] })
           }
         } else if (item.type === 'Directive' && item.name === 'subdivision' && !item.graceCount) {
-          const argument = item.arguments[0]
-          const evaluated = argument && argument.type !== 'NamedArgument'
-            ? evaluateExpression(argument, activeContext)
-            : undefined
-          let subdivision: Fraction | undefined
-          if (evaluated && 'value' in evaluated) {
-            const value = (evaluated as { readonly value: EvaluatedLiteral }).value
-            const exact = value.kind === 'absolutePitch' ? undefined : value.value.exactRational()
-            if (exact) subdivision = new Fraction(exact)
-          }
-          if (!subdivision || subdivision.compare(0) <= 0) {
+          const subdivision = subdivisionPulse(item, activeContext)
+          if (!subdivision) {
             results.push({ diagnostics: [{ code: 'XP_DIRECTIVE', severity: 'error', message: 'Subdivision must be a positive exact rational.', locations: [item.location] }] })
           } else {
-            activePulse = new Fraction(1).div(subdivision)
-            results.push({ shape: sequence([], [origin(item)]), diagnostics: evaluated?.diagnostics ?? [] })
+            activePulse = subdivision.pulse
+            results.push({ shape: sequence([], [origin(item)]), diagnostics: subdivision.diagnostics })
           }
         } else {
           results.push(visit(item, activeContext, activePulse))
           activeContext = contextAfter(item, activeContext)
+          activePulse = pulseAfter(item, activePulse, activeContext)
         }
       }
       const diagnostics = results.flatMap((result) => result.diagnostics)
@@ -344,8 +381,16 @@ export function evaluateScoreShape(
           ],
         }
       }
+      const normalized = scaleShape(evaluated.shape, currentPulse.div(evaluated.shape.duration))
+      if (normalized.kind === 'sequence' && normalized.children.length > 1 &&
+        !Number.isInteger(Math.log2(normalized.children.length))) {
+        return {
+          shape: { ...normalized, tuplet: normalized.children.length },
+          diagnostics: evaluated.diagnostics,
+        }
+      }
       return {
-        shape: scaleShape(evaluated.shape, currentPulse.div(evaluated.shape.duration)),
+        shape: normalized,
         diagnostics: evaluated.diagnostics,
       }
     }

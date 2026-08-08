@@ -13,20 +13,22 @@ const props = defineProps<{
 }>()
 
 type StaffItem =
-  | { kind: 'note'; pitch: StaffPitch; duration: Fraction; soundingLabel?: string; tiedFromIndex?: number }
+  | { kind: 'note'; pitch: StaffPitch; duration: Fraction; soundingLabel?: string; tiedFromIndex?: number; tupletPosition?: number; tupletCount?: number }
   | { kind: 'rest'; duration: Fraction }
   | { kind: 'barline'; style: BarlineStyle }
   | { kind: 'annotation'; text: string }
+
+const durationValue = (duration: Fraction) => Number(duration.n) / Number(duration.d)
 
 const items = computed(() => {
   const result: StaffItem[] = []
   let activePitch: StaffPitch | undefined
   let activeNoteIndex: number | undefined
-  const visit = (shape: StaffNotationShape) => {
+  const visit = (shape: StaffNotationShape, tupletPosition?: number, tupletCount?: number) => {
     if (shape.kind === 'note') {
       activePitch = shape.pitch
       activeNoteIndex = result.length
-      result.push({ kind: 'note', pitch: shape.pitch, duration: shape.duration, soundingLabel: shape.soundingLabel })
+      result.push({ kind: 'note', pitch: shape.pitch, duration: shape.duration, soundingLabel: shape.soundingLabel, tupletPosition, tupletCount })
     } else if (shape.kind === 'continue' && activePitch) {
       result.push({ kind: 'note', pitch: activePitch, duration: shape.duration, tiedFromIndex: activeNoteIndex })
       activeNoteIndex = result.length - 1
@@ -38,8 +40,14 @@ const items = computed(() => {
       result.push({ kind: 'barline', style: shape.style })
     } else if (shape.kind === 'annotation') {
       result.push({ kind: 'annotation', text: shape.text })
-    } else if (shape.kind === 'sequence') shape.children.forEach(visit)
-    else if (shape.kind === 'parallel') shape.branches.forEach(visit)
+    } else if (shape.kind === 'sequence') {
+      shape.children.forEach((child, index) => visit(
+        child,
+        shape.tuplet ? index : undefined,
+        shape.tuplet,
+      ))
+    }
+    else if (shape.kind === 'parallel') shape.branches.forEach((branch) => visit(branch))
   }
   if (props.notation) visit(props.notation)
   return result
@@ -73,10 +81,15 @@ const ledgerPositions = (position: number) => {
   return positions
 }
 
-const hasEighthFlag = (duration?: Fraction) => {
-  if (!duration) return false
-  if (typeof duration.compare === 'function') return duration.compare(0.5) === 0
-  return Number(duration.n) / Number(duration.d) === 0.5
+const flagCount = (duration?: Fraction, tupletCount?: number) => {
+  if (!duration) return 0
+  if (tupletCount) return Math.max(1, Math.ceil(Math.log2(tupletCount)) - 1)
+  const value = durationValue(duration)
+  if (value >= 1 || value <= 0) return 0
+  const subdivision = Math.round(1 / value)
+  const binarySubdivision = subdivision % 3 === 0 ? subdivision / 3 : subdivision
+  const binaryFlags = Math.log2(binarySubdivision)
+  return Number.isInteger(binaryFlags) ? binaryFlags + (subdivision % 3 === 0 ? 1 : 0) : 0
 }
 </script>
 
@@ -193,10 +206,17 @@ const hasEighthFlag = (duration?: Fraction) => {
           :y2="y(item.pitch.staffPosition) - 30"
         />
         <path
-          v-if="hasEighthFlag(item.duration)"
+          v-for="flag in flagCount(item.duration, item.tupletCount)"
+          :key="`flag-${flag}`"
           class="flag"
-          :d="`M ${x(index) + 6} ${y(item.pitch.staffPosition) - 30} Q ${x(index) + 20} ${y(item.pitch.staffPosition) - 23} ${x(index) + 12} ${y(item.pitch.staffPosition) - 13}`"
+          :d="`M ${x(index) + 6} ${y(item.pitch.staffPosition) - 30 + (flag - 1) * 7} Q ${x(index) + 20} ${y(item.pitch.staffPosition) - 23 + (flag - 1) * 7} ${x(index) + 12} ${y(item.pitch.staffPosition) - 13 + (flag - 1) * 7}`"
         />
+        <text
+          v-if="item.tupletPosition === Math.floor((item.tupletCount ?? 0) / 2)"
+          class="tuplet-number"
+          :x="x(index)"
+          y="38"
+        >{{ item.tupletCount }}</text>
         <text
           v-if="item.pitch.notehead === 'x' && item.soundingLabel"
           class="sounding-label"
@@ -262,6 +282,12 @@ const hasEighthFlag = (duration?: Fraction) => {
 
 .sounding-label {
   font-size: 11px;
+  text-anchor: middle;
+}
+
+.tuplet-number {
+  font-size: 12px;
+  font-weight: 600;
   text-anchor: middle;
 }
 

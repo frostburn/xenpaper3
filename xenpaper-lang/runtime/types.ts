@@ -120,7 +120,7 @@ export type StaffNotationShape =
   | { readonly kind: 'continue'; readonly duration: Fraction }
   | { readonly kind: 'barline'; readonly style: BarlineStyle; readonly duration: Fraction }
   | { readonly kind: 'annotation'; readonly text: string; readonly duration: Fraction }
-  | { readonly kind: 'sequence'; readonly duration: Fraction; readonly children: readonly StaffNotationShape[] }
+  | { readonly kind: 'sequence'; readonly duration: Fraction; readonly children: readonly StaffNotationShape[]; readonly tuplet?: number }
   | { readonly kind: 'parallel'; readonly duration: Fraction; readonly branches: readonly StaffNotationShape[] }
 
 export interface SourceOrigin {
@@ -179,6 +179,8 @@ export type BarlineStyle = 'single' | 'double' | 'repeat-start' | 'repeat-end'
 export interface SequenceShape extends ShapeBase {
   readonly kind: 'sequence'
   readonly children: readonly ScoreShape[]
+  /** Number of notes explicitly normalized into a non-binary rhythmic slot. */
+  readonly tuplet?: number
 }
 
 export interface ParallelShape extends ShapeBase {
