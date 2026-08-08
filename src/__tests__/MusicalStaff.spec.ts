@@ -82,7 +82,7 @@ describe('MusicalStaff', () => {
     )
   })
 
-  it('infers a triplet from continuation-weighted slot duration', () => {
+  it('infers a triplet with an intact continued note', () => {
     const expression = parse('C [F G=] F').body[0]!
     const evaluated = evaluateScoreShape(expression)
     if (!('shape' in evaluated)) throw new Error('Expected a score shape.')
@@ -92,7 +92,7 @@ describe('MusicalStaff', () => {
 
     expect(wrapper.get('.tuplet-number').text()).toBe('3')
     expect(wrapper.findAll('.tuplet-bracket')).toHaveLength(1)
-    expect(wrapper.findAll('.flag')).toHaveLength(3)
+    expect(wrapper.findAll('.flag')).toHaveLength(1)
   })
 
   it('uses an eighth-rest glyph in a two-item normalized slot', () => {
@@ -178,9 +178,47 @@ describe('MusicalStaff', () => {
     }
     const wrapper = mount(MusicalStaff, { props: { notation: continued } })
 
-    expect(wrapper.findAll('.notehead')).toHaveLength(3)
-    expect(wrapper.findAll('.tie')).toHaveLength(2)
+    expect(wrapper.findAll('.notehead')).toHaveLength(1)
+    expect(wrapper.findAll('.notehead--open')).toHaveLength(1)
+    expect(wrapper.findAll('.tie')).toHaveLength(0)
     expect(wrapper.findAll('.accidental')).toHaveLength(1)
+  })
+
+  it('renders explicit half and whole note durations', () => {
+    const expression = parse('@1/2 C D @1/4 E').body[0]!
+    const evaluated = evaluateScoreShape(expression)
+    if (!('shape' in evaluated)) throw new Error('Expected a score shape.')
+    const wrapper = mount(MusicalStaff, {
+      props: { notation: constructStaffNotationShape(evaluated.shape) },
+    })
+
+    expect(wrapper.findAll('.notehead--open')).toHaveLength(3)
+    expect(wrapper.findAll('.stem')).toHaveLength(2)
+  })
+
+  it('extends notes and chords through following continues', () => {
+    for (const source of ['C=', '[C, E, G]=']) {
+      const evaluated = evaluateScoreShape(parse(source).body[0]!)
+      if (!('shape' in evaluated)) throw new Error('Expected a score shape.')
+      const wrapper = mount(MusicalStaff, {
+        props: { notation: constructStaffNotationShape(evaluated.shape) },
+      })
+      expect(wrapper.findAll('.notehead--open')).toHaveLength(source === 'C=' ? 1 : 3)
+      expect(wrapper.findAll('.tie')).toHaveLength(0)
+    }
+  })
+
+  it('extends a continued bracket slot into quarter-note triplets', () => {
+    const evaluated = evaluateScoreShape(parse('[C E G]=').body[0]!)
+    if (!('shape' in evaluated)) throw new Error('Expected a score shape.')
+    const wrapper = mount(MusicalStaff, {
+      props: { notation: constructStaffNotationShape(evaluated.shape) },
+    })
+
+    expect(wrapper.findAll('.notehead')).toHaveLength(3)
+    expect(wrapper.findAll('.flag')).toHaveLength(0)
+    expect(wrapper.get('.tuplet-number').text()).toBe('3')
+    expect(wrapper.findAll('.tuplet-bracket')).toHaveLength(1)
   })
 
   it('renders barlines without interrupting continued notes', () => {
@@ -200,9 +238,9 @@ describe('MusicalStaff', () => {
     const wrapper = mount(MusicalStaff, { props: { notation: barred } })
 
     expect(wrapper.findAll('.barline')).toHaveLength(1)
-    expect(wrapper.findAll('.notehead')).toHaveLength(2)
-    expect(wrapper.findAll('.tie')).toHaveLength(1)
-    expect(wrapper.get('.tie').attributes('d')).toMatch(/^M 66 /)
+    expect(wrapper.findAll('.notehead')).toHaveLength(1)
+    expect(wrapper.findAll('.notehead--open')).toHaveLength(1)
+    expect(wrapper.findAll('.tie')).toHaveLength(0)
   })
 
   it('renders double and repeat barlines with repeat dots', () => {

@@ -36,34 +36,38 @@ type LayoutItem = StaffItemContent & {
   tupletEndOffset?: Fraction
 }
 
+type NoteLayoutItem = Extract<LayoutItem, { kind: 'note' }>
+
 const durationValue = (duration: Fraction) => Number(duration.n) / Number(duration.d)
+const fraction = (duration: Fraction) => new Fraction(duration.n, duration.d)
 
 const items = computed(() => {
   const layout: LayoutItem[] = []
-  type VisitState = { activePitch?: StaffPitch; activeNoteOffset?: Fraction }
+  type VisitState = { activeNotes: NoteLayoutItem[]; activeSpan?: Fraction }
   const visit = (shape: StaffNotationShape, offset: Fraction, state: VisitState): Fraction => {
     if (shape.kind === 'note') {
-      state.activePitch = shape.pitch
-      state.activeNoteOffset = offset
-      layout.push({
+      const note: NoteLayoutItem = {
         kind: 'note',
         offset,
         pitch: shape.pitch,
         duration: shape.duration,
         soundingLabel: shape.soundingLabel,
+      }
+      layout.push(note)
+      state.activeNotes = [note]
+      state.activeSpan = shape.duration
+    } else if (shape.kind === 'continue' && state.activeNotes.length && state.activeSpan) {
+      const continuedDuration = fraction(shape.duration)
+      const activeSpan = fraction(state.activeSpan)
+      const factor = continuedDuration.div(activeSpan)
+      state.activeNotes.forEach((note) => {
+        const duration = fraction(note.duration)
+        note.duration = duration.add(duration.mul(factor))
       })
-    } else if (shape.kind === 'continue' && state.activePitch) {
-      layout.push({
-        kind: 'note',
-        offset,
-        pitch: state.activePitch,
-        duration: shape.duration,
-        tiedFromOffset: state.activeNoteOffset,
-      })
-      state.activeNoteOffset = offset
+      state.activeSpan = activeSpan.add(continuedDuration)
     } else if (shape.kind === 'rest') {
-      state.activePitch = undefined
-      state.activeNoteOffset = undefined
+      state.activeNotes = []
+      state.activeSpan = undefined
       layout.push({ kind: 'rest', offset, duration: shape.duration })
     } else if (shape.kind === 'barline') {
       layout.push({ kind: 'barline', offset, style: shape.style })
@@ -87,15 +91,24 @@ const items = computed(() => {
             tupletEndOffset: rhythmicItems[rhythmicItems.length - 1]?.offset ?? startOffset,
           }),
         )
+        state.activeNotes = rhythmicItems.filter(
+          (item): item is NoteLayoutItem => item.kind === 'note',
+        )
+        state.activeSpan = shape.duration
       }
       return offset
     } else if (shape.kind === 'parallel') {
-      const branchEnds = shape.branches.map((branch) => visit(branch, offset, { ...state }))
+      const branchStates = shape.branches.map((): VisitState => ({ activeNotes: [] }))
+      const branchEnds = shape.branches.map((branch, index) =>
+        visit(branch, offset, branchStates[index]!),
+      )
+      state.activeNotes = branchStates.flatMap((branch) => branch.activeNotes)
+      state.activeSpan = shape.duration
       return branchEnds.reduce((latest, end) => (end.compare(latest) > 0 ? end : latest), offset)
     }
     return shape.duration ? offset.add(shape.duration) : offset
   }
-  if (props.notation) visit(props.notation, new Fraction(0), {})
+  if (props.notation) visit(props.notation, new Fraction(0), { activeNotes: [] })
 
   const offsets = [
     ...layout.map((item) => item.offset),
@@ -148,14 +161,16 @@ const ledgerPositions = (position: number) => {
 
 const flagCount = (duration?: Fraction, tupletCount?: number) => {
   if (!duration) return 0
-  if (tupletCount) return Math.max(1, Math.ceil(Math.log2(tupletCount)) - 1)
-  const value = durationValue(duration)
+  const value = durationValue(duration) * (tupletCount ? tupletCount / 2 : 1)
   if (value >= 1 || value <= 0) return 0
   const subdivision = Math.round(1 / value)
   const binarySubdivision = subdivision % 3 === 0 ? subdivision / 3 : subdivision
   const binaryFlags = Math.log2(binarySubdivision)
   return Number.isInteger(binaryFlags) ? binaryFlags + (subdivision % 3 === 0 ? 1 : 0) : 0
 }
+
+const isOpenNotehead = (duration: Fraction) => durationValue(duration) >= 2
+const hasStem = (duration: Fraction) => durationValue(duration) < 4
 
 const restSymbol = (duration: Fraction) => {
   const flags = flagCount(duration)
@@ -286,12 +301,14 @@ const restSymbol = (duration: Fraction) => {
         <ellipse
           v-else
           class="notehead"
+          :class="{ 'notehead--open': isOpenNotehead(item.duration) }"
           :cx="x(item.column)"
           :cy="y(item.pitch.staffPosition)"
           rx="7"
           ry="5"
         />
         <line
+          v-if="hasStem(item.duration)"
           class="stem"
           :x1="x(item.column) + 6"
           :x2="x(item.column) + 6"
@@ -361,6 +378,12 @@ const restSymbol = (duration: Fraction) => {
 
 .notehead {
   fill: currentColor;
+}
+
+.notehead--open {
+  fill: white;
+  stroke: currentColor;
+  stroke-width: 1.5;
 }
 
 .pitch-decorations,
