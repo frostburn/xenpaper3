@@ -98,6 +98,17 @@ export function applyPitchContextChange(node: PitchContextChange, input: PitchCo
       continue
     }
     if (statement.type !== 'ContextAssignment') throw new TypeError('Unsupported pitch-context statement.')
+    if (statement.target.type === 'ContextNameTarget' && statement.target.name === 'root' && statement.value.type === 'PitchLiteral') {
+      const target = evaluatePitchLiteral(statement.value, { ...context, rootFormula: new Map() })
+      const nominal = statement.value.nominal.value
+      const upper = nominal.toUpperCase()
+      const greekKey = GREEK_SCRIPT[upper] ?? upper
+      const rank = NOMINAL_RANK[greekKey]
+      const nominalPosition = rank === undefined ? 0 : Math.ceil(rank - 1)
+      const caseShift = nominal === nominal.toLowerCase() ? 7 : 0
+      context = { ...context, rootFormula: target.formula, rootStaffPosition: nominalPosition + caseShift + shifts(statement.value.modifiers) * 7 }
+      continue
+    }
     if (statement.target.type === 'ContextPitchTarget' && statement.value.type === 'Identifier' && statement.value.name === 'root') {
       const target = evaluatePitchLiteral(statement.target.pitch, { ...context, rootFormula: new Map() })
       const nominal = statement.target.pitch.nominal.value

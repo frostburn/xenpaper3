@@ -198,6 +198,8 @@ export function constructStaffNotationShape(shape: ScoreShape): StaffNotationSha
       return { kind: 'continue', duration: shape.duration }
     case 'barline':
       return { kind: 'barline', style: shape.style, duration: shape.duration }
+    case 'annotation':
+      return { kind: 'annotation', text: shape.text, duration: shape.duration }
     case 'sequence':
       return { kind: 'sequence', duration: shape.duration, children: shape.children.map(constructStaffNotationShape) }
     case 'parallel':

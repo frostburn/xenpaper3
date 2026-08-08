@@ -16,6 +16,7 @@ export type {
   AttackShape,
   AttackAppearance,
   AbsolutePitchValue,
+  AnnotationShape,
   BarlineShape,
   BarlineStyle,
   ContinueShape,
