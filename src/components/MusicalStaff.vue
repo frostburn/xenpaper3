@@ -156,24 +156,36 @@ const items = computed(() => {
   const column = (offset: Fraction) =>
     uniqueOffsets.findIndex((candidate) => candidate.equals(offset))
 
-  const displayLabelRows = new Map<number, number>()
-  return layout.map(({ offset, tiedFromOffset, tupletStartOffset, tupletEndOffset, ...item }) => {
-    const itemColumn = column(offset)
-    const displayLabelRow =
-      item.kind === 'note' && item.displayLabel
-        ? (displayLabelRows.get(itemColumn) ?? 0)
-        : undefined
-    if (displayLabelRow !== undefined) displayLabelRows.set(itemColumn, displayLabelRow + 1)
+  const staffItems = layout.map(
+    ({ offset, tiedFromOffset, tupletStartOffset, tupletEndOffset, ...item }) => {
+      const itemColumn = column(offset)
 
-    return {
-      ...item,
-      column: itemColumn,
-      tiedFromColumn: tiedFromOffset ? column(tiedFromOffset) : undefined,
-      tupletStartColumn: tupletStartOffset ? column(tupletStartOffset) : undefined,
-      tupletEndColumn: tupletEndOffset ? column(tupletEndOffset) : undefined,
-      displayLabelRow,
-    }
-  }) as StaffItem[]
+      return {
+        ...item,
+        column: itemColumn,
+        tiedFromColumn: tiedFromOffset ? column(tiedFromOffset) : undefined,
+        tupletStartColumn: tupletStartOffset ? column(tupletStartOffset) : undefined,
+        tupletEndColumn: tupletEndOffset ? column(tupletEndOffset) : undefined,
+      }
+    },
+  ) as StaffItem[]
+
+  const labeledNotesByColumn = new Map<number, Extract<StaffItem, { kind: 'note' }>[]>()
+  staffItems.forEach((item) => {
+    if (item.kind !== 'note' || !item.displayLabel) return
+    const columnLabels = labeledNotesByColumn.get(item.column) ?? []
+    columnLabels.push(item)
+    labeledNotesByColumn.set(item.column, columnLabels)
+  })
+  labeledNotesByColumn.forEach((columnLabels) => {
+    columnLabels
+      .sort((a, b) => b.pitch.staffPosition - a.pitch.staffPosition)
+      .forEach((item, displayLabelRow) => {
+        item.displayLabelRow = displayLabelRow
+      })
+  })
+
+  return staffItems
 })
 
 const repeatMarkerColumns = computed(

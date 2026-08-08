@@ -174,15 +174,15 @@ describe('MusicalStaff', () => {
     ])
   })
 
-  it('stacks parallel composition display labels vertically', () => {
+  it('stacks parallel composition display labels in their top-to-bottom staff order', () => {
     const note = notation.children[0]!
     if (note.kind !== 'note') throw new Error('Expected a note.')
     const parallel: StaffNotationShape = {
       kind: 'parallel',
       duration: note.duration,
       branches: [
-        { ...note, displayLabel: '1/1' },
-        { ...note, displayLabel: '5/4' },
+        { ...note, displayLabel: '1/1', pitch: { ...note.pitch, staffPosition: 0 } },
+        { ...note, displayLabel: '5/4', pitch: { ...note.pitch, staffPosition: 4 } },
       ],
     }
     const wrapper = mount(MusicalStaff, { props: { notation: parallel } })
@@ -190,7 +190,7 @@ describe('MusicalStaff', () => {
 
     expect(labels.map((label) => label.text())).toEqual(['1/1', '5/4'])
     expect(labels.map((label) => label.attributes('x'))).toEqual(['60', '60'])
-    expect(labels.map((label) => label.attributes('y'))).toEqual(['130', '143'])
+    expect(labels.map((label) => label.attributes('y'))).toEqual(['143', '130'])
   })
 
   it('aligns parallel branches by rhythmic offset across different subdivisions', () => {
