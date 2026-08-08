@@ -42,6 +42,43 @@ describe('MusicalStaff', () => {
     },
   )
 
+  it('renders sixteenth-note subdivisions with two flags', () => {
+    const expression = parse('@4 C D E F').body[0]!
+    const evaluated = evaluateScoreShape(expression)
+    if (!('shape' in evaluated)) throw new Error('Expected a score shape.')
+    const wrapper = mount(MusicalStaff, {
+      props: { notation: constructStaffNotationShape(evaluated.shape) },
+    })
+
+    expect(wrapper.findAll('.notehead')).toHaveLength(4)
+    expect(wrapper.findAll('.flag')).toHaveLength(8)
+  })
+
+  it('renders a three-note normalized slot as a triplet', () => {
+    const expression = parse('[C D E]').body[0]!
+    const evaluated = evaluateScoreShape(expression)
+    if (!('shape' in evaluated)) throw new Error('Expected a score shape.')
+    const wrapper = mount(MusicalStaff, {
+      props: { notation: constructStaffNotationShape(evaluated.shape) },
+    })
+
+    expect(wrapper.findAll('.notehead')).toHaveLength(3)
+    expect(wrapper.findAll('.flag')).toHaveLength(3)
+    expect(wrapper.get('.tuplet-number').text()).toBe('3')
+  })
+
+  it('does not mark an ordinary three-note sequence as a triplet', () => {
+    const expression = parse('C D E').body[0]!
+    const evaluated = evaluateScoreShape(expression)
+    if (!('shape' in evaluated)) throw new Error('Expected a score shape.')
+    const wrapper = mount(MusicalStaff, {
+      props: { notation: constructStaffNotationShape(evaluated.shape) },
+    })
+
+    expect(wrapper.find('.tuplet-number').exists()).toBe(false)
+    expect(wrapper.findAll('.flag')).toHaveLength(0)
+  })
+
   it('renders staff lines, notes, accidentals, ledger lines, and rests', () => {
     const wrapper = mount(MusicalStaff, { props: { notation } })
 

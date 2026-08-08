@@ -46,6 +46,18 @@ describe('score-shape timing', () => {
     expect(result.duration.equals(4)).toBe(true)
   })
 
+  it('propagates subdivision state through and beyond repeats', () => {
+    const result = shape('|: C @2 D :| E') as SequenceShape
+    const repeat = result.children[0] as SequenceShape
+    const repeatedSequence = repeat.children[1] as SequenceShape
+    const repeatedAttacks = repeatedSequence.children.filter((child) => child.kind === 'attack')
+    const following = result.children[1]
+
+    expect(repeatedAttacks.map((attack) => attack.duration.valueOf())).toEqual([1, 0.5])
+    expect(following).toMatchObject({ kind: 'attack' })
+    expect(following!.duration.valueOf()).toBe(0.5)
+  })
+
   it('normalizes attached continuation as part of the complete fragment', () => {
     const result = shape('[3/2= 4/3]') as SequenceShape
 
