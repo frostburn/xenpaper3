@@ -123,7 +123,7 @@ export interface StaffPitch {
 }
 
 export type StaffNotationShape =
-  | { readonly kind: 'note'; readonly pitch: StaffPitch; readonly duration: Fraction; readonly displayLabel?: string; readonly dynamic?: DynamicMark; readonly velocity?: Fraction; readonly grace?: boolean; readonly notatedDuration?: Fraction }
+  | { readonly kind: 'note'; readonly pitch: StaffPitch; readonly duration: Fraction; readonly displayLabel?: string; readonly dynamic?: DynamicMark; readonly velocity?: Fraction; readonly dynamicChanged?: boolean; readonly velocityExplicit?: boolean; readonly grace?: boolean; readonly notatedDuration?: Fraction }
   | { readonly kind: 'rest'; readonly duration: Fraction; readonly generated: boolean }
   | { readonly kind: 'continue'; readonly duration: Fraction }
   | { readonly kind: 'barline'; readonly style: BarlineStyle; readonly duration: Fraction }
@@ -155,6 +155,10 @@ export interface AttackShape extends ShapeBase {
   readonly dynamic: DynamicMark
   readonly velocity: Fraction
   readonly automation?: PitchAutomation
+  /** True on the first compatible attack after an authored dynamic directive. */
+  readonly dynamicChanged?: boolean
+  /** True when velocity came from an authored one-shot velocity directive. */
+  readonly velocityExplicit?: boolean
   /** Grace attacks are engraved small and lead into the following donor note. */
   readonly grace?: boolean
   /** Authored rhythmic value of a grace donor before time was stolen. */

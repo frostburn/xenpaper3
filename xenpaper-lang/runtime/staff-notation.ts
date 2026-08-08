@@ -192,6 +192,8 @@ export function constructStaffNotationShape(shape: ScoreShape): StaffNotationSha
           ...(shape.displayLabel ? { displayLabel: shape.displayLabel } : {}),
           dynamic: shape.dynamic,
           velocity: shape.velocity,
+          ...(shape.dynamicChanged ? { dynamicChanged: true } : {}),
+          ...(shape.velocityExplicit ? { velocityExplicit: true } : {}),
           ...(shape.grace ? { grace: true } : {}),
           ...(shape.notatedDuration ? { notatedDuration: shape.notatedDuration } : {}),
         }
