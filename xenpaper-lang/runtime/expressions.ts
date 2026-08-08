@@ -5,7 +5,14 @@ import { Value } from '../value'
 import { evaluateLiteral, type NumericLiteralNode } from './literals'
 import type { EvaluatedLiteral, PitchOffsetValue, ScalarValue, SourceOrigin } from './types'
 import type { PitchContext, PrimeMapping } from './types'
-import { DEFAULT_PITCH_CONTEXT, evaluateIntervalLiteral, evaluatePitchLiteral, scalePitchOffset, spellPitchDifference } from './pitches'
+import { createPitchContext, DEFAULT_PITCH_CONTEXT, evaluateIntervalLiteral, evaluatePitchLiteral, scalePitchOffset, spellPitchDifference } from './pitches'
+
+function equaveShifts(modifiers: readonly { readonly kind: string }[]): number {
+  return modifiers.reduce(
+    (sum, modifier) => sum + (modifier.kind === 'equaveUp' ? 1 : modifier.kind === 'doubleEquaveUp' ? 2 : modifier.kind === 'equaveDown' ? -1 : 0),
+    0,
+  )
+}
 
 export type ExpressionEvaluationResult =
   | { readonly value: EvaluatedLiteral; readonly diagnostics: readonly Diagnostic[] }
@@ -163,6 +170,15 @@ function binary(
 /** Evaluate the arithmetic subset of the parser AST without throwing for source errors. */
 export function evaluateExpression(node: Expression, mapping: PrimeMapping | PitchContext = DEFAULT_PITCH_CONTEXT): ExpressionEvaluationResult {
   try {
+    if (node.type === 'DegreeLiteral') {
+      const context = 'rootFormula' in mapping ? mapping : createPitchContext(mapping)
+      const value = context.degreeStep.mul(new Value(BigInt(node.degree)))
+        .add(context.degreeEquave.mul(new Value(equaveShifts(node.modifiers))))
+      return {
+        value: result('pitchOffset', value, [{ location: node.location, role: 'literal' }]),
+        diagnostics: [],
+      }
+    }
     if (isNumericLiteral(node)) {
       if (node.type === 'EqualDivisionLiteral' && node.equave) {
         const equave = evaluateExpression(node.equave, mapping)
@@ -181,6 +197,16 @@ export function evaluateExpression(node: Expression, mapping: PrimeMapping | Pit
       const operand = evaluateExpression(node.operand, mapping)
       if (!('value' in operand)) return operand
       if (node.operator === '+') return operand
+      if (["'", '"', '`'].includes(node.operator)) {
+        if (operand.value.kind === 'absolutePitch') throw new TypeError('An equave shift requires a pitch offset.')
+        const context = 'rootFormula' in mapping ? mapping : createPitchContext(mapping)
+        const shift = node.operator === "'" ? 1 : node.operator === '"' ? 2 : -1
+        const offset = operand.value.kind === 'pitchOffset' ? operand.value : pitchCoercion(operand.value)
+        return {
+          value: { ...offset, value: offset.value.add(context.degreeEquave.mul(new Value(shift))) },
+          diagnostics: operand.diagnostics,
+        }
+      }
       if (node.operator !== '-') throw new TypeError(`Unknown unary operator ${node.operator}.`)
       if (operand.value.kind === 'absolutePitch') throw new TypeError('An absolute pitch cannot be negated.')
       const origins: readonly SourceOrigin[] = [

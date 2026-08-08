@@ -166,6 +166,22 @@ describe('staff notation construction', () => {
     })
   })
 
+  it('retains Latin spelling and staff position when an EDO preset maps its sound', () => {
+    const node = parse("{13edo} E B c 'C").body[0] as Expression
+    const evaluated = evaluateScoreShape(node)
+    if (!('shape' in evaluated)) throw new Error('Expected shape.')
+
+    const staff = constructStaffNotationShape(evaluated.shape)
+    if (staff.kind !== 'sequence') throw new Error('Expected a sequence.')
+    const notes = staff.children.filter((child) => child.kind === 'note')
+    expect(notes.map((note) => [note.pitch.staffPosition, note.pitch.accidentals])).toEqual([
+      [2, []], [6, []], [7, []], [7, []],
+    ])
+    expect(notes.map((note) => note.pitch.cents)).toEqual([
+      553.8461538461539, 1292.3076923076922, 1200, 1200,
+    ])
+  })
+
   it('places a unison ratio on the active staff root', () => {
     const node = parse('{D = root} 1/1').body[0] as Expression
     const evaluated = evaluateScoreShape(node)

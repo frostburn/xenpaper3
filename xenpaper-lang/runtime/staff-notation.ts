@@ -121,12 +121,12 @@ export function constructStaffNotation(value: EvaluatedLiteral, options: StaffNo
     }
     const latin = LETTERS.indexOf(key as (typeof LETTERS)[number])
     if (latin >= 0) {
-      const soundingOctave = Math.round((cents - SEMITONES[latin]! * 100) / 1200)
-      const position = soundingOctave * 7 + latin
-      const chromatic = Math.round((cents - (soundingOctave * 1200 + SEMITONES[latin]! * 100)) / 100)
+      const writtenOctave = (rawNominal === rawNominal.toLowerCase() ? 1 : 0) +
+        equaveStaffShift(value.spelling.modifiers) / 7
+      const position = writtenOctave * 7 + latin
       return {
         staffPosition: position,
-        ...decorations(value, chromatic),
+        ...decorations(value),
         notehead: 'normal',
         cents,
       }

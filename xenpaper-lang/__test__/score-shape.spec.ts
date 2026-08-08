@@ -14,6 +14,23 @@ function shape(source: string, pulse: Fraction | number = 1): ScoreShape {
 }
 
 describe('score-shape timing', () => {
+  it('uses 12-EDO degrees by default and updates their division with EDO presets', () => {
+    const defaults = shape("0 1 2 11 '0 `0") as SequenceShape
+    const attacksIn = (score: ScoreShape): Extract<ScoreShape, { kind: 'attack' }>[] => score.kind === 'attack'
+      ? [score]
+      : score.kind === 'sequence'
+        ? score.children.flatMap(attacksIn)
+        : score.kind === 'parallel'
+          ? score.branches.flatMap(attacksIn)
+          : []
+    const defaultAttacks = attacksIn(defaults)
+    expect(defaultAttacks.map((attack) => attack.pitch.value.valueOf())).toEqual([0, 100, 200, 1100, 1200, -1200])
+
+    const tenEdo = shape('{10edo} 0= 1 2 3 4 5 6 7 9 9 10=') as SequenceShape
+    const attacks = attacksIn(tenEdo)
+    expect(attacks.map((attack) => attack.pitch.value.valueOf())).toEqual([0, 120, 240, 360, 480, 600, 720, 840, 1080, 1080, 1200])
+    expect(tenEdo.children.filter((child) => child.kind === 'sequence')).toHaveLength(2)
+  })
   it('flows root reassociation through an ordinary sequence', () => {
     const result = shape('{A = root} A B') as SequenceShape
     expect(result.children).toHaveLength(3)

@@ -93,6 +93,10 @@ export interface PrimeMapping {
 
 export interface PitchContext {
   readonly mapping: PrimeMapping
+  /** Numeric scale-degree step; defaults to one semitone. */
+  readonly degreeStep: Value
+  /** Displacement applied by each equave modifier on a numeric degree. */
+  readonly degreeEquave: Value
   /** Sounding displacement of the current root from the default root frequency. */
   readonly rootDisplacement: Value
   readonly rootFormula: PrimeMonzo

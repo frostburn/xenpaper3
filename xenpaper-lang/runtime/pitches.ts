@@ -73,6 +73,8 @@ export function mapFormula(monzo: PrimeMonzo, mapping: PrimeMapping): Value {
 export function createPitchContext(mapping: PrimeMapping = DEFAULT_MAPPING): PitchContext {
   return {
     mapping,
+    degreeStep: Value.cents(100),
+    degreeEquave: Value.cents(1200),
     rootDisplacement: Value.cents(0),
     rootFormula: new Map(),
     up: mapFormula(new Map([[2, new Fraction(-1, 2)], [3, new Fraction(5, 2)], [11, new Fraction(-1)]]), mapping),
@@ -97,6 +99,8 @@ export function applyPitchContextChange(node: PitchContextChange, input: PitchCo
       const mapping = edoMapping(Number(match[1]))
       context = {
         ...createPitchContext(mapping),
+        degreeStep: Value.cents(new Fraction(1200, Number(match[1]))),
+        degreeEquave: Value.cents(1200),
         rootDisplacement: context.rootDisplacement,
         rootFormula: context.rootFormula,
         rootStaffPosition: context.rootStaffPosition,
