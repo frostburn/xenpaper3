@@ -172,8 +172,8 @@ describe('MusicalStaff', () => {
       duration: notation.duration,
       children: [
         notation.children[0]!,
-        { kind: 'continue', duration: notation.duration },
-        { kind: 'continue', duration: notation.duration },
+        { kind: 'continue', duration: { n: 1, d: 1 } as StaffNotationShape['duration'] },
+        { kind: 'continue', duration: { n: 1, d: 1 } as StaffNotationShape['duration'] },
       ],
     }
     const wrapper = mount(MusicalStaff, { props: { notation: continued } })
@@ -219,6 +219,33 @@ describe('MusicalStaff', () => {
     expect(wrapper.findAll('.notehead--open')).toHaveLength(3)
     expect(wrapper.findAll('.stem')).toHaveLength(2)
     expect(wrapper.findAll('.augmentation-dot')).toHaveLength(1)
+  })
+
+  it('shows a question mark instead of approximating an unsupported note duration', () => {
+    const evaluated = evaluateScoreShape(parse('C====').body[0]!)
+    if (!('shape' in evaluated)) throw new Error('Expected a score shape.')
+    const wrapper = mount(MusicalStaff, {
+      props: { notation: constructStaffNotationShape(evaluated.shape) },
+    })
+
+    expect(wrapper.get('.notation-error').text()).toBe('?')
+    expect(wrapper.find('.notehead').exists()).toBe(false)
+    expect(wrapper.find('.stem').exists()).toBe(false)
+    expect(wrapper.find('.augmentation-dot').exists()).toBe(false)
+  })
+
+  it('shows a question mark for unsupported rest durations', () => {
+    const wrapper = mount(MusicalStaff, {
+      props: {
+        notation: {
+          kind: 'rest',
+          duration: { n: 2, d: 1 } as StaffNotationShape['duration'],
+          generated: false,
+        },
+      },
+    })
+
+    expect(wrapper.get('.rest').text()).toBe('?')
   })
 
   it('extends notes and chords through following continues', () => {
