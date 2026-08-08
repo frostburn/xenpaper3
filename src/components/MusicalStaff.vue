@@ -37,13 +37,18 @@ type LayoutItem = StaffItemContent & {
 }
 
 type NoteLayoutItem = Extract<LayoutItem, { kind: 'note' }>
+type RhythmicLayoutItem = Extract<LayoutItem, { kind: 'note' | 'rest' }>
 
 const durationValue = (duration: Fraction) => Number(duration.n) / Number(duration.d)
 const fraction = (duration: Fraction) => new Fraction(duration.n, duration.d)
 
 const items = computed(() => {
   const layout: LayoutItem[] = []
-  type VisitState = { activeNotes: NoteLayoutItem[]; activeSpan?: Fraction }
+  type VisitState = {
+    activeItems: RhythmicLayoutItem[]
+    activeNotes: NoteLayoutItem[]
+    activeSpan?: Fraction
+  }
   const visit = (shape: StaffNotationShape, offset: Fraction, state: VisitState): Fraction => {
     if (shape.kind === 'note') {
       const note: NoteLayoutItem = {
@@ -54,15 +59,16 @@ const items = computed(() => {
         soundingLabel: shape.soundingLabel,
       }
       layout.push(note)
+      state.activeItems = [note]
       state.activeNotes = [note]
       state.activeSpan = shape.duration
-    } else if (shape.kind === 'continue' && state.activeNotes.length && state.activeSpan) {
+    } else if (shape.kind === 'continue' && state.activeItems.length && state.activeSpan) {
       const continuedDuration = fraction(shape.duration)
       const activeSpan = fraction(state.activeSpan)
       const factor = continuedDuration.div(activeSpan)
-      state.activeNotes.forEach((note) => {
-        const duration = fraction(note.duration)
-        note.duration = duration.add(duration.mul(factor))
+      state.activeItems.forEach((item) => {
+        const duration = fraction(item.duration)
+        item.duration = duration.add(duration.mul(factor))
       })
       const tupletCount = state.activeNotes[0]?.tupletCount
       const resolvesToRegularNotes = state.activeNotes.every(
@@ -80,6 +86,7 @@ const items = computed(() => {
       }
       state.activeSpan = activeSpan.add(continuedDuration)
     } else if (shape.kind === 'rest') {
+      state.activeItems = []
       state.activeNotes = []
       state.activeSpan = undefined
       layout.push({ kind: 'rest', offset, duration: shape.duration })
@@ -114,21 +121,25 @@ const items = computed(() => {
         state.activeNotes = rhythmicItems.slice(lastRest + 1).filter(
           (item): item is NoteLayoutItem => item.kind === 'note',
         )
-        state.activeSpan = state.activeNotes.length ? shape.duration : undefined
+        state.activeItems = rhythmicItems
+        state.activeSpan = rhythmicItems.length ? shape.duration : undefined
       }
       return offset
     } else if (shape.kind === 'parallel') {
-      const branchStates = shape.branches.map((): VisitState => ({ activeNotes: [] }))
+      const branchStates = shape.branches.map(
+        (): VisitState => ({ activeItems: [], activeNotes: [] }),
+      )
       const branchEnds = shape.branches.map((branch, index) =>
         visit(branch, offset, branchStates[index]!),
       )
       state.activeNotes = branchStates.flatMap((branch) => branch.activeNotes)
+      state.activeItems = branchStates.flatMap((branch) => branch.activeItems)
       state.activeSpan = shape.duration
       return branchEnds.reduce((latest, end) => (end.compare(latest) > 0 ? end : latest), offset)
     }
     return shape.duration ? offset.add(shape.duration) : offset
   }
-  if (props.notation) visit(props.notation, new Fraction(0), { activeNotes: [] })
+  if (props.notation) visit(props.notation, new Fraction(0), { activeItems: [], activeNotes: [] })
 
   const offsets = [
     ...layout.map((item) => item.offset),

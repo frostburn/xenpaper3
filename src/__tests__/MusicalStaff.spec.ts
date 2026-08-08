@@ -133,7 +133,7 @@ describe('MusicalStaff', () => {
     expect(wrapper.findAll('.augmentation-dot')).toHaveLength(0)
   })
 
-  it('does not extend normalized notes through a trailing rest', () => {
+  it('extends a normalized note and rest without continuing through the rest barrier', () => {
     const evaluated = evaluateScoreShape(parse('[C .]=').body[0]!)
     if (!('shape' in evaluated)) throw new Error('Expected a score shape.')
     const wrapper = mount(MusicalStaff, {
@@ -141,8 +141,9 @@ describe('MusicalStaff', () => {
     })
 
     expect(wrapper.findAll('.notehead')).toHaveLength(1)
-    expect(wrapper.findAll('.flag')).toHaveLength(1)
+    expect(wrapper.findAll('.flag')).toHaveLength(0)
     expect(wrapper.findAll('.notehead--open')).toHaveLength(0)
+    expect(wrapper.get('.rest').text()).toBe('𝄽')
   })
 
   it('does not mark an ordinary three-note sequence as a triplet', () => {
