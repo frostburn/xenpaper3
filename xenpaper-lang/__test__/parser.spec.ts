@@ -219,17 +219,19 @@ describe("Xenpaper surface grammar", () => {
     expect(items.map((item) => item.type)).toEqual(["PitchLiteral", "HardBoundary", "PitchLiteral"]);
   });
 
-  it("parses a barline attached to the preceding pitch", () => {
-    const items = (parse("C D E| F G").body[0] as SyntaxNode).items as SyntaxNode[];
+  it("uses barlines and repeat markers as sequence gaps", () => {
+    const items = (parse("C|D| E|:F G:||").body[0] as SyntaxNode).items as SyntaxNode[];
 
     expect(items.map((item) => item.type)).toEqual([
       "PitchLiteral",
-      "PitchLiteral",
+      "Barline",
       "PitchLiteral",
       "Barline",
       "PitchLiteral",
-      "PitchLiteral",
+      "Repeat",
+      "Barline",
     ]);
+    expect(((items[5].body as SyntaxNode[])[0] as SyntaxNode).type).toBe("Sequence");
   });
 
   it("supports prefixes with relative pitch offset literals", () => {
