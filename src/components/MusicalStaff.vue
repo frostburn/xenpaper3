@@ -15,63 +15,91 @@ const props = defineProps<{
 type TupletItem = {
   tupletPosition?: number
   tupletCount?: number
-  tupletStartIndex?: number
-  tupletEndIndex?: number
+  tupletStartColumn?: number
+  tupletEndColumn?: number
 }
 
-type StaffItem = TupletItem & (
-  | { kind: 'note'; pitch: StaffPitch; duration: Fraction; soundingLabel?: string; tiedFromIndex?: number }
-  | { kind: 'rest'; duration: Fraction }
-  | { kind: 'barline'; style: BarlineStyle }
-  | { kind: 'annotation'; text: string }
-)
+type StaffItem = TupletItem &
+  (
+    | {
+        kind: 'note'
+        pitch: StaffPitch
+        duration: Fraction
+        soundingLabel?: string
+        tiedFromColumn?: number
+      }
+    | { kind: 'rest'; duration: Fraction }
+    | { kind: 'barline'; style: BarlineStyle }
+    | { kind: 'annotation'; text: string }
+  ) & { column: number }
 
 const durationValue = (duration: Fraction) => Number(duration.n) / Number(duration.d)
 
 const items = computed(() => {
   const result: StaffItem[] = []
-  let activePitch: StaffPitch | undefined
-  let activeNoteIndex: number | undefined
-  const visit = (shape: StaffNotationShape) => {
+  type VisitState = { activePitch?: StaffPitch; activeNoteColumn?: number }
+  const visit = (shape: StaffNotationShape, column: number, state: VisitState): number => {
     if (shape.kind === 'note') {
-      activePitch = shape.pitch
-      activeNoteIndex = result.length
-      result.push({ kind: 'note', pitch: shape.pitch, duration: shape.duration, soundingLabel: shape.soundingLabel })
-    } else if (shape.kind === 'continue' && activePitch) {
-      result.push({ kind: 'note', pitch: activePitch, duration: shape.duration, tiedFromIndex: activeNoteIndex })
-      activeNoteIndex = result.length - 1
+      state.activePitch = shape.pitch
+      state.activeNoteColumn = column
+      result.push({
+        kind: 'note',
+        column,
+        pitch: shape.pitch,
+        duration: shape.duration,
+        soundingLabel: shape.soundingLabel,
+      })
+    } else if (shape.kind === 'continue' && state.activePitch) {
+      result.push({
+        kind: 'note',
+        column,
+        pitch: state.activePitch,
+        duration: shape.duration,
+        tiedFromColumn: state.activeNoteColumn,
+      })
+      state.activeNoteColumn = column
     } else if (shape.kind === 'rest') {
-      activePitch = undefined
-      activeNoteIndex = undefined
-      result.push({ kind: 'rest', duration: shape.duration })
+      state.activePitch = undefined
+      state.activeNoteColumn = undefined
+      result.push({ kind: 'rest', column, duration: shape.duration })
     } else if (shape.kind === 'barline') {
-      result.push({ kind: 'barline', style: shape.style })
+      result.push({ kind: 'barline', column, style: shape.style })
     } else if (shape.kind === 'annotation') {
-      result.push({ kind: 'annotation', text: shape.text })
+      result.push({ kind: 'annotation', column, text: shape.text })
     } else if (shape.kind === 'sequence') {
+      const startColumn = column
       const startIndex = result.length
-      shape.children.forEach((child) => visit(child))
+      shape.children.forEach((child) => {
+        column = visit(child, column, state)
+      })
       if (shape.tuplet) {
-        const rhythmicItems = result.slice(startIndex).filter(
-          (item) => item.kind === 'note' || item.kind === 'rest',
+        const rhythmicItems = result
+          .slice(startIndex)
+          .filter((item) => item.kind === 'note' || item.kind === 'rest')
+        rhythmicItems.forEach((item, position) =>
+          Object.assign(item, {
+            tupletPosition: position,
+            tupletCount: shape.tuplet,
+            tupletStartColumn: startColumn,
+            tupletEndColumn: column - 1,
+          }),
         )
-        const endIndex = result.length - 1
-        rhythmicItems.forEach((item, position) => Object.assign(item, {
-          tupletPosition: position,
-          tupletCount: shape.tuplet,
-          tupletStartIndex: startIndex,
-          tupletEndIndex: endIndex,
-        }))
       }
+      return column
+    } else if (shape.kind === 'parallel') {
+      const branchEnds = shape.branches.map((branch) => visit(branch, column, { ...state }))
+      return Math.max(column, ...branchEnds)
     }
-    else if (shape.kind === 'parallel') shape.branches.forEach((branch) => visit(branch))
+    return column + 1
   }
-  if (props.notation) visit(props.notation)
+  if (props.notation) visit(props.notation, 0, {})
   return result
 })
 
-const width = computed(() => Math.max(360, 80 + items.value.length * 52))
-const x = (index: number) => 60 + index * 52
+const width = computed(() =>
+  Math.max(360, 80 + (Math.max(-1, ...items.value.map((item) => item.column)) + 1) * 52),
+)
+const x = (column: number) => 60 + column * 52
 const y = (position: number) => 100 - (position - 2) * 6
 const accidental = (value: string) =>
   ({
@@ -133,59 +161,71 @@ const restSymbol = (duration: Fraction) => {
       <text
         v-if="item.tupletPosition === Math.floor((item.tupletCount ?? 0) / 2)"
         class="tuplet-number"
-        :x="(x(item.tupletStartIndex!) + x(item.tupletEndIndex!)) / 2"
+        :x="(x(item.tupletStartColumn!) + x(item.tupletEndColumn!)) / 2"
         y="31"
-      >{{ item.tupletCount }}</text>
+      >
+        {{ item.tupletCount }}
+      </text>
       <path
         v-if="item.tupletPosition === Math.floor((item.tupletCount ?? 0) / 2)"
         class="tuplet-bracket"
-        :d="`M ${x(item.tupletStartIndex!) - 10} 40 V 34 H ${(x(item.tupletStartIndex!) + x(item.tupletEndIndex!)) / 2 - 10} M ${(x(item.tupletStartIndex!) + x(item.tupletEndIndex!)) / 2 + 10} 34 H ${x(item.tupletEndIndex!) + 10} V 40`"
+        :d="`M ${x(item.tupletStartColumn!) - 10} 40 V 34 H ${(x(item.tupletStartColumn!) + x(item.tupletEndColumn!)) / 2 - 10} M ${(x(item.tupletStartColumn!) + x(item.tupletEndColumn!)) / 2 + 10} 34 H ${x(item.tupletEndColumn!) + 10} V 40`"
       />
-      <text v-if="item.kind === 'rest'" class="rest" :x="x(index)" y="79">{{ restSymbol(item.duration) }}</text>
-      <text v-else-if="item.kind === 'annotation'" class="annotation" :x="x(index)" y="25">
+      <text v-if="item.kind === 'rest'" class="rest" :x="x(item.column)" y="79">
+        {{ restSymbol(item.duration) }}
+      </text>
+      <text v-else-if="item.kind === 'annotation'" class="annotation" :x="x(item.column)" y="25">
         {{ item.text }}
       </text>
       <g v-else-if="item.kind === 'barline'" class="barline" :class="`barline--${item.style}`">
         <line
-          :x1="x(index) - (item.style === 'single' ? 0 : 3)"
-          :x2="x(index) - (item.style === 'single' ? 0 : 3)"
+          :x1="x(item.column) - (item.style === 'single' ? 0 : 3)"
+          :x2="x(item.column) - (item.style === 'single' ? 0 : 3)"
           y1="52"
           y2="100"
         />
         <line
           v-if="item.style !== 'single'"
-          :x1="x(index) + 3"
-          :x2="x(index) + 3"
+          :x1="x(item.column) + 3"
+          :x2="x(item.column) + 3"
           y1="52"
           y2="100"
         />
         <template v-if="item.style === 'repeat-start' || item.style === 'repeat-end'">
-          <circle :cx="x(index) + (item.style === 'repeat-start' ? 10 : -10)" cy="70" r="2.5" />
-          <circle :cx="x(index) + (item.style === 'repeat-start' ? 10 : -10)" cy="82" r="2.5" />
+          <circle
+            :cx="x(item.column) + (item.style === 'repeat-start' ? 10 : -10)"
+            cy="70"
+            r="2.5"
+          />
+          <circle
+            :cx="x(item.column) + (item.style === 'repeat-start' ? 10 : -10)"
+            cy="82"
+            r="2.5"
+          />
         </template>
       </g>
       <template v-else>
         <path
-          v-if="item.tiedFromIndex !== undefined"
+          v-if="item.tiedFromColumn !== undefined"
           class="tie"
-          :d="`M ${x(item.tiedFromIndex) + 6} ${y(item.pitch.staffPosition) + 7} Q ${(x(item.tiedFromIndex) + x(index)) / 2} ${y(item.pitch.staffPosition) + 17} ${x(index) - 6} ${y(item.pitch.staffPosition) + 7}`"
+          :d="`M ${x(item.tiedFromColumn) + 6} ${y(item.pitch.staffPosition) + 7} Q ${(x(item.tiedFromColumn) + x(item.column)) / 2} ${y(item.pitch.staffPosition) + 17} ${x(item.column) - 6} ${y(item.pitch.staffPosition) + 7}`"
         />
         <line
           v-for="position in ledgerPositions(item.pitch.staffPosition)"
           :key="position"
           class="ledger-line"
-          :x1="x(index) - 12"
-          :x2="x(index) + 12"
+          :x1="x(item.column) - 12"
+          :x2="x(item.column) + 12"
           :y1="y(position)"
           :y2="y(position)"
         />
         <text
           v-if="
             (item.pitch.inflections?.length || item.pitch.accidentals.length) &&
-            item.tiedFromIndex === undefined
+            item.tiedFromColumn === undefined
           "
           class="pitch-decorations"
-          :x="x(index) - 11"
+          :x="x(item.column) - 11"
           :y="y(item.pitch.staffPosition) + 5"
         >
           <tspan
@@ -202,23 +242,23 @@ const restSymbol = (duration: Fraction) => {
         <polygon
           v-if="item.pitch.notehead === 'triangle-down'"
           class="notehead"
-          :points="`${x(index) - 7},${y(item.pitch.staffPosition) - 5} ${x(index) + 7},${y(item.pitch.staffPosition) - 5} ${x(index)},${y(item.pitch.staffPosition) + 6}`"
+          :points="`${x(item.column) - 7},${y(item.pitch.staffPosition) - 5} ${x(item.column) + 7},${y(item.pitch.staffPosition) - 5} ${x(item.column)},${y(item.pitch.staffPosition) + 6}`"
         />
         <polygon
           v-else-if="item.pitch.notehead === 'triangle-up'"
           class="notehead"
-          :points="`${x(index)},${y(item.pitch.staffPosition) - 6} ${x(index) + 7},${y(item.pitch.staffPosition) + 5} ${x(index) - 7},${y(item.pitch.staffPosition) + 5}`"
+          :points="`${x(item.column)},${y(item.pitch.staffPosition) - 6} ${x(item.column) + 7},${y(item.pitch.staffPosition) + 5} ${x(item.column) - 7},${y(item.pitch.staffPosition) + 5}`"
         />
         <g v-else-if="item.pitch.notehead === 'x'" class="notehead x-notehead">
           <line
-            :x1="x(index) - 6"
-            :x2="x(index) + 6"
+            :x1="x(item.column) - 6"
+            :x2="x(item.column) + 6"
             :y1="y(item.pitch.staffPosition) - 6"
             :y2="y(item.pitch.staffPosition) + 6"
           />
           <line
-            :x1="x(index) - 6"
-            :x2="x(index) + 6"
+            :x1="x(item.column) - 6"
+            :x2="x(item.column) + 6"
             :y1="y(item.pitch.staffPosition) + 6"
             :y2="y(item.pitch.staffPosition) - 6"
           />
@@ -226,15 +266,15 @@ const restSymbol = (duration: Fraction) => {
         <ellipse
           v-else
           class="notehead"
-          :cx="x(index)"
+          :cx="x(item.column)"
           :cy="y(item.pitch.staffPosition)"
           rx="7"
           ry="5"
         />
         <line
           class="stem"
-          :x1="x(index) + 6"
-          :x2="x(index) + 6"
+          :x1="x(item.column) + 6"
+          :x2="x(item.column) + 6"
           :y1="y(item.pitch.staffPosition)"
           :y2="y(item.pitch.staffPosition) - 30"
         />
@@ -242,12 +282,12 @@ const restSymbol = (duration: Fraction) => {
           v-for="flag in flagCount(item.duration, item.tupletCount)"
           :key="`flag-${flag}`"
           class="flag"
-          :d="`M ${x(index) + 6} ${y(item.pitch.staffPosition) - 30 + (flag - 1) * 7} Q ${x(index) + 20} ${y(item.pitch.staffPosition) - 23 + (flag - 1) * 7} ${x(index) + 12} ${y(item.pitch.staffPosition) - 13 + (flag - 1) * 7}`"
+          :d="`M ${x(item.column) + 6} ${y(item.pitch.staffPosition) - 30 + (flag - 1) * 7} Q ${x(item.column) + 20} ${y(item.pitch.staffPosition) - 23 + (flag - 1) * 7} ${x(item.column) + 12} ${y(item.pitch.staffPosition) - 13 + (flag - 1) * 7}`"
         />
         <text
           v-if="item.pitch.notehead === 'x' && item.soundingLabel"
           class="sounding-label"
-          :x="x(index)"
+          :x="x(item.column)"
           y="130"
         >
           {{ item.soundingLabel }}
