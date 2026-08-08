@@ -3,6 +3,7 @@ import type { Expression } from '../parser.generated.js'
 import type { Diagnostic } from '../diagnostics'
 import { Value } from '../value'
 import { evaluateExpression } from './expressions'
+import { DYNAMIC_VELOCITIES, resolveDirective } from './directives'
 import { DEFAULT_PITCH_CONTEXT, applyPitchContextChange, mapFormula } from './pitches'
 import type {
   AttackShape,
@@ -20,6 +21,7 @@ import type {
   SequenceShape,
   SourceOrigin,
   PitchContext,
+  DynamicMark,
 } from './types'
 
 export interface ScoreShapeOptions {
@@ -260,6 +262,7 @@ export function evaluateScoreShape(
     current: Expression,
     context: PitchContext,
     currentPulse: Fraction = pulse,
+    currentDynamic: DynamicMark = 'mf',
   ): ScoreShapeEvaluationResult => {
     if (current.type === 'Rest') {
       return {
@@ -346,38 +349,86 @@ export function evaluateScoreShape(
     if (current.type === 'Sequence') {
       let activeContext = context
       let activePulse = currentPulse
+      let activeDynamic = currentDynamic
+      let velocity: Fraction | undefined
+      let grace: { duration: Fraction; count: number; indices: number[] } | undefined
+      let gliss: number[] | undefined
       const results: ScoreShapeEvaluationResult[] = []
       for (const item of current.items) {
         if (item.type === 'PitchContextChange') {
-          try {
-            activeContext = applyPitchContextChange(item, activeContext)
-            results.push({ shape: contextAnnotation(item), diagnostics: [] })
-          } catch (error) {
-            results.push({ diagnostics: [{ code: 'XP_CONTEXT', severity: 'error', message: error instanceof Error ? error.message : 'Invalid pitch context.', locations: [item.location] }] })
-          }
-        } else if (item.type === 'Directive' && item.name === 'subdivision' && !item.graceCount) {
-          const subdivision = subdivisionPulse(item, activeContext)
-          if (!subdivision) {
-            results.push({ diagnostics: [{ code: 'XP_DIRECTIVE', severity: 'error', message: 'Subdivision must be a positive exact rational.', locations: [item.location] }] })
-          } else {
-            activePulse = subdivision.pulse
-            results.push({ shape: sequence([], [origin(item)]), diagnostics: subdivision.diagnostics })
-          }
-        } else {
-          results.push(visit(item, activeContext, activePulse))
-          activeContext = contextAfter(item, activeContext)
-          activePulse = pulseAfter(item, activePulse, activeContext)
+          try { activeContext = applyPitchContextChange(item, activeContext); results.push({ shape: contextAnnotation(item), diagnostics: [] }) }
+          catch (error) { results.push({ diagnostics: [{ code: 'XP_CONTEXT', severity: 'error', message: error instanceof Error ? error.message : 'Invalid pitch context.', locations: [item.location] }] }) }
+          continue
         }
+        if (item.type === 'Directive') {
+          const resolved = resolveDirective(item, activeContext)
+          const directive = resolved.directive
+          if (directive?.kind === 'subdivision') activePulse = directive.pulse
+          else if (directive?.kind === 'dynamic') activeDynamic = directive.mark
+          else if (directive?.kind === 'velocity') velocity = directive.velocity
+          else if (directive?.kind === 'grace') grace = { duration: directive.duration, count: directive.count, indices: [] }
+          else if (directive?.kind === 'gliss') gliss = []
+          const shape: ScoreShape = directive?.kind === 'unknown'
+            ? { kind: 'annotation', text: item.rawName.startsWith('@') ? item.rawName : `@${item.rawName}`, duration: new Fraction(0), origins: [origin(item, 'directive')] }
+            : sequence([], [origin(item, 'directive')])
+          results.push({ shape, diagnostics: resolved.diagnostics })
+          continue
+        }
+        let result = visit(item, activeContext, activePulse, activeDynamic)
+        const index = results.length
+        if ('shape' in result && attacks(result.shape).length) {
+          if (velocity) {
+            let first = true; const pending = velocity
+            const applyVelocity = (shape: ScoreShape): ScoreShape => {
+              if (shape.kind === 'attack' && first) { first = false; return { ...shape, velocity: pending } }
+              if (shape.kind === 'sequence') return { ...shape, children: shape.children.map(applyVelocity) }
+              if (shape.kind === 'parallel') return { ...shape, branches: shape.branches.map(applyVelocity) }
+              return shape
+            }
+            result = { ...result, shape: applyVelocity(result.shape) }; velocity = undefined
+          }
+          if (grace) grace.indices.push(index)
+          if (gliss) gliss.push(index)
+        }
+        results.push(result)
+        if (grace && grace.indices.length === grace.count + 1) {
+          const targetIndex = grace.indices[grace.indices.length - 1]!
+          const stolen = grace.duration.mul(grace.count)
+          for (const i of grace.indices.slice(0, -1)) { const r = results[i]!; if ('shape' in r) results[i] = { ...r, shape: scaleShape(r.shape, grace.duration.div(r.shape.duration)) } }
+          const target = results[targetIndex]!
+          if ('shape' in target && target.shape.duration.compare(stolen) >= 0) results[targetIndex] = { ...target, shape: scaleShape(target.shape, target.shape.duration.sub(stolen).div(target.shape.duration)) }
+          else results.push({ diagnostics: [{ code: 'XP_GRACE_DURATION', severity: 'error', message: 'Grace notes exceed the following item duration.', locations: [item.location] }] })
+          grace = undefined
+        }
+        if (gliss && gliss.length === 2) {
+          const sourceIndex = gliss[0]!, targetIndex = gliss[1]!, source = results[sourceIndex]!, target = results[targetIndex]!
+          if ('shape' in source && 'shape' in target) {
+            const from = attacks(source.shape), to = attacks(target.shape)
+            if (target.shape.duration.n || from.length !== to.length) results.push({ diagnostics: [{ code: 'XP_GLISS_SHAPE', severity: 'error', message: 'Glissando requires an equal-shaped zero-duration target.', locations: [item.location] }] })
+            else {
+              let leaf = 0
+              const automate = (shape: ScoreShape): ScoreShape => {
+                if (shape.kind === 'attack') { const destination = to[leaf++]!; return { ...shape, automation: { curve: 'linear', from: shape.pitch, to: destination.pitch, duration: shape.duration } } }
+                if (shape.kind === 'sequence') return { ...shape, children: shape.children.map(automate) }
+                if (shape.kind === 'parallel') return { ...shape, branches: shape.branches.map(automate) }
+                return shape
+              }
+              results[sourceIndex] = { ...source, shape: automate(source.shape) }
+              results[targetIndex] = { ...target, shape: sequence([], target.shape.origins) }
+            }
+          }
+          gliss = undefined
+        }
+        activeContext = contextAfter(item, activeContext)
+        activePulse = pulseAfter(item, activePulse, activeContext)
       }
       const diagnostics = results.flatMap((result) => result.diagnostics)
+      if (grace || gliss) diagnostics.push({ code: 'XP_DIRECTIVE', severity: 'error', message: 'A one-shot directive is missing required following attacks.', locations: [current.location] })
       if (!results.every(hasShape)) return { diagnostics }
-      return {
-        shape: sequence(results.map((result) => result.shape), [origin(current)]),
-        diagnostics,
-      }
+      return { shape: sequence(results.map((result) => result.shape), [origin(current)]), diagnostics }
     }
     if (current.type === 'Parallel') {
-      const results = current.branches.map((branch) => visit(branch, context, currentPulse))
+      const results = current.branches.map((branch) => visit(branch, context, currentPulse, currentDynamic))
       const diagnostics = results.flatMap((result) => result.diagnostics)
       if (!results.every(hasShape)) return { diagnostics }
       const branches = results.map((result) => result.shape)
@@ -393,7 +444,7 @@ export function evaluateScoreShape(
       }
       return { shape, diagnostics }
     }
-    if (current.type === 'Group') return visit(current.expression, context, currentPulse)
+    if (current.type === 'Group') return visit(current.expression, context, currentPulse, currentDynamic)
     if (current.type === 'NormalizeToSlot') {
       if (!current.expression) {
         return {
@@ -401,7 +452,7 @@ export function evaluateScoreShape(
           diagnostics: [],
         }
       }
-      const evaluated = visit(current.expression, context, currentPulse)
+      const evaluated = visit(current.expression, context, currentPulse, currentDynamic)
       if (!('shape' in evaluated)) return evaluated
       if (!evaluated.shape.duration.n) {
         return {
@@ -432,14 +483,21 @@ export function evaluateScoreShape(
       }
     }
     if (current.type === 'PostfixExpression') {
-      const evaluated = visit(current.expression, context, currentPulse)
+      const evaluated = visit(current.expression, context, currentPulse, currentDynamic)
       if (!('shape' in evaluated)) return evaluated
+      const elimination = current.marks.find((mark) => mark.type === 'TailElimination')
+      let base = evaluated.shape
+      if (elimination) {
+        const removed = currentPulse.mul(elimination.count)
+        if (removed.compare(base.duration) > 0) return { diagnostics: [...evaluated.diagnostics, { code: 'XP_TAIL_ELIMINATION', severity: 'error', message: 'Tail elimination exceeds the score item duration.', locations: [elimination.location] }] }
+        base = scaleShape(base, base.duration.n ? base.duration.sub(removed).div(base.duration) : new Fraction(0))
+      }
       const continuations = current.marks.filter((mark) => mark.type === 'DetachedContinue')
-      if (!continuations.length) return evaluated
+      if (!continuations.length) return { shape: base, diagnostics: evaluated.diagnostics }
       return {
         shape: sequence(
           [
-            evaluated.shape,
+            base,
             ...continuations.map<ContinueShape>((mark) => ({
               kind: 'continue',
               duration: currentPulse,
@@ -463,6 +521,8 @@ export function evaluateScoreShape(
       duration: currentPulse,
       origins: evaluated.pitch.origins,
       rootStaffPosition: context.rootStaffPosition,
+      dynamic: currentDynamic,
+      velocity: DYNAMIC_VELOCITIES[currentDynamic],
       ...(current.type === 'DegreeLiteral' || current.type === 'EqualDivisionLiteral' ||
         (current.type === 'QuantityLiteral' && current.unit === 'c')
         ? { displayLabel: String(current.raw) }
