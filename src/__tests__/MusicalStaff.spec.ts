@@ -1,7 +1,12 @@
 import { mount } from '@vue/test-utils'
 import { describe, expect, it } from 'vitest'
 import MusicalStaff from '../components/MusicalStaff.vue'
-import type { StaffNotationShape } from '../../xenpaper-lang'
+import {
+  constructStaffNotationShape,
+  evaluateScoreShape,
+  parse,
+  type StaffNotationShape,
+} from '../../xenpaper-lang'
 
 const notation: StaffNotationShape = {
   kind: 'sequence',
@@ -22,6 +27,21 @@ const notation: StaffNotationShape = {
 }
 
 describe('MusicalStaff', () => {
+  it.each(['C @2 D E @1 F G', 'C [D E] F G'])(
+    'renders equivalent quarter and eighth note values for %s',
+    (source) => {
+      const expression = parse(source).body[0]!
+      const evaluated = evaluateScoreShape(expression)
+      if (!('shape' in evaluated)) throw new Error('Expected a score shape.')
+      const wrapper = mount(MusicalStaff, {
+        props: { notation: constructStaffNotationShape(evaluated.shape) },
+      })
+
+      expect(wrapper.findAll('.notehead')).toHaveLength(5)
+      expect(wrapper.findAll('.flag')).toHaveLength(2)
+    },
+  )
+
   it('renders staff lines, notes, accidentals, ledger lines, and rests', () => {
     const wrapper = mount(MusicalStaff, { props: { notation } })
 
