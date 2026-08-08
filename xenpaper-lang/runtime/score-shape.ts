@@ -234,7 +234,11 @@ export function evaluateScoreShape(
           const iterationAttacks = iterationShapes.flatMap(attacks)
           for (let index = 0; index < Math.min(displayedAttacks.length, iterationAttacks.length); index++) {
             const attack = iterationAttacks[index]!
-            alternatives[index]!.push({ pitch: attack.pitch, rootStaffPosition: attack.rootStaffPosition })
+            alternatives[index]!.push({
+              pitch: attack.pitch,
+              rootStaffPosition: attack.rootStaffPosition,
+              soundingCents: attack.soundingCents,
+            })
           }
         }
         if (iteration < count) activeContext = iterationContext
@@ -355,6 +359,9 @@ export function evaluateScoreShape(
       duration: pulse,
       origins: evaluated.pitch.origins,
       rootStaffPosition: context.rootStaffPosition,
+      soundingCents: evaluated.pitch.kind === 'absolutePitch'
+        ? evaluated.pitch.rootOffset.valueOf()
+        : evaluated.pitch.value.valueOf() + mapFormula(context.rootFormula, context.mapping).valueOf(),
     }
     return { shape, diagnostics: evaluated.diagnostics }
   }

@@ -184,12 +184,14 @@ export function constructStaffNotationShape(shape: ScoreShape): StaffNotationSha
         const pitch = constructStaffNotation(shape.pitch, { rootStaffPosition: shape.rootStaffPosition })
         const alternatives = (shape.alternateAppearances ?? []).map((appearance) =>
           constructStaffNotation(appearance.pitch, { rootStaffPosition: appearance.rootStaffPosition }))
+        const ambiguous = alternatives.some((alternative) => appearanceKey(alternative) !== appearanceKey(pitch))
         return {
           kind: 'note',
-          pitch: alternatives.some((alternative) => appearanceKey(alternative) !== appearanceKey(pitch))
-            ? { ...pitch, notehead: 'x' }
-            : pitch,
+          pitch: ambiguous ? { ...pitch, notehead: 'x' } : pitch,
           duration: shape.duration,
+          ...(ambiguous
+            ? { soundingCents: [shape.soundingCents, ...(shape.alternateAppearances ?? []).map((appearance) => appearance.soundingCents)] }
+            : {}),
         }
       }
     case 'rest':

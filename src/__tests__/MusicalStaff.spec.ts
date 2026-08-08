@@ -99,11 +99,14 @@ describe('MusicalStaff', () => {
         notehead: 'x',
         cents: 500,
       },
+      soundingCents: [0, 203.91000173077458],
     }
     const wrapper = mount(MusicalStaff, { props: { notation: crossed } })
 
     expect(wrapper.findAll('.x-notehead line')).toHaveLength(2)
     expect(wrapper.find('ellipse.notehead').exists()).toBe(false)
+    expect(wrapper.get('.sounding-label').text()).toBe('0¢ / 203.91¢')
+    expect(wrapper.get('.sounding-label').attributes('y')).toBe('130')
   })
 
   it('renders root-change annotations above the staff', () => {
