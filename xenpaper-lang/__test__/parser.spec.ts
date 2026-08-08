@@ -34,6 +34,10 @@ type SyntaxNode = {
 };
 
 describe("Xenpaper surface grammar", () => {
+  it("parses adjacent dots as a single cluster rest", () => {
+    expect(parse("...").body[0]).toMatchObject({ type: "Rest", raw: "..." });
+  });
+
   it("compiles and parses the representative score syntax", () => {
     const program = parse(score);
 

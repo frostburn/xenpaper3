@@ -106,6 +106,29 @@ describe('MusicalStaff', () => {
     expect(wrapper.get('.rest').text()).toBe('𝄾')
   })
 
+  it('renders whole, half, and dotted rests', () => {
+    const evaluated = evaluateScoreShape(parse('@1/4 . @1/2 . @1 ...').body[0]!)
+    if (!('shape' in evaluated)) throw new Error('Expected a score shape.')
+    const wrapper = mount(MusicalStaff, {
+      props: { notation: constructStaffNotationShape(evaluated.shape) },
+    })
+
+    expect(wrapper.findAll('.rest').map((rest) => rest.text())).toEqual(['𝄻', '𝄼', '𝄼'])
+    expect(wrapper.findAll('.rest-dot')).toHaveLength(1)
+  })
+
+  it('extends every note in a continued binary normalized slot', () => {
+    const evaluated = evaluateScoreShape(parse('[C D]=').body[0]!)
+    if (!('shape' in evaluated)) throw new Error('Expected a score shape.')
+    const wrapper = mount(MusicalStaff, {
+      props: { notation: constructStaffNotationShape(evaluated.shape) },
+    })
+
+    expect(wrapper.findAll('.notehead')).toHaveLength(2)
+    expect(wrapper.findAll('.flag')).toHaveLength(0)
+    expect(wrapper.findAll('.augmentation-dot')).toHaveLength(0)
+  })
+
   it('does not mark an ordinary three-note sequence as a triplet', () => {
     const expression = parse('C D E').body[0]!
     const evaluated = evaluateScoreShape(expression)
@@ -239,7 +262,7 @@ describe('MusicalStaff', () => {
       props: {
         notation: {
           kind: 'rest',
-          duration: { n: 2, d: 1 } as StaffNotationShape['duration'],
+          duration: { n: 5, d: 1 } as StaffNotationShape['duration'],
           generated: false,
         },
       },

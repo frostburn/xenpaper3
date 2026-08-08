@@ -233,7 +233,12 @@ export function evaluateScoreShape(
   ): ScoreShapeEvaluationResult => {
     if (current.type === 'Rest') {
       return {
-        shape: { kind: 'rest', duration: currentPulse, generated: false, origins: [origin(current)] },
+        shape: {
+          kind: 'rest',
+          duration: currentPulse.mul(current.raw.length),
+          generated: false,
+          origins: [origin(current)],
+        },
         diagnostics: [],
       }
     }
@@ -387,12 +392,12 @@ export function evaluateScoreShape(
       if (normalized.kind === 'sequence' && tuplet && tuplet > 1 &&
         !Number.isInteger(Math.log2(tuplet))) {
         return {
-          shape: { ...normalized, tuplet },
+          shape: { ...normalized, normalized: true, tuplet },
           diagnostics: evaluated.diagnostics,
         }
       }
       return {
-        shape: normalized,
+        shape: normalized.kind === 'sequence' ? { ...normalized, normalized: true } : normalized,
         diagnostics: evaluated.diagnostics,
       }
     }

@@ -237,7 +237,7 @@ export interface Repeat extends Node {
 
 export interface Rest extends Node {
   type: "Rest";
-  raw: ".";
+  raw: string;
 }
 
 export interface Sequence extends Node {

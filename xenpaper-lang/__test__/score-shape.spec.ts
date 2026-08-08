@@ -72,6 +72,12 @@ describe('score-shape timing', () => {
     expect(shape('[]').duration.equals(1)).toBe(true)
   })
 
+  it('uses the cluster length as the authored rest duration', () => {
+    expect(shape('..')).toMatchObject({ kind: 'rest', generated: false })
+    expect(shape('..').duration.equals(2)).toBe(true)
+    expect(shape('...').duration.equals(3)).toBe(true)
+  })
+
   it('uses the maximum branch duration and pads shorter branches', () => {
     const result = shape('3/2 4/3, 5/4 6/5 7/6') as ParallelShape
     const shortBranch = result.branches[0] as SequenceShape

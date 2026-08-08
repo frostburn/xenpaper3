@@ -93,18 +93,20 @@ const items = computed(() => {
       shape.children.forEach((child) => {
         offset = visit(child, offset, state)
       })
-      if (shape.tuplet) {
+      if (shape.normalized || shape.tuplet) {
         const rhythmicItems = layout
           .slice(startIndex)
           .filter((item) => item.kind === 'note' || item.kind === 'rest')
-        rhythmicItems.forEach((item, position) =>
-          Object.assign(item, {
-            tupletPosition: position,
-            tupletCount: shape.tuplet,
-            tupletStartOffset: startOffset,
-            tupletEndOffset: rhythmicItems[rhythmicItems.length - 1]?.offset ?? startOffset,
-          }),
-        )
+        if (shape.tuplet) {
+          rhythmicItems.forEach((item, position) =>
+            Object.assign(item, {
+              tupletPosition: position,
+              tupletCount: shape.tuplet,
+              tupletStartOffset: startOffset,
+              tupletEndOffset: rhythmicItems[rhythmicItems.length - 1]?.offset ?? startOffset,
+            }),
+          )
+        }
         state.activeNotes = rhythmicItems.filter(
           (item): item is NoteLayoutItem => item.kind === 'note',
         )
@@ -212,8 +214,22 @@ const isDotted = (duration: Fraction) => {
 
 const restSymbol = (duration: Fraction, tupletCount?: number) => {
   const value = effectiveDuration(duration, tupletCount)
-  return value.equals(1) ? '𝄽' : value.equals('1/2') ? '𝄾' : value.equals('1/4') ? '𝄿' : '?'
+  const base = isDotted(value) ? value.mul(2).div(3) : value
+  return base.equals(4)
+    ? '𝄻'
+    : base.equals(2)
+      ? '𝄼'
+      : base.equals(1)
+        ? '𝄽'
+        : base.equals('1/2')
+          ? '𝄾'
+          : base.equals('1/4')
+            ? '𝄿'
+            : '?'
 }
+
+const isSupportedRestDuration = (duration: Fraction, tupletCount?: number) =>
+  restSymbol(duration, tupletCount) !== '?'
 </script>
 
 <template>
@@ -244,9 +260,21 @@ const restSymbol = (duration: Fraction, tupletCount?: number) => {
         class="tuplet-bracket"
         :d="`M ${x(item.tupletStartColumn!) - 10} 40 V 34 H ${(x(item.tupletStartColumn!) + x(item.tupletEndColumn!)) / 2 - 10} M ${(x(item.tupletStartColumn!) + x(item.tupletEndColumn!)) / 2 + 10} 34 H ${x(item.tupletEndColumn!) + 10} V 40`"
       />
-      <text v-if="item.kind === 'rest'" class="rest" :x="x(item.column)" y="79">
-        {{ restSymbol(item.duration, item.tupletCount) }}
-      </text>
+      <template v-if="item.kind === 'rest'">
+        <text class="rest" :x="x(item.column)" y="79">
+          {{ restSymbol(item.duration, item.tupletCount) }}
+        </text>
+        <circle
+          v-if="
+            isSupportedRestDuration(item.duration, item.tupletCount) &&
+            isDotted(effectiveDuration(item.duration, item.tupletCount))
+          "
+          class="augmentation-dot rest-dot"
+          :cx="x(item.column) + 17"
+          cy="76"
+          r="2"
+        />
+      </template>
       <text v-else-if="item.kind === 'annotation'" class="annotation" :x="x(item.column)" y="25">
         {{ item.text }}
       </text>
