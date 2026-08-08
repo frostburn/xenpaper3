@@ -3,7 +3,7 @@ import { Fraction } from 'xen-dev-utils/fraction'
 import type { Diagnostic } from '../diagnostics'
 import { Value } from '../value'
 import { evaluateLiteral, type NumericLiteralNode } from './literals'
-import type { EvaluatedLiteral, SourceOrigin } from './types'
+import type { EvaluatedLiteral, PitchOffsetValue, ScalarValue, SourceOrigin } from './types'
 import type { PitchContext, PrimeMapping } from './types'
 import { DEFAULT_PITCH_CONTEXT, evaluateIntervalLiteral, evaluatePitchLiteral, scalePitchOffset, spellPitchDifference } from './pitches'
 
@@ -29,11 +29,13 @@ function diagnostic(node: Expression, error: unknown): Diagnostic {
   return { code, severity: 'error', message, locations: [node.location] }
 }
 
+function result(kind: 'scalar', value: Value, origins: readonly SourceOrigin[]): ScalarValue
+function result(kind: 'pitchOffset', value: Value, origins: readonly SourceOrigin[]): PitchOffsetValue
 function result(
-  kind: EvaluatedLiteral['kind'],
+  kind: 'scalar' | 'pitchOffset',
   value: Value,
   origins: readonly SourceOrigin[],
-): EvaluatedLiteral {
+): ScalarValue | PitchOffsetValue {
   return { kind, value, origins }
 }
 
@@ -45,8 +47,9 @@ function operatorOrigins(
   return [...left.origins, ...right.origins, { location: node.location, role: 'operator' }]
 }
 
-function pitchCoercion(value: EvaluatedLiteral): EvaluatedLiteral {
+function pitchCoercion(value: EvaluatedLiteral): PitchOffsetValue {
   if (value.kind === 'pitchOffset') return value
+  if (value.kind === 'absolutePitch') throw new TypeError('An absolute pitch cannot be coerced to a pitch offset.')
   const ratio = value.value.exactRational()
   if (!ratio || ratio.compare(0) <= 0) {
     throw new TypeError('A scalar mixed with a pitch offset must be a positive exact ratio.')
@@ -106,9 +109,8 @@ function multiplyOrDivide(
       origins: operatorOrigins(left, right, node),
     }
   }
-  const kind = left.kind === 'pitchOffset' || right.kind === 'pitchOffset' ? 'pitchOffset' : 'scalar'
   return result(
-    kind,
+    'scalar',
     divide ? left.value.div(right.value) : left.value.mul(right.value),
     operatorOrigins(left, right, node),
   )
@@ -180,11 +182,15 @@ export function evaluateExpression(node: Expression, mapping: PrimeMapping | Pit
       if (!('value' in operand)) return operand
       if (node.operator === '+') return operand
       if (node.operator !== '-') throw new TypeError(`Unknown unary operator ${node.operator}.`)
+      if (operand.value.kind === 'absolutePitch') throw new TypeError('An absolute pitch cannot be negated.')
+      const origins: readonly SourceOrigin[] = [
+        ...operand.value.origins,
+        { location: node.location, role: 'operator' },
+      ]
       return {
-        value: result(operand.value.kind, operand.value.value.neg(), [
-          ...operand.value.origins,
-          { location: node.location, role: 'operator' },
-        ]),
+        value: operand.value.kind === 'scalar'
+          ? result('scalar', operand.value.value.neg(), origins)
+          : result('pitchOffset', operand.value.value.neg(), origins),
         diagnostics: operand.diagnostics,
       }
     }
