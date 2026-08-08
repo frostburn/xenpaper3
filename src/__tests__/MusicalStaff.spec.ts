@@ -174,6 +174,25 @@ describe('MusicalStaff', () => {
     ])
   })
 
+  it('stacks parallel composition display labels vertically', () => {
+    const note = notation.children[0]!
+    if (note.kind !== 'note') throw new Error('Expected a note.')
+    const parallel: StaffNotationShape = {
+      kind: 'parallel',
+      duration: note.duration,
+      branches: [
+        { ...note, displayLabel: '1/1' },
+        { ...note, displayLabel: '5/4' },
+      ],
+    }
+    const wrapper = mount(MusicalStaff, { props: { notation: parallel } })
+    const labels = wrapper.findAll('.sounding-label')
+
+    expect(labels.map((label) => label.text())).toEqual(['1/1', '5/4'])
+    expect(labels.map((label) => label.attributes('x'))).toEqual(['60', '60'])
+    expect(labels.map((label) => label.attributes('y'))).toEqual(['130', '143'])
+  })
+
   it('aligns parallel branches by rhythmic offset across different subdivisions', () => {
     const expression = parse('C D, [E F] [G A]').body[0]!
     const evaluated = evaluateScoreShape(expression)

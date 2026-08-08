@@ -25,7 +25,12 @@ type StaffItemContent =
   | { kind: 'barline'; style: BarlineStyle }
   | { kind: 'annotation'; text: string }
 
-type StaffItem = TupletItem & StaffItemContent & { column: number; tiedFromColumn?: number }
+type StaffItem = TupletItem &
+  StaffItemContent & {
+    column: number
+    tiedFromColumn?: number
+    displayLabelRow?: number
+  }
 
 type LayoutItem = StaffItemContent & {
   tupletPosition?: number
@@ -118,9 +123,9 @@ const items = computed(() => {
         rhythmicItems.forEach((item, index) => {
           if (item.kind === 'rest') lastRest = index
         })
-        state.activeNotes = rhythmicItems.slice(lastRest + 1).filter(
-          (item): item is NoteLayoutItem => item.kind === 'note',
-        )
+        state.activeNotes = rhythmicItems
+          .slice(lastRest + 1)
+          .filter((item): item is NoteLayoutItem => item.kind === 'note')
         state.activeItems = rhythmicItems
         state.activeSpan = rhythmicItems.length ? shape.duration : undefined
       }
@@ -151,25 +156,37 @@ const items = computed(() => {
   const column = (offset: Fraction) =>
     uniqueOffsets.findIndex((candidate) => candidate.equals(offset))
 
-  return layout.map(({ offset, tiedFromOffset, tupletStartOffset, tupletEndOffset, ...item }) => ({
-    ...item,
-    column: column(offset),
-    tiedFromColumn: tiedFromOffset ? column(tiedFromOffset) : undefined,
-    tupletStartColumn: tupletStartOffset ? column(tupletStartOffset) : undefined,
-    tupletEndColumn: tupletEndOffset ? column(tupletEndOffset) : undefined,
-  })) as StaffItem[]
+  const displayLabelRows = new Map<number, number>()
+  return layout.map(({ offset, tiedFromOffset, tupletStartOffset, tupletEndOffset, ...item }) => {
+    const itemColumn = column(offset)
+    const displayLabelRow =
+      item.kind === 'note' && item.displayLabel
+        ? (displayLabelRows.get(itemColumn) ?? 0)
+        : undefined
+    if (displayLabelRow !== undefined) displayLabelRows.set(itemColumn, displayLabelRow + 1)
+
+    return {
+      ...item,
+      column: itemColumn,
+      tiedFromColumn: tiedFromOffset ? column(tiedFromOffset) : undefined,
+      tupletStartColumn: tupletStartOffset ? column(tupletStartOffset) : undefined,
+      tupletEndColumn: tupletEndOffset ? column(tupletEndOffset) : undefined,
+      displayLabelRow,
+    }
+  }) as StaffItem[]
 })
 
-const repeatMarkerColumns = computed(() =>
-  new Set(
-    items.value
-      .filter(
-        (item) =>
-          item.kind === 'barline' &&
-          (item.style === 'repeat-start' || item.style === 'repeat-end'),
-      )
-      .map((item) => item.column),
-  ),
+const repeatMarkerColumns = computed(
+  () =>
+    new Set(
+      items.value
+        .filter(
+          (item) =>
+            item.kind === 'barline' &&
+            (item.style === 'repeat-start' || item.style === 'repeat-end'),
+        )
+        .map((item) => item.column),
+    ),
 )
 const repeatMarkerSpace = 24
 const repeatSpaceBefore = (column: number) =>
@@ -182,6 +199,9 @@ const width = computed(() =>
       (Math.max(-1, ...items.value.map((item) => item.column)) + 1) * 52 +
       repeatMarkerColumns.value.size * repeatMarkerSpace,
   ),
+)
+const height = computed(() =>
+  Math.max(150, 138 + Math.max(0, ...items.value.map((item) => item.displayLabelRow ?? 0)) * 13),
 )
 const x = (column: number) => 60 + column * 52 + repeatSpaceBefore(column)
 const barlineX = (item: Extract<StaffItem, { kind: 'barline' }>) =>
@@ -281,7 +301,12 @@ const restDotY = (duration: Fraction, tupletCount?: number) =>
 </script>
 
 <template>
-  <svg class="musical-staff" :viewBox="`0 0 ${width} 150`" role="img" aria-label="Musical staff">
+  <svg
+    class="musical-staff"
+    :viewBox="`0 0 ${width} ${height}`"
+    role="img"
+    aria-label="Musical staff"
+  >
     <g class="staff-lines">
       <line
         v-for="line in 5"
@@ -464,7 +489,7 @@ const restDotY = (duration: Fraction, tupletCount?: number) =>
             v-if="item.displayLabel"
             class="sounding-label"
             :x="x(item.column)"
-            y="130"
+            :y="130 + (item.displayLabelRow ?? 0) * 13"
           >
             {{ item.displayLabel }}
           </text>
