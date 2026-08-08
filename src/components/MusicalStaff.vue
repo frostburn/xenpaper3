@@ -183,6 +183,16 @@ const flagCount = (duration?: Fraction, tupletCount?: number) => {
   return Number.isInteger(binaryFlags) ? binaryFlags + (subdivision % 3 === 0 ? 1 : 0) : 0
 }
 
+const effectiveDurationValue = (duration: Fraction, tupletCount?: number) =>
+  durationValue(duration) * (tupletCount ? tupletCount / 2 : 1)
+
+const isSupportedNoteDuration = (duration?: Fraction, tupletCount?: number) => {
+  if (!duration) return false
+  const value = effectiveDurationValue(duration, tupletCount)
+  if (value <= 0 || value > 6) return false
+  return Number.isInteger(Math.log2(value)) || Number.isInteger(Math.log2(value / 3))
+}
+
 const isOpenNotehead = (duration: Fraction) => durationValue(duration) >= 2
 const hasStem = (duration: Fraction) => durationValue(duration) < 4
 const isDotted = (duration: Fraction) => {
@@ -190,9 +200,9 @@ const isDotted = (duration: Fraction) => {
   return relativeToDottedHalf > 0 && Number.isInteger(Math.log2(relativeToDottedHalf))
 }
 
-const restSymbol = (duration: Fraction) => {
-  const flags = flagCount(duration)
-  return flags === 1 ? '𝄾' : flags === 2 ? '𝄿' : '𝄽'
+const restSymbol = (duration: Fraction, tupletCount?: number) => {
+  const value = effectiveDurationValue(duration, tupletCount)
+  return value === 1 ? '𝄽' : value === 0.5 ? '𝄾' : value === 0.25 ? '𝄿' : '?'
 }
 </script>
 
@@ -225,7 +235,7 @@ const restSymbol = (duration: Fraction) => {
         :d="`M ${x(item.tupletStartColumn!) - 10} 40 V 34 H ${(x(item.tupletStartColumn!) + x(item.tupletEndColumn!)) / 2 - 10} M ${(x(item.tupletStartColumn!) + x(item.tupletEndColumn!)) / 2 + 10} 34 H ${x(item.tupletEndColumn!) + 10} V 40`"
       />
       <text v-if="item.kind === 'rest'" class="rest" :x="x(item.column)" y="79">
-        {{ restSymbol(item.duration) }}
+        {{ restSymbol(item.duration, item.tupletCount) }}
       </text>
       <text v-else-if="item.kind === 'annotation'" class="annotation" :x="x(item.column)" y="25">
         {{ item.text }}
@@ -258,102 +268,112 @@ const restSymbol = (duration: Fraction) => {
         </template>
       </g>
       <template v-else>
-        <path
-          v-if="item.tiedFromColumn !== undefined"
-          class="tie"
-          :d="`M ${x(item.tiedFromColumn) + 6} ${y(item.pitch.staffPosition) + 7} Q ${(x(item.tiedFromColumn) + x(item.column)) / 2} ${y(item.pitch.staffPosition) + 17} ${x(item.column) - 6} ${y(item.pitch.staffPosition) + 7}`"
-        />
-        <line
-          v-for="position in ledgerPositions(item.pitch.staffPosition)"
-          :key="position"
-          class="ledger-line"
-          :x1="x(item.column) - 12"
-          :x2="x(item.column) + 12"
-          :y1="y(position)"
-          :y2="y(position)"
-        />
         <text
-          v-if="
-            (item.pitch.inflections?.length || item.pitch.accidentals.length) &&
-            item.tiedFromColumn === undefined
-          "
-          class="pitch-decorations"
-          :x="x(item.column) - 11"
+          v-if="!isSupportedNoteDuration(item.duration, item.tupletCount)"
+          class="notation-error"
+          :x="x(item.column)"
           :y="y(item.pitch.staffPosition) + 5"
         >
-          <tspan
-            v-for="(value, inflectionIndex) in item.pitch.inflections"
-            :key="`inflection-${inflectionIndex}`"
-            class="inflection"
+          ?
+        </text>
+        <template v-else>
+          <path
+            v-if="item.tiedFromColumn !== undefined"
+            class="tie"
+            :d="`M ${x(item.tiedFromColumn) + 6} ${y(item.pitch.staffPosition) + 7} Q ${(x(item.tiedFromColumn) + x(item.column)) / 2} ${y(item.pitch.staffPosition) + 17} ${x(item.column) - 6} ${y(item.pitch.staffPosition) + 7}`"
+          />
+          <line
+            v-for="position in ledgerPositions(item.pitch.staffPosition)"
+            :key="position"
+            class="ledger-line"
+            :x1="x(item.column) - 12"
+            :x2="x(item.column) + 12"
+            :y1="y(position)"
+            :y2="y(position)"
+          />
+          <text
+            v-if="
+              (item.pitch.inflections?.length || item.pitch.accidentals.length) &&
+              item.tiedFromColumn === undefined
+            "
+            class="pitch-decorations"
+            :x="x(item.column) - 11"
+            :y="y(item.pitch.staffPosition) + 5"
           >
-            {{ inflection(value) }}
-          </tspan>
-          <tspan v-if="item.pitch.accidentals.length" class="accidental">
-            {{ item.pitch.accidentals.map(accidental).join('') }}
-          </tspan>
-        </text>
-        <polygon
-          v-if="item.pitch.notehead === 'triangle-down'"
-          class="notehead"
-          :points="`${x(item.column) - 7},${y(item.pitch.staffPosition) - 5} ${x(item.column) + 7},${y(item.pitch.staffPosition) - 5} ${x(item.column)},${y(item.pitch.staffPosition) + 6}`"
-        />
-        <polygon
-          v-else-if="item.pitch.notehead === 'triangle-up'"
-          class="notehead"
-          :points="`${x(item.column)},${y(item.pitch.staffPosition) - 6} ${x(item.column) + 7},${y(item.pitch.staffPosition) + 5} ${x(item.column) - 7},${y(item.pitch.staffPosition) + 5}`"
-        />
-        <g v-else-if="item.pitch.notehead === 'x'" class="notehead x-notehead">
-          <line
-            :x1="x(item.column) - 6"
-            :x2="x(item.column) + 6"
-            :y1="y(item.pitch.staffPosition) - 6"
-            :y2="y(item.pitch.staffPosition) + 6"
+            <tspan
+              v-for="(value, inflectionIndex) in item.pitch.inflections"
+              :key="`inflection-${inflectionIndex}`"
+              class="inflection"
+            >
+              {{ inflection(value) }}
+            </tspan>
+            <tspan v-if="item.pitch.accidentals.length" class="accidental">
+              {{ item.pitch.accidentals.map(accidental).join('') }}
+            </tspan>
+          </text>
+          <polygon
+            v-if="item.pitch.notehead === 'triangle-down'"
+            class="notehead"
+            :points="`${x(item.column) - 7},${y(item.pitch.staffPosition) - 5} ${x(item.column) + 7},${y(item.pitch.staffPosition) - 5} ${x(item.column)},${y(item.pitch.staffPosition) + 6}`"
+          />
+          <polygon
+            v-else-if="item.pitch.notehead === 'triangle-up'"
+            class="notehead"
+            :points="`${x(item.column)},${y(item.pitch.staffPosition) - 6} ${x(item.column) + 7},${y(item.pitch.staffPosition) + 5} ${x(item.column) - 7},${y(item.pitch.staffPosition) + 5}`"
+          />
+          <g v-else-if="item.pitch.notehead === 'x'" class="notehead x-notehead">
+            <line
+              :x1="x(item.column) - 6"
+              :x2="x(item.column) + 6"
+              :y1="y(item.pitch.staffPosition) - 6"
+              :y2="y(item.pitch.staffPosition) + 6"
+            />
+            <line
+              :x1="x(item.column) - 6"
+              :x2="x(item.column) + 6"
+              :y1="y(item.pitch.staffPosition) + 6"
+              :y2="y(item.pitch.staffPosition) - 6"
+            />
+          </g>
+          <ellipse
+            v-else
+            class="notehead"
+            :class="{ 'notehead--open': isOpenNotehead(item.duration) }"
+            :cx="x(item.column)"
+            :cy="y(item.pitch.staffPosition)"
+            rx="7"
+            ry="5"
+          />
+          <circle
+            v-if="isDotted(item.duration)"
+            class="augmentation-dot"
+            :cx="x(item.column) + 13"
+            :cy="y(item.pitch.staffPosition) - (item.pitch.staffPosition % 2 ? 0 : 3)"
+            r="2"
           />
           <line
-            :x1="x(item.column) - 6"
+            v-if="hasStem(item.duration)"
+            class="stem"
+            :x1="x(item.column) + 6"
             :x2="x(item.column) + 6"
-            :y1="y(item.pitch.staffPosition) + 6"
-            :y2="y(item.pitch.staffPosition) - 6"
+            :y1="y(item.pitch.staffPosition)"
+            :y2="y(item.pitch.staffPosition) - 30"
           />
-        </g>
-        <ellipse
-          v-else
-          class="notehead"
-          :class="{ 'notehead--open': isOpenNotehead(item.duration) }"
-          :cx="x(item.column)"
-          :cy="y(item.pitch.staffPosition)"
-          rx="7"
-          ry="5"
-        />
-        <circle
-          v-if="isDotted(item.duration)"
-          class="augmentation-dot"
-          :cx="x(item.column) + 13"
-          :cy="y(item.pitch.staffPosition) - (item.pitch.staffPosition % 2 ? 0 : 3)"
-          r="2"
-        />
-        <line
-          v-if="hasStem(item.duration)"
-          class="stem"
-          :x1="x(item.column) + 6"
-          :x2="x(item.column) + 6"
-          :y1="y(item.pitch.staffPosition)"
-          :y2="y(item.pitch.staffPosition) - 30"
-        />
-        <path
-          v-for="flag in flagCount(item.duration, item.tupletCount)"
-          :key="`flag-${flag}`"
-          class="flag"
-          :d="`M ${x(item.column) + 6} ${y(item.pitch.staffPosition) - 30 + (flag - 1) * 7} Q ${x(item.column) + 20} ${y(item.pitch.staffPosition) - 23 + (flag - 1) * 7} ${x(item.column) + 12} ${y(item.pitch.staffPosition) - 13 + (flag - 1) * 7}`"
-        />
-        <text
-          v-if="item.pitch.notehead === 'x' && item.soundingLabel"
-          class="sounding-label"
-          :x="x(item.column)"
-          y="130"
-        >
-          {{ item.soundingLabel }}
-        </text>
+          <path
+            v-for="flag in flagCount(item.duration, item.tupletCount)"
+            :key="`flag-${flag}`"
+            class="flag"
+            :d="`M ${x(item.column) + 6} ${y(item.pitch.staffPosition) - 30 + (flag - 1) * 7} Q ${x(item.column) + 20} ${y(item.pitch.staffPosition) - 23 + (flag - 1) * 7} ${x(item.column) + 12} ${y(item.pitch.staffPosition) - 13 + (flag - 1) * 7}`"
+          />
+          <text
+            v-if="item.pitch.notehead === 'x' && item.soundingLabel"
+            class="sounding-label"
+            :x="x(item.column)"
+            y="130"
+          >
+            {{ item.soundingLabel }}
+          </text>
+        </template>
       </template>
     </g>
   </svg>
