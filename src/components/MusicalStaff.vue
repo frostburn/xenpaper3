@@ -7,7 +7,7 @@ const props = defineProps<{
 }>()
 
 type StaffItem =
-  | { kind: 'note'; pitch: StaffPitch; tiedFromIndex?: number }
+  | { kind: 'note'; pitch: StaffPitch; soundingCents?: readonly number[]; tiedFromIndex?: number }
   | { kind: 'rest' }
   | { kind: 'barline'; style: BarlineStyle }
   | { kind: 'annotation'; text: string }
@@ -20,7 +20,7 @@ const items = computed(() => {
     if (shape.kind === 'note') {
       activePitch = shape.pitch
       activeNoteIndex = result.length
-      result.push({ kind: 'note', pitch: shape.pitch })
+      result.push({ kind: 'note', pitch: shape.pitch, soundingCents: shape.soundingCents })
     } else if (shape.kind === 'continue' && activePitch) {
       result.push({ kind: 'note', pitch: activePitch, tiedFromIndex: activeNoteIndex })
       activeNoteIndex = result.length - 1
@@ -66,6 +66,10 @@ const ledgerPositions = (position: number) => {
   for (let current = 12; current <= position; current += 2) positions.push(current)
   return positions
 }
+
+const soundingLabel = (values: readonly number[]) => values
+  .map((value) => `${Number.isInteger(value) ? value : value.toFixed(2)}¢`)
+  .join(' / ')
 </script>
 
 <template>
@@ -163,6 +167,12 @@ const ledgerPositions = (position: number) => {
           :y1="y(item.pitch.staffPosition)"
           :y2="y(item.pitch.staffPosition) - 30"
         />
+        <text
+          v-if="item.pitch.notehead === 'x' && item.soundingCents?.length"
+          class="sounding-label"
+          :x="x(index)"
+          y="130"
+        >{{ soundingLabel(item.soundingCents) }}</text>
       </template>
     </g>
   </svg>
@@ -209,6 +219,11 @@ const ledgerPositions = (position: number) => {
 
 .annotation {
   font-size: 12px;
+  text-anchor: middle;
+}
+
+.sounding-label {
+  font-size: 11px;
   text-anchor: middle;
 }
 

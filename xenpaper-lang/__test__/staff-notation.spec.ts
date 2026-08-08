@@ -136,6 +136,7 @@ describe('staff notation construction', () => {
       [1, 'normal'],
       [0, 'normal'],
     ])
+    expect(notes[1]).toMatchObject({ soundingCents: [0, 203.91000173077458] })
   })
 
   it('retains source nominal spelling while constructing a score staff', () => {
