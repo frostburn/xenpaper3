@@ -40,6 +40,8 @@ export interface ScalarValue {
 export interface PitchOffsetValue {
   readonly kind: 'pitchOffset'
   readonly value: Value
+  /** Root-relative value retained for notation when `value` includes a sounding root displacement. */
+  readonly notationValue?: Value
   readonly formula?: PrimeMonzo
   readonly spelling?: IntervalSpelling
   readonly origins: readonly SourceOrigin[]

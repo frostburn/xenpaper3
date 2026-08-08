@@ -110,7 +110,7 @@ describe('staff notation construction', () => {
     ])
   })
 
-  it('uses an x notehead when a repeated pitch has inconsistent staff appearances', () => {
+  it('keeps root-frequency changes out of repeated staff appearances', () => {
     const node = parse('C |: 1/1 D E {root = D} :| 1/1 C').body[0] as Expression
     const evaluated = evaluateScoreShape(node)
     if (!('shape' in evaluated)) throw new Error('Expected shape.')
@@ -130,13 +130,26 @@ describe('staff notation construction', () => {
     expect(annotations).toEqual(['root = D'])
     expect(notes.map((note) => note.kind === 'note' && [note.pitch.staffPosition, note.pitch.notehead])).toEqual([
       [0, 'normal'],
-      [0, 'x'],
-      [1, 'x'],
-      [2, 'x'],
+      [0, 'normal'],
+      [1, 'normal'],
       [2, 'normal'],
       [0, 'normal'],
+      [0, 'normal'],
     ])
-    expect(notes[1]).toMatchObject({ soundingLabel: '1/1' })
+    expect(notes[1]).not.toHaveProperty('soundingLabel')
+  })
+
+  it('engraves a root-frequency shift relative to the moved root', () => {
+    const node = parse('C D 1/1 {root = D} C D 1/1').body[0] as Expression
+    const evaluated = evaluateScoreShape(node)
+    if (!('shape' in evaluated)) throw new Error('Expected shape.')
+
+    const staff = constructStaffNotationShape(evaluated.shape)
+    if (staff.kind !== 'sequence') throw new Error('Expected a sequence.')
+    const notes = staff.children.filter((child) => child.kind === 'note')
+    expect(notes.map((note) => [note.pitch.staffPosition, note.pitch.accidentals])).toEqual([
+      [0, []], [1, []], [0, []], [0, []], [1, []], [0, []],
+    ])
   })
 
   it('retains source nominal spelling while constructing a score staff', () => {
