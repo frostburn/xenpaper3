@@ -183,14 +183,24 @@ const flagCount = (duration?: Fraction, tupletCount?: number) => {
   return Number.isInteger(binaryFlags) ? binaryFlags + (subdivision % 3 === 0 ? 1 : 0) : 0
 }
 
-const effectiveDurationValue = (duration: Fraction, tupletCount?: number) =>
-  durationValue(duration) * (tupletCount ? tupletCount / 2 : 1)
+const effectiveDuration = (duration: Fraction, tupletCount?: number) =>
+  fraction(duration)
+    .mul(tupletCount ?? 2)
+    .div(2)
+
+const isPowerOfTwoFraction = (value: Fraction) => {
+  let numerator = value.n
+  let denominator = value.d
+  while (numerator > 1 && numerator % 2 === 0) numerator /= 2
+  while (denominator > 1 && denominator % 2 === 0) denominator /= 2
+  return numerator === 1 && denominator === 1
+}
 
 const isSupportedNoteDuration = (duration?: Fraction, tupletCount?: number) => {
   if (!duration) return false
-  const value = effectiveDurationValue(duration, tupletCount)
-  if (value <= 0 || value > 6) return false
-  return Number.isInteger(Math.log2(value)) || Number.isInteger(Math.log2(value / 3))
+  const value = effectiveDuration(duration, tupletCount)
+  if (value.s <= 0 || value.compare(6) > 0) return false
+  return isPowerOfTwoFraction(value) || isPowerOfTwoFraction(value.div(3))
 }
 
 const isOpenNotehead = (duration: Fraction) => durationValue(duration) >= 2
@@ -201,8 +211,8 @@ const isDotted = (duration: Fraction) => {
 }
 
 const restSymbol = (duration: Fraction, tupletCount?: number) => {
-  const value = effectiveDurationValue(duration, tupletCount)
-  return value === 1 ? '𝄽' : value === 0.5 ? '𝄾' : value === 0.25 ? '𝄿' : '?'
+  const value = effectiveDuration(duration, tupletCount)
+  return value.equals(1) ? '𝄽' : value.equals('1/2') ? '𝄾' : value.equals('1/4') ? '𝄿' : '?'
 }
 </script>
 

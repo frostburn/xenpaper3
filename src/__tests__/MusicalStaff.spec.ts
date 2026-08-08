@@ -248,6 +248,19 @@ describe('MusicalStaff', () => {
     expect(wrapper.get('.rest').text()).toBe('?')
   })
 
+  it('preserves exact effective durations in large normalized tuplets', () => {
+    const source = `[${Array.from({ length: 48 }, () => 'C').join(' ')} .]`
+    const evaluated = evaluateScoreShape(parse(source).body[0]!)
+    if (!('shape' in evaluated)) throw new Error('Expected a score shape.')
+    const wrapper = mount(MusicalStaff, {
+      props: { notation: constructStaffNotationShape(evaluated.shape) },
+    })
+
+    expect(wrapper.findAll('.notehead')).toHaveLength(48)
+    expect(wrapper.find('.notation-error').exists()).toBe(false)
+    expect(wrapper.get('.rest').text()).toBe('𝄾')
+  })
+
   it('extends notes and chords through following continues', () => {
     for (const source of ['C=', '[C, E, G]=']) {
       const evaluated = evaluateScoreShape(parse(source).body[0]!)
