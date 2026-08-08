@@ -169,11 +169,29 @@ export function constructStaffNotation(value: EvaluatedLiteral, options: StaffNo
   }
 }
 
+function appearanceKey(pitch: StaffPitch): string {
+  const inflections = (pitch.inflections ?? []).map((value) => 'kind' in value
+    ? value.kind
+    : `${value.direction}:${value.prime}:${value.flavor ?? ''}`)
+  return [pitch.staffPosition, pitch.notehead, pitch.accidentals.join(','), inflections.join(',')].join('|')
+}
+
 /** Project a duration-bearing score tree, including rests, into staff data. */
 export function constructStaffNotationShape(shape: ScoreShape): StaffNotationShape {
   switch (shape.kind) {
     case 'attack':
-      return { kind: 'note', pitch: constructStaffNotation(shape.pitch, { rootStaffPosition: shape.rootStaffPosition }), duration: shape.duration }
+      {
+        const pitch = constructStaffNotation(shape.pitch, { rootStaffPosition: shape.rootStaffPosition })
+        const alternatives = (shape.alternateAppearances ?? []).map((appearance) =>
+          constructStaffNotation(appearance.pitch, { rootStaffPosition: appearance.rootStaffPosition }))
+        return {
+          kind: 'note',
+          pitch: alternatives.some((alternative) => appearanceKey(alternative) !== appearanceKey(pitch))
+            ? { ...pitch, notehead: 'x' }
+            : pitch,
+          duration: shape.duration,
+        }
+      }
     case 'rest':
       return { kind: 'rest', duration: shape.duration, generated: shape.generated }
     case 'continue':

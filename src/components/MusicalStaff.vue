@@ -130,6 +130,20 @@ const ledgerPositions = (position: number) => {
           class="notehead"
           :points="`${x(index)},${y(item.pitch.staffPosition) - 6} ${x(index) + 7},${y(item.pitch.staffPosition) + 5} ${x(index) - 7},${y(item.pitch.staffPosition) + 5}`"
         />
+        <g v-else-if="item.pitch.notehead === 'x'" class="notehead x-notehead">
+          <line
+            :x1="x(index) - 6"
+            :x2="x(index) + 6"
+            :y1="y(item.pitch.staffPosition) - 6"
+            :y2="y(item.pitch.staffPosition) + 6"
+          />
+          <line
+            :x1="x(index) - 6"
+            :x2="x(index) + 6"
+            :y1="y(item.pitch.staffPosition) + 6"
+            :y2="y(item.pitch.staffPosition) - 6"
+          />
+        </g>
         <ellipse
           v-else
           class="notehead"
@@ -162,6 +176,7 @@ const ledgerPositions = (position: number) => {
 .ledger-line,
 .stem,
 .barline line,
+.x-notehead line,
 .tie {
   stroke: currentColor;
   stroke-width: 1.5;

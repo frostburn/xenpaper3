@@ -14,6 +14,7 @@ export type { StaffNotationOptions } from './runtime/staff-notation'
 export type { ScoreShapeEvaluationResult, ScoreShapeOptions } from './runtime/score-shape'
 export type {
   AttackShape,
+  AttackAppearance,
   AbsolutePitchValue,
   BarlineShape,
   BarlineStyle,

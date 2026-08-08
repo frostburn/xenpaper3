@@ -89,6 +89,23 @@ describe('MusicalStaff', () => {
     expect(wrapper.findAll('.barline--repeat-end circle')).toHaveLength(2)
   })
 
+  it('renders an x notehead for context-dependent repeat appearances', () => {
+    const crossed: StaffNotationShape = {
+      kind: 'note',
+      duration: notation.duration,
+      pitch: {
+        staffPosition: 3,
+        accidentals: [],
+        notehead: 'x',
+        cents: 500,
+      },
+    }
+    const wrapper = mount(MusicalStaff, { props: { notation: crossed } })
+
+    expect(wrapper.findAll('.x-notehead line')).toHaveLength(2)
+    expect(wrapper.find('ellipse.notehead').exists()).toBe(false)
+  })
+
   it('renders ASCII-style operators and flavored numeric FJS inflections before accidentals', () => {
     const decorated: StaffNotationShape = {
       kind: 'note',

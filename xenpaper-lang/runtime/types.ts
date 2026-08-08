@@ -109,7 +109,7 @@ export interface StaffPitch {
   /** FJS suffixes, such as the `^5` in A^5. */
   readonly inflections?: readonly StaffInflection[]
   /** Greek/interordinal pitches use a triangular head pointing at the other neighbouring line/space. */
-  readonly notehead: 'normal' | 'triangle-up' | 'triangle-down'
+  readonly notehead: 'normal' | 'triangle-up' | 'triangle-down' | 'x'
   /** Sounding distance above middle C, retained for positioning refinements by a renderer. */
   readonly cents: number
 }
@@ -142,6 +142,13 @@ export interface ShapeBase {
 export interface AttackShape extends ShapeBase {
   readonly kind: 'attack'
   readonly pitch: PitchOffsetValue | (AbsolutePitchValue & { readonly value: Value })
+  readonly rootStaffPosition: number
+  /** Other contexts in which this source attack occurs after repeat expansion. */
+  readonly alternateAppearances?: readonly AttackAppearance[]
+}
+
+export interface AttackAppearance {
+  readonly pitch: AttackShape['pitch']
   readonly rootStaffPosition: number
 }
 
