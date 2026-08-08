@@ -113,7 +113,11 @@ describe('MusicalStaff', () => {
       props: { notation: constructStaffNotationShape(evaluated.shape) },
     })
 
-    expect(wrapper.findAll('.rest').map((rest) => rest.text())).toEqual(['𝄻', '𝄼', '𝄼'])
+    expect(wrapper.findAll('.rest-box')).toHaveLength(3)
+    expect(wrapper.findAll('.rest-box--whole')).toHaveLength(1)
+    expect(wrapper.findAll('.rest-box--half')).toHaveLength(2)
+    expect(wrapper.get('.rest-box--whole').attributes()).toMatchObject({ y: '64', height: '6' })
+    expect(wrapper.get('.rest-box--half').attributes()).toMatchObject({ y: '70', height: '6' })
     expect(wrapper.findAll('.rest-dot')).toHaveLength(1)
   })
 

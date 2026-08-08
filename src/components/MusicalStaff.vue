@@ -215,21 +215,32 @@ const isDotted = (duration: Fraction) => {
 const restSymbol = (duration: Fraction, tupletCount?: number) => {
   const value = effectiveDuration(duration, tupletCount)
   const base = isDotted(value) ? value.mul(2).div(3) : value
-  return base.equals(4)
-    ? '𝄻'
-    : base.equals(2)
-      ? '𝄼'
-      : base.equals(1)
-        ? '𝄽'
-        : base.equals('1/2')
-          ? '𝄾'
-          : base.equals('1/4')
-            ? '𝄿'
-            : '?'
+  return base.equals(4) || base.equals(2)
+    ? ''
+    : base.equals(1)
+      ? '𝄽'
+      : base.equals('1/2')
+        ? '𝄾'
+        : base.equals('1/4')
+          ? '𝄿'
+          : '?'
+}
+
+const restBox = (duration: Fraction, tupletCount?: number) => {
+  const value = effectiveDuration(duration, tupletCount)
+  const base = isDotted(value) ? value.mul(2).div(3) : value
+  return base.equals(4) ? 'whole' : base.equals(2) ? 'half' : undefined
 }
 
 const isSupportedRestDuration = (duration: Fraction, tupletCount?: number) =>
-  restSymbol(duration, tupletCount) !== '?'
+  Boolean(restBox(duration, tupletCount)) || restSymbol(duration, tupletCount) !== '?'
+
+const restDotY = (duration: Fraction, tupletCount?: number) =>
+  restBox(duration, tupletCount) === 'whole'
+    ? 68
+    : restBox(duration, tupletCount) === 'half'
+      ? 72
+      : 76
 </script>
 
 <template>
@@ -261,7 +272,16 @@ const isSupportedRestDuration = (duration: Fraction, tupletCount?: number) =>
         :d="`M ${x(item.tupletStartColumn!) - 10} 40 V 34 H ${(x(item.tupletStartColumn!) + x(item.tupletEndColumn!)) / 2 - 10} M ${(x(item.tupletStartColumn!) + x(item.tupletEndColumn!)) / 2 + 10} 34 H ${x(item.tupletEndColumn!) + 10} V 40`"
       />
       <template v-if="item.kind === 'rest'">
-        <text class="rest" :x="x(item.column)" y="79">
+        <rect
+          v-if="restBox(item.duration, item.tupletCount)"
+          class="rest rest-box"
+          :class="`rest-box--${restBox(item.duration, item.tupletCount)}`"
+          :x="x(item.column) - 7"
+          :y="restBox(item.duration, item.tupletCount) === 'whole' ? 64 : 70"
+          width="14"
+          height="6"
+        />
+        <text v-else class="rest" :x="x(item.column)" y="79">
           {{ restSymbol(item.duration, item.tupletCount) }}
         </text>
         <circle
@@ -271,7 +291,7 @@ const isSupportedRestDuration = (duration: Fraction, tupletCount?: number) =>
           "
           class="augmentation-dot rest-dot"
           :cx="x(item.column) + 17"
-          cy="76"
+          :cy="restDotY(item.duration, item.tupletCount)"
           r="2"
         />
       </template>
@@ -470,6 +490,10 @@ const isSupportedRestDuration = (duration: Fraction, tupletCount?: number) =>
 }
 
 .augmentation-dot {
+  fill: currentColor;
+}
+
+.rest-box {
   fill: currentColor;
 }
 
