@@ -2,6 +2,7 @@
 import { computed } from 'vue'
 import type {
   BarlineStyle,
+  DynamicMark,
   StaffInflection,
   StaffNotationShape,
   StaffPitch,
@@ -20,7 +21,7 @@ type TupletItem = {
 }
 
 type StaffItemContent =
-  | { kind: 'note'; pitch: StaffPitch; duration: Fraction; displayLabel?: string }
+  | { kind: 'note'; pitch: StaffPitch; duration: Fraction; displayLabel?: string; dynamic?: DynamicMark; velocity?: Fraction; grace?: boolean; notatedDuration?: Fraction }
   | { kind: 'rest'; duration: Fraction }
   | { kind: 'barline'; style: BarlineStyle }
   | { kind: 'annotation'; text: string }
@@ -29,6 +30,8 @@ type StaffItem = TupletItem &
   StaffItemContent & {
     column: number
     tiedFromColumn?: number
+    tiedToColumn?: number
+    tiedToPosition?: number
     displayLabelRow?: number
   }
 
@@ -62,6 +65,10 @@ const items = computed(() => {
         pitch: shape.pitch,
         duration: shape.duration,
         displayLabel: shape.displayLabel,
+        dynamic: shape.dynamic,
+        velocity: shape.velocity,
+        grace: shape.grace,
+        notatedDuration: shape.notatedDuration,
       }
       layout.push(note)
       state.activeItems = [note]
@@ -170,6 +177,15 @@ const items = computed(() => {
     },
   ) as StaffItem[]
 
+  staffItems.forEach((item, index) => {
+    if (item.kind !== 'note' || !item.grace) return
+    const donor = staffItems.slice(index + 1).find((candidate) => candidate.kind === 'note' && !candidate.grace)
+    if (donor?.kind === 'note') {
+      item.tiedToColumn = donor.column
+      item.tiedToPosition = donor.pitch.staffPosition
+    }
+  })
+
   const labeledNotesByColumn = new Map<number, Extract<StaffItem, { kind: 'note' }>[]>()
   staffItems.forEach((item) => {
     if (item.kind !== 'note' || !item.displayLabel) return
@@ -213,7 +229,7 @@ const width = computed(() =>
   ),
 )
 const height = computed(() =>
-  Math.max(150, 138 + Math.max(0, ...items.value.map((item) => item.displayLabelRow ?? 0)) * 13),
+  Math.max(170, 158 + Math.max(0, ...items.value.map((item) => item.displayLabelRow ?? 0)) * 13),
 )
 const x = (column: number) => 60 + column * 52 + repeatSpaceBefore(column)
 const barlineX = (item: Extract<StaffItem, { kind: 'barline' }>) =>
@@ -276,6 +292,8 @@ const isSupportedNoteDuration = (duration?: Fraction, tupletCount?: number) => {
 
 const isOpenNotehead = (duration: Fraction) => durationValue(duration) >= 2
 const hasStem = (duration: Fraction) => durationValue(duration) < 4
+const engravingDuration = (item: Extract<StaffItem, { kind: 'note' }>) => item.notatedDuration ?? item.duration
+const velocityLabel = (velocity: Fraction) => `${Math.round(durationValue(velocity) * 100)}%`
 const isDotted = (duration: Fraction) => {
   const relativeToDottedHalf = durationValue(duration) / 3
   return relativeToDottedHalf > 0 && Number.isInteger(Math.log2(relativeToDottedHalf))
@@ -331,7 +349,11 @@ const restDotY = (duration: Fraction, tupletCount?: number) =>
     </g>
     <text class="clef" x="25" y="98">𝄞</text>
     <text v-if="!items.length" class="empty-message" x="70" y="126">No notation loaded</text>
-    <g v-for="(item, index) in items" :key="index">
+    <g
+      v-for="(item, index) in items"
+      :key="index"
+      :class="{ 'grace-note': item.kind === 'note' && item.grace }"
+    >
       <text
         v-if="item.tupletPosition === Math.floor((item.tupletCount ?? 0) / 2)"
         class="tuplet-number"
@@ -400,8 +422,13 @@ const restDotY = (duration: Fraction, tupletCount?: number) =>
         </template>
       </g>
       <template v-else>
+        <path
+          v-if="item.grace && item.tiedToColumn !== undefined && item.tiedToPosition !== undefined"
+          class="grace-tie"
+          :d="`M ${x(item.column) + 5} ${y(item.pitch.staffPosition) + 5} Q ${(x(item.column) + x(item.tiedToColumn)) / 2} ${Math.max(y(item.pitch.staffPosition), y(item.tiedToPosition)) + 15} ${x(item.tiedToColumn) - 7} ${y(item.tiedToPosition) + 7}`"
+        />
         <text
-          v-if="!isSupportedNoteDuration(item.duration, item.tupletCount)"
+          v-if="!isSupportedNoteDuration(engravingDuration(item), item.tupletCount)"
           class="notation-error"
           :x="x(item.column)"
           :y="y(item.pitch.staffPosition) + 5"
@@ -470,21 +497,21 @@ const restDotY = (duration: Fraction, tupletCount?: number) =>
           <ellipse
             v-else
             class="notehead"
-            :class="{ 'notehead--open': isOpenNotehead(item.duration) }"
+            :class="{ 'notehead--open': isOpenNotehead(engravingDuration(item)) }"
             :cx="x(item.column)"
             :cy="y(item.pitch.staffPosition)"
             rx="7"
             ry="5"
           />
           <circle
-            v-if="isDotted(item.duration)"
+            v-if="isDotted(engravingDuration(item))"
             class="augmentation-dot"
             :cx="x(item.column) + 13"
             :cy="y(item.pitch.staffPosition) - (item.pitch.staffPosition % 2 ? 0 : 3)"
             r="2"
           />
           <line
-            v-if="hasStem(item.duration)"
+            v-if="hasStem(engravingDuration(item))"
             class="stem"
             :x1="x(item.column) + 6"
             :x2="x(item.column) + 6"
@@ -492,7 +519,7 @@ const restDotY = (duration: Fraction, tupletCount?: number) =>
             :y2="y(item.pitch.staffPosition) - 30"
           />
           <path
-            v-for="flag in flagCount(item.duration, item.tupletCount)"
+            v-for="flag in flagCount(engravingDuration(item), item.tupletCount)"
             :key="`flag-${flag}`"
             class="flag"
             :d="`M ${x(item.column) + 6} ${y(item.pitch.staffPosition) - 30 + (flag - 1) * 7} Q ${x(item.column) + 20} ${y(item.pitch.staffPosition) - 23 + (flag - 1) * 7} ${x(item.column) + 12} ${y(item.pitch.staffPosition) - 13 + (flag - 1) * 7}`"
@@ -504,6 +531,9 @@ const restDotY = (duration: Fraction, tupletCount?: number) =>
             :y="130 + (item.displayLabelRow ?? 0) * 13"
           >
             {{ item.displayLabel }}
+          </text>
+          <text class="performance-label" :x="x(item.column)" :y="145 + (item.displayLabelRow ?? 0) * 13">
+            {{ item.dynamic }}<tspan v-if="item.velocity"> · {{ velocityLabel(item.velocity) }}</tspan>
           </text>
         </template>
       </template>
@@ -527,6 +557,22 @@ const restDotY = (duration: Fraction, tupletCount?: number) =>
 .tie {
   stroke: currentColor;
   stroke-width: 1.5;
+}
+
+.grace-tie {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1;
+}
+
+.grace-note .notehead {
+  transform-box: fill-box;
+  transform-origin: center;
+  transform: scale(0.68);
+}
+
+.grace-note .stem {
+  stroke-width: 1;
 }
 
 .flag {
@@ -581,9 +627,14 @@ const restDotY = (duration: Fraction, tupletCount?: number) =>
   text-anchor: middle;
 }
 
-.sounding-label {
+.sounding-label,
+.performance-label {
   font-size: 11px;
   text-anchor: middle;
+}
+
+.performance-label {
+  font-style: italic;
 }
 
 .tuplet-number {

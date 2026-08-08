@@ -27,6 +27,16 @@ const notation: StaffNotationShape = {
 }
 
 describe('MusicalStaff', () => {
+  it('renders grace notes small, tied to an unchanged donor, with performance labels', () => {
+    const evaluated = evaluateScoreShape(parse('@p @4?? B c# c=').body[0]!)
+    if (!('shape' in evaluated)) throw new Error('Expected a score shape.')
+    const wrapper = mount(MusicalStaff, { props: { notation: constructStaffNotationShape(evaluated.shape) } })
+
+    expect(wrapper.findAll('.grace-note')).toHaveLength(2)
+    expect(wrapper.findAll('.grace-tie')).toHaveLength(2)
+    expect(wrapper.findAll('.notehead--open')).toHaveLength(1)
+    expect(wrapper.findAll('.performance-label').map((label) => label.text())).toEqual(['p · 30%', 'p · 30%', 'p · 30%'])
+  })
   it.each(['C @2 D E @1 F G', 'C [D E] F G'])(
     'renders equivalent quarter and eighth note values for %s',
     (source) => {
