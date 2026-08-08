@@ -424,6 +424,7 @@ export function evaluateScoreShape(
       let activeContext = context
       let activePulse = currentPulse
       let activeDynamic = currentDynamic
+      let dynamicPending = false
       let velocity: Fraction | undefined
       let grace: { duration: Fraction; count: number; indices: number[] } | undefined
       let gliss: number[] | undefined
@@ -438,7 +439,7 @@ export function evaluateScoreShape(
           const resolved = resolveDirective(item, activeContext)
           const directive = resolved.directive
           if (directive?.kind === 'subdivision') activePulse = directive.pulse
-          else if (directive?.kind === 'dynamic') activeDynamic = directive.mark
+          else if (directive?.kind === 'dynamic') { activeDynamic = directive.mark; dynamicPending = true }
           else if (directive?.kind === 'velocity') velocity = directive.velocity
           else if (directive?.kind === 'grace') grace = { duration: directive.duration, count: directive.count, indices: [] }
           else if (directive?.kind === 'gliss') gliss = []
@@ -451,10 +452,22 @@ export function evaluateScoreShape(
         let result = visit(item, activeContext, activePulse, activeDynamic)
         const index = results.length
         if ('shape' in result && attacks(result.shape).length) {
+          if (dynamicPending) {
+            let first = true
+            result = {
+              ...result,
+              shape: mapAttacks(result.shape, (attack) => {
+                if (!first) return attack
+                first = false
+                return { ...attack, dynamicChanged: true }
+              }),
+            }
+            dynamicPending = false
+          }
           if (velocity) {
             let first = true; const pending = velocity
             const applyVelocity = (shape: ScoreShape): ScoreShape => {
-              if (shape.kind === 'attack' && first) { first = false; return { ...shape, velocity: pending } }
+              if (shape.kind === 'attack' && first) { first = false; return { ...shape, velocity: pending, velocityExplicit: true } }
               if (shape.kind === 'sequence') return { ...shape, children: shape.children.map(applyVelocity) }
               if (shape.kind === 'parallel') return { ...shape, branches: shape.branches.map(applyVelocity) }
               return shape

@@ -21,7 +21,7 @@ type TupletItem = {
 }
 
 type StaffItemContent =
-  | { kind: 'note'; pitch: StaffPitch; duration: Fraction; displayLabel?: string; dynamic?: DynamicMark; velocity?: Fraction; grace?: boolean; notatedDuration?: Fraction }
+  | { kind: 'note'; pitch: StaffPitch; duration: Fraction; displayLabel?: string; dynamic?: DynamicMark; velocity?: Fraction; dynamicChanged?: boolean; velocityExplicit?: boolean; grace?: boolean; notatedDuration?: Fraction }
   | { kind: 'rest'; duration: Fraction }
   | { kind: 'barline'; style: BarlineStyle }
   | { kind: 'annotation'; text: string }
@@ -67,6 +67,8 @@ const items = computed(() => {
         displayLabel: shape.displayLabel,
         dynamic: shape.dynamic,
         velocity: shape.velocity,
+        dynamicChanged: shape.dynamicChanged,
+        velocityExplicit: shape.velocityExplicit,
         grace: shape.grace,
         notatedDuration: shape.notatedDuration,
       }
@@ -532,8 +534,13 @@ const restDotY = (duration: Fraction, tupletCount?: number) =>
           >
             {{ item.displayLabel }}
           </text>
-          <text class="performance-label" :x="x(item.column)" :y="145 + (item.displayLabelRow ?? 0) * 13">
-            {{ item.dynamic }}<tspan v-if="item.velocity"> · {{ velocityLabel(item.velocity) }}</tspan>
+          <text
+            v-if="item.dynamicChanged || item.velocityExplicit"
+            class="performance-label"
+            :x="x(item.column)"
+            :y="145 + (item.displayLabelRow ?? 0) * 13"
+          >
+            <tspan v-if="item.dynamicChanged">{{ item.dynamic }}</tspan><tspan v-if="item.dynamicChanged && item.velocityExplicit"> · </tspan><tspan v-if="item.velocityExplicit && item.velocity">{{ velocityLabel(item.velocity) }}</tspan>
           </text>
         </template>
       </template>
