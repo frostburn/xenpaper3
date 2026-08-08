@@ -131,9 +131,9 @@ describe('staff notation construction', () => {
     expect(notes.map((note) => note.kind === 'note' && [note.pitch.staffPosition, note.pitch.notehead])).toEqual([
       [0, 'normal'],
       [0, 'x'],
-      [1, 'normal'],
+      [1, 'x'],
+      [2, 'x'],
       [2, 'normal'],
-      [1, 'normal'],
       [0, 'normal'],
     ])
     expect(notes[1]).toMatchObject({ soundingLabel: '1/1' })

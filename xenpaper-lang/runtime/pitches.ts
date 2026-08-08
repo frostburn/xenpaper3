@@ -73,6 +73,7 @@ export function mapFormula(monzo: PrimeMonzo, mapping: PrimeMapping): Value {
 export function createPitchContext(mapping: PrimeMapping = DEFAULT_MAPPING): PitchContext {
   return {
     mapping,
+    rootDisplacement: Value.cents(0),
     rootFormula: new Map(),
     up: mapFormula(new Map([[2, new Fraction(-1, 2)], [3, new Fraction(5, 2)], [11, new Fraction(-1)]]), mapping),
     lift: mapFormula(new Map([[2, new Fraction(1, 2)], [5, new Fraction(1)], [7, new Fraction(-1)]]), mapping),
@@ -94,19 +95,18 @@ export function applyPitchContextChange(node: PitchContextChange, input: PitchCo
       const match = /^(\d+)(?:edo|p)$/i.exec(statement.raw)
       if (!match) throw new TypeError(`Unsupported pitch preset ${statement.raw}.`)
       const mapping = edoMapping(Number(match[1]))
-      context = { ...createPitchContext(mapping), rootFormula: context.rootFormula, rootStaffPosition: context.rootStaffPosition }
+      context = {
+        ...createPitchContext(mapping),
+        rootDisplacement: context.rootDisplacement,
+        rootFormula: context.rootFormula,
+        rootStaffPosition: context.rootStaffPosition,
+      }
       continue
     }
     if (statement.type !== 'ContextAssignment') throw new TypeError('Unsupported pitch-context statement.')
     if (statement.target.type === 'ContextNameTarget' && statement.target.name === 'root' && statement.value.type === 'PitchLiteral') {
-      const target = evaluatePitchLiteral(statement.value, { ...context, rootFormula: new Map() })
-      const nominal = statement.value.nominal.value
-      const upper = nominal.toUpperCase()
-      const greekKey = GREEK_SCRIPT[upper] ?? upper
-      const rank = NOMINAL_RANK[greekKey]
-      const nominalPosition = rank === undefined ? 0 : Math.ceil(rank - 1)
-      const caseShift = nominal === nominal.toLowerCase() ? 7 : 0
-      context = { ...context, rootFormula: target.formula, rootStaffPosition: nominalPosition + caseShift + shifts(statement.value.modifiers) * 7 }
+      const target = evaluatePitchLiteral(statement.value, context)
+      context = { ...context, rootDisplacement: context.rootDisplacement.add(target.rootOffset) }
       continue
     }
     if (statement.target.type === 'ContextPitchTarget' && statement.value.type === 'Identifier' && statement.value.name === 'root') {

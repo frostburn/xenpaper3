@@ -125,12 +125,21 @@ function playablePitch(node: Expression, context: PitchContext):
   const evaluated = evaluateExpression(node, context)
   if (!('value' in evaluated)) return evaluated
   if (evaluated.value.kind === 'pitchOffset') {
-    return { pitch: evaluated.value, diagnostics: evaluated.diagnostics }
+    return {
+      pitch: { ...evaluated.value, value: evaluated.value.value.add(context.rootDisplacement) },
+      diagnostics: evaluated.diagnostics,
+    }
   }
   if (evaluated.value.kind === 'absolutePitch') {
-    const absoluteRootOffset = evaluated.value.rootOffset.add(mapFormula(context.rootFormula, context.mapping))
+    const absoluteRootOffset = evaluated.value.rootOffset
+      .add(mapFormula(context.rootFormula, context.mapping))
+      .add(context.rootDisplacement)
     return {
-      pitch: { ...evaluated.value, rootOffset: absoluteRootOffset, value: evaluated.value.rootOffset },
+      pitch: {
+        ...evaluated.value,
+        rootOffset: absoluteRootOffset,
+        value: evaluated.value.rootOffset.add(context.rootDisplacement),
+      },
       diagnostics: evaluated.diagnostics,
     }
   }
@@ -149,7 +158,11 @@ function playablePitch(node: Expression, context: PitchContext):
     }
   }
   return {
-    pitch: { kind: 'pitchOffset', value: Value.pitch(evaluated.value.value), origins: evaluated.value.origins },
+    pitch: {
+      kind: 'pitchOffset',
+      value: Value.pitch(evaluated.value.value).add(context.rootDisplacement),
+      origins: evaluated.value.origins,
+    },
     diagnostics: evaluated.diagnostics,
   }
 }
