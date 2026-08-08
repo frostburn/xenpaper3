@@ -189,9 +189,7 @@ export function constructStaffNotationShape(shape: ScoreShape): StaffNotationSha
           kind: 'note',
           pitch: ambiguous ? { ...pitch, notehead: 'x' } : pitch,
           duration: shape.duration,
-          ...(ambiguous
-            ? { soundingCents: [shape.soundingCents, ...(shape.alternateAppearances ?? []).map((appearance) => appearance.soundingCents)] }
-            : {}),
+          ...(ambiguous && shape.soundingLabel ? { soundingLabel: shape.soundingLabel } : {}),
         }
       }
     case 'rest':
