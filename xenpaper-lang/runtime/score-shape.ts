@@ -451,6 +451,9 @@ export function evaluateScoreShape(
       origins: evaluated.pitch.origins,
       rootStaffPosition: context.rootStaffPosition,
       ...('raw' in current ? { soundingLabel: String(current.raw) } : {}),
+      ...(current.type === 'DegreeLiteral' || (current.type === 'QuantityLiteral' && current.unit === 'c')
+        ? { displayLabel: true }
+        : {}),
     }
     return { shape, diagnostics: evaluated.diagnostics }
   }

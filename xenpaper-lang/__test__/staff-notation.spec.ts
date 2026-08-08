@@ -57,6 +57,21 @@ describe('staff notation construction', () => {
     expect(notation('610c')).toMatchObject({ staffPosition: 3, accidentals: ['sharp'] })
   })
 
+  it('labels degrees and raw cent values below the staff', () => {
+    const node = parse('3 123c C').body[0] as Expression
+    const evaluated = evaluateScoreShape(node)
+    if (!('shape' in evaluated)) throw new Error('Expected shape.')
+    const staff = constructStaffNotationShape(evaluated.shape)
+    if (staff.kind !== 'sequence') throw new Error('Expected a sequence.')
+
+    expect(staff.children).toMatchObject([
+      { kind: 'note', soundingLabel: '3' },
+      { kind: 'note', soundingLabel: '123c' },
+      { kind: 'note' },
+    ])
+    expect(staff.children[2]).not.toHaveProperty('soundingLabel')
+  })
+
   it('carries exact durations and rests from score construction', () => {
     const node = parse('1/1 []').body[0] as Expression
     const evaluated = evaluateScoreShape(node, { pulse: 2 })

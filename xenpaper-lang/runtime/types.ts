@@ -154,6 +154,8 @@ export interface AttackShape extends ShapeBase {
   readonly rootStaffPosition: number
   /** Authored pitch expression shown when repeat contexts make the staff appearance ambiguous. */
   readonly soundingLabel?: string
+  /** Show the authored value below the staff even when its notehead is unambiguous. */
+  readonly displayLabel?: boolean
   /** Other contexts in which this source attack occurs after repeat expansion. */
   readonly alternateAppearances?: readonly AttackAppearance[]
 }

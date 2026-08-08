@@ -461,7 +461,7 @@ const restDotY = (duration: Fraction, tupletCount?: number) =>
             :d="`M ${x(item.column) + 6} ${y(item.pitch.staffPosition) - 30 + (flag - 1) * 7} Q ${x(item.column) + 20} ${y(item.pitch.staffPosition) - 23 + (flag - 1) * 7} ${x(item.column) + 12} ${y(item.pitch.staffPosition) - 13 + (flag - 1) * 7}`"
           />
           <text
-            v-if="item.pitch.notehead === 'x' && item.soundingLabel"
+            v-if="item.soundingLabel"
             class="sounding-label"
             :x="x(item.column)"
             y="130"

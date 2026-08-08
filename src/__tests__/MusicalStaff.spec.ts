@@ -424,6 +424,20 @@ describe('MusicalStaff', () => {
     expect(wrapper.get('.sounding-label').attributes('y')).toBe('130')
   })
 
+  it('renders an authored degree or cent label below a normal notehead', () => {
+    const labeled: StaffNotationShape = {
+      kind: 'note',
+      duration: notation.duration,
+      pitch: { staffPosition: 3, accidentals: [], notehead: 'normal', cents: 300 },
+      soundingLabel: '3',
+    }
+    const wrapper = mount(MusicalStaff, { props: { notation: labeled } })
+
+    expect(wrapper.get('.sounding-label').text()).toBe('3')
+    expect(wrapper.get('.sounding-label').attributes('y')).toBe('130')
+    expect(wrapper.find('ellipse.notehead').exists()).toBe(true)
+  })
+
   it('renders root-change annotations above the staff', () => {
     const annotated: StaffNotationShape = {
       kind: 'annotation',
