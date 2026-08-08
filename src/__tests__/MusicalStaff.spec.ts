@@ -65,6 +65,21 @@ describe('MusicalStaff', () => {
     expect(wrapper.findAll('.notehead')).toHaveLength(3)
     expect(wrapper.findAll('.flag')).toHaveLength(3)
     expect(wrapper.get('.tuplet-number').text()).toBe('3')
+    expect(wrapper.findAll('.tuplet-bracket')).toHaveLength(1)
+  })
+
+  it('brackets the full extent of a quintuplet', () => {
+    const expression = parse('C [D E F G G] F').body[0]!
+    const evaluated = evaluateScoreShape(expression)
+    if (!('shape' in evaluated)) throw new Error('Expected a score shape.')
+    const wrapper = mount(MusicalStaff, {
+      props: { notation: constructStaffNotationShape(evaluated.shape) },
+    })
+
+    expect(wrapper.get('.tuplet-number').text()).toBe('5')
+    expect(wrapper.get('.tuplet-bracket').attributes('d')).toBe(
+      'M 102 40 V 34 H 206 M 226 34 H 330 V 40',
+    )
   })
 
   it('does not mark an ordinary three-note sequence as a triplet', () => {

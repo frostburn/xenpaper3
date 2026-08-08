@@ -215,8 +215,13 @@ const flagCount = (duration?: Fraction, tupletCount?: number) => {
           v-if="item.tupletPosition === Math.floor((item.tupletCount ?? 0) / 2)"
           class="tuplet-number"
           :x="x(index)"
-          y="38"
+          y="31"
         >{{ item.tupletCount }}</text>
+        <path
+          v-if="item.tupletPosition === Math.floor((item.tupletCount ?? 0) / 2)"
+          class="tuplet-bracket"
+          :d="`M ${x(index - item.tupletPosition!) - 10} 40 V 34 H ${x(index) - 10} M ${x(index) + 10} 34 H ${x(index - item.tupletPosition! + item.tupletCount! - 1) + 10} V 40`"
+        />
         <text
           v-if="item.pitch.notehead === 'x' && item.soundingLabel"
           class="sounding-label"
@@ -252,6 +257,12 @@ const flagCount = (duration?: Fraction, tupletCount?: number) => {
   fill: none;
   stroke: currentColor;
   stroke-width: 3;
+}
+
+.tuplet-bracket {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.5;
 }
 
 .barline circle {
