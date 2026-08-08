@@ -246,6 +246,21 @@ describe('MusicalStaff', () => {
     expect(wrapper.findAll('.tuplet-bracket')).toHaveLength(1)
   })
 
+  it('resolves a twice-continued bracket slot into regular quarter notes', () => {
+    const evaluated = evaluateScoreShape(parse('[C E G]==').body[0]!)
+    if (!('shape' in evaluated)) throw new Error('Expected a score shape.')
+    const wrapper = mount(MusicalStaff, {
+      props: { notation: constructStaffNotationShape(evaluated.shape) },
+    })
+
+    expect(wrapper.findAll('.notehead')).toHaveLength(3)
+    expect(wrapper.findAll('.notehead--open')).toHaveLength(0)
+    expect(wrapper.findAll('.stem')).toHaveLength(3)
+    expect(wrapper.findAll('.flag')).toHaveLength(0)
+    expect(wrapper.find('.tuplet-number').exists()).toBe(false)
+    expect(wrapper.find('.tuplet-bracket').exists()).toBe(false)
+  })
+
   it('renders barlines without interrupting continued notes', () => {
     const barred: StaffNotationShape = {
       kind: 'sequence',

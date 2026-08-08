@@ -64,6 +64,20 @@ const items = computed(() => {
         const duration = fraction(note.duration)
         note.duration = duration.add(duration.mul(factor))
       })
+      const tupletCount = state.activeNotes[0]?.tupletCount
+      const resolvesToRegularNotes = state.activeNotes.every(
+        (note) =>
+          note.tupletCount === tupletCount &&
+          Number.isInteger(Math.log2(durationValue(note.duration))),
+      )
+      if (tupletCount && resolvesToRegularNotes) {
+        state.activeNotes.forEach((note) => {
+          delete note.tupletPosition
+          delete note.tupletCount
+          delete note.tupletStartOffset
+          delete note.tupletEndOffset
+        })
+      }
       state.activeSpan = activeSpan.add(continuedDuration)
     } else if (shape.kind === 'rest') {
       state.activeNotes = []
