@@ -8,6 +8,7 @@ export { applyFjsInflections, fjsInflection, fjsPrimeComma } from './runtime/fjs
 export type { FjsFlavor, FjsInflectionInput } from './runtime/fjs'
 export { DEFAULT_MAPPING, DEFAULT_PITCH_CONTEXT, applyPitchContextChange, createPitchContext, edoMapping, evaluateIntervalLiteral, evaluatePitchLiteral, mapFormula, scalePitchOffset, spellPitchDifference } from './runtime/pitches'
 export type { ExpressionEvaluationResult } from './runtime/expressions'
+export { DIRECTIVE_REGISTRY, DYNAMIC_VELOCITIES, resolveDirective } from './runtime/directives'
 export { evaluateScoreShape } from './runtime/score-shape'
 export { expandToBeatEvents, flattenScoreShape } from './runtime/beat-events'
 export type { BeatEventExpansionOptions, BeatEventExpansionResult, BeatEventFlatteningResult } from './runtime/beat-events'
@@ -26,6 +27,8 @@ export type {
   BeatTimedNoteEvent,
   BeatTimedScore,
   ContinueShape,
+  DynamicMark,
+  PitchAutomation,
   EvaluatedLiteral,
   ExpandedNode,
   ExpandedProgram,

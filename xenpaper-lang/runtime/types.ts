@@ -152,10 +152,22 @@ export interface AttackShape extends ShapeBase {
   readonly kind: 'attack'
   readonly pitch: PitchOffsetValue | (AbsolutePitchValue & { readonly value: Value })
   readonly rootStaffPosition: number
+  readonly dynamic: DynamicMark
+  readonly velocity: Fraction
+  readonly automation?: PitchAutomation
   /** Authored pitch expression to show below the staff. */
   readonly displayLabel?: string
   /** Other contexts in which this source attack occurs after repeat expansion. */
   readonly alternateAppearances?: readonly AttackAppearance[]
+}
+
+export type DynamicMark = 'ppp' | 'pp' | 'p' | 'mp' | 'mf' | 'f' | 'ff' | 'fff'
+
+export interface PitchAutomation {
+  readonly curve: 'linear'
+  readonly from: AttackShape['pitch']
+  readonly to: AttackShape['pitch']
+  readonly duration: Fraction
 }
 
 export interface AttackAppearance {
@@ -214,6 +226,9 @@ export interface BeatTimedNoteEvent {
   readonly duration: Fraction
   readonly pitch: AttackShape['pitch']
   readonly rootStaffPosition: number
+  readonly dynamic?: DynamicMark
+  readonly velocity?: Fraction
+  readonly automation?: PitchAutomation
   readonly label?: string
   readonly origins: readonly SourceOrigin[]
 }
