@@ -85,7 +85,18 @@ function annotateRepeatAppearances(shape: ScoreShape, alternatives: readonly (re
   const annotate = (current: ScoreShape): ScoreShape => {
     if (current.kind === 'attack') {
       const alternateAppearances = alternatives[attackIndex++]
-      return alternateAppearances?.length ? { ...current, alternateAppearances } : current
+      if (!alternateAppearances?.length) return current
+      const notationValue = (pitch: AttackShape['pitch']) => pitch.kind === 'absolutePitch'
+        ? pitch.rootOffset
+        : pitch.notationValue ?? pitch.value
+      const ambiguous = alternateAppearances.some((appearance) =>
+        appearance.rootStaffPosition !== current.rootStaffPosition ||
+        !notationValue(appearance.pitch).equals(notationValue(current.pitch)))
+      return {
+        ...current,
+        alternateAppearances,
+        ...(ambiguous && !current.displayLabel ? { displayLabel: authoredLabels.get(current) } : {}),
+      }
     }
     if (current.kind === 'sequence') return { ...current, children: current.children.map(annotate) }
     if (current.kind === 'parallel') return { ...current, branches: current.branches.map(annotate) }
@@ -93,6 +104,8 @@ function annotateRepeatAppearances(shape: ScoreShape, alternatives: readonly (re
   }
   return annotate(shape)
 }
+
+const authoredLabels = new WeakMap<AttackShape, string>()
 
 function attacks(shape: ScoreShape): AttackShape[] {
   if (shape.kind === 'attack') return [shape]
@@ -450,11 +463,12 @@ export function evaluateScoreShape(
       duration: currentPulse,
       origins: evaluated.pitch.origins,
       rootStaffPosition: context.rootStaffPosition,
-      ...('raw' in current ? { soundingLabel: String(current.raw) } : {}),
-      ...(current.type === 'DegreeLiteral' || (current.type === 'QuantityLiteral' && current.unit === 'c')
-        ? { displayLabel: true }
+      ...(current.type === 'DegreeLiteral' || current.type === 'EqualDivisionLiteral' ||
+        (current.type === 'QuantityLiteral' && current.unit === 'c')
+        ? { displayLabel: String(current.raw) }
         : {}),
     }
+    if ('raw' in current) authoredLabels.set(shape, String(current.raw))
     return { shape, diagnostics: evaluated.diagnostics }
   }
 

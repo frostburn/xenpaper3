@@ -414,7 +414,7 @@ describe('MusicalStaff', () => {
         notehead: 'x',
         cents: 500,
       },
-      soundingLabel: '1/1',
+      displayLabel: '1/1',
     }
     const wrapper = mount(MusicalStaff, { props: { notation: crossed } })
 
@@ -429,7 +429,7 @@ describe('MusicalStaff', () => {
       kind: 'note',
       duration: notation.duration,
       pitch: { staffPosition: 3, accidentals: [], notehead: 'normal', cents: 300 },
-      soundingLabel: '3',
+      displayLabel: '3',
     }
     const wrapper = mount(MusicalStaff, { props: { notation: labeled } })
 

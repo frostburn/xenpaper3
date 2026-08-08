@@ -123,7 +123,7 @@ export interface StaffPitch {
 }
 
 export type StaffNotationShape =
-  | { readonly kind: 'note'; readonly pitch: StaffPitch; readonly duration: Fraction; readonly soundingLabel?: string }
+  | { readonly kind: 'note'; readonly pitch: StaffPitch; readonly duration: Fraction; readonly displayLabel?: string }
   | { readonly kind: 'rest'; readonly duration: Fraction; readonly generated: boolean }
   | { readonly kind: 'continue'; readonly duration: Fraction }
   | { readonly kind: 'barline'; readonly style: BarlineStyle; readonly duration: Fraction }
@@ -152,10 +152,8 @@ export interface AttackShape extends ShapeBase {
   readonly kind: 'attack'
   readonly pitch: PitchOffsetValue | (AbsolutePitchValue & { readonly value: Value })
   readonly rootStaffPosition: number
-  /** Authored pitch expression shown when repeat contexts make the staff appearance ambiguous. */
-  readonly soundingLabel?: string
-  /** Show the authored value below the staff even when its notehead is unambiguous. */
-  readonly displayLabel?: boolean
+  /** Authored pitch expression to show below the staff. */
+  readonly displayLabel?: string
   /** Other contexts in which this source attack occurs after repeat expansion. */
   readonly alternateAppearances?: readonly AttackAppearance[]
 }

@@ -43,7 +43,7 @@ export function flattenScoreShape(shape: ScoreShape): BeatEventFlatteningResult 
         duration: copy(current.duration),
         pitch: current.pitch,
         rootStaffPosition: current.rootStaffPosition,
-        label: current.soundingLabel,
+        label: current.displayLabel,
         origins: current.origins,
       }
       events.push(event)

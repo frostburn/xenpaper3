@@ -20,7 +20,7 @@ type TupletItem = {
 }
 
 type StaffItemContent =
-  | { kind: 'note'; pitch: StaffPitch; duration: Fraction; soundingLabel?: string }
+  | { kind: 'note'; pitch: StaffPitch; duration: Fraction; displayLabel?: string }
   | { kind: 'rest'; duration: Fraction }
   | { kind: 'barline'; style: BarlineStyle }
   | { kind: 'annotation'; text: string }
@@ -56,7 +56,7 @@ const items = computed(() => {
         offset,
         pitch: shape.pitch,
         duration: shape.duration,
-        soundingLabel: shape.soundingLabel,
+        displayLabel: shape.displayLabel,
       }
       layout.push(note)
       state.activeItems = [note]
@@ -461,12 +461,12 @@ const restDotY = (duration: Fraction, tupletCount?: number) =>
             :d="`M ${x(item.column) + 6} ${y(item.pitch.staffPosition) - 30 + (flag - 1) * 7} Q ${x(item.column) + 20} ${y(item.pitch.staffPosition) - 23 + (flag - 1) * 7} ${x(item.column) + 12} ${y(item.pitch.staffPosition) - 13 + (flag - 1) * 7}`"
           />
           <text
-            v-if="item.soundingLabel"
+            v-if="item.displayLabel"
             class="sounding-label"
             :x="x(item.column)"
             y="130"
           >
-            {{ item.soundingLabel }}
+            {{ item.displayLabel }}
           </text>
         </template>
       </template>

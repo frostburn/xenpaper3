@@ -58,18 +58,20 @@ describe('staff notation construction', () => {
   })
 
   it('labels degrees and raw cent values below the staff', () => {
-    const node = parse('3 123c C').body[0] as Expression
+    const node = parse(String.raw`3 123c 4\17 5\13<3> C`).body[0] as Expression
     const evaluated = evaluateScoreShape(node)
     if (!('shape' in evaluated)) throw new Error('Expected shape.')
     const staff = constructStaffNotationShape(evaluated.shape)
     if (staff.kind !== 'sequence') throw new Error('Expected a sequence.')
 
     expect(staff.children).toMatchObject([
-      { kind: 'note', soundingLabel: '3' },
-      { kind: 'note', soundingLabel: '123c' },
+      { kind: 'note', displayLabel: '3' },
+      { kind: 'note', displayLabel: '123c' },
+      { kind: 'note', displayLabel: String.raw`4\17` },
+      { kind: 'note', displayLabel: String.raw`5\13<3>` },
       { kind: 'note' },
     ])
-    expect(staff.children[2]).not.toHaveProperty('soundingLabel')
+    expect(staff.children[4]).not.toHaveProperty('displayLabel')
   })
 
   it('carries exact durations and rests from score construction', () => {
@@ -151,7 +153,7 @@ describe('staff notation construction', () => {
       [0, 'normal'],
       [0, 'normal'],
     ])
-    expect(notes[1]).not.toHaveProperty('soundingLabel')
+    expect(notes[1]).not.toHaveProperty('displayLabel')
   })
 
   it('engraves a root-frequency shift relative to the moved root', () => {
