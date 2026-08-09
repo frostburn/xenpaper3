@@ -77,8 +77,9 @@ function decorations(value: EvaluatedLiteral, chromatic?: number) {
 function soundingValue(value: EvaluatedLiteral): Value {
   if (value.kind === 'absolutePitch') return value.rootOffset
   if (value.kind === 'pitchOffset') return value.notationValue ?? value.value
-  const ratio = value.value.exactRational()
-  if (!ratio || ratio.compare(0) <= 0) throw new TypeError('Staff notation requires a pitch or a positive exact ratio.')
+  if (!value.value.dimensions.isDimensionless || value.value.valueOf() <= 0) {
+    throw new TypeError('Staff notation requires a pitch or a positive ratio.')
+  }
   return Value.pitch(value.value)
 }
 

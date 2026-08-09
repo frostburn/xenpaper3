@@ -236,15 +236,15 @@ function playablePitch(node: Expression, context: PitchContext):
       diagnostics: evaluated.diagnostics,
     }
   }
-  const ratio = evaluated.value.value.exactRational()
-  if (!ratio || ratio.compare(0) <= 0) {
+  const ratio = evaluated.value.value
+  if (!ratio.dimensions.isDimensionless || ratio.valueOf() <= 0) {
     return {
       diagnostics: [
         ...evaluated.diagnostics,
         {
           code: 'XP_TYPE_MISMATCH',
           severity: 'error',
-          message: 'A score atom must be a pitch offset or positive exact ratio.',
+          message: 'A score atom must be a pitch offset or positive ratio.',
           locations: [node.location],
         },
       ],
@@ -253,8 +253,8 @@ function playablePitch(node: Expression, context: PitchContext):
   return {
     pitch: {
       kind: 'pitchOffset',
-      value: Value.pitch(evaluated.value.value).add(context.rootDisplacement),
-      notationValue: Value.pitch(evaluated.value.value),
+      value: Value.pitch(ratio).add(context.rootDisplacement),
+      notationValue: Value.pitch(ratio),
       origins: evaluated.value.origins,
     },
     diagnostics: evaluated.diagnostics,

@@ -57,6 +57,14 @@ describe('score-shape timing', () => {
     expect(result.children.every((child) => child.duration.equals(new Fraction(1, 4)))).toBe(true)
   })
 
+  it('treats positive irrational scalar expressions as playable ratios', () => {
+    const result = shape('sqrt(2)')
+
+    expect(result).toMatchObject({ kind: 'attack' })
+    if (result.kind !== 'attack') throw new Error('Expected an attack.')
+    expect(result.pitch.value.equals(Value.pitch(new Value(2).pow(new Value(1n, 2n))))).toBe(true)
+  })
+
   it('normalizes a square-bracketed sequence to one slot', () => {
     const result = shape('[3/2 4/3 5/4]') as SequenceShape
 
