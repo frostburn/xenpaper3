@@ -4,6 +4,7 @@ import type {
   EqualDivisionLiteral,
   IntegerLiteral,
   QuantityLiteral,
+  RealLiteral,
   RatioLiteral,
 } from '../parser.generated.js'
 import type { Diagnostic } from '../diagnostics'
@@ -15,6 +16,7 @@ export type NumericLiteralNode =
   | EqualDivisionLiteral
   | IntegerLiteral
   | QuantityLiteral
+  | RealLiteral
   | RatioLiteral
 
 export type LiteralEvaluationResult =
@@ -41,8 +43,9 @@ export function decimalFraction(text: string): Fraction {
   return new Fraction(`${sign}${whole}.${fractional}`)
 }
 
-function rationalLiteral(node: IntegerLiteral | DecimalLiteral | RatioLiteral): Value {
+function rationalLiteral(node: IntegerLiteral | DecimalLiteral | RealLiteral | RatioLiteral): Value {
   if (node.type === 'IntegerLiteral') return new Value(BigInt(node.value))
+  if (node.type === 'RealLiteral') return Value.real(Number(node.value))
   if (node.type === 'DecimalLiteral')
     return new Value(decimalFraction(signed(node.value, node.sign)))
   return new Value(BigInt(signed(node.numerator, node.sign)), BigInt(node.denominator))

@@ -37,6 +37,7 @@ function isNumericLiteral(node: Expression): node is NumericLiteralNode {
   return (
     node.type === 'IntegerLiteral' ||
     node.type === 'DecimalLiteral' ||
+    node.type === 'RealLiteral' ||
     node.type === 'RatioLiteral' ||
     node.type === 'QuantityLiteral' ||
     node.type === 'EqualDivisionLiteral'
