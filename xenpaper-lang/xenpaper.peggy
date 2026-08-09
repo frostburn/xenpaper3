@@ -204,6 +204,7 @@ PrimaryExpression
   / EqualDivisionLiteral
   / QuantityLiteral
   / RatioLiteral
+  / RealLiteral
   / DecimalLiteral
   / IntegerLiteral
   / CallExpression
@@ -267,7 +268,7 @@ Directive
     }
 
 NumericDirectiveBody
-  = value:(UnsignedRatioLiteral / UnsignedDecimalLiteral / UnsignedIntegerLiteral)
+  = value:(UnsignedRatioLiteral / UnsignedRealLiteral / UnsignedDecimalLiteral / UnsignedIntegerLiteral)
     grace:$([?]*) {
       return {
         name: 'subdivision',
@@ -437,7 +438,7 @@ ScaleDegreeLiteral
     }
 
 NumericLiteralSuffix
-  = "/" / "\\" / "." &[0-9]
+  = "/" / "\\" / "." [0-9]+ ("e" / "r" / UnitSuffix)
 
 BinaryOperatorAfterSpacing
   = Spacing (AdditiveOperator / MultiplicativeOperator / "^")
@@ -551,8 +552,24 @@ DecimalLiteral
     }
 
 UnsignedDecimalLiteral
-  = value:$([0-9]+ "." [0-9]+) !IdentifierContinue {
-      return node('DecimalLiteral', { value, raw: value });
+  = value:$([0-9]+ "." [0-9]+) "e" !IdentifierContinue {
+      return node('DecimalLiteral', { value, raw: text() });
+    }
+
+RealLiteral
+  = sign:Sign? body:UnsignedRealLiteral {
+      if (!sign) return body;
+      return node('RealLiteral', {
+        ...body,
+        sign,
+        raw: sign + body.raw,
+        value: sign + body.value,
+      });
+    }
+
+UnsignedRealLiteral
+  = value:$([0-9]+ "." [0-9]+) "r" !IdentifierContinue {
+      return node('RealLiteral', { value, raw: text() });
     }
 
 IntegerLiteral

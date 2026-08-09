@@ -21,7 +21,14 @@ describe('numeric literal evaluation', () => {
   it('constructs decimals exactly from their source digits', () => {
     expect(decimalFraction('1.95').equals(new Fraction(39, 20))).toBe(true)
     expect(decimalFraction('-0.125').equals(new Fraction(-1, 8))).toBe(true)
-    expect(value('1.95').equals(new Fraction(39, 20))).toBe(true)
+    expect(value('1.95e').equals(new Fraction(39, 20))).toBe(true)
+  })
+
+  it('constructs raw real literals without exact semantics', () => {
+    const approximate = value('3.14159r')
+
+    expect(approximate.magnitude).toEqual({ kind: 'real', value: 3.14159 })
+    expect(approximate.equals(decimalFraction('3.14159'))).toBe(false)
   })
 
   it('constructs signed integers and ratios exactly', () => {

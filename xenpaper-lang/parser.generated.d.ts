@@ -46,6 +46,7 @@ export type Expression =
   | PitchLiteral
   | PostfixExpression
   | QuantityLiteral
+  | RealLiteral
   | RatioLiteral
   | Repeat
   | Rest
@@ -105,6 +106,13 @@ export interface ContextPreset extends Node {
 
 export interface DecimalLiteral extends Node {
   type: 'DecimalLiteral'
+  value: string
+  raw: string
+  sign?: string
+}
+
+export interface RealLiteral extends Node {
+  type: 'RealLiteral'
   value: string
   raw: string
   sign?: string

@@ -176,14 +176,25 @@ describe('Xenpaper surface grammar', () => {
     expect(expression.operator).toBe('+')
   })
 
-  it('parses full numeric literals as sequence items before degrees', () => {
-    const program = parse(String.raw`3/2 1\12 3.5`)
+  it('parses explicitly marked numeric literals as sequence items before degrees', () => {
+    const program = parse(String.raw`3/2 1\12 3.5e 3.5r`)
     const items = (program.body[0] as SyntaxNode).items as SyntaxNode[]
 
     expect(items.map((item) => item.type)).toEqual([
       'RatioLiteral',
       'EqualDivisionLiteral',
       'DecimalLiteral',
+      'RealLiteral',
+    ])
+  })
+
+  it('treats an unmarked decimal-looking token as music', () => {
+    const items = (parse('1.2').body[0] as SyntaxNode).items as SyntaxNode[]
+
+    expect(items.map((item) => [item.type, item.raw])).toEqual([
+      ['DegreeLiteral', '1'],
+      ['Rest', '.'],
+      ['DegreeLiteral', '2'],
     ])
   })
 
