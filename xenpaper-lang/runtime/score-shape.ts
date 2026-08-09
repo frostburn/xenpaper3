@@ -489,7 +489,7 @@ export function evaluateScoreShape(
         if (gliss && gliss.length === 2) {
           const sourceIndex = gliss[0]!, targetIndex = gliss[1]!, source = results[sourceIndex]!, target = results[targetIndex]!
           if ('shape' in source && 'shape' in target) {
-            const from = attacks(source.shape), to = attacks(target.shape)
+            const to = attacks(target.shape)
             const sourceTree = pitchTree(source.shape)
             const targetTree = pitchTree(target.shape)
             if (!sourceTree || !targetTree || !matchingPitchTrees(sourceTree, targetTree)) results.push({ diagnostics: [{ code: 'XP_GLISS_SHAPE', severity: 'error', message: 'Glissando source and target pitch structures must match.', locations: [item.location] }] })
