@@ -246,6 +246,17 @@ export function evaluateExpression(node: Expression, mapping: PrimeMapping | Pit
           diagnostics: argument.diagnostics,
         }
       }
+      if (node.callee === 'sqrt') {
+        if (argument.value.kind !== 'scalar') throw new TypeError('sqrt() expects a scalar quantity.')
+        return {
+          value: result(
+            'scalar',
+            argument.value.value.pow(new Fraction(1, 2)),
+            argument.value.origins,
+          ),
+          diagnostics: argument.diagnostics,
+        }
+      }
       throw new TypeError(`Unknown call ${node.callee}().`)
     }
     throw new TypeError(`${node.type} is not an arithmetic expression.`)

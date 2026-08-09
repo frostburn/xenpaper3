@@ -42,6 +42,11 @@ The lower-level literal, expression, pitch, FJS, directive, and notation helpers
 are exported for focused tooling and tests. There is not yet a single
 `compile(source)` convenience API; consumers must call `parse()` themselves.
 
+Arithmetic expressions provide `pitch(ratio)` to convert a positive scalar
+ratio to a pitch displacement, `ratio(offset)` for the inverse conversion, and
+`sqrt(quantity)` for a square root. `sqrt()` retains an exact monomial when the
+value model is closed under the operation and halves the quantity's dimensions.
+
 ## Exact values
 
 `Value` deliberately provides a small set of closed exact forms instead of a

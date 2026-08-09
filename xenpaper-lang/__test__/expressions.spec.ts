@@ -54,6 +54,34 @@ describe('arithmetic expression evaluation', () => {
   it('supports explicit pitch and ratio coercion calls', () => {
     expect(evaluate('pitch(3/2)').value.equals(Value.pitch(new Value(3n, 2n)))).toBe(true)
     expect(evaluate('ratio(700c)').value.equals(Value.ratio(Value.cents(700)))).toBe(true)
+    expect(evaluate(String.raw`ratio(13 * (1\13<3>))`).value.equals(3)).toBe(true)
+  })
+
+  it('evaluates square roots while preserving exact values and dimensions', () => {
+    expect(evaluate('sqrt(4)').value.equals(2)).toBe(true)
+    expect(evaluate('sqrt(2) * sqrt(2)').value.equals(2)).toBe(true)
+
+    const duration = evaluate('sqrt(4 * 1s^2)')
+    expect(duration.value.equals(Value.seconds(2))).toBe(true)
+  })
+
+  it('falls back to real arithmetic for sums of unrelated square roots', () => {
+    const sum = evaluate('sqrt(2) + sqrt(3)')
+
+    expect(sum.value.magnitude.kind).toBe('real')
+    expect(sum.value.valueOf()).toBeCloseTo(Math.sqrt(2) + Math.sqrt(3))
+  })
+
+  it('rejects pitch arguments and invalid arity for conversion functions', () => {
+    expect(evaluateExpression(expression('ratio(3/2)'))).toMatchObject({
+      diagnostics: [{ code: 'XP_TYPE_MISMATCH', message: 'ratio() expects a pitch offset.' }],
+    })
+    expect(evaluateExpression(expression('sqrt(700c)'))).toMatchObject({
+      diagnostics: [{ code: 'XP_TYPE_MISMATCH', message: 'sqrt() expects a scalar quantity.' }],
+    })
+    expect(evaluateExpression(expression('sqrt(1, 2)'))).toMatchObject({
+      diagnostics: [{ code: 'XP_TYPE_MISMATCH', message: 'sqrt() expects one argument.' }],
+    })
   })
 
   it('preserves literal and operator origins', () => {
