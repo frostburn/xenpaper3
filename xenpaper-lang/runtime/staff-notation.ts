@@ -190,9 +190,7 @@ export function constructStaffNotationShape(shape: ScoreShape): StaffNotationSha
           pitch: ambiguous ? { ...pitch, notehead: 'x' } : pitch,
           duration: shape.duration,
           ...(shape.displayLabel ? { displayLabel: shape.displayLabel } : {}),
-          dynamic: shape.dynamic,
           velocity: shape.velocity,
-          ...(shape.dynamicChanged ? { dynamicChanged: true } : {}),
           ...(shape.velocityExplicit ? { velocityExplicit: true } : {}),
           ...(shape.grace ? { grace: true } : {}),
           ...(shape.notatedDuration ? { notatedDuration: shape.notatedDuration } : {}),
@@ -206,6 +204,8 @@ export function constructStaffNotationShape(shape: ScoreShape): StaffNotationSha
       return { kind: 'barline', style: shape.style, duration: shape.duration }
     case 'annotation':
       return { kind: 'annotation', text: shape.text, duration: shape.duration }
+    case 'dynamic':
+      return { kind: 'dynamic', mark: shape.mark, duration: shape.duration }
     case 'sequence':
       return {
         kind: 'sequence',

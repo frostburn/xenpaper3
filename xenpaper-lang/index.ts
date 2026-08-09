@@ -27,6 +27,7 @@ export type {
   BeatTimedNoteEvent,
   BeatTimedScore,
   ContinueShape,
+  DynamicShape,
   DynamicMark,
   PitchAutomation,
   EvaluatedLiteral,

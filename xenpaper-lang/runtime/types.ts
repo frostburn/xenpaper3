@@ -123,11 +123,12 @@ export interface StaffPitch {
 }
 
 export type StaffNotationShape =
-  | { readonly kind: 'note'; readonly pitch: StaffPitch; readonly duration: Fraction; readonly displayLabel?: string; readonly dynamic?: DynamicMark; readonly velocity?: Fraction; readonly dynamicChanged?: boolean; readonly velocityExplicit?: boolean; readonly grace?: boolean; readonly notatedDuration?: Fraction }
+  | { readonly kind: 'note'; readonly pitch: StaffPitch; readonly duration: Fraction; readonly displayLabel?: string; readonly velocity?: Fraction; readonly velocityExplicit?: boolean; readonly grace?: boolean; readonly notatedDuration?: Fraction }
   | { readonly kind: 'rest'; readonly duration: Fraction; readonly generated: boolean }
   | { readonly kind: 'continue'; readonly duration: Fraction }
   | { readonly kind: 'barline'; readonly style: BarlineStyle; readonly duration: Fraction }
   | { readonly kind: 'annotation'; readonly text: string; readonly duration: Fraction }
+  | { readonly kind: 'dynamic'; readonly mark: DynamicMark; readonly duration: Fraction }
   | { readonly kind: 'sequence'; readonly duration: Fraction; readonly children: readonly StaffNotationShape[]; readonly normalized?: boolean; readonly tuplet?: number }
   | { readonly kind: 'parallel'; readonly duration: Fraction; readonly branches: readonly StaffNotationShape[] }
 
@@ -155,8 +156,6 @@ export interface AttackShape extends ShapeBase {
   readonly dynamic: DynamicMark
   readonly velocity: Fraction
   readonly automation?: PitchAutomation
-  /** True on the first compatible attack after an authored dynamic directive. */
-  readonly dynamicChanged?: boolean
   /** True when velocity came from an authored one-shot velocity directive. */
   readonly velocityExplicit?: boolean
   /** Grace attacks are engraved small and lead into the following donor note. */
@@ -202,6 +201,11 @@ export interface AnnotationShape extends ShapeBase {
   readonly text: string
 }
 
+export interface DynamicShape extends ShapeBase {
+  readonly kind: 'dynamic'
+  readonly mark: DynamicMark
+}
+
 export type BarlineStyle = 'single' | 'double' | 'repeat-start' | 'repeat-end'
 
 export interface SequenceShape extends ShapeBase {
@@ -224,6 +228,7 @@ export type ScoreShape =
   | ContinueShape
   | BarlineShape
   | AnnotationShape
+  | DynamicShape
   | SequenceShape
   | ParallelShape
 
@@ -244,7 +249,7 @@ export interface BeatTimedNoteEvent {
 export interface BeatTimedMarkerEvent {
   readonly kind: 'marker'
   readonly start: Fraction
-  readonly marker: 'barline' | 'annotation'
+  readonly marker: 'barline' | 'annotation' | 'dynamic'
   readonly label: string
   readonly origins: readonly SourceOrigin[]
 }
