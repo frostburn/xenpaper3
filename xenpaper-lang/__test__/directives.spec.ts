@@ -27,6 +27,14 @@ describe('directive runtime', () => {
     expect(events.map(({ velocity }) => velocity.valueOf())).toEqual([0.3, 0.8, 0.3])
   })
 
+  it('keeps dynamics as zero-duration events at their authored offsets', () => {
+    const result = compile('@ff . C')
+    if (!('score' in result)) throw new Error('Expected score.')
+    expect(result.score.events).toContainEqual(expect.objectContaining({ kind: 'marker', marker: 'dynamic', label: 'ff' }))
+    const dynamic = result.score.events.find((event) => event.kind === 'marker' && event.marker === 'dynamic')
+    expect(dynamic?.start.valueOf()).toBe(0)
+  })
+
   it('isolates dynamic state in lexical groups', () => {
     expect(notes('@p C (@f D) E').map(({ dynamic }) => dynamic)).toEqual(['p', 'f', 'p'])
   })

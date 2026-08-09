@@ -45,6 +45,16 @@ describe('MusicalStaff', () => {
 
     expect(wrapper.findAll('.performance-label').map((label) => label.text())).toEqual(['p', 'f'])
   })
+
+  it('renders a dynamic as an event at its authored offset, even before a rest', () => {
+    const evaluated = evaluateScoreShape(parse('@ff . C D E').body[0]!)
+    if (!('shape' in evaluated)) throw new Error('Expected a score shape.')
+    const wrapper = mount(MusicalStaff, { props: { notation: constructStaffNotationShape(evaluated.shape) } })
+
+    expect(wrapper.get('.dynamic-label').text()).toBe('ff')
+    expect(wrapper.get('.dynamic-label').attributes('x')).toBe(wrapper.get('.rest').attributes('x'))
+    expect(wrapper.findAll('.performance-label')).toHaveLength(1)
+  })
   it.each(['C @2 D E @1 F G', 'C [D E] F G'])(
     'renders equivalent quarter and eighth note values for %s',
     (source) => {

@@ -67,12 +67,12 @@ export function flattenScoreShape(shape: ScoreShape): BeatEventFlatteningResult 
       }
     } else if (current.kind === 'rest') {
       state.active = []
-    } else if (current.kind === 'barline' || current.kind === 'annotation') {
+    } else if (current.kind === 'barline' || current.kind === 'annotation' || current.kind === 'dynamic') {
       events.push({
         kind: 'marker',
         start: copy(start),
         marker: current.kind,
-        label: current.kind === 'barline' ? current.style : current.text,
+        label: current.kind === 'barline' ? current.style : current.kind === 'dynamic' ? current.mark : current.text,
         origins: current.origins,
       })
     } else if (current.kind === 'sequence') {
