@@ -50,6 +50,22 @@ describe('Xenpaper surface grammar', () => {
     expect(items.map((item) => item.raw)).toEqual(['C', '.', '.', 'D'])
   })
 
+  it('preserves degrees and rest clusters when rests are attached to numbers', () => {
+    const singleRest = (parse('1.C').body[0] as SyntaxNode).items as SyntaxNode[]
+    const clusterRest = (parse('1...C').body[0] as SyntaxNode).items as SyntaxNode[]
+
+    expect(singleRest.map((item) => [item.type, item.raw])).toEqual([
+      ['DegreeLiteral', '1'],
+      ['Rest', '.'],
+      ['PitchLiteral', 'C'],
+    ])
+    expect(clusterRest.map((item) => [item.type, item.raw])).toEqual([
+      ['DegreeLiteral', '1'],
+      ['Rest', '...'],
+      ['PitchLiteral', 'C'],
+    ])
+  })
+
   it('compiles and parses the representative score syntax', () => {
     const program = parse(score)
 

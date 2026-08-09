@@ -437,7 +437,7 @@ ScaleDegreeLiteral
     }
 
 NumericLiteralSuffix
-  = "/" / "\\" / "."
+  = "/" / "\\" / "." &[0-9]
 
 BinaryOperatorAfterSpacing
   = Spacing (AdditiveOperator / MultiplicativeOperator / "^")
@@ -551,7 +551,7 @@ DecimalLiteral
     }
 
 UnsignedDecimalLiteral
-  = value:$([0-9]+ "." [0-9]*) !IdentifierContinue {
+  = value:$([0-9]+ "." [0-9]+) !IdentifierContinue {
       return node('DecimalLiteral', { value, raw: value });
     }
 
