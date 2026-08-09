@@ -5,11 +5,26 @@ import { Value } from '../value'
 import { evaluateLiteral, type NumericLiteralNode } from './literals'
 import type { EvaluatedLiteral, PitchOffsetValue, ScalarValue, SourceOrigin } from './types'
 import type { PitchContext, PrimeMapping } from './types'
-import { createPitchContext, DEFAULT_PITCH_CONTEXT, evaluateIntervalLiteral, evaluatePitchLiteral, scalePitchOffset, spellPitchDifference } from './pitches'
+import {
+  createPitchContext,
+  DEFAULT_PITCH_CONTEXT,
+  evaluateIntervalLiteral,
+  evaluatePitchLiteral,
+  scalePitchOffset,
+  spellPitchDifference,
+} from './pitches'
 
 function equaveShifts(modifiers: readonly { readonly kind: string }[]): number {
   return modifiers.reduce(
-    (sum, modifier) => sum + (modifier.kind === 'equaveUp' ? 1 : modifier.kind === 'doubleEquaveUp' ? 2 : modifier.kind === 'equaveDown' ? -1 : 0),
+    (sum, modifier) =>
+      sum +
+      (modifier.kind === 'equaveUp'
+        ? 1
+        : modifier.kind === 'doubleEquaveUp'
+          ? 2
+          : modifier.kind === 'equaveDown'
+            ? -1
+            : 0),
     0,
   )
 }
@@ -37,7 +52,11 @@ function diagnostic(node: Expression, error: unknown): Diagnostic {
 }
 
 function result(kind: 'scalar', value: Value, origins: readonly SourceOrigin[]): ScalarValue
-function result(kind: 'pitchOffset', value: Value, origins: readonly SourceOrigin[]): PitchOffsetValue
+function result(
+  kind: 'pitchOffset',
+  value: Value,
+  origins: readonly SourceOrigin[],
+): PitchOffsetValue
 function result(
   kind: 'scalar' | 'pitchOffset',
   value: Value,
@@ -56,7 +75,8 @@ function operatorOrigins(
 
 function pitchCoercion(value: EvaluatedLiteral): PitchOffsetValue {
   if (value.kind === 'pitchOffset') return value
-  if (value.kind === 'absolutePitch') throw new TypeError('An absolute pitch cannot be coerced to a pitch offset.')
+  if (value.kind === 'absolutePitch')
+    throw new TypeError('An absolute pitch cannot be coerced to a pitch offset.')
   const ratio = value.value.exactRational()
   if (!ratio || ratio.compare(0) <= 0) {
     throw new TypeError('A scalar mixed with a pitch offset must be a positive exact ratio.')
@@ -74,11 +94,21 @@ function addOrSubtract(
   if (left.kind === 'absolutePitch' || right.kind === 'absolutePitch') {
     if (left.kind === 'absolutePitch' && right.kind === 'absolutePitch') {
       if (!subtract) throw new TypeError('Absolute pitches cannot be added together.')
-      return { kind: 'pitchOffset', value: left.rootOffset.sub(right.rootOffset), spelling: spellPitchDifference(left, right), origins }
+      return {
+        kind: 'pitchOffset',
+        value: left.rootOffset.sub(right.rootOffset),
+        spelling: spellPitchDifference(left, right),
+        origins,
+      }
     }
-    if (left.kind !== 'absolutePitch') throw new TypeError('A pitch offset cannot subtract an absolute pitch.')
+    if (left.kind !== 'absolutePitch')
+      throw new TypeError('A pitch offset cannot subtract an absolute pitch.')
     const offset = pitchCoercion(right)
-    return { ...left, rootOffset: subtract ? left.rootOffset.sub(offset.value) : left.rootOffset.add(offset.value), origins }
+    return {
+      ...left,
+      rootOffset: subtract ? left.rootOffset.sub(offset.value) : left.rootOffset.add(offset.value),
+      origins,
+    }
   }
   if (left.kind === 'pitchOffset' || right.kind === 'pitchOffset') {
     const lhs = pitchCoercion(left)
@@ -89,7 +119,11 @@ function addOrSubtract(
       origins,
     )
   }
-  return result('scalar', subtract ? left.value.sub(right.value) : left.value.add(right.value), origins)
+  return result(
+    'scalar',
+    subtract ? left.value.sub(right.value) : left.value.add(right.value),
+    origins,
+  )
 }
 
 function multiplyOrDivide(
@@ -98,7 +132,8 @@ function multiplyOrDivide(
   divide: boolean,
   node: Expression,
 ): EvaluatedLiteral {
-  if (left.kind === 'absolutePitch' || right.kind === 'absolutePitch') throw new TypeError('Absolute pitches cannot be multiplied or divided.')
+  if (left.kind === 'absolutePitch' || right.kind === 'absolutePitch')
+    throw new TypeError('Absolute pitches cannot be multiplied or divided.')
   if (left.kind === 'pitchOffset' && right.kind === 'pitchOffset') {
     throw new TypeError('Pitch offsets cannot be multiplied or divided together.')
   }
@@ -108,7 +143,8 @@ function multiplyOrDivide(
   if (left.kind === 'pitchOffset' || right.kind === 'pitchOffset') {
     const scalar = left.kind === 'pitchOffset' ? right : left
     const offset = left.kind === 'pitchOffset' ? left : right
-    if (scalar.kind !== 'scalar' || offset.kind !== 'pitchOffset') throw new TypeError('Pitch offsets require a scalar factor.')
+    if (scalar.kind !== 'scalar' || offset.kind !== 'pitchOffset')
+      throw new TypeError('Pitch offsets require a scalar factor.')
     const factor = scalar.value.exactRational()
     if (!factor) throw new TypeError('Pitch offsets can only be scaled by exact rational scalars.')
     return {
@@ -123,7 +159,11 @@ function multiplyOrDivide(
   )
 }
 
-function modulo(left: EvaluatedLiteral, right: EvaluatedLiteral, node: Expression): EvaluatedLiteral {
+function modulo(
+  left: EvaluatedLiteral,
+  right: EvaluatedLiteral,
+  node: Expression,
+): EvaluatedLiteral {
   if (left.kind !== 'scalar' || right.kind !== 'scalar') {
     throw new TypeError('Modulo requires scalar operands.')
   }
@@ -156,11 +196,7 @@ function binary(
       if (left.kind !== 'scalar' || right.kind !== 'scalar') {
         throw new TypeError('Exponentiation requires scalar operands.')
       }
-      return result(
-        'scalar',
-        left.value.pow(right.value),
-        operatorOrigins(left, right, node),
-      )
+      return result('scalar', left.value.pow(right.value), operatorOrigins(left, right, node))
     }
     default:
       throw new TypeError(`Unknown binary operator ${operator}.`)
@@ -168,11 +204,15 @@ function binary(
 }
 
 /** Evaluate the arithmetic subset of the parser AST without throwing for source errors. */
-export function evaluateExpression(node: Expression, mapping: PrimeMapping | PitchContext = DEFAULT_PITCH_CONTEXT): ExpressionEvaluationResult {
+export function evaluateExpression(
+  node: Expression,
+  mapping: PrimeMapping | PitchContext = DEFAULT_PITCH_CONTEXT,
+): ExpressionEvaluationResult {
   try {
     if (node.type === 'DegreeLiteral') {
       const context = 'rootFormula' in mapping ? mapping : createPitchContext(mapping)
-      const value = context.degreeStep.mul(new Value(BigInt(node.degree)))
+      const value = context.degreeStep
+        .mul(new Value(BigInt(node.degree)))
         .add(context.degreeEquave.mul(new Value(equaveShifts(node.modifiers))))
       return {
         value: result('pitchOffset', value, [{ location: node.location, role: 'literal' }]),
@@ -190,33 +230,39 @@ export function evaluateExpression(node: Expression, mapping: PrimeMapping | Pit
       }
       return evaluateLiteral(node)
     }
-    if (node.type === 'PitchLiteral') return { value: evaluatePitchLiteral(node, mapping), diagnostics: [] }
-    if (node.type === 'IntervalLiteral') return { value: evaluateIntervalLiteral(node, mapping), diagnostics: [] }
+    if (node.type === 'PitchLiteral')
+      return { value: evaluatePitchLiteral(node, mapping), diagnostics: [] }
+    if (node.type === 'IntervalLiteral')
+      return { value: evaluateIntervalLiteral(node, mapping), diagnostics: [] }
     if (node.type === 'Group') return evaluateExpression(node.expression, mapping)
     if (node.type === 'UnaryExpression') {
       const operand = evaluateExpression(node.operand, mapping)
       if (!('value' in operand)) return operand
       if (node.operator === '+') return operand
       if (["'", '"', '`'].includes(node.operator)) {
-        if (operand.value.kind === 'absolutePitch') throw new TypeError('An equave shift requires a pitch offset.')
+        if (operand.value.kind === 'absolutePitch')
+          throw new TypeError('An equave shift requires a pitch offset.')
         const context = 'rootFormula' in mapping ? mapping : createPitchContext(mapping)
         const shift = node.operator === "'" ? 1 : node.operator === '"' ? 2 : -1
-        const offset = operand.value.kind === 'pitchOffset' ? operand.value : pitchCoercion(operand.value)
+        const offset =
+          operand.value.kind === 'pitchOffset' ? operand.value : pitchCoercion(operand.value)
         return {
           value: { ...offset, value: offset.value.add(context.degreeEquave.mul(new Value(shift))) },
           diagnostics: operand.diagnostics,
         }
       }
       if (node.operator !== '-') throw new TypeError(`Unknown unary operator ${node.operator}.`)
-      if (operand.value.kind === 'absolutePitch') throw new TypeError('An absolute pitch cannot be negated.')
+      if (operand.value.kind === 'absolutePitch')
+        throw new TypeError('An absolute pitch cannot be negated.')
       const origins: readonly SourceOrigin[] = [
         ...operand.value.origins,
         { location: node.location, role: 'operator' },
       ]
       return {
-        value: operand.value.kind === 'scalar'
-          ? result('scalar', operand.value.value.neg(), origins)
-          : result('pitchOffset', operand.value.value.neg(), origins),
+        value:
+          operand.value.kind === 'scalar'
+            ? result('scalar', operand.value.value.neg(), origins)
+            : result('pitchOffset', operand.value.value.neg(), origins),
         diagnostics: operand.diagnostics,
       }
     }
@@ -240,14 +286,16 @@ export function evaluateExpression(node: Expression, mapping: PrimeMapping | Pit
         }
       }
       if (node.callee === 'ratio') {
-        if (argument.value.kind !== 'pitchOffset') throw new TypeError('ratio() expects a pitch offset.')
+        if (argument.value.kind !== 'pitchOffset')
+          throw new TypeError('ratio() expects a pitch offset.')
         return {
           value: result('scalar', Value.ratio(argument.value.value), argument.value.origins),
           diagnostics: argument.diagnostics,
         }
       }
       if (node.callee === 'sqrt') {
-        if (argument.value.kind !== 'scalar') throw new TypeError('sqrt() expects a scalar quantity.')
+        if (argument.value.kind !== 'scalar')
+          throw new TypeError('sqrt() expects a scalar quantity.')
         return {
           value: result(
             'scalar',

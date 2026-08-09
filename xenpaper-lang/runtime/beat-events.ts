@@ -67,12 +67,21 @@ export function flattenScoreShape(shape: ScoreShape): BeatEventFlatteningResult 
       }
     } else if (current.kind === 'rest') {
       state.active = []
-    } else if (current.kind === 'barline' || current.kind === 'annotation' || current.kind === 'dynamic') {
+    } else if (
+      current.kind === 'barline' ||
+      current.kind === 'annotation' ||
+      current.kind === 'dynamic'
+    ) {
       events.push({
         kind: 'marker',
         start: copy(start),
         marker: current.kind,
-        label: current.kind === 'barline' ? current.style : current.kind === 'dynamic' ? current.mark : current.text,
+        label:
+          current.kind === 'barline'
+            ? current.style
+            : current.kind === 'dynamic'
+              ? current.mark
+              : current.text,
         origins: current.origins,
       })
     } else if (current.kind === 'sequence') {
@@ -101,7 +110,8 @@ export function expandToBeatEvents(
   const expanded = expandRepeats(program, options)
   if (!expanded.program) return { diagnostics: expanded.diagnostics }
   const body = expanded.program.body
-  if (!body.length) return { score: { duration: new Fraction(0), events: [] }, diagnostics: expanded.diagnostics }
+  if (!body.length)
+    return { score: { duration: new Fraction(0), events: [] }, diagnostics: expanded.diagnostics }
   const location = program.location
   const node = {
     type: 'Sequence',

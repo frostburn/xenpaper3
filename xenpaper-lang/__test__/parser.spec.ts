@@ -1,5 +1,5 @@
-import { describe, expect, it } from "vitest";
-import { parse } from "../parser.generated.js";
+import { describe, expect, it } from 'vitest'
+import { parse } from '../parser.generated.js'
 
 const score = String.raw`# FJS and prefix modifiers
 E^5 Ebv5 P1v5 Cv5 E_
@@ -18,247 +18,249 @@ A B . ||
 
 # Repeat remains an AST macro
 {root = 220Hz}
-{${"`"}A = root}
+{${'`'}A = root}
 {41edo}
 |:(x10)
-[${"`"}A, Cv5, E]
+[${'`'}A, Cv5, E]
 [Cv5, E, Gv5]
-[${"`"}B, Dv5, Gv5]
-[${"`"}Av5, Dv5, F#]
-{root = ${"`"}Av5}
-:|`;
+[${'`'}B, Dv5, Gv5]
+[${'`'}Av5, Dv5, F#]
+{root = ${'`'}Av5}
+:|`
 
 type SyntaxNode = {
-  type: string;
-  [property: string]: unknown;
-};
+  type: string
+  [property: string]: unknown
+}
 
-describe("Xenpaper surface grammar", () => {
-  it("parses adjacent dots as a single cluster rest", () => {
-    expect(parse("...").body[0]).toMatchObject({ type: "Rest", raw: "..." });
-  });
+describe('Xenpaper surface grammar', () => {
+  it('parses adjacent dots as a single cluster rest', () => {
+    expect(parse('...').body[0]).toMatchObject({ type: 'Rest', raw: '...' })
+  })
 
-  it("compiles and parses the representative score syntax", () => {
-    const program = parse(score);
+  it('compiles and parses the representative score syntax', () => {
+    const program = parse(score)
 
-    expect(program.type).toBe("Program");
-    expect(program.source).toBe(score);
+    expect(program.type).toBe('Program')
+    expect(program.source).toBe(score)
     expect((program.comments as SyntaxNode[]).map((comment) => comment.value)).toEqual([
-      " FJS and prefix modifiers",
-      " Context changes",
-      " Parallel composition; duration checks happen after parsing",
-      " Repeat remains an AST macro",
-    ]);
-  });
+      ' FJS and prefix modifiers',
+      ' Context changes',
+      ' Parallel composition; duration checks happen after parsing',
+      ' Repeat remains an AST macro',
+    ])
+  })
 
-  it("distinguishes attached FJS inflections and prefix pitch modifiers", () => {
-    const program = parse("E^5 Ebv5 P1v5 Cv5 E_ /'C '/C vDb C#");
-    const items = (program.body as SyntaxNode[])[0].items as SyntaxNode[];
+  it('distinguishes attached FJS inflections and prefix pitch modifiers', () => {
+    const program = parse("E^5 Ebv5 P1v5 Cv5 E_ /'C '/C vDb C#")
+    const items = (program.body as SyntaxNode[])[0].items as SyntaxNode[]
 
     expect(items.map((item) => item.type)).toEqual([
-      "PitchLiteral",
-      "PitchLiteral",
-      "IntervalLiteral",
-      "PitchLiteral",
-      "PitchLiteral",
-      "PitchLiteral",
-      "PitchLiteral",
-      "PitchLiteral",
-      "PitchLiteral",
-    ]);
+      'PitchLiteral',
+      'PitchLiteral',
+      'IntervalLiteral',
+      'PitchLiteral',
+      'PitchLiteral',
+      'PitchLiteral',
+      'PitchLiteral',
+      'PitchLiteral',
+      'PitchLiteral',
+    ])
     expect(items.map((item) => item.raw)).toEqual([
-      "E^5",
-      "Ebv5",
-      "P1v5",
-      "Cv5",
-      "E_",
+      'E^5',
+      'Ebv5',
+      'P1v5',
+      'Cv5',
+      'E_',
       "/'C",
       "'/C",
-      "vDb",
-      "C#",
-    ]);
-    expect((items[4].accidentals as SyntaxNode[]).map((accidental) => accidental.value)).toEqual(["_"]);
-    expect(parse("E_5").body[0]).toMatchObject({ type: "Identifier", name: "E_5" });
-  });
+      'vDb',
+      'C#',
+    ])
+    expect((items[4].accidentals as SyntaxNode[]).map((accidental) => accidental.value)).toEqual([
+      '_',
+    ])
+    expect(parse('E_5').body[0]).toMatchObject({ type: 'Identifier', name: 'E_5' })
+  })
 
-  it("keeps parallel branches and repeats as syntax-tree nodes", () => {
-    const program = parse("C D,\nE F G,\nA B . ||\n|:(x10) [C, E, G] :|");
-    const body = program.body as SyntaxNode[];
+  it('keeps parallel branches and repeats as syntax-tree nodes', () => {
+    const program = parse('C D,\nE F G,\nA B . ||\n|:(x10) [C, E, G] :|')
+    const body = program.body as SyntaxNode[]
 
-    expect(body.map((item) => item.type)).toEqual(["Parallel", "HardBoundary", "Repeat"]);
+    expect(body.map((item) => item.type)).toEqual(['Parallel', 'HardBoundary', 'Repeat'])
     expect((body[0].branches as SyntaxNode[]).map((branch) => branch.type)).toEqual([
-      "Sequence",
-      "Sequence",
-      "Sequence",
-    ]);
-    expect((body[2].count as SyntaxNode).value).toBe("10");
-  });
+      'Sequence',
+      'Sequence',
+      'Sequence',
+    ])
+    expect((body[2].count as SyntaxNode).value).toBe('10')
+  })
 
-  it("admits equave shifts with negative degrees", () => {
-    const expression = parse('"-2').body[0];
+  it('admits equave shifts with negative degrees', () => {
+    const expression = parse('"-2').body[0]
 
-    expect(expression.type).toBe("UnaryExpression");
-    expect(expression.operator).toBe('"');
-    expect((expression.operand as SyntaxNode).type).toBe("DegreeLiteral");
-    expect((expression.operand as SyntaxNode).degree).toBe("-2");
-  });
+    expect(expression.type).toBe('UnaryExpression')
+    expect(expression.operator).toBe('"')
+    expect((expression.operand as SyntaxNode).type).toBe('DegreeLiteral')
+    expect((expression.operand as SyntaxNode).degree).toBe('-2')
+  })
 
-  it("admits equave shifts with ratios", () => {
-    const expression = parse('"3/2').body[0];
+  it('admits equave shifts with ratios', () => {
+    const expression = parse('"3/2').body[0]
 
-    expect(expression.type).toBe("UnaryExpression");
-    expect(expression.operator).toBe('"');
-    expect((expression.operand as SyntaxNode).type).toBe("RatioLiteral");
-  });
+    expect(expression.type).toBe('UnaryExpression')
+    expect(expression.operator).toBe('"')
+    expect((expression.operand as SyntaxNode).type).toBe('RatioLiteral')
+  })
 
-  it("parses unary plus degrees like unary minus degrees", () => {
-    const expression = parse("+5").body[0];
+  it('parses unary plus degrees like unary minus degrees', () => {
+    const expression = parse('+5').body[0]
 
-    expect(expression.type).toBe("DegreeLiteral");
-    expect(expression.degree).toBe("5");
-  });
+    expect(expression.type).toBe('DegreeLiteral')
+    expect(expression.degree).toBe('5')
+  })
 
-  it("parses a sequence of degrees", () => {
-    const program = parse("0 1 2 -3");
-    const items = (program.body[0] as SyntaxNode).items as SyntaxNode[];
-
-    expect(items.map((item) => item.type)).toEqual([
-      "DegreeLiteral",
-      "DegreeLiteral",
-      "DegreeLiteral",
-      "DegreeLiteral",
-    ]);
-    expect(items.map((item) => item.degree)).toEqual(["0", "1", "2", "-3"]);
-  });
-
-  it("preserves attached plus signs as degree signs after sequence gaps", () => {
-    const program = parse("0 +5");
-    const items = (program.body[0] as SyntaxNode).items as SyntaxNode[];
-
-    expect(items.map((item) => item.type)).toEqual(["DegreeLiteral", "DegreeLiteral"]);
-    expect(items.map((item) => item.degree)).toEqual(["0", "5"]);
-  });
-
-  it("keeps spaced plus signs as binary addition", () => {
-    const expression = parse("0 + 5").body[0];
-
-    expect(expression.type).toBe("BinaryExpression");
-    expect(expression.operator).toBe("+");
-  });
-
-  it("parses full numeric literals as sequence items before degrees", () => {
-    const program = parse(String.raw`3/2 1\12 3.5`);
-    const items = (program.body[0] as SyntaxNode).items as SyntaxNode[];
+  it('parses a sequence of degrees', () => {
+    const program = parse('0 1 2 -3')
+    const items = (program.body[0] as SyntaxNode).items as SyntaxNode[]
 
     expect(items.map((item) => item.type)).toEqual([
-      "RatioLiteral",
-      "EqualDivisionLiteral",
-      "DecimalLiteral",
-    ]);
-  });
+      'DegreeLiteral',
+      'DegreeLiteral',
+      'DegreeLiteral',
+      'DegreeLiteral',
+    ])
+    expect(items.map((item) => item.degree)).toEqual(['0', '1', '2', '-3'])
+  })
 
-  it("parses a sequence of degrees followed by binary operation of integers", () => {
-    const program = parse("0 1 2 - 3");
-    const items = (program.body[0] as SyntaxNode).items as SyntaxNode[];
+  it('preserves attached plus signs as degree signs after sequence gaps', () => {
+    const program = parse('0 +5')
+    const items = (program.body[0] as SyntaxNode).items as SyntaxNode[]
+
+    expect(items.map((item) => item.type)).toEqual(['DegreeLiteral', 'DegreeLiteral'])
+    expect(items.map((item) => item.degree)).toEqual(['0', '5'])
+  })
+
+  it('keeps spaced plus signs as binary addition', () => {
+    const expression = parse('0 + 5').body[0]
+
+    expect(expression.type).toBe('BinaryExpression')
+    expect(expression.operator).toBe('+')
+  })
+
+  it('parses full numeric literals as sequence items before degrees', () => {
+    const program = parse(String.raw`3/2 1\12 3.5`)
+    const items = (program.body[0] as SyntaxNode).items as SyntaxNode[]
 
     expect(items.map((item) => item.type)).toEqual([
-      "DegreeLiteral",
-      "DegreeLiteral",
-      "BinaryExpression",
-    ]);
-    expect(items[2].operator).toBe("-");
-  });
+      'RatioLiteral',
+      'EqualDivisionLiteral',
+      'DecimalLiteral',
+    ])
+  })
 
-  it("parses a parallel composition of degrees", () => {
-    const program = parse("0, 1, 2, -3");
-    const branches = (program.body[0] as SyntaxNode).branches as SyntaxNode[];
+  it('parses a sequence of degrees followed by binary operation of integers', () => {
+    const program = parse('0 1 2 - 3')
+    const items = (program.body[0] as SyntaxNode).items as SyntaxNode[]
+
+    expect(items.map((item) => item.type)).toEqual([
+      'DegreeLiteral',
+      'DegreeLiteral',
+      'BinaryExpression',
+    ])
+    expect(items[2].operator).toBe('-')
+  })
+
+  it('parses a parallel composition of degrees', () => {
+    const program = parse('0, 1, 2, -3')
+    const branches = (program.body[0] as SyntaxNode).branches as SyntaxNode[]
 
     expect(branches.map((branch) => branch.type)).toEqual([
-      "DegreeLiteral",
-      "DegreeLiteral",
-      "DegreeLiteral",
-      "DegreeLiteral",
-    ]);
-    expect(branches.map((branch) => branch.degree)).toEqual(["0", "1", "2", "-3"]);
-  });
+      'DegreeLiteral',
+      'DegreeLiteral',
+      'DegreeLiteral',
+      'DegreeLiteral',
+    ])
+    expect(branches.map((branch) => branch.degree)).toEqual(['0', '1', '2', '-3'])
+  })
 
-  it("parses a slotted triplet of degrees", () => {
-    const program = parse("[1 -2 3]");
-    const expression = (program.body[0] as SyntaxNode).expression as SyntaxNode;
-    const items = expression.items as SyntaxNode[];
+  it('parses a slotted triplet of degrees', () => {
+    const program = parse('[1 -2 3]')
+    const expression = (program.body[0] as SyntaxNode).expression as SyntaxNode
+    const items = expression.items as SyntaxNode[]
 
-    expect(expression.type).toBe("Sequence");
-    expect(items.map((item) => item.degree)).toEqual(["1", "-2", "3"]);
-  });
+    expect(expression.type).toBe('Sequence')
+    expect(items.map((item) => item.degree)).toEqual(['1', '-2', '3'])
+  })
 
-  it("parses a slotted chord of degrees", () => {
-    const program = parse("[1, -2, 3]");
-    const expression = (program.body[0] as SyntaxNode).expression as SyntaxNode;
-    const branches = expression.branches as SyntaxNode[];
+  it('parses a slotted chord of degrees', () => {
+    const program = parse('[1, -2, 3]')
+    const expression = (program.body[0] as SyntaxNode).expression as SyntaxNode
+    const branches = expression.branches as SyntaxNode[]
 
-    expect(expression.type).toBe("Parallel");
-    expect(branches.map((branch) => branch.degree)).toEqual(["1", "-2", "3"]);
-  });
+    expect(expression.type).toBe('Parallel')
+    expect(branches.map((branch) => branch.degree)).toEqual(['1', '-2', '3'])
+  })
 
-  it("parses holds", () => {
-    const program = parse("0= = | =");
-    const items = (program.body[0] as SyntaxNode).items as SyntaxNode[];
-
-    expect(items.map((item) => item.type)).toEqual([
-      "PostfixExpression",
-      "DetachedContinue",
-      "Barline",
-      "DetachedContinue",
-    ]);
-    expect(((items[0].marks as SyntaxNode[])[0] as SyntaxNode).type).toBe("DetachedContinue");
-  });
-
-  it("parses double barlines as hard boundaries", () => {
-    const items = parse("C || D").body as SyntaxNode[];
-
-    expect(items.map((item) => item.type)).toEqual(["PitchLiteral", "HardBoundary", "PitchLiteral"]);
-  });
-
-  it("uses barlines and repeat markers as sequence gaps", () => {
-    const items = (parse("C|D| E|:F G:||").body[0] as SyntaxNode).items as SyntaxNode[];
+  it('parses holds', () => {
+    const program = parse('0= = | =')
+    const items = (program.body[0] as SyntaxNode).items as SyntaxNode[]
 
     expect(items.map((item) => item.type)).toEqual([
-      "PitchLiteral",
-      "Barline",
-      "PitchLiteral",
-      "Barline",
-      "PitchLiteral",
-      "Repeat",
-      "Barline",
-    ]);
-    expect(((items[5].body as SyntaxNode[])[0] as SyntaxNode).type).toBe("Sequence");
-  });
+      'PostfixExpression',
+      'DetachedContinue',
+      'Barline',
+      'DetachedContinue',
+    ])
+    expect(((items[0].marks as SyntaxNode[])[0] as SyntaxNode).type).toBe('DetachedContinue')
+  })
 
-  it("supports prefixes with relative pitch offset literals", () => {
-    const program = parse("^M2 'P4");
-    const items = (program.body[0] as SyntaxNode).items as SyntaxNode[];
+  it('parses double barlines as hard boundaries', () => {
+    const items = parse('C || D').body as SyntaxNode[]
 
-    expect(items.map((item) => item.type)).toEqual(["IntervalLiteral", "IntervalLiteral"]);
-    expect(items.map((item) => item.quality)).toEqual(["M", "P"]);
-    expect((items[0].modifiers as SyntaxNode[]).map((modifier) => modifier.raw)).toEqual(["^"]);
-    expect((items[1].modifiers as SyntaxNode[]).map((modifier) => modifier.raw)).toEqual(["'"]);
-  });
+    expect(items.map((item) => item.type)).toEqual(['PitchLiteral', 'HardBoundary', 'PitchLiteral'])
+  })
 
-  it("sequences a pitch with an attached up modifier instead of treating it as power", () => {
-    const expression = parse("C ^D").body[0];
-    const items = expression.items as SyntaxNode[];
+  it('uses barlines and repeat markers as sequence gaps', () => {
+    const items = (parse('C|D| E|:F G:||').body[0] as SyntaxNode).items as SyntaxNode[]
 
-    expect(expression.type).toBe("Sequence");
-    expect(items.map((item) => item.type)).toEqual(["PitchLiteral", "PitchLiteral"]);
-    expect((items[1].modifiers as SyntaxNode[]).map((modifier) => modifier.raw)).toEqual(["^"]);
-  });
+    expect(items.map((item) => item.type)).toEqual([
+      'PitchLiteral',
+      'Barline',
+      'PitchLiteral',
+      'Barline',
+      'PitchLiteral',
+      'Repeat',
+      'Barline',
+    ])
+    expect(((items[5].body as SyntaxNode[])[0] as SyntaxNode).type).toBe('Sequence')
+  })
 
-  it("supports multiple augmentation and diminution of pitch offsets", () => {
-    const program = parse("AAA4 dd5");
-    const items = (program.body[0] as SyntaxNode).items as SyntaxNode[];
+  it('supports prefixes with relative pitch offset literals', () => {
+    const program = parse("^M2 'P4")
+    const items = (program.body[0] as SyntaxNode).items as SyntaxNode[]
 
-    expect(items.map((item) => item.type)).toEqual(["IntervalLiteral", "IntervalLiteral"]);
-    expect(items.map((item) => item.quality)).toEqual(["AAA", "dd"]);
-    expect(items.map((item) => item.number)).toEqual(["4", "5"]);
-  });
-});
+    expect(items.map((item) => item.type)).toEqual(['IntervalLiteral', 'IntervalLiteral'])
+    expect(items.map((item) => item.quality)).toEqual(['M', 'P'])
+    expect((items[0].modifiers as SyntaxNode[]).map((modifier) => modifier.raw)).toEqual(['^'])
+    expect((items[1].modifiers as SyntaxNode[]).map((modifier) => modifier.raw)).toEqual(["'"])
+  })
+
+  it('sequences a pitch with an attached up modifier instead of treating it as power', () => {
+    const expression = parse('C ^D').body[0]
+    const items = expression.items as SyntaxNode[]
+
+    expect(expression.type).toBe('Sequence')
+    expect(items.map((item) => item.type)).toEqual(['PitchLiteral', 'PitchLiteral'])
+    expect((items[1].modifiers as SyntaxNode[]).map((modifier) => modifier.raw)).toEqual(['^'])
+  })
+
+  it('supports multiple augmentation and diminution of pitch offsets', () => {
+    const program = parse('AAA4 dd5')
+    const items = (program.body[0] as SyntaxNode).items as SyntaxNode[]
+
+    expect(items.map((item) => item.type)).toEqual(['IntervalLiteral', 'IntervalLiteral'])
+    expect(items.map((item) => item.quality)).toEqual(['AAA', 'dd'])
+    expect(items.map((item) => item.number)).toEqual(['4', '5'])
+  })
+})

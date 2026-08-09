@@ -17,7 +17,10 @@ describe('staff notation construction', () => {
   it('places just ratios relative to middle C and retains FJS inflections', () => {
     expect(notation('1/1')).toMatchObject({ staffPosition: 0 })
     expect(notation('3/2')).toMatchObject({ staffPosition: 4 })
-    expect(notation('5/3')).toMatchObject({ staffPosition: 5, inflections: [{ direction: 'numerator', prime: 5n }] })
+    expect(notation('5/3')).toMatchObject({
+      staffPosition: 5,
+      inflections: [{ direction: 'numerator', prime: 5n }],
+    })
   })
 
   it('constructs notation for positive irrational scalar ratios', () => {
@@ -149,7 +152,9 @@ describe('staff notation construction', () => {
 
     expect(evaluated.diagnostics).toEqual([])
     expect(annotations).toEqual(['root = D'])
-    expect(notes.map((note) => note.kind === 'note' && [note.pitch.staffPosition, note.pitch.notehead])).toEqual([
+    expect(
+      notes.map((note) => note.kind === 'note' && [note.pitch.staffPosition, note.pitch.notehead]),
+    ).toEqual([
       [0, 'normal'],
       [0, 'normal'],
       [1, 'normal'],
@@ -169,7 +174,12 @@ describe('staff notation construction', () => {
     if (staff.kind !== 'sequence') throw new Error('Expected a sequence.')
     const notes = staff.children.filter((child) => child.kind === 'note')
     expect(notes.map((note) => [note.pitch.staffPosition, note.pitch.accidentals])).toEqual([
-      [0, []], [1, []], [0, []], [0, []], [1, []], [0, []],
+      [0, []],
+      [1, []],
+      [0, []],
+      [0, []],
+      [1, []],
+      [0, []],
     ])
   })
 
@@ -196,7 +206,10 @@ describe('staff notation construction', () => {
     if (staff.kind !== 'sequence') throw new Error('Expected a sequence.')
     const notes = staff.children.filter((child) => child.kind === 'note')
     expect(notes.map((note) => [note.pitch.staffPosition, note.pitch.accidentals])).toEqual([
-      [2, []], [6, []], [7, []], [7, []],
+      [2, []],
+      [6, []],
+      [7, []],
+      [7, []],
     ])
     expect(notes.map((note) => note.pitch.cents)).toEqual([
       553.8461538461539, 1292.3076923076922, 1200, 1200,

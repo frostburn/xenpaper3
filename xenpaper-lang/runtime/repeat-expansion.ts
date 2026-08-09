@@ -19,7 +19,9 @@ type SyntaxNode = {
 class ExpansionLimitError extends Error {}
 
 function isNode(value: unknown): value is SyntaxNode {
-  return typeof value === 'object' && value !== null && typeof (value as SyntaxNode).type === 'string'
+  return (
+    typeof value === 'object' && value !== null && typeof (value as SyntaxNode).type === 'string'
+  )
 }
 
 /** Expand repeat macros while retaining a distinct provenance path on every occurrence. */
@@ -113,7 +115,8 @@ export function expandRepeats(
         }
       } else if (isNode(value)) {
         const children = cloneNode(value, path)
-        clone[key] = children.length === 1 ? children[0] : makeSequence(children, value.location, path)
+        clone[key] =
+          children.length === 1 ? children[0] : makeSequence(children, value.location, path)
       }
     }
     return [clone as ExpandedNode]

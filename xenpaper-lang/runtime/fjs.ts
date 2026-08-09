@@ -52,7 +52,8 @@ function toneSplitterMaster(cents: number): [number, number] {
 
 /** Superscript adjustment for a single prime in the requested FJS flavor. */
 export function fjsPrimeComma(prime: number, flavor: FjsFlavor = ''): PrimeMonzo {
-  if (!Number.isSafeInteger(prime) || prime < 5 || !isPrime(prime)) throw new TypeError(`Invalid FJS prime ${prime}.`)
+  if (!Number.isSafeInteger(prime) || prime < 5 || !isPrime(prime))
+    throw new TypeError(`Invalid FJS prime ${prime}.`)
   const key = `${prime}:${flavor}`
   const cached = cache.get(key)
   if (cached) return cached
@@ -65,8 +66,14 @@ export function fjsPrimeComma(prime: number, flavor: FjsFlavor = ''): PrimeMonzo
   let twos = pair[0]
   const threes = pair[1]
   let commaCents = cents + 1200 * twos + 1200 * Math.log2(3) * threes
-  while (commaCents > 600) { commaCents -= 1200; twos-- }
-  while (commaCents < -600) { commaCents += 1200; twos++ }
+  while (commaCents > 600) {
+    commaCents -= 1200
+    twos--
+  }
+  while (commaCents < -600) {
+    commaCents += 1200
+    twos++
+  }
   const result = new Map<number, Fraction>([[prime, new Fraction(1)]])
   if (twos) result.set(2, new Fraction(twos))
   if (threes) result.set(3, new Fraction(threes))
@@ -76,15 +83,22 @@ export function fjsPrimeComma(prime: number, flavor: FjsFlavor = ''): PrimeMonzo
 
 /** Factor an FJS label, deliberately ignoring its 2- and 3-limit factors. */
 export function fjsInflection(value: number, flavor: FjsFlavor = ''): PrimeMonzo {
-  if (!Number.isSafeInteger(value) || value < 1) throw new TypeError(`Invalid FJS inflection ${value}.`)
+  if (!Number.isSafeInteger(value) || value < 1)
+    throw new TypeError(`Invalid FJS inflection ${value}.`)
   const result = new Map<number, Fraction>()
   let remaining = value
   for (let prime = 2; prime * prime <= remaining; prime++) {
     let exponent = 0
-    while (remaining % prime === 0) { remaining /= prime; exponent++ }
+    while (remaining % prime === 0) {
+      remaining /= prime
+      exponent++
+    }
     if (prime <= 3 || !exponent) continue
     for (const [component, amount] of fjsPrimeComma(prime, flavor)) {
-      result.set(component, (result.get(component) ?? new Fraction(0)).add(new Fraction(amount).mul(exponent)))
+      result.set(
+        component,
+        (result.get(component) ?? new Fraction(0)).add(new Fraction(amount).mul(exponent)),
+      )
     }
   }
   if (remaining > 3) {
@@ -95,10 +109,16 @@ export function fjsInflection(value: number, flavor: FjsFlavor = ''): PrimeMonzo
   return result
 }
 
-export function applyFjsInflections(result: Map<number, Fraction>, inflections: readonly FjsInflectionInput[]) {
+export function applyFjsInflections(
+  result: Map<number, Fraction>,
+  inflections: readonly FjsInflectionInput[],
+) {
   for (const inflection of inflections) {
     const sign = inflection.direction === 'numerator' ? 1 : -1
-    for (const [prime, exponent] of fjsInflection(Number(inflection.prime), (inflection.flavor ?? '') as FjsFlavor)) {
+    for (const [prime, exponent] of fjsInflection(
+      Number(inflection.prime),
+      (inflection.flavor ?? '') as FjsFlavor,
+    )) {
       const combined = (result.get(prime) ?? new Fraction(0)).add(new Fraction(exponent).mul(sign))
       if (combined.n) result.set(prime, combined)
       else result.delete(prime)
@@ -107,6 +127,7 @@ export function applyFjsInflections(result: Map<number, Fraction>, inflections: 
 }
 
 function isPrime(value: number) {
-  for (let divisor = 2; divisor * divisor <= value; divisor++) if (value % divisor === 0) return false
+  for (let divisor = 2; divisor * divisor <= value; divisor++)
+    if (value % divisor === 0) return false
   return true
 }

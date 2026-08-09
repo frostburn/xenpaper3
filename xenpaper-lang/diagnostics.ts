@@ -8,4 +8,3 @@ export interface Diagnostic {
   readonly message: string
   readonly locations: readonly LocationRange[]
 }
-

@@ -2,24 +2,26 @@ import { mount } from '@vue/test-utils'
 import { describe, expect, it, vi } from 'vitest'
 import XenpaperLangTestingView from '../views/XenpaperLangTestingView.vue'
 
-const { constructStaffNotationShape, evaluateScoreShape, expandToBeatEvents, parse } = vi.hoisted(() => ({
-  constructStaffNotationShape: vi.fn<(shape: object) => object>(() => ({
-    kind: 'note',
-    pitch: { staffPosition: 0, accidentals: [], notehead: 'normal', cents: 0 },
-  })),
-  evaluateScoreShape: vi.fn<(expression: object) => object>(() => ({
-    shape: { kind: 'attack' },
-    diagnostics: [],
-  })),
-  expandToBeatEvents: vi.fn<() => object>(() => ({
-    score: { duration: { valueOf: () => 1 }, events: [] },
-    diagnostics: [],
-  })),
-  parse: vi.fn<(source: string) => object>(() => ({
-    type: 'Program',
-    body: [{ type: 'Sequence' }],
-  })),
-}))
+const { constructStaffNotationShape, evaluateScoreShape, expandToBeatEvents, parse } = vi.hoisted(
+  () => ({
+    constructStaffNotationShape: vi.fn<(shape: object) => object>(() => ({
+      kind: 'note',
+      pitch: { staffPosition: 0, accidentals: [], notehead: 'normal', cents: 0 },
+    })),
+    evaluateScoreShape: vi.fn<(expression: object) => object>(() => ({
+      shape: { kind: 'attack' },
+      diagnostics: [],
+    })),
+    expandToBeatEvents: vi.fn<() => object>(() => ({
+      score: { duration: { valueOf: () => 1 }, events: [] },
+      diagnostics: [],
+    })),
+    parse: vi.fn<(source: string) => object>(() => ({
+      type: 'Program',
+      body: [{ type: 'Sequence' }],
+    })),
+  }),
+)
 vi.mock('../../xenpaper-lang', () => ({
   constructStaffNotationShape,
   evaluateScoreShape,
@@ -83,9 +85,7 @@ describe('XenpaperLangTestingView', () => {
     expect(evaluateScoreShape).not.toHaveBeenCalled()
     expect(wrapper.getComponent({ name: 'PianoRoll' }).props('score')).toBeUndefined()
     expect(wrapper.getComponent({ name: 'MusicalStaff' }).props('notation')).toBeUndefined()
-    expect(warn).toHaveBeenCalledWith([
-      { code: 'XP_CONTINUE_WITHOUT_ATTACK', severity: 'error' },
-    ])
+    expect(warn).toHaveBeenCalledWith([{ code: 'XP_CONTINUE_WITHOUT_ATTACK', severity: 'error' }])
     warn.mockRestore()
   })
 })

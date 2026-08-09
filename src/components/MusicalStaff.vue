@@ -21,7 +21,16 @@ type TupletItem = {
 }
 
 type StaffItemContent =
-  | { kind: 'note'; pitch: StaffPitch; duration: Fraction; displayLabel?: string; velocity?: Fraction; velocityExplicit?: boolean; grace?: boolean; notatedDuration?: Fraction }
+  | {
+      kind: 'note'
+      pitch: StaffPitch
+      duration: Fraction
+      displayLabel?: string
+      velocity?: Fraction
+      velocityExplicit?: boolean
+      grace?: boolean
+      notatedDuration?: Fraction
+    }
   | { kind: 'rest'; duration: Fraction }
   | { kind: 'barline'; style: BarlineStyle }
   | { kind: 'annotation'; text: string }
@@ -182,7 +191,9 @@ const items = computed(() => {
 
   staffItems.forEach((item, index) => {
     if (item.kind !== 'note' || !item.grace) return
-    const donor = staffItems.slice(index + 1).find((candidate) => candidate.kind === 'note' && !candidate.grace)
+    const donor = staffItems
+      .slice(index + 1)
+      .find((candidate) => candidate.kind === 'note' && !candidate.grace)
     if (donor?.kind === 'note') {
       item.tiedToColumn = donor.column
       item.tiedToPosition = donor.pitch.staffPosition
@@ -295,7 +306,8 @@ const isSupportedNoteDuration = (duration?: Fraction, tupletCount?: number) => {
 
 const isOpenNotehead = (duration: Fraction) => durationValue(duration) >= 2
 const hasStem = (duration: Fraction) => durationValue(duration) < 4
-const engravingDuration = (item: Extract<StaffItem, { kind: 'note' }>) => item.notatedDuration ?? item.duration
+const engravingDuration = (item: Extract<StaffItem, { kind: 'note' }>) =>
+  item.notatedDuration ?? item.duration
 const velocityLabel = (velocity: Fraction) => `${Math.round(durationValue(velocity) * 100)}%`
 const isDotted = (duration: Fraction) => {
   const relativeToDottedHalf = durationValue(duration) / 3
@@ -397,7 +409,12 @@ const restDotY = (duration: Fraction, tupletCount?: number) =>
       <text v-else-if="item.kind === 'annotation'" class="annotation" :x="x(item.column)" y="25">
         {{ item.text }}
       </text>
-      <text v-else-if="item.kind === 'dynamic'" class="performance-label dynamic-label" :x="x(item.column)" y="145">
+      <text
+        v-else-if="item.kind === 'dynamic'"
+        class="performance-label dynamic-label"
+        :x="x(item.column)"
+        y="145"
+      >
         {{ item.mark }}
       </text>
       <g v-else-if="item.kind === 'barline'" class="barline" :class="`barline--${item.style}`">

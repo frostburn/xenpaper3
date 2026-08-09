@@ -1,18 +1,38 @@
 export type { Diagnostic, DiagnosticSeverity } from './diagnostics'
 export { parse } from './parser.generated.js'
+export type * from './parser.generated.js'
 export { expandRepeats } from './runtime/repeat-expansion'
 export { decimalFraction, evaluateLiteral } from './runtime/literals'
 export type { LiteralEvaluationResult, NumericLiteralNode } from './runtime/literals'
 export { evaluateExpression } from './runtime/expressions'
 export { applyFjsInflections, fjsInflection, fjsPrimeComma } from './runtime/fjs'
 export type { FjsFlavor, FjsInflectionInput } from './runtime/fjs'
-export { DEFAULT_MAPPING, DEFAULT_PITCH_CONTEXT, applyPitchContextChange, createPitchContext, edoMapping, evaluateIntervalLiteral, evaluatePitchLiteral, mapFormula, scalePitchOffset, spellPitchDifference } from './runtime/pitches'
+export {
+  DEFAULT_MAPPING,
+  DEFAULT_PITCH_CONTEXT,
+  applyPitchContextChange,
+  createPitchContext,
+  edoMapping,
+  evaluateIntervalLiteral,
+  evaluatePitchLiteral,
+  mapFormula,
+  scalePitchOffset,
+  spellPitchDifference,
+} from './runtime/pitches'
 export type { ExpressionEvaluationResult } from './runtime/expressions'
 export { DIRECTIVE_REGISTRY, DYNAMIC_VELOCITIES, resolveDirective } from './runtime/directives'
 export { evaluateScoreShape } from './runtime/score-shape'
 export { expandToBeatEvents, flattenScoreShape } from './runtime/beat-events'
-export type { BeatEventExpansionOptions, BeatEventExpansionResult, BeatEventFlatteningResult } from './runtime/beat-events'
-export { constructStaffNotation, constructStaffNotationShape, toStaffPitch } from './runtime/staff-notation'
+export type {
+  BeatEventExpansionOptions,
+  BeatEventExpansionResult,
+  BeatEventFlatteningResult,
+} from './runtime/beat-events'
+export {
+  constructStaffNotation,
+  constructStaffNotationShape,
+  toStaffPitch,
+} from './runtime/staff-notation'
 export type { StaffNotationOptions } from './runtime/staff-notation'
 export type { ScoreShapeEvaluationResult, ScoreShapeOptions } from './runtime/score-shape'
 export type {
