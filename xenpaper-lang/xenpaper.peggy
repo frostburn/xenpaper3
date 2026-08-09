@@ -589,9 +589,10 @@ IdentifierContinue
 SequenceGap
   = RequiredSpacing
   // Structural notation separates adjacent sequence items without requiring
-  // whitespace on either side (`C|D` and `E|:F G:||`).
+  // whitespace on either side (`C|D`, `C.D`, and `E|:F G:||`).
   / &("|:" / Barline)
-  / &{ return offset() > 0 && input.charAt(offset() - 1) === "|"; }
+  / &Rest
+  / &{ return offset() > 0 && ["|", "."].includes(input.charAt(offset() - 1)); }
 
 Spacing
   = (White / Comment)*

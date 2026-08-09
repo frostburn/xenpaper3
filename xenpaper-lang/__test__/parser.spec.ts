@@ -38,6 +38,18 @@ describe('Xenpaper surface grammar', () => {
     expect(parse('...').body[0]).toMatchObject({ type: 'Rest', raw: '...' })
   })
 
+  it('parses rests attached to surrounding notes as sequence items', () => {
+    const items = (parse('C. .D').body[0] as SyntaxNode).items as SyntaxNode[]
+
+    expect(items.map((item) => item.type)).toEqual([
+      'PitchLiteral',
+      'Rest',
+      'Rest',
+      'PitchLiteral',
+    ])
+    expect(items.map((item) => item.raw)).toEqual(['C', '.', '.', 'D'])
+  })
+
   it('compiles and parses the representative score syntax', () => {
     const program = parse(score)
 
