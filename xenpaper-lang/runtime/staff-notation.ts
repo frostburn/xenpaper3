@@ -1,11 +1,31 @@
 import { Value } from '../value'
-import type { EvaluatedLiteral, FjsSpelling, PrimeMonzo, ScoreShape, StaffInflection, StaffNotationShape, StaffPitch } from './types'
+import type {
+  EvaluatedLiteral,
+  FjsSpelling,
+  PrimeMonzo,
+  ScoreShape,
+  StaffInflection,
+  StaffNotationShape,
+  StaffPitch,
+} from './types'
 
 const LETTERS = ['C', 'D', 'E', 'F', 'G', 'A', 'B'] as const
 const SEMITONES = [0, 2, 4, 5, 7, 9, 11] as const
 const GREEK_RANK: Readonly<Record<string, number>> = {
-  ETA: 0.5, ALP: 1.5, BET: 2.5, GAM: 3.5, DEL: 4.5, EPS: 5.5, ZET: 6.5,
-  'Η': 0.5, 'Α': 1.5, 'Β': 2.5, 'Γ': 3.5, 'Δ': 4.5, 'Ε': 5.5, 'Ζ': 6.5,
+  ETA: 0.5,
+  ALP: 1.5,
+  BET: 2.5,
+  GAM: 3.5,
+  DEL: 4.5,
+  EPS: 5.5,
+  ZET: 6.5,
+  Η: 0.5,
+  Α: 1.5,
+  Β: 2.5,
+  Γ: 3.5,
+  Δ: 4.5,
+  Ε: 5.5,
+  Ζ: 6.5,
 }
 
 const UPWARD_GREEK_NOMINALS = new Set(['BET', 'Β'])
@@ -22,7 +42,8 @@ function fjsInflections(formula: PrimeMonzo | undefined): FjsSpelling[] | undefi
   for (const [prime, exponent] of formula) {
     if (prime < 5 || exponent.d !== 1) continue
     const direction = exponent.compare(0) > 0 ? 'numerator' : 'denominator'
-    for (let index = 0; index < Math.abs(exponent.n); index++) result.push({ direction, prime: BigInt(prime) })
+    for (let index = 0; index < Math.abs(exponent.n); index++)
+      result.push({ direction, prime: BigInt(prime) })
   }
   return result.length ? result : undefined
 }
@@ -49,18 +70,22 @@ function writtenAccidental(token: string): string {
 
 function decorations(value: EvaluatedLiteral, chromatic?: number) {
   const written = value.kind === 'absolutePitch' ? value.spelling.accidentals : undefined
-  const fjs = value.kind === 'absolutePitch'
-    ? value.spelling.inflections
-    : value.kind === 'pitchOffset'
-      ? value.spelling?.inflections
-      : undefined
-  const modifiers = value.kind === 'absolutePitch'
-    ? value.spelling.modifiers
-    : value.kind === 'pitchOffset'
-      ? value.spelling?.modifiers
-      : undefined
+  const fjs =
+    value.kind === 'absolutePitch'
+      ? value.spelling.inflections
+      : value.kind === 'pitchOffset'
+        ? value.spelling?.inflections
+        : undefined
+  const modifiers =
+    value.kind === 'absolutePitch'
+      ? value.spelling.modifiers
+      : value.kind === 'pitchOffset'
+        ? value.spelling?.modifiers
+        : undefined
   const operatorInflections: StaffInflection[] = (modifiers ?? [])
-    .filter((kind): kind is 'up' | 'down' | 'lift' | 'drop' => ['up', 'down', 'lift', 'drop'].includes(kind))
+    .filter((kind): kind is 'up' | 'down' | 'lift' | 'drop' =>
+      ['up', 'down', 'lift', 'drop'].includes(kind),
+    )
     .map((kind) => ({ kind }))
   const accidental = written?.length
     ? written.map(writtenAccidental).join('+')
@@ -96,12 +121,17 @@ function naturalCents(position: number): number {
 
 function equaveStaffShift(modifiers: readonly string[] | undefined): number {
   return (modifiers ?? []).reduce(
-    (total, kind) => total + (kind === 'equaveUp' ? 7 : kind === 'doubleEquaveUp' ? 14 : kind === 'equaveDown' ? -7 : 0),
+    (total, kind) =>
+      total +
+      (kind === 'equaveUp' ? 7 : kind === 'doubleEquaveUp' ? 14 : kind === 'equaveDown' ? -7 : 0),
     0,
   )
 }
 
-export function constructStaffNotation(value: EvaluatedLiteral, options: StaffNotationOptions = {}): StaffPitch {
+export function constructStaffNotation(
+  value: EvaluatedLiteral,
+  options: StaffNotationOptions = {},
+): StaffPitch {
   const cents = soundingValue(value).valueOf()
   const rootPosition = options.rootStaffPosition ?? 0
   if (!Number.isFinite(cents)) throw new RangeError('Staff pitch must be finite.')
@@ -122,7 +152,8 @@ export function constructStaffNotation(value: EvaluatedLiteral, options: StaffNo
     }
     const latin = LETTERS.indexOf(key as (typeof LETTERS)[number])
     if (latin >= 0) {
-      const writtenOctave = (rawNominal === rawNominal.toLowerCase() ? 1 : 0) +
+      const writtenOctave =
+        (rawNominal === rawNominal.toLowerCase() ? 1 : 0) +
         equaveStaffShift(value.spelling.modifiers) / 7
       const position = writtenOctave * 7 + latin
       return {
@@ -137,8 +168,11 @@ export function constructStaffNotation(value: EvaluatedLiteral, options: StaffNo
   if (value.kind === 'pitchOffset' && value.spelling) {
     const numericNumber = Number(value.spelling.number.valueOf())
     const zeroBased = numericNumber - 1
-    const position = rootPosition + Math.ceil(zeroBased) + equaveStaffShift(value.spelling.modifiers)
-    const chromatic = Math.round((naturalCents(rootPosition) + cents - naturalCents(position)) / 100)
+    const position =
+      rootPosition + Math.ceil(zeroBased) + equaveStaffShift(value.spelling.modifiers)
+    const chromatic = Math.round(
+      (naturalCents(rootPosition) + cents - naturalCents(position)) / 100,
+    )
     return {
       staffPosition: position,
       ...decorations(value, chromatic),
@@ -156,9 +190,13 @@ export function constructStaffNotation(value: EvaluatedLiteral, options: StaffNo
   let best = Infinity
   for (let index = 0; index < SEMITONES.length; index++) {
     const distance = Math.abs(SEMITONES[index]! - pitchClass)
-    if (distance < best) { best = distance; letter = index }
+    if (distance < best) {
+      best = distance
+      letter = index
+    }
   }
-  if (SEMITONES[letter] !== pitchClass) accidental = pitchClass > SEMITONES[letter]! ? 'sharp' : 'flat'
+  if (SEMITONES[letter] !== pitchClass)
+    accidental = pitchClass > SEMITONES[letter]! ? 'sharp' : 'flat'
   const position = octaveOffset * 7 + letter
   const inflections = fjsInflections(formulaOf(value))
   return {
@@ -171,32 +209,43 @@ export function constructStaffNotation(value: EvaluatedLiteral, options: StaffNo
 }
 
 function appearanceKey(pitch: StaffPitch): string {
-  const inflections = (pitch.inflections ?? []).map((value) => 'kind' in value
-    ? value.kind
-    : `${value.direction}:${value.prime}:${value.flavor ?? ''}`)
-  return [pitch.staffPosition, pitch.notehead, pitch.accidentals.join(','), inflections.join(',')].join('|')
+  const inflections = (pitch.inflections ?? []).map((value) =>
+    'kind' in value ? value.kind : `${value.direction}:${value.prime}:${value.flavor ?? ''}`,
+  )
+  return [
+    pitch.staffPosition,
+    pitch.notehead,
+    pitch.accidentals.join(','),
+    inflections.join(','),
+  ].join('|')
 }
 
 /** Project a duration-bearing score tree, including rests, into staff data. */
 export function constructStaffNotationShape(shape: ScoreShape): StaffNotationShape {
   switch (shape.kind) {
-    case 'attack':
-      {
-        const pitch = constructStaffNotation(shape.pitch, { rootStaffPosition: shape.rootStaffPosition })
-        const alternatives = (shape.alternateAppearances ?? []).map((appearance) =>
-          constructStaffNotation(appearance.pitch, { rootStaffPosition: appearance.rootStaffPosition }))
-        const ambiguous = alternatives.some((alternative) => appearanceKey(alternative) !== appearanceKey(pitch))
-        return {
-          kind: 'note',
-          pitch: ambiguous ? { ...pitch, notehead: 'x' } : pitch,
-          duration: shape.duration,
-          ...(shape.displayLabel ? { displayLabel: shape.displayLabel } : {}),
-          velocity: shape.velocity,
-          ...(shape.velocityExplicit ? { velocityExplicit: true } : {}),
-          ...(shape.grace ? { grace: true } : {}),
-          ...(shape.notatedDuration ? { notatedDuration: shape.notatedDuration } : {}),
-        }
+    case 'attack': {
+      const pitch = constructStaffNotation(shape.pitch, {
+        rootStaffPosition: shape.rootStaffPosition,
+      })
+      const alternatives = (shape.alternateAppearances ?? []).map((appearance) =>
+        constructStaffNotation(appearance.pitch, {
+          rootStaffPosition: appearance.rootStaffPosition,
+        }),
+      )
+      const ambiguous = alternatives.some(
+        (alternative) => appearanceKey(alternative) !== appearanceKey(pitch),
+      )
+      return {
+        kind: 'note',
+        pitch: ambiguous ? { ...pitch, notehead: 'x' } : pitch,
+        duration: shape.duration,
+        ...(shape.displayLabel ? { displayLabel: shape.displayLabel } : {}),
+        velocity: shape.velocity,
+        ...(shape.velocityExplicit ? { velocityExplicit: true } : {}),
+        ...(shape.grace ? { grace: true } : {}),
+        ...(shape.notatedDuration ? { notatedDuration: shape.notatedDuration } : {}),
       }
+    }
     case 'rest':
       return { kind: 'rest', duration: shape.duration, generated: shape.generated }
     case 'continue':
@@ -216,7 +265,11 @@ export function constructStaffNotationShape(shape: ScoreShape): StaffNotationSha
         ...(shape.tuplet ? { tuplet: shape.tuplet } : {}),
       }
     case 'parallel':
-      return { kind: 'parallel', duration: shape.duration, branches: shape.branches.map(constructStaffNotationShape) }
+      return {
+        kind: 'parallel',
+        duration: shape.duration,
+        branches: shape.branches.map(constructStaffNotationShape),
+      }
   }
 }
 

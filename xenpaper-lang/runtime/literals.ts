@@ -43,7 +43,8 @@ export function decimalFraction(text: string): Fraction {
 
 function rationalLiteral(node: IntegerLiteral | DecimalLiteral | RatioLiteral): Value {
   if (node.type === 'IntegerLiteral') return new Value(BigInt(node.value))
-  if (node.type === 'DecimalLiteral') return new Value(decimalFraction(signed(node.value, node.sign)))
+  if (node.type === 'DecimalLiteral')
+    return new Value(decimalFraction(signed(node.value, node.sign)))
   return new Value(BigInt(signed(node.numerator, node.sign)), BigInt(node.denominator))
 }
 

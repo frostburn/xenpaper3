@@ -93,7 +93,7 @@ describe('Xenpaper value arithmetic', () => {
   it('falls back instead of constructing a non-algebraic radical', () => {
     const rad = new Value(2).pow(new Value(2).pow(new Fraction(1, 2)))
     expect(rad.isExact()).toBe(false)
-    expect(rad.valueOf()).toBeCloseTo(2**2**0.5)
+    expect(rad.valueOf()).toBeCloseTo(2 ** (2 ** 0.5))
   })
 })
 

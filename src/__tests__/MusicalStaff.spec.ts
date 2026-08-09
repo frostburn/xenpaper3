@@ -30,7 +30,9 @@ describe('MusicalStaff', () => {
   it('renders grace notes small, tied to an unchanged donor, with performance labels', () => {
     const evaluated = evaluateScoreShape(parse('@p @4?? B @velocity(80%) c# c=').body[0]!)
     if (!('shape' in evaluated)) throw new Error('Expected a score shape.')
-    const wrapper = mount(MusicalStaff, { props: { notation: constructStaffNotationShape(evaluated.shape) } })
+    const wrapper = mount(MusicalStaff, {
+      props: { notation: constructStaffNotationShape(evaluated.shape) },
+    })
 
     expect(wrapper.findAll('.grace-note')).toHaveLength(2)
     expect(wrapper.findAll('.grace-tie')).toHaveLength(2)
@@ -41,7 +43,9 @@ describe('MusicalStaff', () => {
   it('only displays dynamics where an authored directive changes the prevailing mark', () => {
     const evaluated = evaluateScoreShape(parse('C D @p E F @f G').body[0]!)
     if (!('shape' in evaluated)) throw new Error('Expected a score shape.')
-    const wrapper = mount(MusicalStaff, { props: { notation: constructStaffNotationShape(evaluated.shape) } })
+    const wrapper = mount(MusicalStaff, {
+      props: { notation: constructStaffNotationShape(evaluated.shape) },
+    })
 
     expect(wrapper.findAll('.performance-label').map((label) => label.text())).toEqual(['p', 'f'])
   })
@@ -49,7 +53,9 @@ describe('MusicalStaff', () => {
   it('renders a dynamic as an event at its authored offset, even before a rest', () => {
     const evaluated = evaluateScoreShape(parse('@ff . C D E').body[0]!)
     if (!('shape' in evaluated)) throw new Error('Expected a score shape.')
-    const wrapper = mount(MusicalStaff, { props: { notation: constructStaffNotationShape(evaluated.shape) } })
+    const wrapper = mount(MusicalStaff, {
+      props: { notation: constructStaffNotationShape(evaluated.shape) },
+    })
 
     expect(wrapper.get('.dynamic-label').text()).toBe('ff')
     expect(wrapper.get('.dynamic-label').attributes('x')).toBe(wrapper.get('.rest').attributes('x'))

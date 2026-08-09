@@ -109,7 +109,8 @@ describe('arithmetic expression evaluation', () => {
     const g = evaluate('G')
     expect(c.kind).toBe('absolutePitch')
     expect(g.kind).toBe('absolutePitch')
-    if (c.kind !== 'absolutePitch' || g.kind !== 'absolutePitch') throw new Error('Expected pitches.')
+    if (c.kind !== 'absolutePitch' || g.kind !== 'absolutePitch')
+      throw new Error('Expected pitches.')
     expect(c.rootOffset.equals(Value.cents(0))).toBe(true)
     expect(g.rootOffset.equals(Value.pitch(new Value(3n, 2n)))).toBe(true)
   })
@@ -117,7 +118,8 @@ describe('arithmetic expression evaluation', () => {
   it('applies active mappings to formulas without moving C', () => {
     const evaluated = evaluateExpression(expression('G'), edoMapping(12))
     expect(evaluated.diagnostics).toEqual([])
-    if (!('value' in evaluated) || evaluated.value.kind !== 'absolutePitch') throw new Error('Expected a pitch.')
+    if (!('value' in evaluated) || evaluated.value.kind !== 'absolutePitch')
+      throw new Error('Expected a pitch.')
     expect(evaluated.value.rootOffset.equals(Value.cents(700))).toBe(true)
   })
 
@@ -127,7 +129,9 @@ describe('arithmetic expression evaluation', () => {
     if (difference.kind !== 'pitchOffset') throw new Error('Expected an interval.')
     expect(difference.value.equals(Value.pitch(new Value(4n, 3n)))).toBe(true)
     expect(difference.spelling).toMatchObject({ quality: 'P', number: 4n, raw: 'P4' })
-    expect(evaluateExpression(expression('G + D'))).toMatchObject({ diagnostics: [{ code: 'XP_TYPE_MISMATCH' }] })
+    expect(evaluateExpression(expression('G + D'))).toMatchObject({
+      diagnostics: [{ code: 'XP_TYPE_MISMATCH' }],
+    })
   })
 
   it('evaluates compound and chromatically altered relative intervals', () => {
@@ -162,16 +166,23 @@ describe('arithmetic expression evaluation', () => {
 
   it('supports neutral intervals and half accidentals', () => {
     expect(evaluate('n3').value.equals(Value.pitch(new Value(3n, 2n)).div(new Value(2)))).toBe(true)
-    expect(evaluate('n4').value.equals(Value.pitch(new Value(3).pow(new Value(5n, 2n)).div(new Value(2).pow(new Value(7n, 2n)))))).toBe(true)
+    expect(
+      evaluate('n4').value.equals(
+        Value.pitch(new Value(3).pow(new Value(5n, 2n)).div(new Value(2).pow(new Value(7n, 2n)))),
+      ),
+    ).toBe(true)
     const halfSharp = evaluate('Ct')
     if (halfSharp.kind !== 'absolutePitch') throw new Error('Expected a pitch.')
-    expect(halfSharp.rootOffset.equals(Value.pitch(new Value(2187n, 2048n)).div(new Value(2)))).toBe(true)
+    expect(
+      halfSharp.rootOffset.equals(Value.pitch(new Value(2187n, 2048n)).div(new Value(2))),
+    ).toBe(true)
   })
 
   it('applies the Xenpaper 2 default up and lift offsets', () => {
     const up = evaluate('^C')
     const lift = evaluate('/C')
-    if (up.kind !== 'absolutePitch' || lift.kind !== 'absolutePitch') throw new Error('Expected pitches.')
+    if (up.kind !== 'absolutePitch' || lift.kind !== 'absolutePitch')
+      throw new Error('Expected pitches.')
     expect(up.rootOffset.equals(Value.pitch(new Value(243n, 242n)).div(2))).toBe(true)
     expect(lift.rootOffset.equals(Value.pitch(new Value(50n, 49n)).div(2))).toBe(true)
   })
@@ -182,7 +193,13 @@ describe('arithmetic expression evaluation', () => {
     const context = applyPitchContextChange(change, DEFAULT_PITCH_CONTEXT)
     const a = evaluateExpression(expression('A'), context)
     const b = evaluateExpression(expression('B'), context)
-    if (!('value' in a) || a.value.kind !== 'absolutePitch' || !('value' in b) || b.value.kind !== 'absolutePitch') throw new Error('Expected pitches.')
+    if (
+      !('value' in a) ||
+      a.value.kind !== 'absolutePitch' ||
+      !('value' in b) ||
+      b.value.kind !== 'absolutePitch'
+    )
+      throw new Error('Expected pitches.')
     expect(a.value.rootOffset.equals(Value.cents(0))).toBe(true)
     expect(b.value.rootOffset.equals(Value.pitch(new Value(9n, 8n)))).toBe(true)
   })
@@ -193,7 +210,13 @@ describe('arithmetic expression evaluation', () => {
     const context = applyPitchContextChange(change, DEFAULT_PITCH_CONTEXT)
     const c = evaluateExpression(expression('C'), context)
     const d = evaluateExpression(expression('D'), context)
-    if (!('value' in c) || c.value.kind !== 'absolutePitch' || !('value' in d) || d.value.kind !== 'absolutePitch') throw new Error('Expected pitches.')
+    if (
+      !('value' in c) ||
+      c.value.kind !== 'absolutePitch' ||
+      !('value' in d) ||
+      d.value.kind !== 'absolutePitch'
+    )
+      throw new Error('Expected pitches.')
     expect(context.rootDisplacement.equals(Value.pitch(new Value(9n, 8n)))).toBe(true)
     expect(c.value.rootOffset.equals(Value.cents(0))).toBe(true)
     expect(d.value.rootOffset.equals(Value.pitch(new Value(9n, 8n)))).toBe(true)

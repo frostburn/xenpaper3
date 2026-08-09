@@ -16,19 +16,24 @@ function shape(source: string, pulse: Fraction | number = 1): ScoreShape {
 describe('score-shape timing', () => {
   it('uses 12-EDO degrees by default and updates their division with EDO presets', () => {
     const defaults = shape("0 1 2 11 '0 `0") as SequenceShape
-    const attacksIn = (score: ScoreShape): Extract<ScoreShape, { kind: 'attack' }>[] => score.kind === 'attack'
-      ? [score]
-      : score.kind === 'sequence'
-        ? score.children.flatMap(attacksIn)
-        : score.kind === 'parallel'
-          ? score.branches.flatMap(attacksIn)
-          : []
+    const attacksIn = (score: ScoreShape): Extract<ScoreShape, { kind: 'attack' }>[] =>
+      score.kind === 'attack'
+        ? [score]
+        : score.kind === 'sequence'
+          ? score.children.flatMap(attacksIn)
+          : score.kind === 'parallel'
+            ? score.branches.flatMap(attacksIn)
+            : []
     const defaultAttacks = attacksIn(defaults)
-    expect(defaultAttacks.map((attack) => attack.pitch.value.valueOf())).toEqual([0, 100, 200, 1100, 1200, -1200])
+    expect(defaultAttacks.map((attack) => attack.pitch.value.valueOf())).toEqual([
+      0, 100, 200, 1100, 1200, -1200,
+    ])
 
     const tenEdo = shape('{10edo} 0= 1 2 3 4 5 6 7 9 9 10=') as SequenceShape
     const attacks = attacksIn(tenEdo)
-    expect(attacks.map((attack) => attack.pitch.value.valueOf())).toEqual([0, 120, 240, 360, 480, 600, 720, 840, 1080, 1080, 1200])
+    expect(attacks.map((attack) => attack.pitch.value.valueOf())).toEqual([
+      0, 120, 240, 360, 480, 600, 720, 840, 1080, 1080, 1200,
+    ])
     expect(tenEdo.children.filter((child) => child.kind === 'sequence')).toHaveLength(2)
   })
   it('flows root reassociation through an ordinary sequence', () => {
@@ -37,7 +42,8 @@ describe('score-shape timing', () => {
     expect(result.children[0]).toMatchObject({ kind: 'annotation', text: 'A = root' })
     expect(result.children[1]).toMatchObject({ kind: 'attack' })
     expect(result.children[2]).toMatchObject({ kind: 'attack' })
-    if (result.children[1]?.kind !== 'attack' || result.children[2]?.kind !== 'attack') throw new Error('Expected attacks.')
+    if (result.children[1]?.kind !== 'attack' || result.children[2]?.kind !== 'attack')
+      throw new Error('Expected attacks.')
     expect(result.children[1].pitch.value.equals(Value.cents(0))).toBe(true)
     expect(result.children[2].pitch.value.equals(Value.pitch(new Value(9n, 8n)))).toBe(true)
   })
@@ -139,7 +145,11 @@ describe('score-shape timing', () => {
     const innerSlot = outerSlot.children[1] as SequenceShape
 
     expect(result.duration.equals(2)).toBe(true)
-    expect(outerSlot.children.every((child) => child.duration.equals(new Fraction(1, 2)))).toBe(true)
-    expect(innerSlot.children.every((child) => child.duration.equals(new Fraction(1, 4)))).toBe(true)
+    expect(outerSlot.children.every((child) => child.duration.equals(new Fraction(1, 2)))).toBe(
+      true,
+    )
+    expect(innerSlot.children.every((child) => child.duration.equals(new Fraction(1, 4)))).toBe(
+      true,
+    )
   })
 })

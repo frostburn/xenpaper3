@@ -35,5 +35,10 @@ describe('PianoRoll', () => {
 
     expect(wrapper.findAll('rect.note')).toHaveLength(1)
     expect(wrapper.get('rect.note title').text()).toContain('G — beat 0.3333333333333333')
+    expect(wrapper.findAll('.beat-line').map((line) => line.attributes('x1'))).toEqual([
+      '70',
+      '170',
+      '270',
+    ])
   })
 })

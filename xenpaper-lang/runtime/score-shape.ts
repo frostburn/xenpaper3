@@ -43,7 +43,10 @@ function origin(node: Expression, role: SourceOrigin['role'] = 'structural'): So
   return { location: node.location, role }
 }
 
-function sequence(children: readonly ScoreShape[], origins: readonly SourceOrigin[]): SequenceShape {
+function sequence(
+  children: readonly ScoreShape[],
+  origins: readonly SourceOrigin[],
+): SequenceShape {
   return {
     kind: 'sequence',
     children,
@@ -77,15 +80,24 @@ function scaleShape(shape: ScoreShape, factor: Fraction): ScoreShape {
     case 'dynamic':
       return { ...shape, duration }
     case 'sequence':
-      return { ...shape, duration, children: shape.children.map((child) => scaleShape(child, factor)) }
+      return {
+        ...shape,
+        duration,
+        children: shape.children.map((child) => scaleShape(child, factor)),
+      }
     case 'parallel':
-      return { ...shape, duration, branches: shape.branches.map((branch) => scaleShape(branch, factor)) }
+      return {
+        ...shape,
+        duration,
+        branches: shape.branches.map((branch) => scaleShape(branch, factor)),
+      }
   }
 }
 
 /** Trim from the rhythmic tail without moving or rescaling earlier material. */
 function trimShape(shape: ScoreShape, duration: Fraction): ScoreShape {
-  if (duration.compare(0) < 0 || duration.compare(shape.duration) > 0) throw new RangeError('Invalid trimmed duration.')
+  if (duration.compare(0) < 0 || duration.compare(shape.duration) > 0)
+    throw new RangeError('Invalid trimmed duration.')
   if (shape.kind === 'sequence') {
     let remaining = duration
     const children = shape.children.map((child) => {
@@ -96,7 +108,13 @@ function trimShape(shape: ScoreShape, duration: Fraction): ScoreShape {
     return { ...shape, duration, children }
   }
   if (shape.kind === 'parallel') {
-    return { ...shape, duration, branches: shape.branches.map((branch) => trimShape(branch, branch.duration.compare(duration) > 0 ? duration : branch.duration)) }
+    return {
+      ...shape,
+      duration,
+      branches: shape.branches.map((branch) =>
+        trimShape(branch, branch.duration.compare(duration) > 0 ? duration : branch.duration),
+      ),
+    }
   }
   return { ...shape, duration }
 }
@@ -105,28 +123,47 @@ function trimShape(shape: ScoreShape, duration: Fraction): ScoreShape {
 function resizeShape(shape: ScoreShape, duration: Fraction): ScoreShape {
   if (shape.duration.n) return scaleShape(shape, duration.div(shape.duration))
   if (shape.kind === 'attack') return { ...shape, duration }
-  if (shape.kind === 'parallel') return { ...shape, duration, branches: shape.branches.map((branch) => resizeShape(branch, duration)) }
+  if (shape.kind === 'parallel')
+    return {
+      ...shape,
+      duration,
+      branches: shape.branches.map((branch) => resizeShape(branch, duration)),
+    }
   if (shape.kind === 'sequence') {
     const pitchChild = shape.children.findIndex((child) => attacks(child).length > 0)
-    return { ...shape, duration, children: shape.children.map((child, index) => index === pitchChild ? resizeShape(child, duration) : child) }
+    return {
+      ...shape,
+      duration,
+      children: shape.children.map((child, index) =>
+        index === pitchChild ? resizeShape(child, duration) : child,
+      ),
+    }
   }
   return { ...shape, duration }
 }
 
-function mapAttacks(shape: ScoreShape, transform: (attack: AttackShape) => AttackShape): ScoreShape {
+function mapAttacks(
+  shape: ScoreShape,
+  transform: (attack: AttackShape) => AttackShape,
+): ScoreShape {
   if (shape.kind === 'attack') return transform(shape)
-  if (shape.kind === 'sequence') return { ...shape, children: shape.children.map((child) => mapAttacks(child, transform)) }
-  if (shape.kind === 'parallel') return { ...shape, branches: shape.branches.map((branch) => mapAttacks(branch, transform)) }
+  if (shape.kind === 'sequence')
+    return { ...shape, children: shape.children.map((child) => mapAttacks(child, transform)) }
+  if (shape.kind === 'parallel')
+    return { ...shape, branches: shape.branches.map((branch) => mapAttacks(branch, transform)) }
   return shape
 }
 
-type PitchTree = { kind: 'attack'; attack: AttackShape } | { kind: 'sequence' | 'parallel'; children: PitchTree[] }
+type PitchTree =
+  | { kind: 'attack'; attack: AttackShape }
+  | { kind: 'sequence' | 'parallel'; children: PitchTree[] }
 
 function pitchTree(shape: ScoreShape): PitchTree | undefined {
   if (shape.kind === 'attack') return { kind: 'attack', attack: shape }
   if (shape.kind !== 'sequence' && shape.kind !== 'parallel') return undefined
   const children = (shape.kind === 'sequence' ? shape.children : shape.branches)
-    .map(pitchTree).filter((child): child is PitchTree => Boolean(child))
+    .map(pitchTree)
+    .filter((child): child is PitchTree => Boolean(child))
   if (!children.length) return undefined
   if (children.length === 1) return children[0]
   return { kind: shape.kind, children }
@@ -134,8 +171,11 @@ function pitchTree(shape: ScoreShape): PitchTree | undefined {
 
 function matchingPitchTrees(source: PitchTree, target: PitchTree): boolean {
   if (source.kind === 'attack' || target.kind === 'attack') return source.kind === target.kind
-  return source.kind === target.kind && source.children.length === target.children.length &&
+  return (
+    source.kind === target.kind &&
+    source.children.length === target.children.length &&
     source.children.every((child, index) => matchingPitchTrees(child, target.children[index]!))
+  )
 }
 
 /** Sounding span for each attack, including attached continuation shapes. */
@@ -143,8 +183,11 @@ function attackSpans(shape: ScoreShape): Map<AttackShape, Fraction> {
   const spans = new Map<AttackShape, Fraction>()
   type State = { active: AttackShape[] }
   const visit = (current: ScoreShape, state: State) => {
-    if (current.kind === 'attack') { spans.set(current, current.duration); state.active = [current] }
-    else if (current.kind === 'continue') for (const attack of state.active) spans.set(attack, spans.get(attack)!.add(current.duration))
+    if (current.kind === 'attack') {
+      spans.set(current, current.duration)
+      state.active = [current]
+    } else if (current.kind === 'continue')
+      for (const attack of state.active) spans.set(attack, spans.get(attack)!.add(current.duration))
     else if (current.kind === 'rest') state.active = []
     else if (current.kind === 'sequence') current.children.forEach((child) => visit(child, state))
     else if (current.kind === 'parallel') {
@@ -157,22 +200,28 @@ function attackSpans(shape: ScoreShape): Map<AttackShape, Fraction> {
   return spans
 }
 
-function annotateRepeatAppearances(shape: ScoreShape, alternatives: readonly (readonly AttackAppearance[])[]): ScoreShape {
+function annotateRepeatAppearances(
+  shape: ScoreShape,
+  alternatives: readonly (readonly AttackAppearance[])[],
+): ScoreShape {
   let attackIndex = 0
   const annotate = (current: ScoreShape): ScoreShape => {
     if (current.kind === 'attack') {
       const alternateAppearances = alternatives[attackIndex++]
       if (!alternateAppearances?.length) return current
-      const notationValue = (pitch: AttackShape['pitch']) => pitch.kind === 'absolutePitch'
-        ? pitch.rootOffset
-        : pitch.notationValue ?? pitch.value
-      const ambiguous = alternateAppearances.some((appearance) =>
-        appearance.rootStaffPosition !== current.rootStaffPosition ||
-        !notationValue(appearance.pitch).equals(notationValue(current.pitch)))
+      const notationValue = (pitch: AttackShape['pitch']) =>
+        pitch.kind === 'absolutePitch' ? pitch.rootOffset : (pitch.notationValue ?? pitch.value)
+      const ambiguous = alternateAppearances.some(
+        (appearance) =>
+          appearance.rootStaffPosition !== current.rootStaffPosition ||
+          !notationValue(appearance.pitch).equals(notationValue(current.pitch)),
+      )
       return {
         ...current,
         alternateAppearances,
-        ...(ambiguous && !current.displayLabel ? { displayLabel: authoredLabels.get(current) } : {}),
+        ...(ambiguous && !current.displayLabel
+          ? { displayLabel: authoredLabels.get(current) }
+          : {}),
       }
     }
     if (current.kind === 'sequence') return { ...current, children: current.children.map(annotate) }
@@ -191,26 +240,39 @@ function attacks(shape: ScoreShape): AttackShape[] {
   return []
 }
 
-function contextAnnotation(node: Extract<Expression, { type: 'PitchContextChange' }>): AnnotationShape {
-  const text = node.statements.map((statement) => {
-    if (statement.type !== 'ContextAssignment') return statement.type === 'ContextPreset' ? statement.raw : 'context'
-    const target = statement.target.type === 'ContextNameTarget'
-      ? statement.target.name
-      : statement.target.type === 'ContextPitchTarget'
-        ? statement.target.pitch.raw
-        : statement.target.operator
-    const value = 'raw' in statement.value
-      ? String(statement.value.raw)
-      : statement.value.type === 'Identifier'
-        ? statement.value.name
-        : statement.value.type
-    return `${target} = ${value}`
-  }).join('; ')
+function contextAnnotation(
+  node: Extract<Expression, { type: 'PitchContextChange' }>,
+): AnnotationShape {
+  const text = node.statements
+    .map((statement) => {
+      if (statement.type !== 'ContextAssignment')
+        return statement.type === 'ContextPreset' ? statement.raw : 'context'
+      const target =
+        statement.target.type === 'ContextNameTarget'
+          ? statement.target.name
+          : statement.target.type === 'ContextPitchTarget'
+            ? statement.target.pitch.raw
+            : statement.target.operator
+      const value =
+        'raw' in statement.value
+          ? String(statement.value.raw)
+          : statement.value.type === 'Identifier'
+            ? statement.value.name
+            : statement.value.type
+      return `${target} = ${value}`
+    })
+    .join('; ')
   return { kind: 'annotation', text, duration: new Fraction(0), origins: [origin(node, 'context')] }
 }
 
-function playablePitch(node: Expression, context: PitchContext):
-  | { readonly pitch: PitchOffsetValue | (AbsolutePitchValue & { readonly value: Value }); readonly diagnostics: readonly Diagnostic[] }
+function playablePitch(
+  node: Expression,
+  context: PitchContext,
+):
+  | {
+      readonly pitch: PitchOffsetValue | (AbsolutePitchValue & { readonly value: Value })
+      readonly diagnostics: readonly Diagnostic[]
+    }
   | { readonly diagnostics: readonly Diagnostic[] } {
   const evaluated = evaluateExpression(node, context)
   if (!('value' in evaluated)) return evaluated
@@ -225,8 +287,9 @@ function playablePitch(node: Expression, context: PitchContext):
     }
   }
   if (evaluated.value.kind === 'absolutePitch') {
-    const absoluteRootOffset = evaluated.value.rootOffset
-      .add(mapFormula(context.rootFormula, context.mapping))
+    const absoluteRootOffset = evaluated.value.rootOffset.add(
+      mapFormula(context.rootFormula, context.mapping),
+    )
     return {
       pitch: {
         ...evaluated.value,
@@ -281,7 +344,8 @@ export function evaluateScoreShape(
       return current.items.reduce((active, item) => contextAfter(item, active), context)
     }
     if (current.type === 'Group') return contextAfter(current.expression, context)
-    if (current.type === 'NormalizeToSlot' && current.expression) return contextAfter(current.expression, context)
+    if (current.type === 'NormalizeToSlot' && current.expression)
+      return contextAfter(current.expression, context)
     if (current.type === 'PostfixExpression') return contextAfter(current.expression, context)
     if (current.type === 'Repeat') {
       let active = context
@@ -294,12 +358,16 @@ export function evaluateScoreShape(
     return context
   }
 
-  const subdivisionPulse = (current: Extract<Expression, { type: 'Directive' }>, context: PitchContext) => {
+  const subdivisionPulse = (
+    current: Extract<Expression, { type: 'Directive' }>,
+    context: PitchContext,
+  ) => {
     if (current.name !== 'subdivision' || current.graceCount) return undefined
     const argument = current.arguments[0]
-    const evaluated = argument && argument.type !== 'NamedArgument'
-      ? evaluateExpression(argument, context)
-      : undefined
+    const evaluated =
+      argument && argument.type !== 'NamedArgument'
+        ? evaluateExpression(argument, context)
+        : undefined
     let subdivision: Fraction | undefined
     if (evaluated && 'value' in evaluated) {
       const value = (evaluated as { readonly value: EvaluatedLiteral }).value
@@ -311,13 +379,15 @@ export function evaluateScoreShape(
       : undefined
   }
 
-  const pulseAfter = (current: Expression, currentPulse: Fraction, context: PitchContext): Fraction => {
-    if (current.type === 'Directive') return subdivisionPulse(current, context)?.pulse ?? currentPulse
+  const pulseAfter = (
+    current: Expression,
+    currentPulse: Fraction,
+    context: PitchContext,
+  ): Fraction => {
+    if (current.type === 'Directive')
+      return subdivisionPulse(current, context)?.pulse ?? currentPulse
     if (current.type === 'Sequence') {
-      return current.items.reduce(
-        (active, item) => pulseAfter(item, active, context),
-        currentPulse,
-      )
+      return current.items.reduce((active, item) => pulseAfter(item, active, context), currentPulse)
     }
     if (current.type === 'Repeat') {
       let active = currentPulse
@@ -392,7 +462,11 @@ export function evaluateScoreShape(
           for (const _attack of displayedAttacks) alternatives.push([])
         } else {
           const iterationAttacks = iterationShapes.flatMap(attacks)
-          for (let index = 0; index < Math.min(displayedAttacks.length, iterationAttacks.length); index++) {
+          for (
+            let index = 0;
+            index < Math.min(displayedAttacks.length, iterationAttacks.length);
+            index++
+          ) {
             const attack = iterationAttacks[index]!
             alternatives[index]!.push({
               pitch: attack.pitch,
@@ -411,11 +485,7 @@ export function evaluateScoreShape(
       ) as SequenceShape
       return {
         shape: sequence(
-          [
-            barline(current, 'repeat-start'),
-            ...displayed.children,
-            barline(current, 'repeat-end'),
-          ],
+          [barline(current, 'repeat-start'), ...displayed.children, barline(current, 'repeat-end')],
           [origin(current)],
         ),
         diagnostics,
@@ -431,8 +501,21 @@ export function evaluateScoreShape(
       const results: ScoreShapeEvaluationResult[] = []
       for (const item of current.items) {
         if (item.type === 'PitchContextChange') {
-          try { activeContext = applyPitchContextChange(item, activeContext); results.push({ shape: contextAnnotation(item), diagnostics: [] }) }
-          catch (error) { results.push({ diagnostics: [{ code: 'XP_CONTEXT', severity: 'error', message: error instanceof Error ? error.message : 'Invalid pitch context.', locations: [item.location] }] }) }
+          try {
+            activeContext = applyPitchContextChange(item, activeContext)
+            results.push({ shape: contextAnnotation(item), diagnostics: [] })
+          } catch (error) {
+            results.push({
+              diagnostics: [
+                {
+                  code: 'XP_CONTEXT',
+                  severity: 'error',
+                  message: error instanceof Error ? error.message : 'Invalid pitch context.',
+                  locations: [item.location],
+                },
+              ],
+            })
+          }
           continue
         }
         if (item.type === 'Directive') {
@@ -441,13 +524,25 @@ export function evaluateScoreShape(
           if (directive?.kind === 'subdivision') activePulse = directive.pulse
           else if (directive?.kind === 'dynamic') activeDynamic = directive.mark
           else if (directive?.kind === 'velocity') velocity = directive.velocity
-          else if (directive?.kind === 'grace') grace = { duration: directive.duration, count: directive.count, indices: [] }
+          else if (directive?.kind === 'grace')
+            grace = { duration: directive.duration, count: directive.count, indices: [] }
           else if (directive?.kind === 'gliss') gliss = []
-          const shape: ScoreShape = directive?.kind === 'unknown'
-            ? { kind: 'annotation', text: item.rawName.startsWith('@') ? item.rawName : `@${item.rawName}`, duration: new Fraction(0), origins: [origin(item, 'directive')] }
-            : directive?.kind === 'dynamic'
-              ? { kind: 'dynamic', mark: directive.mark, duration: new Fraction(0), origins: [origin(item, 'directive')] }
-              : sequence([], [origin(item, 'directive')])
+          const shape: ScoreShape =
+            directive?.kind === 'unknown'
+              ? {
+                  kind: 'annotation',
+                  text: item.rawName.startsWith('@') ? item.rawName : `@${item.rawName}`,
+                  duration: new Fraction(0),
+                  origins: [origin(item, 'directive')],
+                }
+              : directive?.kind === 'dynamic'
+                ? {
+                    kind: 'dynamic',
+                    mark: directive.mark,
+                    duration: new Fraction(0),
+                    origins: [origin(item, 'directive')],
+                  }
+                : sequence([], [origin(item, 'directive')])
           results.push({ shape, diagnostics: resolved.diagnostics })
           continue
         }
@@ -455,14 +550,21 @@ export function evaluateScoreShape(
         const index = results.length
         if ('shape' in result && attacks(result.shape).length) {
           if (velocity) {
-            let first = true; const pending = velocity
+            let first = true
+            const pending = velocity
             const applyVelocity = (shape: ScoreShape): ScoreShape => {
-              if (shape.kind === 'attack' && first) { first = false; return { ...shape, velocity: pending, velocityExplicit: true } }
-              if (shape.kind === 'sequence') return { ...shape, children: shape.children.map(applyVelocity) }
-              if (shape.kind === 'parallel') return { ...shape, branches: shape.branches.map(applyVelocity) }
+              if (shape.kind === 'attack' && first) {
+                first = false
+                return { ...shape, velocity: pending, velocityExplicit: true }
+              }
+              if (shape.kind === 'sequence')
+                return { ...shape, children: shape.children.map(applyVelocity) }
+              if (shape.kind === 'parallel')
+                return { ...shape, branches: shape.branches.map(applyVelocity) }
               return shape
             }
-            result = { ...result, shape: applyVelocity(result.shape) }; velocity = undefined
+            result = { ...result, shape: applyVelocity(result.shape) }
+            velocity = undefined
           }
           if (grace) grace.indices.push(index)
           if (gliss) gliss.push(index)
@@ -473,38 +575,90 @@ export function evaluateScoreShape(
           const stolen = grace.duration.mul(grace.count)
           for (const i of grace.indices.slice(0, -1)) {
             const r = results[i]!
-            if ('shape' in r) results[i] = { ...r, shape: mapAttacks(resizeShape(r.shape, grace.duration), (attack) => ({ ...attack, grace: true })) }
+            if ('shape' in r)
+              results[i] = {
+                ...r,
+                shape: mapAttacks(resizeShape(r.shape, grace.duration), (attack) => ({
+                  ...attack,
+                  grace: true,
+                })),
+              }
           }
           const target = results[targetIndex]!
           if ('shape' in target && target.shape.duration.compare(stolen) >= 0) {
             const notatedDuration = target.shape.duration
             results[targetIndex] = {
               ...target,
-              shape: mapAttacks(trimShape(target.shape, target.shape.duration.sub(stolen)), (attack) => ({ ...attack, notatedDuration })),
+              shape: mapAttacks(
+                trimShape(target.shape, target.shape.duration.sub(stolen)),
+                (attack) => ({ ...attack, notatedDuration }),
+              ),
             }
-          }
-          else results.push({ diagnostics: [{ code: 'XP_GRACE_DURATION', severity: 'error', message: 'Grace notes exceed the following item duration.', locations: [item.location] }] })
+          } else
+            results.push({
+              diagnostics: [
+                {
+                  code: 'XP_GRACE_DURATION',
+                  severity: 'error',
+                  message: 'Grace notes exceed the following item duration.',
+                  locations: [item.location],
+                },
+              ],
+            })
           grace = undefined
         }
         if (gliss && gliss.length === 2) {
-          const sourceIndex = gliss[0]!, targetIndex = gliss[1]!, source = results[sourceIndex]!, target = results[targetIndex]!
+          const sourceIndex = gliss[0]!,
+            targetIndex = gliss[1]!,
+            source = results[sourceIndex]!,
+            target = results[targetIndex]!
           if ('shape' in source && 'shape' in target) {
             const to = attacks(target.shape)
             const sourceTree = pitchTree(source.shape)
             const targetTree = pitchTree(target.shape)
-            if (!sourceTree || !targetTree || !matchingPitchTrees(sourceTree, targetTree)) results.push({ diagnostics: [{ code: 'XP_GLISS_SHAPE', severity: 'error', message: 'Glissando source and target pitch structures must match.', locations: [item.location] }] })
+            if (!sourceTree || !targetTree || !matchingPitchTrees(sourceTree, targetTree))
+              results.push({
+                diagnostics: [
+                  {
+                    code: 'XP_GLISS_SHAPE',
+                    severity: 'error',
+                    message: 'Glissando source and target pitch structures must match.',
+                    locations: [item.location],
+                  },
+                ],
+              })
             else {
               const spans = attackSpans(source.shape)
               let leaf = 0
               const automate = (shape: ScoreShape): ScoreShape => {
-                if (shape.kind === 'attack') { const destination = to[leaf++]!; return { ...shape, automation: { curve: 'linear', from: shape.pitch, to: destination.pitch, duration: spans.get(shape) ?? shape.duration } } }
-                if (shape.kind === 'sequence') return { ...shape, children: shape.children.map(automate) }
-                if (shape.kind === 'parallel') return { ...shape, branches: shape.branches.map(automate) }
+                if (shape.kind === 'attack') {
+                  const destination = to[leaf++]!
+                  return {
+                    ...shape,
+                    automation: {
+                      curve: 'linear',
+                      from: shape.pitch,
+                      to: destination.pitch,
+                      duration: spans.get(shape) ?? shape.duration,
+                    },
+                  }
+                }
+                if (shape.kind === 'sequence')
+                  return { ...shape, children: shape.children.map(automate) }
+                if (shape.kind === 'parallel')
+                  return { ...shape, branches: shape.branches.map(automate) }
                 return shape
               }
               results[sourceIndex] = { ...source, shape: automate(source.shape) }
               results[targetIndex] = target.shape.duration.n
-                ? { ...target, shape: { kind: 'continue', duration: target.shape.duration, origins: target.shape.origins } }
+                ? {
+                    ...target,
+                    shape: {
+                      kind: 'continue',
+                      duration: target.shape.duration,
+                      origins: target.shape.origins,
+                    },
+                  }
                 : { ...target, shape: sequence([], target.shape.origins) }
             }
           }
@@ -514,12 +668,26 @@ export function evaluateScoreShape(
         activePulse = pulseAfter(item, activePulse, activeContext)
       }
       const diagnostics = results.flatMap((result) => result.diagnostics)
-      if (grace || gliss) diagnostics.push({ code: 'XP_DIRECTIVE', severity: 'error', message: 'A one-shot directive is missing required following attacks.', locations: [current.location] })
+      if (grace || gliss)
+        diagnostics.push({
+          code: 'XP_DIRECTIVE',
+          severity: 'error',
+          message: 'A one-shot directive is missing required following attacks.',
+          locations: [current.location],
+        })
       if (!results.every(hasShape)) return { diagnostics }
-      return { shape: sequence(results.map((result) => result.shape), [origin(current)]), diagnostics }
+      return {
+        shape: sequence(
+          results.map((result) => result.shape),
+          [origin(current)],
+        ),
+        diagnostics,
+      }
     }
     if (current.type === 'Parallel') {
-      const results = current.branches.map((branch) => visit(branch, context, currentPulse, currentDynamic))
+      const results = current.branches.map((branch) =>
+        visit(branch, context, currentPulse, currentDynamic),
+      )
       const diagnostics = results.flatMap((result) => result.diagnostics)
       if (!results.every(hasShape)) return { diagnostics }
       const branches = results.map((result) => result.shape)
@@ -535,11 +703,17 @@ export function evaluateScoreShape(
       }
       return { shape, diagnostics }
     }
-    if (current.type === 'Group') return visit(current.expression, context, currentPulse, currentDynamic)
+    if (current.type === 'Group')
+      return visit(current.expression, context, currentPulse, currentDynamic)
     if (current.type === 'NormalizeToSlot') {
       if (!current.expression) {
         return {
-          shape: { kind: 'rest', duration: currentPulse, generated: false, origins: [origin(current)] },
+          shape: {
+            kind: 'rest',
+            duration: currentPulse,
+            generated: false,
+            origins: [origin(current)],
+          },
           diagnostics: [],
         }
       }
@@ -561,8 +735,12 @@ export function evaluateScoreShape(
       const normalizedSlots = evaluated.shape.duration.div(currentPulse)
       const normalized = scaleShape(evaluated.shape, currentPulse.div(evaluated.shape.duration))
       const tuplet = Number(normalizedSlots.d) === 1 ? Number(normalizedSlots.n) : undefined
-      if (normalized.kind === 'sequence' && tuplet && tuplet > 1 &&
-        !Number.isInteger(Math.log2(tuplet))) {
+      if (
+        normalized.kind === 'sequence' &&
+        tuplet &&
+        tuplet > 1 &&
+        !Number.isInteger(Math.log2(tuplet))
+      ) {
         return {
           shape: { ...normalized, normalized: true, tuplet },
           diagnostics: evaluated.diagnostics,
@@ -580,7 +758,18 @@ export function evaluateScoreShape(
       let base = evaluated.shape
       if (elimination) {
         const removed = currentPulse.mul(elimination.count)
-        if (removed.compare(base.duration) > 0) return { diagnostics: [...evaluated.diagnostics, { code: 'XP_TAIL_ELIMINATION', severity: 'error', message: 'Tail elimination exceeds the score item duration.', locations: [elimination.location] }] }
+        if (removed.compare(base.duration) > 0)
+          return {
+            diagnostics: [
+              ...evaluated.diagnostics,
+              {
+                code: 'XP_TAIL_ELIMINATION',
+                severity: 'error',
+                message: 'Tail elimination exceeds the score item duration.',
+                locations: [elimination.location],
+              },
+            ],
+          }
         base = trimShape(base, base.duration.sub(removed))
       }
       const continuations = current.marks.filter((mark) => mark.type === 'DetachedContinue')
@@ -614,8 +803,9 @@ export function evaluateScoreShape(
       rootStaffPosition: context.rootStaffPosition,
       dynamic: currentDynamic,
       velocity: DYNAMIC_VELOCITIES[currentDynamic],
-      ...(current.type === 'DegreeLiteral' || current.type === 'EqualDivisionLiteral' ||
-        (current.type === 'QuantityLiteral' && current.unit === 'c')
+      ...(current.type === 'DegreeLiteral' ||
+      current.type === 'EqualDivisionLiteral' ||
+      (current.type === 'QuantityLiteral' && current.unit === 'c')
         ? { displayLabel: String(current.raw) }
         : {}),
     }

@@ -30,8 +30,12 @@ describe('directive runtime', () => {
   it('keeps dynamics as zero-duration events at their authored offsets', () => {
     const result = compile('@ff . C')
     if (!('score' in result)) throw new Error('Expected score.')
-    expect(result.score.events).toContainEqual(expect.objectContaining({ kind: 'marker', marker: 'dynamic', label: 'ff' }))
-    const dynamic = result.score.events.find((event) => event.kind === 'marker' && event.marker === 'dynamic')
+    expect(result.score.events).toContainEqual(
+      expect.objectContaining({ kind: 'marker', marker: 'dynamic', label: 'ff' }),
+    )
+    const dynamic = result.score.events.find(
+      (event) => event.kind === 'marker' && event.marker === 'dynamic',
+    )
     expect(dynamic?.start.valueOf()).toBe(0)
   })
 
@@ -63,7 +67,12 @@ describe('directive runtime', () => {
 
   it('warns and preserves unknown directives', () => {
     const result = compile('@mystery C')
-    expect(result.diagnostics).toContainEqual(expect.objectContaining({ code: 'XP_UNKNOWN_DIRECTIVE', severity: 'warning' }))
-    expect('score' in result && result.score.events.some((event) => event.kind === 'marker' && event.label === '@mystery')).toBe(true)
+    expect(result.diagnostics).toContainEqual(
+      expect.objectContaining({ code: 'XP_UNKNOWN_DIRECTIVE', severity: 'warning' }),
+    )
+    expect(
+      'score' in result &&
+        result.score.events.some((event) => event.kind === 'marker' && event.label === '@mystery'),
+    ).toBe(true)
   })
 })

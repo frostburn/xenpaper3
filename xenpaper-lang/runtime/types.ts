@@ -123,14 +123,33 @@ export interface StaffPitch {
 }
 
 export type StaffNotationShape =
-  | { readonly kind: 'note'; readonly pitch: StaffPitch; readonly duration: Fraction; readonly displayLabel?: string; readonly velocity?: Fraction; readonly velocityExplicit?: boolean; readonly grace?: boolean; readonly notatedDuration?: Fraction }
+  | {
+      readonly kind: 'note'
+      readonly pitch: StaffPitch
+      readonly duration: Fraction
+      readonly displayLabel?: string
+      readonly velocity?: Fraction
+      readonly velocityExplicit?: boolean
+      readonly grace?: boolean
+      readonly notatedDuration?: Fraction
+    }
   | { readonly kind: 'rest'; readonly duration: Fraction; readonly generated: boolean }
   | { readonly kind: 'continue'; readonly duration: Fraction }
   | { readonly kind: 'barline'; readonly style: BarlineStyle; readonly duration: Fraction }
   | { readonly kind: 'annotation'; readonly text: string; readonly duration: Fraction }
   | { readonly kind: 'dynamic'; readonly mark: DynamicMark; readonly duration: Fraction }
-  | { readonly kind: 'sequence'; readonly duration: Fraction; readonly children: readonly StaffNotationShape[]; readonly normalized?: boolean; readonly tuplet?: number }
-  | { readonly kind: 'parallel'; readonly duration: Fraction; readonly branches: readonly StaffNotationShape[] }
+  | {
+      readonly kind: 'sequence'
+      readonly duration: Fraction
+      readonly children: readonly StaffNotationShape[]
+      readonly normalized?: boolean
+      readonly tuplet?: number
+    }
+  | {
+      readonly kind: 'parallel'
+      readonly duration: Fraction
+      readonly branches: readonly StaffNotationShape[]
+    }
 
 export interface SourceOrigin {
   readonly location: LocationRange
