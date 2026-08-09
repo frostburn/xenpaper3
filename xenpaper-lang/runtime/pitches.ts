@@ -472,7 +472,7 @@ export function scalePitchOffset(offset: PitchOffsetValue, factor: Fraction): Pi
   }
 }
 
-function spellIntervalFormula(input: PrimeMonzo): IntervalSpelling | undefined {
+export function spellIntervalFormula(input: PrimeMonzo): IntervalSpelling | undefined {
   const base = new Map([...input].map(([prime, exponent]) => [prime, new Fraction(exponent)]))
   const inflections: { direction: 'numerator' | 'denominator'; prime: bigint }[] = []
   for (const [prime, exponent] of input) {

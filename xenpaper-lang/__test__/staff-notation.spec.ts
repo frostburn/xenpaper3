@@ -21,6 +21,11 @@ describe('staff notation construction', () => {
       staffPosition: 5,
       inflections: [{ direction: 'numerator', prime: 5n }],
     })
+    expect(notation('6/5')).toMatchObject({
+      staffPosition: 2,
+      accidentals: ['flat'],
+      inflections: [{ direction: 'denominator', prime: 5n }],
+    })
   })
 
   it('constructs notation for positive irrational scalar ratios', () => {

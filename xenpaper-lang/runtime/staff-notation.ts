@@ -1,4 +1,5 @@
 import { Value } from '../value'
+import { spellIntervalFormula } from './pitches'
 import type {
   EvaluatedLiteral,
   FjsSpelling,
@@ -181,6 +182,25 @@ export function constructStaffNotation(
     }
   }
 
+  const formula = formulaOf(value)
+  const hasFjsPrime = formula && [...formula].some(([prime, exponent]) => prime >= 5 && exponent.n)
+  const fjsSpelling = hasFjsPrime ? spellIntervalFormula(formula) : undefined
+  if (fjsSpelling) {
+    const numericNumber = Number(fjsSpelling.number.valueOf())
+    const position = rootPosition + Math.ceil(numericNumber - 1)
+    const chromatic = Math.round(
+      (naturalCents(rootPosition) + cents - naturalCents(position)) / 100,
+    )
+    const accidental = inferredAccidental(chromatic)
+    return {
+      staffPosition: position,
+      accidentals: accidental ? [accidental] : [],
+      ...(fjsSpelling.inflections?.length ? { inflections: fjsSpelling.inflections } : {}),
+      notehead: 'normal',
+      cents,
+    }
+  }
+
   const absoluteCents = cents + naturalCents(rootPosition)
   const midiOffset = Math.round(absoluteCents / 100)
   const octaveOffset = Math.floor(midiOffset / 12)
@@ -198,7 +218,7 @@ export function constructStaffNotation(
   if (SEMITONES[letter] !== pitchClass)
     accidental = pitchClass > SEMITONES[letter]! ? 'sharp' : 'flat'
   const position = octaveOffset * 7 + letter
-  const inflections = fjsInflections(formulaOf(value))
+  const inflections = fjsInflections(formula)
   return {
     staffPosition: position,
     accidentals: accidental ? [accidental] : [],
