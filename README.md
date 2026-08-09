@@ -1,54 +1,57 @@
-# xenpaper3
+# Xenpaper 3
 
-This template should help get you started developing with Vue 3 in Vite.
+Xenpaper 3 is an in-progress browser environment for writing and rendering
+microtonal music. The repository currently contains two language runtimes and a
+Vue test application used to exercise them:
 
-## Recommended IDE Setup
+- [`xenpaper-lang/`](xenpaper-lang/) parses Xenpaper scores, evaluates their
+  pitches and rhythm, and projects them to beat events and staff notation.
+- [`sw-patch/`](sw-patch/) implements a sandboxed language for constructing Web
+  Audio synthesizers and effects.
+- [`src/`](src/) contains test pages and notation, piano-roll, and waveform
+  components. It is development scaffolding rather than the finished editor.
 
-[VS Code](https://code.visualstudio.com/) + [Vue (Official)](https://marketplace.visualstudio.com/items?itemName=Vue.volar) (and disable Vetur).
+## Requirements
 
-## Recommended Browser Setup
+- Node.js 22.18 or later (Node.js 24.12 or later is also supported)
+- npm
 
-- Chromium-based browsers (Chrome, Edge, Brave, etc.):
-  - [Vue.js devtools](https://chromewebstore.google.com/detail/vuejs-devtools/nhdogjmejiglipccpnnnanhbledajbpd)
-  - [Turn on Custom Object Formatter in Chrome DevTools](http://bit.ly/object-formatters)
-- Firefox:
-  - [Vue.js devtools](https://addons.mozilla.org/en-US/firefox/addon/vue-js-devtools/)
-  - [Turn on Custom Object Formatter in Firefox DevTools](https://fxdx.dev/firefox-devtools-custom-object-formatters/)
-
-## Type Support for `.vue` Imports in TS
-
-TypeScript cannot handle type information for `.vue` imports by default, so we replace the `tsc` CLI with `vue-tsc` for type checking. In editors, we need [Volar](https://marketplace.visualstudio.com/items?itemName=Vue.volar) to make the TypeScript language service aware of `.vue` types.
-
-## Customize configuration
-
-See [Vite Configuration Reference](https://vite.dev/config/).
-
-## Project Setup
+## Setup
 
 ```sh
 npm install
 ```
 
-### Compile and Hot-Reload for Development
+The Peggy parsers are generated locally and deliberately excluded from version
+control. The development, build, and test commands generate both parsers before
+using them.
+
+## Development
 
 ```sh
 npm run dev
 ```
 
-### Type-Check, Compile and Minify for Production
+The home page links to the SW Patch and Xenpaper language test pages.
+
+## Checks
 
 ```sh
+npm run test:unit -- --run
+npm run type-check
+npm run lint
 npm run build
 ```
 
-### Run Unit Tests with [Vitest](https://vitest.dev/)
+`npm run lint` applies safe automatic fixes. `npm run format` formats `src/`
+with oxfmt.
 
-```sh
-npm run test:unit
-```
+## Language documentation
 
-### Lint with [ESLint](https://eslint.org/)
+See [`xenpaper-lang/README.md`](xenpaper-lang/README.md) for the score-language
+pipeline and public entry points. See [`sw-patch/README.md`](sw-patch/README.md)
+for patch syntax and runtime behavior.
 
-```sh
-npm run lint
-```
+## License
+
+This project is licensed under the terms in [`LICENSE`](LICENSE).
