@@ -20,6 +20,10 @@ describe('staff notation construction', () => {
     expect(notation('5/3')).toMatchObject({ staffPosition: 5, inflections: [{ direction: 'numerator', prime: 5n }] })
   })
 
+  it('constructs notation for positive irrational scalar ratios', () => {
+    expect(notation('sqrt(2)')).toMatchObject({ cents: 600, notehead: 'normal' })
+  })
+
   it('converts relative intervals into absolute staff positions', () => {
     expect(notation('M3')).toMatchObject({ staffPosition: 2 })
     expect(notation('Eb')).toMatchObject({ accidentals: ['flat'], staffPosition: 2 })
