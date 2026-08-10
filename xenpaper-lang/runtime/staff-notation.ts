@@ -1,4 +1,5 @@
 import { Value } from '../value'
+import { Fraction } from 'xen-dev-utils/fraction'
 import { groupFjsInflections } from './fjs'
 import { normalizeStaffAccidental, spellIntervalFormula } from './pitches'
 import type {
@@ -13,6 +14,7 @@ import type {
 
 const LETTERS = ['C', 'D', 'E', 'F', 'G', 'A', 'B'] as const
 const SEMITONES = [0, 2, 4, 5, 7, 9, 11] as const
+const PYTHAGOREAN_THREES = [0, 2, 4, -1, 1, 3, 5] as const
 const GREEK_RANK: Readonly<Record<string, number>> = {
   ETA: 0.5,
   ALP: 1.5,
@@ -126,6 +128,14 @@ function naturalCents(position: number): number {
   return octave * 1200 + SEMITONES[letter]! * 100
 }
 
+function formulaChromatic(formula: PrimeMonzo, position: number): number | undefined {
+  if ([...formula].some(([prime, exponent]) => prime > 3 && exponent.n)) return undefined
+  const letter = ((position % 7) + 7) % 7
+  const threes = formula.get(3) ?? new Fraction(0)
+  const chromatic = threes.sub(PYTHAGOREAN_THREES[letter]!).div(7)
+  return chromatic.d <= 2 ? chromatic.valueOf() : undefined
+}
+
 function equaveStaffShift(modifiers: readonly string[] | undefined): number {
   return (modifiers ?? []).reduce(
     (total, kind) =>
@@ -176,7 +186,9 @@ export function constructStaffNotation(
         (rawNominal === rawNominal.toLowerCase() ? 1 : 0) +
         equaveStaffShift(value.spelling.modifiers) / 7
       const position = writtenOctave * 7 + latin
-      const chromatic = Math.round((cents - naturalCents(position)) / 50) / 2
+      const chromatic =
+        (value.spelling.derived ? formulaChromatic(value.formula, position) : undefined) ??
+        Math.round((cents - naturalCents(position)) / 50) / 2
       return {
         staffPosition: position,
         ...decorations(value, value.spelling.derived ? chromatic : undefined),

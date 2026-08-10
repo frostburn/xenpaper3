@@ -108,9 +108,22 @@ function addOrSubtract(
       throw new TypeError('A pitch offset cannot subtract an absolute pitch.')
     const offset = pitchCoercion(right)
     const spelling = transposePitchSpelling(left.spelling, offset.spelling, subtract)
+    const formula = offset.formula
+      ? new Map([...left.formula].map(([prime, exponent]) => [prime, new Fraction(exponent)]))
+      : undefined
+    if (formula && offset.formula) {
+      for (const [prime, exponent] of offset.formula) {
+        const combined = (formula.get(prime) ?? new Fraction(0)).add(
+          subtract ? new Fraction(exponent).neg() : exponent,
+        )
+        if (combined.n) formula.set(prime, combined)
+        else formula.delete(prime)
+      }
+    }
     return {
       ...left,
       rootOffset: subtract ? left.rootOffset.sub(offset.value) : left.rootOffset.add(offset.value),
+      ...(formula ? { formula } : {}),
       ...(spelling ? { spelling } : {}),
       origins,
     }

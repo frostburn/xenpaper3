@@ -148,6 +148,20 @@ describe('arithmetic expression evaluation', () => {
     expect(interval.value.equals(evaluate('M3 - n3').value)).toBe(true)
   })
 
+  it('updates the exact pitch formula when transposing an absolute pitch', () => {
+    const transposed = evaluate('A + M3')
+    const difference = evaluate('(A + M3) - C')
+    const expected = evaluate('c#')
+
+    expect(transposed.kind === 'absolutePitch' && transposed.formula).toEqual(
+      expected.kind === 'absolutePitch' ? expected.formula : undefined,
+    )
+    expect(difference.kind === 'pitchOffset' && difference.spelling).toMatchObject({
+      quality: 'A',
+      number: 8n,
+    })
+  })
+
   it('evaluates compound and chromatically altered relative intervals', () => {
     expect(evaluate('P4').value.equals(Value.pitch(new Value(4n, 3n)))).toBe(true)
     expect(evaluate('m10').value.equals(Value.pitch(new Value(64n, 27n)))).toBe(true)
