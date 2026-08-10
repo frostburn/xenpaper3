@@ -137,8 +137,15 @@ describe('arithmetic expression evaluation', () => {
 
   it('retains the diatonic result of pitch and interval arithmetic', () => {
     const pitch = evaluate('G - n3')
+    const attachedPitch = evaluate('G-n3')
+    const interval = evaluate('M3-n3')
 
     expect(pitch.kind === 'absolutePitch' && pitch.spelling).toMatchObject({ nominal: 'E' })
+    expect(attachedPitch.kind === 'absolutePitch' && attachedPitch.spelling).toMatchObject({
+      nominal: 'E',
+    })
+    expect(interval.kind).toBe('pitchOffset')
+    expect(interval.value.equals(evaluate('M3 - n3').value)).toBe(true)
   })
 
   it('evaluates compound and chromatically altered relative intervals', () => {

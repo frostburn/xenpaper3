@@ -117,11 +117,23 @@ ShiftedValueExpression
 
 AdditiveExpression
   = first:MultiplicativeExpression
-    rest:(Spacing operator:AdditiveOperator Spacing right:MultiplicativeExpression {
-      return { operator, right };
-    })* {
+    rest:(
+      operator:AttachedAdditiveOperator Spacing right:MultiplicativeExpression {
+        return { operator, right };
+      }
+      / RequiredSpacing operator:AdditiveOperator Spacing right:MultiplicativeExpression {
+        return { operator, right };
+      }
+    )* {
       return foldBinary(first, rest);
     }
+
+// Without whitespace before the operator, plus and minus are unambiguously
+// arithmetic. In particular, `G-n3` and `M3-n3` must not be mistaken for a
+// sequence whose second item is a unary-negated interval.
+AttachedAdditiveOperator
+  = "+" { return "+"; }
+  / "-" { return "-"; }
 
 AdditiveOperator
   = BinaryPlus

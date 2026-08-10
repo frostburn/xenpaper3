@@ -179,6 +179,7 @@ describe('Xenpaper surface grammar', () => {
   it('distinguishes attached negated intervals from spaced subtraction', () => {
     const sequence = parse('D -n3').body[0]
     const subtraction = parse('D - n3').body[0]
+    const attachedSubtraction = parse('D-n3').body[0]
 
     expect(sequence).toMatchObject({
       type: 'Sequence',
@@ -188,6 +189,12 @@ describe('Xenpaper surface grammar', () => {
       ],
     })
     expect(subtraction).toMatchObject({
+      type: 'BinaryExpression',
+      operator: '-',
+      left: { type: 'PitchLiteral', raw: 'D' },
+      right: { type: 'IntervalLiteral', raw: 'n3' },
+    })
+    expect(attachedSubtraction).toMatchObject({
       type: 'BinaryExpression',
       operator: '-',
       left: { type: 'PitchLiteral', raw: 'D' },
