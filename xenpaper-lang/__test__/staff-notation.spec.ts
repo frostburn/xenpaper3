@@ -73,6 +73,8 @@ describe('staff notation construction', () => {
   it('engraves the spelled result of pitch and interval arithmetic', () => {
     expect(notation('G - n3')).toMatchObject({ staffPosition: 2, accidentals: ['half-flat'] })
     expect(notation('G-n3')).toMatchObject({ staffPosition: 2, accidentals: ['half-flat'] })
+    expect(notation('C - D')).toMatchObject({ staffPosition: -1, accidentals: ['flat'] })
+    expect(notation('Eb - C')).toMatchObject({ staffPosition: 2, accidentals: ['flat'] })
   })
 
   it('uses directed triangular noteheads for Greek nominals', () => {

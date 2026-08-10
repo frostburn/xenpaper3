@@ -178,6 +178,21 @@ describe('arithmetic expression evaluation', () => {
     expect(difference.spelling?.raw).toBe('P4.5')
   })
 
+  it('derives traditional quality and direction from pitch differences', () => {
+    const descending = evaluate('C - D')
+    const altered = evaluate('Eb - C')
+
+    expect(descending.kind === 'pitchOffset' && descending.spelling).toMatchObject({
+      quality: 'M',
+      number: 2n,
+      direction: 'descending',
+    })
+    expect(altered.kind === 'pitchOffset' && altered.spelling).toMatchObject({
+      quality: 'm',
+      number: 3n,
+    })
+  })
+
   it('supports neutral intervals and half accidentals', () => {
     expect(evaluate('n3').value.equals(Value.pitch(new Value(3n, 2n)).div(new Value(2)))).toBe(true)
     expect(

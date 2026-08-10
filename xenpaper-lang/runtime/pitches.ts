@@ -308,15 +308,42 @@ export function spellPitchDifference(left: AbsolutePitchValue, right: AbsolutePi
   const leftStep = rank(left.spelling.nominal)
   const rightStep = rank(right.spelling.nominal)
   if (leftStep === undefined || rightStep === undefined) return undefined
-  const distance = leftStep - rightStep
-  if (distance < 0) return undefined
+  const signedDistance = leftStep - rightStep
+  const distance = Math.abs(signedDistance)
   const numericNumber = distance + 1
   const simple = (distance % 7) + 1
-  const quality = [1, 4, 5, 1.5, 4.5, 7.5].includes(simple) ? 'P' : 'M'
   const number = Number.isInteger(numericNumber)
     ? BigInt(numericNumber)
     : new Fraction(numericNumber)
-  return { quality, number, raw: `${quality}${numericNumber}` }
+
+  // The nominal distance supplies the interval number, while the sounding
+  // formula supplies its quality. This distinction is essential for ordinary
+  // spellings such as Eb - C (a minor third, not a major third) and C - D (a
+  // descending major second, not an enharmonic augmented unison).
+  const difference = new Map<number, Fraction>()
+  for (const [prime, exponent] of left.formula) addExponent(difference, prime, exponent)
+  for (const [prime, exponent] of right.formula) addExponent(difference, prime, exponent.neg())
+  if (signedDistance < 0)
+    for (const [prime, exponent] of difference) difference.set(prime, exponent.neg())
+  const formulaSpelling = spellIntervalFormula(difference)
+  const compatibleSpelling =
+    formulaSpelling && Number(formulaSpelling.number.valueOf()) === numericNumber
+      ? formulaSpelling
+      : undefined
+  const quality =
+    compatibleSpelling
+      ? compatibleSpelling.quality
+      : [1, 4, 5, 1.5, 4.5, 7.5].includes(simple)
+        ? 'P'
+        : 'M'
+  const inflections = compatibleSpelling?.inflections
+  return {
+    quality,
+    number,
+    raw: `${quality}${numericNumber}`,
+    ...(signedDistance < 0 ? { direction: 'descending' as const } : {}),
+    ...(inflections?.length ? { inflections } : {}),
+  }
 }
 
 /** Transpose a written Latin pitch by the diatonic span of a named interval. */
