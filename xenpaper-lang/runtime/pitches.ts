@@ -2,7 +2,7 @@ import { Fraction } from 'xen-dev-utils/fraction'
 import type { IntervalLiteral, PitchContextChange, PitchLiteral } from '../parser.generated.js'
 import type { Diagnostic } from '../diagnostics'
 import { Value } from '../value'
-import { applyFjsInflections, fjsPrimeComma } from './fjs'
+import { applyFjsInflections, fjsPrimeComma, groupFjsInflections } from './fjs'
 import type {
   AbsolutePitchValue,
   IntervalSpelling,
@@ -513,10 +513,11 @@ export function spellIntervalFormula(input: PrimeMonzo): IntervalSpelling | unde
   else if (chromaticSteps === -1) quality = 'm'
   else if (chromaticSteps > 0) quality = 'A'.repeat(chromaticSteps)
   else quality = 'd'.repeat(-chromaticSteps - 1)
-  const suffix = inflections
+  const groupedInflections = groupFjsInflections(inflections)
+  const suffix = groupedInflections
     .map(({ direction, prime }) => `${direction === 'numerator' ? '^' : 'v'}${prime}`)
     .join('')
-  return { quality, number, inflections, raw: `${quality}${number}${suffix}` }
+  return { quality, number, inflections: groupedInflections, raw: `${quality}${number}${suffix}` }
 }
 
 export type PitchEvaluationResult = {

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { Fraction } from 'xen-dev-utils/fraction'
 import { parse, type Expression } from '../parser.generated.js'
 import { evaluateExpression } from '../runtime/expressions'
+import { groupFjsInflections } from '../runtime/fjs'
 import { DEFAULT_PITCH_CONTEXT, applyPitchContextChange, edoMapping } from '../runtime/pitches'
 import { Value } from '../value'
 
@@ -231,7 +232,30 @@ describe('arithmetic expression evaluation', () => {
     expect(doubled.kind).toBe('pitchOffset')
     if (doubled.kind !== 'pitchOffset') throw new Error('Expected an interval.')
     expect(doubled.value.equals(Value.pitch(new Value(36n, 25n)))).toBe(true)
-    expect(doubled.spelling?.raw).toBe('d5v5v5')
+    expect(doubled.spelling?.raw).toBe('d5v25')
+  })
+
+  it('groups two-digit products in generated FJS inflections', () => {
+    const products = [25n, 35n, 49n, 55n, 65n, 77n, 85n, 91n, 95n]
+    const factors = [
+      [5n, 5n],
+      [5n, 7n],
+      [7n, 7n],
+      [5n, 11n],
+      [5n, 13n],
+      [7n, 11n],
+      [5n, 17n],
+      [7n, 13n],
+      [5n, 19n],
+    ]
+    expect(
+      factors.map(([left, right]) =>
+        groupFjsInflections([
+          { direction: 'denominator', prime: left! },
+          { direction: 'denominator', prime: right! },
+        ]),
+      ),
+    ).toEqual(products.map((prime) => [{ direction: 'denominator', prime }]))
   })
 
   it('factors FJS labels, ignores 2- and 3-limit factors, and supports neutral FJS', () => {
