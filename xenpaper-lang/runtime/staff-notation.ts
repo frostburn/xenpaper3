@@ -51,15 +51,15 @@ function fjsInflections(formula: PrimeMonzo | undefined): FjsSpelling[] | undefi
   return result.length ? groupFjsInflections(result) : undefined
 }
 
-function inferredAccidental(chromatic: number | undefined): string | undefined {
-  if (!chromatic) return undefined
-  if (chromatic === 1) return 'sharp'
-  if (chromatic === -1) return 'flat'
-  if (chromatic === 2) return 'double-sharp'
-  if (chromatic === -2) return 'double-flat'
-  if (chromatic === 0.5) return 'half-sharp'
-  if (chromatic === -0.5) return 'half-flat'
-  return chromatic > 0 ? `${chromatic}-sharp` : `${-chromatic}-flat`
+function inferredAccidentals(chromatic: number | undefined): string[] {
+  if (!chromatic) return []
+  const direction = chromatic > 0 ? 'sharp' : 'flat'
+  const magnitude = Math.abs(chromatic)
+  const whole = Math.floor(magnitude)
+  const result = whole === 1 ? [direction] : whole === 2 ? [`double-${direction}`] : []
+  if (magnitude % 1 === 0.5) result.push(`half-${direction}`)
+  if (!result.length) result.push(`${magnitude}-${direction}`)
+  return result
 }
 
 function spellingChromatic(quality: string, number: number): number | undefined {
@@ -69,8 +69,8 @@ function spellingChromatic(quality: string, number: number): number | undefined 
   if (quality === 'M' && !perfect) return 0
   if (quality === 'm' && !perfect) return -1
   if (quality === 'n' && !perfect) return -0.5
-  if (quality === 'SA') return 0.5
-  if (quality === 'sd') return perfect ? -0.5 : -1.5
+  if (/^SA+$/.test(quality)) return quality.length - 1.5
+  if (/^sd+$/.test(quality)) return -(quality.length - 1.5 + (perfect ? 0 : 1))
   if (/^A+$/.test(quality)) return quality.length
   if (/^d+$/.test(quality)) return -(quality.length + (perfect ? 0 : 1))
   return undefined
@@ -106,14 +106,12 @@ function decorations(value: EvaluatedLiteral, chromatic?: number) {
       ['up', 'down', 'lift', 'drop'].includes(kind),
     )
     .map((kind) => ({ kind }))
-  const accidental = written?.length
-    ? written.map(writtenAccidental).join('+')
-    : chromatic === undefined
-      ? undefined
-      : inferredAccidental(chromatic)
+  const accidentals = written?.length
+    ? written.map(writtenAccidental)
+    : inferredAccidentals(chromatic)
   const inflections: StaffInflection[] = [...operatorInflections, ...(fjs ?? [])]
   return {
-    accidentals: accidental ? [accidental] : [],
+    accidentals,
     ...(inflections?.length ? { inflections } : {}),
   }
 }
@@ -191,8 +189,8 @@ export function constructStaffNotation(
       rootPosition + Math.ceil(zeroBased) + equaveStaffShift(value.spelling.modifiers)
     const chromatic =
       value.spelling.quality === 'n' ||
-      value.spelling.quality === 'SA' ||
-      value.spelling.quality === 'sd'
+      /^SA+$/.test(value.spelling.quality) ||
+      /^sd+$/.test(value.spelling.quality)
         ? spellingChromatic(value.spelling.quality, numericNumber)
         : Math.round((naturalCents(rootPosition) + cents - naturalCents(position)) / 100)
     return {
@@ -210,10 +208,9 @@ export function constructStaffNotation(
     const numericNumber = Number(fjsSpelling.number.valueOf())
     const position = rootPosition + Math.ceil(numericNumber - 1)
     const chromatic = spellingChromatic(fjsSpelling.quality, numericNumber)
-    const accidental = inferredAccidental(chromatic)
     return {
       staffPosition: position,
-      accidentals: accidental ? [accidental] : [],
+      accidentals: inferredAccidentals(chromatic),
       ...(fjsSpelling.inflections?.length ? { inflections: fjsSpelling.inflections } : {}),
       notehead: 'normal',
       cents,

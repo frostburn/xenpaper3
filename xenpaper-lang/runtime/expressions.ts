@@ -11,6 +11,7 @@ import {
   evaluateIntervalLiteral,
   evaluatePitchLiteral,
   scalePitchOffset,
+  spellIntervalFormula,
   spellPitchDifference,
 } from './pitches'
 
@@ -114,11 +115,25 @@ function addOrSubtract(
   if (left.kind === 'pitchOffset' || right.kind === 'pitchOffset') {
     const lhs = pitchCoercion(left)
     const rhs = pitchCoercion(right)
-    return result(
-      'pitchOffset',
-      subtract ? lhs.value.sub(rhs.value) : lhs.value.add(rhs.value),
-      origins,
+    const value = subtract ? lhs.value.sub(rhs.value) : lhs.value.add(rhs.value)
+    if (!lhs.formula || !rhs.formula) return result('pitchOffset', value, origins)
+    const formula = new Map(
+      [...lhs.formula].map(([prime, exponent]) => [prime, new Fraction(exponent)]),
     )
+    for (const [prime, exponent] of rhs.formula) {
+      const combined = (formula.get(prime) ?? new Fraction(0)).add(
+        subtract ? new Fraction(exponent).neg() : exponent,
+      )
+      if (combined.n) formula.set(prime, combined)
+      else formula.delete(prime)
+    }
+    return {
+      kind: 'pitchOffset',
+      value,
+      formula,
+      spelling: spellIntervalFormula(formula),
+      origins,
+    }
   }
   return result(
     'scalar',

@@ -410,10 +410,10 @@ export function evaluateIntervalLiteral(
   const interordinal = !Number.isInteger(simple)
   const perfect = [1, 4, 5, 1.5, 4.5, 7.5].includes(simple)
   let chromatic: number
-  if (node.quality.startsWith('A'))
+  if (/^SA+$/.test(node.quality)) chromatic = node.quality.length - 1.5
+  else if (/^sd+$/.test(node.quality)) chromatic = -(node.quality.length - 1.5 + (perfect ? 0 : 1))
+  else if (node.quality.startsWith('A'))
     chromatic = node.quality.length + (interordinal && !perfect ? 0.5 : 0)
-  else if (node.quality === 'SA') chromatic = 0.5
-  else if (node.quality === 'sd') chromatic = perfect ? -0.5 : -1.5
   else if (node.quality.startsWith('d'))
     chromatic = -(node.quality.length + (perfect ? 0 : interordinal ? 0.5 : 1))
   else if (node.quality === 'P' && perfect) chromatic = 0
@@ -508,18 +508,20 @@ export function spellIntervalFormula(input: PrimeMonzo): IntervalSpelling | unde
     quality =
       chromaticSteps === 0
         ? 'P'
-        : chromaticSteps === 0.5
-          ? 'SA'
-          : chromaticSteps === -0.5
-            ? 'sd'
+        : !Number.isInteger(chromaticSteps) && chromaticSteps > 0
+          ? `S${'A'.repeat(chromaticSteps + 0.5)}`
+          : !Number.isInteger(chromaticSteps) && chromaticSteps < 0
+            ? `s${'d'.repeat(-chromaticSteps + 0.5)}`
             : chromaticSteps > 0
               ? 'A'.repeat(chromaticSteps)
               : 'd'.repeat(-chromaticSteps)
   else if (chromaticSteps === 0) quality = 'M'
   else if (chromaticSteps === -0.5) quality = 'n'
-  else if (chromaticSteps === 0.5) quality = 'SA'
+  else if (!Number.isInteger(chromaticSteps) && chromaticSteps > 0)
+    quality = `S${'A'.repeat(chromaticSteps + 0.5)}`
   else if (chromaticSteps === -1) quality = 'm'
-  else if (chromaticSteps === -1.5) quality = 'sd'
+  else if (chromaticSteps < -1 && !Number.isInteger(chromaticSteps))
+    quality = `s${'d'.repeat(-chromaticSteps - 0.5)}`
   else if (chromaticSteps > 0) quality = 'A'.repeat(chromaticSteps)
   else quality = 'd'.repeat(-chromaticSteps - 1)
   const groupedInflections = groupFjsInflections(inflections)
