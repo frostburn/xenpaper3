@@ -48,4 +48,16 @@ describe('beat event expansion', () => {
     expect(notes.map((note) => note.start.toFraction())).toEqual(['0', '0', '1', '2', '2', '3'])
     expect(result.duration.equals(new Fraction(4))).toBe(true)
   })
+
+  it('incorporates prevailing dynamics into a single effective dynamic field', () => {
+    const notes = score('C @ff D E').events.filter((event) => event.kind === 'note')
+
+    expect(notes.map(({ dynamic }) => dynamic.toFraction())).toEqual(['1/2', '41/50', '41/50'])
+  })
+
+  it('incorporates a one-shot velocity into the same effective dynamic field', () => {
+    const notes = score('@p C @velocity(4/5) D E').events.filter((event) => event.kind === 'note')
+
+    expect(notes.map(({ dynamic }) => dynamic.toFraction())).toEqual(['3/10', '4/5', '3/10'])
+  })
 })

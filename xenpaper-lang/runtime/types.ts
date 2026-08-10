@@ -258,8 +258,8 @@ export interface BeatTimedNoteEvent {
   readonly duration: Fraction
   readonly pitch: AttackShape['pitch']
   readonly rootStaffPosition: number
-  readonly dynamic?: DynamicMark
-  readonly velocity?: Fraction
+  /** Effective amplitude from either the prevailing dynamic or a one-shot velocity. */
+  readonly dynamic: Fraction
   readonly automation?: PitchAutomation
   readonly label?: string
   readonly origins: readonly SourceOrigin[]
