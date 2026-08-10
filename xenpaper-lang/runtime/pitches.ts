@@ -412,6 +412,8 @@ export function evaluateIntervalLiteral(
   let chromatic: number
   if (node.quality.startsWith('A'))
     chromatic = node.quality.length + (interordinal && !perfect ? 0.5 : 0)
+  else if (node.quality === 'SA') chromatic = 0.5
+  else if (node.quality === 'sd') chromatic = perfect ? -0.5 : -1.5
   else if (node.quality.startsWith('d'))
     chromatic = -(node.quality.length + (perfect ? 0 : interordinal ? 0.5 : 1))
   else if (node.quality === 'P' && perfect) chromatic = 0
@@ -498,19 +500,26 @@ export function spellIntervalFormula(input: PrimeMonzo): IntervalSpelling | unde
   const natural = formula(NOMINALS[['C', 'D', 'E', 'F', 'G', 'A', 'B'][simple - 1]!]!)
   addExponent(natural, 2, Math.floor(span / 7))
   const chromatic = threes.sub(natural.get(3) ?? 0).div(7)
-  if (chromatic.d !== 1) return undefined
-  const chromaticSteps = chromatic.s * chromatic.n
+  if (chromatic.d !== 1 && chromatic.d !== 2) return undefined
+  const chromaticSteps = chromatic.valueOf()
   const perfect = simple === 1 || simple === 4 || simple === 5
   let quality: string
   if (perfect)
     quality =
       chromaticSteps === 0
         ? 'P'
-        : chromaticSteps > 0
-          ? 'A'.repeat(chromaticSteps)
-          : 'd'.repeat(-chromaticSteps)
+        : chromaticSteps === 0.5
+          ? 'SA'
+          : chromaticSteps === -0.5
+            ? 'sd'
+            : chromaticSteps > 0
+              ? 'A'.repeat(chromaticSteps)
+              : 'd'.repeat(-chromaticSteps)
   else if (chromaticSteps === 0) quality = 'M'
+  else if (chromaticSteps === -0.5) quality = 'n'
+  else if (chromaticSteps === 0.5) quality = 'SA'
   else if (chromaticSteps === -1) quality = 'm'
+  else if (chromaticSteps === -1.5) quality = 'sd'
   else if (chromaticSteps > 0) quality = 'A'.repeat(chromaticSteps)
   else quality = 'd'.repeat(-chromaticSteps - 1)
   const groupedInflections = groupFjsInflections(inflections)

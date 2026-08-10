@@ -172,6 +172,8 @@ describe('arithmetic expression evaluation', () => {
         Value.pitch(new Value(3).pow(new Value(5n, 2n)).div(new Value(2).pow(new Value(7n, 2n)))),
       ),
     ).toBe(true)
+    expect(evaluate('SA4').value.equals(evaluate('n4').value)).toBe(true)
+    expect(evaluate('sd5').value.equals(evaluate('n5').value)).toBe(true)
     const halfSharp = evaluate('Ct')
     if (halfSharp.kind !== 'absolutePitch') throw new Error('Expected a pitch.')
     expect(
@@ -233,6 +235,27 @@ describe('arithmetic expression evaluation', () => {
     if (doubled.kind !== 'pitchOffset') throw new Error('Expected an interval.')
     expect(doubled.value.equals(Value.pitch(new Value(36n, 25n)))).toBe(true)
     expect(doubled.spelling?.raw).toBe('d5v25')
+
+    const neutralMultiples = Array.from({ length: 14 }, (_, index) => evaluate(`${index + 1} * n3`))
+    expect(
+      neutralMultiples.every((interval) => interval.kind === 'pitchOffset' && interval.spelling),
+    ).toBe(true)
+    expect(neutralMultiples.map((interval) => interval.spelling?.quality)).toEqual([
+      'n',
+      'P',
+      'n',
+      'M',
+      'SA',
+      'M',
+      'SA',
+      'M',
+      'SA',
+      'M',
+      'SA',
+      'A',
+      'SA',
+      'A',
+    ])
   })
 
   it('groups two-digit products in generated FJS inflections', () => {

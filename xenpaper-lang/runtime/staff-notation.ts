@@ -57,6 +57,8 @@ function inferredAccidental(chromatic: number | undefined): string | undefined {
   if (chromatic === -1) return 'flat'
   if (chromatic === 2) return 'double-sharp'
   if (chromatic === -2) return 'double-flat'
+  if (chromatic === 0.5) return 'half-sharp'
+  if (chromatic === -0.5) return 'half-flat'
   return chromatic > 0 ? `${chromatic}-sharp` : `${-chromatic}-flat`
 }
 
@@ -66,6 +68,9 @@ function spellingChromatic(quality: string, number: number): number | undefined 
   if (quality === 'P' && perfect) return 0
   if (quality === 'M' && !perfect) return 0
   if (quality === 'm' && !perfect) return -1
+  if (quality === 'n' && !perfect) return -0.5
+  if (quality === 'SA') return 0.5
+  if (quality === 'sd') return perfect ? -0.5 : -1.5
   if (/^A+$/.test(quality)) return quality.length
   if (/^d+$/.test(quality)) return -(quality.length + (perfect ? 0 : 1))
   return undefined
@@ -184,9 +189,12 @@ export function constructStaffNotation(
     const zeroBased = numericNumber - 1
     const position =
       rootPosition + Math.ceil(zeroBased) + equaveStaffShift(value.spelling.modifiers)
-    const chromatic = Math.round(
-      (naturalCents(rootPosition) + cents - naturalCents(position)) / 100,
-    )
+    const chromatic =
+      value.spelling.quality === 'n' ||
+      value.spelling.quality === 'SA' ||
+      value.spelling.quality === 'sd'
+        ? spellingChromatic(value.spelling.quality, numericNumber)
+        : Math.round((naturalCents(rootPosition) + cents - naturalCents(position)) / 100)
     return {
       staffPosition: position,
       ...decorations(value, chromatic),
