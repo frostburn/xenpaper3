@@ -129,6 +129,7 @@ function soundingValue(value: EvaluatedLiteral): Value {
 /** Convert an evaluated Xenpaper pitch/interval into renderer-independent staff data. */
 export interface StaffNotationOptions {
   readonly rootStaffPosition?: number
+  readonly rootStaffCents?: number
 }
 
 function naturalCents(position: number): number {
@@ -152,6 +153,7 @@ export function constructStaffNotation(
 ): StaffPitch {
   const cents = soundingValue(value).valueOf()
   const rootPosition = options.rootStaffPosition ?? 0
+  const rootCents = options.rootStaffCents ?? naturalCents(rootPosition)
   if (!Number.isFinite(cents)) throw new RangeError('Staff pitch must be finite.')
 
   if (value.kind === 'absolutePitch') {
@@ -193,7 +195,7 @@ export function constructStaffNotation(
       (descending ? -1 : 1) * (Math.ceil(zeroBased) + equaveStaffShift(value.spelling.modifiers))
     const chromatic =
       (descending ? undefined : spellingChromatic(value.spelling.quality, numericNumber)) ??
-      Math.round((naturalCents(rootPosition) + cents - naturalCents(position)) / 50) / 2
+      Math.round((rootCents + cents - naturalCents(position)) / 50) / 2
     return {
       staffPosition: position,
       ...decorations(value, chromatic),
@@ -218,7 +220,7 @@ export function constructStaffNotation(
     }
   }
 
-  const absoluteCents = cents + naturalCents(rootPosition)
+  const absoluteCents = cents + rootCents
   const midiOffset = Math.round(absoluteCents / 100)
   const octaveOffset = Math.floor(midiOffset / 12)
   const pitchClass = ((midiOffset % 12) + 12) % 12
@@ -263,10 +265,12 @@ export function constructStaffNotationShape(shape: ScoreShape): StaffNotationSha
     case 'attack': {
       const pitch = constructStaffNotation(shape.pitch, {
         rootStaffPosition: shape.rootStaffPosition,
+        rootStaffCents: shape.rootStaffCents,
       })
       const alternatives = (shape.alternateAppearances ?? []).map((appearance) =>
         constructStaffNotation(appearance.pitch, {
           rootStaffPosition: appearance.rootStaffPosition,
+          rootStaffCents: appearance.rootStaffCents,
         }),
       )
       const ambiguous = alternatives.some(
