@@ -133,12 +133,17 @@ AdditiveOperator
 BinaryPlus
   = "+" &([ \t\r\n#] / ![0-9]) { return "+"; }
 
-// A minus immediately followed by a digit belongs to the following signed
-// integer. This makes `-1 -2` a sequence of two negative integer leaves.
+// A minus immediately followed by a digit or named interval belongs to the
+// following signed sequence item. This makes `-1 -2` a sequence of two
+// negative integer leaves and `D -n3` a D followed by a descending neutral
+// third. Whitespace after the minus keeps it binary, as in `D - n3`.
 // Write arithmetic subtraction of integer literals as `-1/1 - 2/1` or put
 // whitespace after the binary minus.
 BinaryMinus
-  = "-" &([ \t\r\n#] / ![0-9]) { return "-"; }
+  = "-" &([ \t\r\n#] / !([0-9] / NamedIntervalStart)) { return "-"; }
+
+NamedIntervalStart
+  = PitchModifier* IntervalQuality [0-9]
 
 MultiplicativeExpression
   = first:PowerExpression

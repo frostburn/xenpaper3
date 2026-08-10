@@ -176,6 +176,25 @@ describe('Xenpaper surface grammar', () => {
     expect(expression.operator).toBe('+')
   })
 
+  it('distinguishes attached negated intervals from spaced subtraction', () => {
+    const sequence = parse('D -n3').body[0]
+    const subtraction = parse('D - n3').body[0]
+
+    expect(sequence).toMatchObject({
+      type: 'Sequence',
+      items: [
+        { type: 'PitchLiteral', raw: 'D' },
+        { type: 'UnaryExpression', operator: '-', operand: { type: 'IntervalLiteral', raw: 'n3' } },
+      ],
+    })
+    expect(subtraction).toMatchObject({
+      type: 'BinaryExpression',
+      operator: '-',
+      left: { type: 'PitchLiteral', raw: 'D' },
+      right: { type: 'IntervalLiteral', raw: 'n3' },
+    })
+  })
+
   it('parses explicitly marked numeric literals as sequence items before degrees', () => {
     const program = parse(String.raw`3/2 1\12 3.5e 3.5r`)
     const items = (program.body[0] as SyntaxNode).items as SyntaxNode[]

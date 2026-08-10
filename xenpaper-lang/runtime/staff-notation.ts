@@ -186,11 +186,13 @@ export function constructStaffNotation(
   if (value.kind === 'pitchOffset' && value.spelling) {
     const numericNumber = Number(value.spelling.number.valueOf())
     const zeroBased = numericNumber - 1
+    const descending = cents < 0 && zeroBased > 0
     const position =
-      rootPosition + Math.ceil(zeroBased) + equaveStaffShift(value.spelling.modifiers)
+      rootPosition +
+      (descending ? -1 : 1) * (Math.ceil(zeroBased) + equaveStaffShift(value.spelling.modifiers))
     const chromatic =
-      spellingChromatic(value.spelling.quality, numericNumber) ??
-      Math.round((naturalCents(rootPosition) + cents - naturalCents(position)) / 100)
+      (descending ? undefined : spellingChromatic(value.spelling.quality, numericNumber)) ??
+      Math.round((naturalCents(rootPosition) + cents - naturalCents(position)) / 50) / 2
     return {
       staffPosition: position,
       ...decorations(value, chromatic),

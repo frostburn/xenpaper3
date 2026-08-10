@@ -278,7 +278,29 @@ export function evaluateExpression(
         value:
           operand.value.kind === 'scalar'
             ? result('scalar', operand.value.value.neg(), origins)
-            : result('pitchOffset', operand.value.value.neg(), origins),
+            : {
+                ...operand.value,
+                value: operand.value.value.neg(),
+                formula: operand.value.formula
+                  ? new Map(
+                      [...operand.value.formula].map(([prime, exponent]) => [
+                        prime,
+                        new Fraction(exponent).neg(),
+                      ]),
+                    )
+                  : undefined,
+                spelling: operand.value.spelling
+                  ? {
+                      ...operand.value.spelling,
+                      inflections: operand.value.spelling.inflections?.map((inflection) => ({
+                        ...inflection,
+                        direction:
+                          inflection.direction === 'numerator' ? 'denominator' : 'numerator',
+                      })),
+                    }
+                  : undefined,
+                origins,
+              },
         diagnostics: operand.diagnostics,
       }
     }
