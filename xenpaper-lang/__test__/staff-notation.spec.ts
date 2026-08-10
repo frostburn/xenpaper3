@@ -294,6 +294,20 @@ describe('staff notation construction', () => {
     })
   })
 
+  it('retains the accidental of a reassociated staff root', () => {
+    const node = parse('{D# = root} 1/1').body[0] as Expression
+    const evaluated = evaluateScoreShape(node)
+    if (!('shape' in evaluated)) throw new Error('Expected shape.')
+
+    expect(constructStaffNotationShape(evaluated.shape)).toMatchObject({
+      kind: 'sequence',
+      children: [
+        { kind: 'annotation', text: 'D# = root' },
+        { kind: 'note', pitch: { staffPosition: 1, accidentals: ['sharp'] } },
+      ],
+    })
+  })
+
   it('restores the active root when engraving a spelled nominal', () => {
     const node = parse('{A = root} A').body[0] as Expression
     const evaluated = evaluateScoreShape(node)

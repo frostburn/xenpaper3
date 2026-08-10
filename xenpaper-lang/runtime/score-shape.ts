@@ -214,6 +214,7 @@ function annotateRepeatAppearances(
       const ambiguous = alternateAppearances.some(
         (appearance) =>
           appearance.rootStaffPosition !== current.rootStaffPosition ||
+          appearance.rootStaffCents !== current.rootStaffCents ||
           !notationValue(appearance.pitch).equals(notationValue(current.pitch)),
       )
       return {
@@ -471,6 +472,7 @@ export function evaluateScoreShape(
             alternatives[index]!.push({
               pitch: attack.pitch,
               rootStaffPosition: attack.rootStaffPosition,
+              rootStaffCents: attack.rootStaffCents,
             })
           }
         }
@@ -801,6 +803,7 @@ export function evaluateScoreShape(
       duration: currentPulse,
       origins: evaluated.pitch.origins,
       rootStaffPosition: context.rootStaffPosition,
+      rootStaffCents: mapFormula(context.rootFormula, context.mapping).valueOf(),
       dynamic: currentDynamic,
       velocity: DYNAMIC_VELOCITIES[currentDynamic],
       ...(current.type === 'DegreeLiteral' ||
