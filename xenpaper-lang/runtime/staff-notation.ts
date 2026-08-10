@@ -51,13 +51,24 @@ function fjsInflections(formula: PrimeMonzo | undefined): FjsSpelling[] | undefi
   return result.length ? groupFjsInflections(result) : undefined
 }
 
-function inferredAccidental(chromatic: number): string | undefined {
+function inferredAccidental(chromatic: number | undefined): string | undefined {
   if (!chromatic) return undefined
   if (chromatic === 1) return 'sharp'
   if (chromatic === -1) return 'flat'
   if (chromatic === 2) return 'double-sharp'
   if (chromatic === -2) return 'double-flat'
   return chromatic > 0 ? `${chromatic}-sharp` : `${-chromatic}-flat`
+}
+
+function spellingChromatic(quality: string, number: number): number | undefined {
+  const simple = ((number - 1) % 7) + 1
+  const perfect = simple === 1 || simple === 4 || simple === 5
+  if (quality === 'P' && perfect) return 0
+  if (quality === 'M' && !perfect) return 0
+  if (quality === 'm' && !perfect) return -1
+  if (/^A+$/.test(quality)) return quality.length
+  if (/^d+$/.test(quality)) return -(quality.length + (perfect ? 0 : 1))
+  return undefined
 }
 
 function writtenAccidental(token: string): string {
@@ -190,9 +201,7 @@ export function constructStaffNotation(
   if (fjsSpelling) {
     const numericNumber = Number(fjsSpelling.number.valueOf())
     const position = rootPosition + Math.ceil(numericNumber - 1)
-    const chromatic = Math.round(
-      (naturalCents(rootPosition) + cents - naturalCents(position)) / 100,
-    )
+    const chromatic = spellingChromatic(fjsSpelling.quality, numericNumber)
     const accidental = inferredAccidental(chromatic)
     return {
       staffPosition: position,
