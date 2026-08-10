@@ -33,7 +33,8 @@ const UPWARD_GREEK_NOMINALS = new Set(['BET', 'Β'])
 
 function formulaOf(value: EvaluatedLiteral): PrimeMonzo | undefined {
   if (value.kind === 'absolutePitch') return value.formula
-  if (value.kind === 'pitchOffset' && value.formula) return value.formula
+  if (value.kind === 'pitchOffset')
+    return value.formula ?? value.notationValue?.primeExponents() ?? value.value.primeExponents()
   return value.value.primeExponents()
 }
 

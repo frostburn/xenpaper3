@@ -170,6 +170,27 @@ describe('staff notation construction', () => {
     expect(notes[1]).not.toHaveProperty('displayLabel')
   })
 
+  it('spells ratios relative to a high-prime root-frequency shift', () => {
+    const node = parse('{root = Ev5} 1/1').body[0] as Expression
+    const evaluated = evaluateScoreShape(node)
+    if (!('shape' in evaluated)) throw new Error('Expected shape.')
+
+    const staff = constructStaffNotationShape(evaluated.shape)
+    expect(staff).toMatchObject({
+      kind: 'sequence',
+      children: [
+        { kind: 'annotation', text: 'root = Ev5' },
+        {
+          kind: 'note',
+          pitch: { staffPosition: 0, accidentals: [], notehead: 'normal' },
+        },
+      ],
+    })
+    if (staff.kind !== 'sequence' || staff.children[1]?.kind !== 'note')
+      throw new Error('Expected a note after the root-frequency annotation.')
+    expect(staff.children[1].pitch).not.toHaveProperty('inflections')
+  })
+
   it('engraves a root-frequency shift relative to the moved root', () => {
     const node = parse('C D 1/1 {root = D} C D 1/1').body[0] as Expression
     const evaluated = evaluateScoreShape(node)
