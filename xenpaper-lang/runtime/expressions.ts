@@ -292,6 +292,10 @@ export function evaluateExpression(
                 spelling: operand.value.spelling
                   ? {
                       ...operand.value.spelling,
+                      direction:
+                        operand.value.spelling.direction === 'descending'
+                          ? 'ascending'
+                          : 'descending',
                       inflections: operand.value.spelling.inflections?.map((inflection) => ({
                         ...inflection,
                         direction:

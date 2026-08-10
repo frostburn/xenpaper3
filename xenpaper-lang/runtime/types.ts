@@ -61,6 +61,8 @@ export interface IntervalSpelling {
   readonly quality: string
   readonly number: bigint | Fraction
   readonly raw: string
+  /** Direction authored by unary negation; an absent value is ascending. */
+  readonly direction?: 'ascending' | 'descending'
   readonly inflections?: readonly FjsSpelling[]
   readonly modifiers?: readonly string[]
 }
