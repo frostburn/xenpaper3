@@ -76,6 +76,8 @@ describe('staff notation construction', () => {
     expect(notation('C - D')).toMatchObject({ staffPosition: -1, accidentals: ['flat'] })
     expect(notation('Eb - C')).toMatchObject({ staffPosition: 2, accidentals: ['flat'] })
     expect(notation('A + M3')).toMatchObject({ staffPosition: 7, accidentals: ['sharp'] })
+    expect(notation("C - 'D")).toMatchObject({ staffPosition: -8, accidentals: ['flat'] })
+    expect(notation('C - `D')).toMatchObject({ staffPosition: 6, accidentals: ['flat'] })
   })
 
   it('derives transposition accidentals independently of a reassociated root', () => {
@@ -88,6 +90,21 @@ describe('staff notation construction', () => {
       children: [
         { kind: 'annotation', text: 'A = root' },
         { kind: 'note', pitch: { staffPosition: 7, accidentals: ['sharp'] } },
+      ],
+    })
+  })
+
+  it('derives named interval accidentals from the root and 3-limit formula', () => {
+    const node = parse('{A = root} -M3 -m3').body[0] as Expression
+    const evaluated = evaluateScoreShape(node)
+    if (!('shape' in evaluated)) throw new Error('Expected shape.')
+
+    expect(constructStaffNotationShape(evaluated.shape)).toMatchObject({
+      kind: 'sequence',
+      children: [
+        { kind: 'annotation', text: 'A = root' },
+        { kind: 'note', pitch: { staffPosition: 3, accidentals: [] } },
+        { kind: 'note', pitch: { staffPosition: 3, accidentals: ['sharp'] } },
       ],
     })
   })
