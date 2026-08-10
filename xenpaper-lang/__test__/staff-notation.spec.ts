@@ -316,6 +316,27 @@ describe('staff notation construction', () => {
     },
   )
 
+  it('uses the complete absolute pitch as the reassociated staff root', () => {
+    const node = parse('{C^5 = root} 1/1').body[0] as Expression
+    const evaluated = evaluateScoreShape(node)
+    if (!('shape' in evaluated)) throw new Error('Expected shape.')
+
+    expect(constructStaffNotationShape(evaluated.shape)).toMatchObject({
+      kind: 'sequence',
+      children: [
+        { kind: 'annotation', text: 'C^5 = root' },
+        {
+          kind: 'note',
+          pitch: {
+            staffPosition: 0,
+            accidentals: [],
+            inflections: [{ direction: 'numerator', prime: 5n }],
+          },
+        },
+      ],
+    })
+  })
+
   it('restores the active root when engraving a spelled nominal', () => {
     const node = parse('{A = root} A').body[0] as Expression
     const evaluated = evaluateScoreShape(node)

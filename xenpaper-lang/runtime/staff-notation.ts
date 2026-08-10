@@ -117,8 +117,7 @@ function soundingValue(value: EvaluatedLiteral): Value {
 
 /** Convert an evaluated Xenpaper pitch/interval into renderer-independent staff data. */
 export interface StaffNotationOptions {
-  readonly rootStaffPosition?: number
-  readonly rootStaffAccidentals?: readonly string[]
+  readonly rootPitch?: Extract<EvaluatedLiteral, { kind: 'absolutePitch' }>
 }
 
 function naturalCents(position: number): number {
@@ -141,16 +140,20 @@ export function constructStaffNotation(
   options: StaffNotationOptions = {},
 ): StaffPitch {
   const cents = soundingValue(value).valueOf()
-  const rootPosition = options.rootStaffPosition ?? 0
+  const rootPosition = options.rootPitch
+    ? constructStaffNotation(options.rootPitch).staffPosition
+    : 0
   if (!Number.isFinite(cents)) throw new RangeError('Staff pitch must be finite.')
 
   if (value.kind !== 'absolutePitch' && cents === 0) {
-    return {
-      staffPosition: rootPosition,
-      accidentals: (options.rootStaffAccidentals ?? []).map(normalizeStaffAccidental),
-      notehead: 'normal',
-      cents,
-    }
+    return options.rootPitch
+      ? constructStaffNotation(options.rootPitch)
+      : {
+          staffPosition: rootPosition,
+          accidentals: [],
+          notehead: 'normal',
+          cents,
+        }
   }
 
   if (value.kind === 'absolutePitch') {
@@ -261,13 +264,11 @@ export function constructStaffNotationShape(shape: ScoreShape): StaffNotationSha
   switch (shape.kind) {
     case 'attack': {
       const pitch = constructStaffNotation(shape.pitch, {
-        rootStaffPosition: shape.rootStaffPosition,
-        rootStaffAccidentals: shape.rootStaffAccidentals,
+        rootPitch: shape.rootPitch,
       })
       const alternatives = (shape.alternateAppearances ?? []).map((appearance) =>
         constructStaffNotation(appearance.pitch, {
-          rootStaffPosition: appearance.rootStaffPosition,
-          rootStaffAccidentals: appearance.rootStaffAccidentals,
+          rootPitch: appearance.rootPitch,
         }),
       )
       const ambiguous = alternatives.some(

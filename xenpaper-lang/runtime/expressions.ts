@@ -229,7 +229,7 @@ export function evaluateExpression(
 ): ExpressionEvaluationResult {
   try {
     if (node.type === 'DegreeLiteral') {
-      const context = 'rootFormula' in mapping ? mapping : createPitchContext(mapping)
+      const context = 'rootPitch' in mapping ? mapping : createPitchContext(mapping)
       const value = context.degreeStep
         .mul(new Value(BigInt(node.degree)))
         .add(context.degreeEquave.mul(new Value(equaveShifts(node.modifiers))))
@@ -261,7 +261,7 @@ export function evaluateExpression(
       if (["'", '"', '`'].includes(node.operator)) {
         if (operand.value.kind === 'absolutePitch')
           throw new TypeError('An equave shift requires a pitch offset.')
-        const context = 'rootFormula' in mapping ? mapping : createPitchContext(mapping)
+        const context = 'rootPitch' in mapping ? mapping : createPitchContext(mapping)
         const shift = node.operator === "'" ? 1 : node.operator === '"' ? 2 : -1
         const offset =
           operand.value.kind === 'pitchOffset' ? operand.value : pitchCoercion(operand.value)
