@@ -174,9 +174,10 @@ export function constructStaffNotation(
         (rawNominal === rawNominal.toLowerCase() ? 1 : 0) +
         equaveStaffShift(value.spelling.modifiers) / 7
       const position = writtenOctave * 7 + latin
+      const chromatic = Math.round((cents - naturalCents(position)) / 50) / 2
       return {
         staffPosition: position,
-        ...decorations(value),
+        ...decorations(value, value.spelling.derived ? chromatic : undefined),
         notehead: 'normal',
         cents,
       }

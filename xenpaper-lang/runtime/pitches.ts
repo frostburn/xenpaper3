@@ -6,6 +6,7 @@ import { applyFjsInflections, fjsPrimeComma, groupFjsInflections } from './fjs'
 import type {
   AbsolutePitchValue,
   IntervalSpelling,
+  PitchSpelling,
   PitchOffsetValue,
   PrimeMapping,
   PrimeMonzo,
@@ -304,6 +305,62 @@ export function spellPitchDifference(left: AbsolutePitchValue, right: AbsolutePi
     ? BigInt(numericNumber)
     : new Fraction(numericNumber)
   return { quality, number, raw: `${quality}${numericNumber}` }
+}
+
+/** Transpose a written Latin pitch by the diatonic span of a named interval. */
+export function transposePitchSpelling(
+  pitch: PitchSpelling,
+  interval: IntervalSpelling | undefined,
+  subtract: boolean,
+): PitchSpelling | undefined {
+  if (!interval || pitch.system !== 'latin') return undefined
+  const base = ['C', 'D', 'E', 'F', 'G', 'A', 'B'].indexOf(pitch.nominal.toUpperCase())
+  if (base < 0) return undefined
+  const octave =
+    (pitch.nominal === pitch.nominal.toLowerCase() ? 1 : 0) +
+    (pitch.modifiers ?? []).reduce(
+      (sum, modifier) =>
+        sum +
+        (modifier === 'equaveUp'
+          ? 1
+          : modifier === 'doubleEquaveUp'
+            ? 2
+            : modifier === 'equaveDown'
+              ? -1
+              : 0),
+      0,
+    )
+  const number = Number(interval.number.valueOf())
+  const intervalOctaves = (interval.modifiers ?? []).reduce(
+    (sum, modifier) =>
+      sum +
+      (modifier === 'equaveUp'
+        ? 7
+        : modifier === 'doubleEquaveUp'
+          ? 14
+          : modifier === 'equaveDown'
+            ? -7
+            : 0),
+    0,
+  )
+  let steps = Math.ceil(number - 1) + intervalOctaves
+  if (interval.direction === 'descending') steps = -steps
+  if (subtract) steps = -steps
+  const rank = base + octave * 7 + steps
+  const nominal = ['C', 'D', 'E', 'F', 'G', 'A', 'B'][((rank % 7) + 7) % 7]!
+  const targetOctave = Math.floor(rank / 7)
+  const modifiers = targetOctave
+    ? Array.from({ length: Math.abs(targetOctave) }, () =>
+        targetOctave > 0 ? 'equaveUp' : 'equaveDown',
+      )
+    : undefined
+  return {
+    nominal,
+    raw: nominal,
+    system: 'latin',
+    derived: true,
+    ...(modifiers ? { modifiers } : {}),
+  }
 }
 
 export function evaluatePitchLiteral(

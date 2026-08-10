@@ -76,6 +76,8 @@ export interface FjsSpelling {
 export interface PitchSpelling {
   readonly nominal: string
   readonly raw: string
+  /** The spelling was derived by pitch/interval arithmetic rather than written literally. */
+  readonly derived?: boolean
   readonly system?: 'latin' | 'greek' | 'mos'
   readonly accidentals?: readonly string[]
   readonly inflections?: readonly FjsSpelling[]
