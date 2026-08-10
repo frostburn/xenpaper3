@@ -235,7 +235,7 @@ HardBoundary
 RepeatExpression
   = "|:" Spacing count:RepeatCount? Spacing body:RepeatBody? Spacing ":|" {
       return node('Repeat', {
-        count: count ?? node('IntegerLiteral', { raw: '2', value: '2' }),
+        ...(count ? { count } : {}),
         body: body ?? [],
       });
     }

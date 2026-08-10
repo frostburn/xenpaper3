@@ -52,16 +52,16 @@ export function expandRepeats(
 
   const cloneNode = (node: SyntaxNode, path: ExpansionPath): ExpandedNode[] => {
     if (node.type === 'Repeat') {
-      const countNode = node.count as SyntaxNode & { value?: unknown }
+      const countNode = node.count as (SyntaxNode & { value?: unknown }) | undefined
       let count: bigint
       try {
-        count = BigInt(String(countNode.value))
+        count = countNode ? BigInt(String(countNode.value)) : 2n
       } catch {
         diagnostics.push({
           code: 'XP_REPEAT_COUNT',
           severity: 'error',
           message: 'Repeat count must be an exact non-negative integer.',
-          locations: [countNode.location ?? node.location],
+          locations: [countNode?.location ?? node.location],
         })
         return []
       }
@@ -70,7 +70,7 @@ export function expandRepeats(
           code: 'XP_REPEAT_COUNT',
           severity: 'error',
           message: 'Repeat count must be an exact non-negative integer.',
-          locations: [countNode.location ?? node.location],
+          locations: [countNode?.location ?? node.location],
         })
         return []
       }
@@ -84,7 +84,7 @@ export function expandRepeats(
             code: 'XP_REPEAT_COUNT',
             severity: 'error',
             message: 'Repeat count is too large to identify every occurrence.',
-            locations: [countNode.location ?? node.location],
+            locations: [countNode?.location ?? node.location],
           })
           return result
         }

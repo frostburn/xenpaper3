@@ -349,7 +349,7 @@ export function evaluateScoreShape(
     if (current.type === 'PostfixExpression') return contextAfter(current.expression, context)
     if (current.type === 'Repeat') {
       let active = context
-      const count = Number(current.count.value)
+      const count = Number(current.count?.value ?? 2)
       for (let iteration = 0; iteration < count; iteration++) {
         active = current.body.reduce((bodyContext, item) => contextAfter(item, bodyContext), active)
       }
@@ -391,7 +391,7 @@ export function evaluateScoreShape(
     }
     if (current.type === 'Repeat') {
       let active = currentPulse
-      for (let iteration = 0; iteration < Number(current.count.value); iteration++) {
+      for (let iteration = 0; iteration < Number(current.count?.value ?? 2); iteration++) {
         active = current.body.reduce(
           (bodyPulse, item) => pulseAfter(item, bodyPulse, context),
           active,
@@ -435,7 +435,7 @@ export function evaluateScoreShape(
       return { shape: barline(current, 'double'), diagnostics: [] }
     }
     if (current.type === 'Repeat') {
-      const count = Number(current.count.value)
+      const count = Number(current.count?.value ?? 2)
       let activeContext = context
       let activePulse = currentPulse
       let displayedShapes: ScoreShape[] | undefined
