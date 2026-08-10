@@ -183,6 +183,14 @@ describe('arithmetic expression evaluation', () => {
     ).toBe(true)
   })
 
+  it('retains named interval spelling when negating an interval', () => {
+    const interval = evaluate('-n3')
+
+    expect(interval.kind).toBe('pitchOffset')
+    expect(interval.value.equals(Value.pitch(new Value(3n, 2n)).div(new Value(2)).neg())).toBe(true)
+    expect(interval.kind === 'pitchOffset' && interval.spelling?.raw).toBe('n3')
+  })
+
   it('applies the Xenpaper 2 default up and lift offsets', () => {
     const up = evaluate('^C')
     const lift = evaluate('/C')
