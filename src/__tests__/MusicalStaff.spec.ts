@@ -255,6 +255,22 @@ describe('MusicalStaff', () => {
     expect(wrapper.findAll('.rest')).toHaveLength(1)
   })
 
+  it('renders accidental clusters as separate musical symbols', () => {
+    const clustered: StaffNotationShape = {
+      kind: 'note',
+      duration: notation.duration,
+      pitch: {
+        staffPosition: 3,
+        accidentals: ['sharp', 'half-sharp'],
+        notehead: 'normal',
+        cents: 650,
+      },
+    }
+    const wrapper = mount(MusicalStaff, { props: { notation: clustered } })
+
+    expect(wrapper.get('.accidental').text()).toBe('♯𝄲')
+  })
+
   it('shows an empty state before notation is populated', () => {
     expect(mount(MusicalStaff).get('.empty-message').text()).toBe('No notation loaded')
   })

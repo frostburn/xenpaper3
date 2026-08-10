@@ -174,6 +174,8 @@ describe('arithmetic expression evaluation', () => {
     ).toBe(true)
     expect(evaluate('SA4').value.equals(evaluate('n4').value)).toBe(true)
     expect(evaluate('sd5').value.equals(evaluate('n5').value)).toBe(true)
+    expect(evaluate('SAA4').spelling?.quality).toBe('SAA')
+    expect(evaluate('sdd5').spelling?.quality).toBe('sdd')
     const halfSharp = evaluate('Ct')
     if (halfSharp.kind !== 'absolutePitch') throw new Error('Expected a pitch.')
     expect(
@@ -256,6 +258,8 @@ describe('arithmetic expression evaluation', () => {
       'SA',
       'A',
     ])
+    expect(evaluate('19 * n3 - 5 * P8').spelling?.raw).toBe('SAA4')
+    expect(evaluate('6 * P8 - 19 * n3').spelling?.raw).toBe('sdd5')
   })
 
   it('groups two-digit products in generated FJS inflections', () => {

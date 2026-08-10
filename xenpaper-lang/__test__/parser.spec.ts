@@ -304,9 +304,9 @@ describe('Xenpaper surface grammar', () => {
   })
 
   it('supports semi-augmented and semi-diminished pitch offsets', () => {
-    const program = parse('SA4 sd5')
+    const program = parse('SA4 SAA4 sd5 sdd5')
     const items = (program.body[0] as SyntaxNode).items as SyntaxNode[]
 
-    expect(items.map((item) => item.quality)).toEqual(['SA', 'sd'])
+    expect(items.map((item) => item.quality)).toEqual(['SA', 'SAA', 'sd', 'sdd'])
   })
 })
