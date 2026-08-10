@@ -14,7 +14,7 @@ describe('repeat expansion', () => {
   it('uses two iterations when the source omits a count', () => {
     const program = parse('|: C :|')
 
-    expect(program.body[0]).not.toHaveProperty('count')
+    expect(program.body[0]).toMatchObject({ count: null })
 
     const expanded = body('|: C :|')
 
@@ -23,6 +23,10 @@ describe('repeat expansion', () => {
       [{ repeatOffset: 0, iteration: 0 }],
       [{ repeatOffset: 0, iteration: 1 }],
     ])
+  })
+
+  it('retains Peggy values for omitted repeat fields', () => {
+    expect(parse('|: :|').body[0]).toMatchObject({ count: null, body: [] })
   })
 
   it('expands nested repeats and composes occurrence paths', () => {

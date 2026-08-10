@@ -239,7 +239,7 @@ export interface RatioLiteral extends Node {
 
 export interface Repeat extends Node {
   type: 'Repeat'
-  count?: IntegerLiteral
+  count: IntegerLiteral | null
   body: Expression[]
 }
 
