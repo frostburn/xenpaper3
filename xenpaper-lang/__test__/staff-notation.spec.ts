@@ -70,6 +70,10 @@ describe('staff notation construction', () => {
     expect(notation('Eb')).toMatchObject({ accidentals: ['flat'], staffPosition: 2 })
   })
 
+  it('engraves the spelled result of pitch and interval arithmetic', () => {
+    expect(notation('G - n3')).toMatchObject({ staffPosition: 2, accidentals: ['half-flat'] })
+  })
+
   it('uses directed triangular noteheads for Greek nominals', () => {
     expect(notation('Gam')).toMatchObject({ staffPosition: 4, notehead: 'triangle-down' })
     expect(notation('Bet')).toMatchObject({ staffPosition: 3, notehead: 'triangle-up' })

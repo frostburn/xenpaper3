@@ -13,6 +13,7 @@ import {
   scalePitchOffset,
   spellIntervalFormula,
   spellPitchDifference,
+  transposePitchSpelling,
 } from './pitches'
 
 function equaveShifts(modifiers: readonly { readonly kind: string }[]): number {
@@ -106,9 +107,11 @@ function addOrSubtract(
     if (left.kind !== 'absolutePitch')
       throw new TypeError('A pitch offset cannot subtract an absolute pitch.')
     const offset = pitchCoercion(right)
+    const spelling = transposePitchSpelling(left.spelling, offset.spelling, subtract)
     return {
       ...left,
       rootOffset: subtract ? left.rootOffset.sub(offset.value) : left.rootOffset.add(offset.value),
+      ...(spelling ? { spelling } : {}),
       origins,
     }
   }
