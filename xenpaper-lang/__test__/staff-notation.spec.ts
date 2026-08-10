@@ -53,6 +53,18 @@ describe('staff notation construction', () => {
       staffPosition: 3,
       accidentals: ['sharp', 'half-sharp'],
     })
+    expect(notation('AAA1')).toMatchObject({
+      staffPosition: 0,
+      accidentals: ['double-sharp', 'sharp'],
+    })
+    expect(notation('AAAA1')).toMatchObject({
+      staffPosition: 0,
+      accidentals: ['double-sharp', 'double-sharp'],
+    })
+    expect(notation('ddd1')).toMatchObject({
+      staffPosition: 0,
+      accidentals: ['double-flat', 'flat'],
+    })
     expect(notation('Eb')).toMatchObject({ accidentals: ['flat'], staffPosition: 2 })
   })
 
