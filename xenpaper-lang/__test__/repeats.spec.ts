@@ -12,6 +12,10 @@ function body(source: string, expansionLimit?: number): readonly ExpandedNode[] 
 
 describe('repeat expansion', () => {
   it('uses two iterations when the source omits a count', () => {
+    const program = parse('|: C :|')
+
+    expect(program.body[0]).not.toHaveProperty('count')
+
     const expanded = body('|: C :|')
 
     expect(expanded.map((node) => node.type)).toEqual(['PitchLiteral', 'PitchLiteral'])
