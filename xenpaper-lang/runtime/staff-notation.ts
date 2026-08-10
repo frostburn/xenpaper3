@@ -136,6 +136,22 @@ function formulaChromatic(formula: PrimeMonzo, position: number): number | undef
   return chromatic.d <= 2 ? chromatic.valueOf() : undefined
 }
 
+function absoluteIntervalFormula(
+  value: Extract<EvaluatedLiteral, { kind: 'pitchOffset' }>,
+  rootPitch: Extract<EvaluatedLiteral, { kind: 'absolutePitch' }> | undefined,
+): PrimeMonzo | undefined {
+  if (!value.formula) return undefined
+  const result = new Map<number, Fraction>()
+  for (const [prime, exponent] of rootPitch?.formula ?? [])
+    result.set(prime, new Fraction(exponent))
+  for (const [prime, exponent] of value.formula) {
+    const combined = (result.get(prime) ?? new Fraction(0)).add(exponent)
+    if (combined.n) result.set(prime, combined)
+    else result.delete(prime)
+  }
+  return result
+}
+
 function equaveStaffShift(modifiers: readonly string[] | undefined): number {
   return (modifiers ?? []).reduce(
     (total, kind) =>
@@ -205,7 +221,9 @@ export function constructStaffNotation(
     const position =
       rootPosition +
       (descending ? -1 : 1) * (Math.ceil(zeroBased) + equaveStaffShift(value.spelling.modifiers))
+    const exactFormula = absoluteIntervalFormula(value, options.rootPitch)
     const chromatic =
+      (exactFormula ? formulaChromatic(exactFormula, position) : undefined) ??
       (descending ? undefined : spellingChromatic(value.spelling.quality, numericNumber)) ??
       Math.round((naturalCents(rootPosition) + cents - naturalCents(position)) / 50) / 2
     return {

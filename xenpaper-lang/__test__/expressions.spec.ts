@@ -195,6 +195,8 @@ describe('arithmetic expression evaluation', () => {
   it('derives traditional quality and direction from pitch differences', () => {
     const descending = evaluate('C - D')
     const altered = evaluate('Eb - C')
+    const compoundDescending = evaluate("C - 'D")
+    const loweredRight = evaluate('C - `D')
 
     expect(descending.kind === 'pitchOffset' && descending.spelling).toMatchObject({
       quality: 'M',
@@ -204,6 +206,15 @@ describe('arithmetic expression evaluation', () => {
     expect(altered.kind === 'pitchOffset' && altered.spelling).toMatchObject({
       quality: 'm',
       number: 3n,
+    })
+    expect(compoundDescending.kind === 'pitchOffset' && compoundDescending.spelling).toMatchObject({
+      quality: 'M',
+      number: 9n,
+      direction: 'descending',
+    })
+    expect(loweredRight.kind === 'pitchOffset' && loweredRight.spelling).toMatchObject({
+      quality: 'm',
+      number: 7n,
     })
   })
 
