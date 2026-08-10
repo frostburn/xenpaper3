@@ -56,7 +56,8 @@ function inferredAccidentals(chromatic: number | undefined): string[] {
   const direction = chromatic > 0 ? 'sharp' : 'flat'
   const magnitude = Math.abs(chromatic)
   const whole = Math.floor(magnitude)
-  const result = whole === 1 ? [direction] : whole === 2 ? [`double-${direction}`] : []
+  const result = Array.from({ length: Math.floor(whole / 2) }, () => `double-${direction}`)
+  if (whole % 2) result.push(direction)
   if (magnitude % 1 === 0.5) result.push(`half-${direction}`)
   if (!result.length) result.push(`${magnitude}-${direction}`)
   return result
@@ -188,11 +189,8 @@ export function constructStaffNotation(
     const position =
       rootPosition + Math.ceil(zeroBased) + equaveStaffShift(value.spelling.modifiers)
     const chromatic =
-      value.spelling.quality === 'n' ||
-      /^SA+$/.test(value.spelling.quality) ||
-      /^sd+$/.test(value.spelling.quality)
-        ? spellingChromatic(value.spelling.quality, numericNumber)
-        : Math.round((naturalCents(rootPosition) + cents - naturalCents(position)) / 100)
+      spellingChromatic(value.spelling.quality, numericNumber) ??
+      Math.round((naturalCents(rootPosition) + cents - naturalCents(position)) / 100)
     return {
       staffPosition: position,
       ...decorations(value, chromatic),

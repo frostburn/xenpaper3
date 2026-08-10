@@ -271,6 +271,38 @@ describe('MusicalStaff', () => {
     expect(wrapper.get('.accidental').text()).toBe('♯𝄲')
   })
 
+  it('renders arbitrarily large sharp and flat clusters with musical symbols', () => {
+    const clustered: StaffNotationShape = {
+      kind: 'sequence',
+      duration: notation.duration,
+      children: [
+        {
+          kind: 'note',
+          duration: notation.duration,
+          pitch: {
+            staffPosition: 0,
+            accidentals: ['double-sharp', 'sharp'],
+            notehead: 'normal',
+            cents: 300,
+          },
+        },
+        {
+          kind: 'note',
+          duration: notation.duration,
+          pitch: {
+            staffPosition: 0,
+            accidentals: ['double-flat', 'double-flat', 'flat'],
+            notehead: 'normal',
+            cents: -500,
+          },
+        },
+      ],
+    }
+    const wrapper = mount(MusicalStaff, { props: { notation: clustered } })
+
+    expect(wrapper.findAll('.accidental').map((item) => item.text())).toEqual(['𝄪♯', '𝄫𝄫♭'])
+  })
+
   it('shows an empty state before notation is populated', () => {
     expect(mount(MusicalStaff).get('.empty-message').text()).toBe('No notation loaded')
   })
