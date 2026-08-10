@@ -392,7 +392,7 @@ IntervalLiteral
     }
 
 IntervalQuality
-  = $("A"+ / "d"+ / "P" / "M" / "m" / "n")
+  = $("SA" / "sd" / "A"+ / "d"+ / "P" / "M" / "m" / "n")
 
 IntervalNumber
   = $(UnsignedInteger (".5" / "½")?)
