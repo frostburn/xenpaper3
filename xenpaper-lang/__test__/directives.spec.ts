@@ -23,8 +23,7 @@ describe('directive runtime', () => {
 
   it('resolves dynamics and consumes velocity once', () => {
     const events = notes('@p C @velocity(80%) D E')
-    expect(events.map(({ dynamic }) => dynamic)).toEqual(['p', 'p', 'p'])
-    expect(events.map(({ velocity }) => velocity.valueOf())).toEqual([0.3, 0.8, 0.3])
+    expect(events.map(({ dynamic }) => dynamic.valueOf())).toEqual([0.3, 0.8, 0.3])
   })
 
   it('keeps dynamics as zero-duration events at their authored offsets', () => {
@@ -40,7 +39,11 @@ describe('directive runtime', () => {
   })
 
   it('isolates dynamic state in lexical groups', () => {
-    expect(notes('@p C (@f D) E').map(({ dynamic }) => dynamic)).toEqual(['p', 'f', 'p'])
+    expect(notes('@p C (@f D) E').map(({ dynamic }) => dynamic.toFraction())).toEqual([
+      '3/10',
+      '13/20',
+      '3/10',
+    ])
   })
 
   it('matches scalar and parallel gliss shapes after tail elimination', () => {
