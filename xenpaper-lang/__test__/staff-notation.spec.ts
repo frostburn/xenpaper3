@@ -43,6 +43,7 @@ describe('staff notation construction', () => {
   it('converts relative intervals into absolute staff positions', () => {
     expect(notation('M3')).toMatchObject({ staffPosition: 2 })
     expect(notation('n3')).toMatchObject({ staffPosition: 2, accidentals: ['half-flat'] })
+    expect(notation('d2')).toMatchObject({ staffPosition: 1, accidentals: ['double-flat'] })
     expect(notation('-n3')).toMatchObject({ staffPosition: -2, accidentals: ['half-flat'] })
     expect(notation('SA4')).toMatchObject({ staffPosition: 3, accidentals: ['half-sharp'] })
     expect(notation('sd5')).toMatchObject({ staffPosition: 4, accidentals: ['half-flat'] })

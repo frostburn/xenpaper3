@@ -186,7 +186,7 @@ export function constructStaffNotation(
   if (value.kind === 'pitchOffset' && value.spelling) {
     const numericNumber = Number(value.spelling.number.valueOf())
     const zeroBased = numericNumber - 1
-    const descending = cents < 0 && zeroBased > 0
+    const descending = value.spelling.direction === 'descending'
     const position =
       rootPosition +
       (descending ? -1 : 1) * (Math.ceil(zeroBased) + equaveStaffShift(value.spelling.modifiers))
