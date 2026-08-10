@@ -103,13 +103,10 @@ export interface PitchContext {
   readonly degreeEquave: Value
   /** Sounding displacement of the current root from the default root frequency. */
   readonly rootDisplacement: Value
-  readonly rootFormula: PrimeMonzo
+  /** Absolute pitch used as the notation root. */
+  readonly rootPitch: AbsolutePitchValue
   readonly up: Value
   readonly lift: Value
-  /** Diatonic staff steps from middle C occupied by the context root. */
-  readonly rootStaffPosition: number
-  /** Authored accidental tokens on the active notation root. */
-  readonly rootStaffAccidentals: readonly string[]
 }
 
 export type EvaluatedLiteral = ScalarValue | PitchOffsetValue | AbsolutePitchValue
@@ -177,8 +174,7 @@ export interface ShapeBase {
 export interface AttackShape extends ShapeBase {
   readonly kind: 'attack'
   readonly pitch: PitchOffsetValue | (AbsolutePitchValue & { readonly value: Value })
-  readonly rootStaffPosition: number
-  readonly rootStaffAccidentals: readonly string[]
+  readonly rootPitch: AbsolutePitchValue
   readonly dynamic: DynamicMark
   readonly velocity: Fraction
   readonly automation?: PitchAutomation
@@ -205,8 +201,7 @@ export interface PitchAutomation {
 
 export interface AttackAppearance {
   readonly pitch: AttackShape['pitch']
-  readonly rootStaffPosition: number
-  readonly rootStaffAccidentals: readonly string[]
+  readonly rootPitch: AbsolutePitchValue
 }
 
 export interface RestShape extends ShapeBase {
@@ -265,8 +260,7 @@ export interface BeatTimedNoteEvent {
   readonly start: Fraction
   readonly duration: Fraction
   readonly pitch: AttackShape['pitch']
-  readonly rootStaffPosition: number
-  readonly rootStaffAccidentals?: readonly string[]
+  readonly rootPitch?: AbsolutePitchValue
   /** Effective amplitude from either the prevailing dynamic or a one-shot velocity. */
   readonly dynamic: Fraction
   readonly automation?: PitchAutomation

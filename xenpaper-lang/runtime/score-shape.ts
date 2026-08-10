@@ -218,8 +218,7 @@ function annotateRepeatAppearances(
         pitch.kind === 'absolutePitch' ? pitch.rootOffset : (pitch.notationValue ?? pitch.value)
       const ambiguous = alternateAppearances.some(
         (appearance) =>
-          appearance.rootStaffPosition !== current.rootStaffPosition ||
-          appearance.rootStaffAccidentals.join() !== current.rootStaffAccidentals.join() ||
+          appearance.rootPitch.spelling.raw !== current.rootPitch.spelling.raw ||
           !notationValue(appearance.pitch).equals(notationValue(current.pitch)),
       )
       return {
@@ -313,7 +312,7 @@ function playablePitch(
   }
   if (evaluated.value.kind === 'absolutePitch') {
     const absoluteRootOffset = evaluated.value.rootOffset.add(
-      mapFormula(context.rootFormula, context.mapping),
+      mapFormula(context.rootPitch.formula, context.mapping),
     )
     return {
       pitch: {
@@ -495,8 +494,7 @@ export function evaluateScoreShape(
             const attack = iterationAttacks[index]!
             alternatives[index]!.push({
               pitch: attack.pitch,
-              rootStaffPosition: attack.rootStaffPosition,
-              rootStaffAccidentals: attack.rootStaffAccidentals,
+              rootPitch: attack.rootPitch,
             })
           }
         }
@@ -826,8 +824,7 @@ export function evaluateScoreShape(
       pitch: evaluated.pitch,
       duration: currentPulse,
       origins: evaluated.pitch.origins,
-      rootStaffPosition: context.rootStaffPosition,
-      rootStaffAccidentals: context.rootStaffAccidentals,
+      rootPitch: context.rootPitch,
       dynamic: currentDynamic,
       velocity: DYNAMIC_VELOCITIES[currentDynamic],
       ...(current.type === 'DegreeLiteral' ||

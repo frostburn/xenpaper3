@@ -173,12 +173,19 @@ export function normalizeStaffAccidental(token: string): string {
 }
 
 export function createPitchContext(mapping: PrimeMapping = DEFAULT_MAPPING): PitchContext {
+  const rootPitch: AbsolutePitchValue = {
+    kind: 'absolutePitch',
+    rootOffset: Value.cents(0),
+    formula: new Map(),
+    spelling: { nominal: 'C', raw: 'C', system: 'latin', accidentals: [] },
+    origins: [],
+  }
   return {
     mapping,
     degreeStep: Value.cents(100),
     degreeEquave: Value.cents(1200),
     rootDisplacement: Value.cents(0),
-    rootFormula: new Map(),
+    rootPitch,
     up: mapFormula(
       new Map([
         [2, new Fraction(-1, 2)],
@@ -195,15 +202,13 @@ export function createPitchContext(mapping: PrimeMapping = DEFAULT_MAPPING): Pit
       ]),
       mapping,
     ),
-    rootStaffPosition: 0,
-    rootStaffAccidentals: [],
   }
 }
 
 export const DEFAULT_PITCH_CONTEXT = createPitchContext()
 
 function asContext(input: PrimeMapping | PitchContext): PitchContext {
-  return 'rootFormula' in input ? input : createPitchContext(input)
+  return 'rootPitch' in input ? input : createPitchContext(input)
 }
 
 /** Apply the stateful subset of a pitch-context block to an immutable context. */
@@ -222,9 +227,10 @@ export function applyPitchContextChange(
         degreeStep: Value.cents(new Fraction(1200, Number(match[1]))),
         degreeEquave: Value.cents(1200),
         rootDisplacement: context.rootDisplacement,
-        rootFormula: context.rootFormula,
-        rootStaffPosition: context.rootStaffPosition,
-        rootStaffAccidentals: context.rootStaffAccidentals,
+        rootPitch: {
+          ...context.rootPitch,
+          rootOffset: mapFormula(context.rootPitch.formula, mapping),
+        },
       }
       continue
     }
@@ -246,22 +252,11 @@ export function applyPitchContextChange(
     ) {
       const target = evaluatePitchLiteral(statement.target.pitch, {
         ...context,
-        rootFormula: new Map(),
+        rootPitch: createPitchContext(context.mapping).rootPitch,
       })
-      const nominal = statement.target.pitch.nominal.value
-      const upper = nominal.toUpperCase()
-      const greekKey = GREEK_SCRIPT[upper] ?? upper
-      const rank = NOMINAL_RANK[greekKey]
-      const nominalPosition = rank === undefined ? 0 : Math.ceil(rank - 1)
-      const caseShift = nominal === nominal.toLowerCase() ? 7 : 0
       context = {
         ...context,
-        rootFormula: target.formula,
-        rootStaffPosition:
-          nominalPosition + caseShift + shifts(statement.target.pitch.modifiers) * 7,
-        rootStaffAccidentals: statement.target.pitch.accidentals.map(
-          (accidental) => accidental.value,
-        ),
+        rootPitch: target,
       }
       continue
     }
@@ -441,8 +436,8 @@ export function evaluatePitchLiteral(
   }
   applyFjsInflections(result, node.inflections)
   let rootOffset = mapFormula(result, context.mapping)
-  if (context.rootFormula.size)
-    rootOffset = rootOffset.sub(mapFormula(context.rootFormula, context.mapping))
+  if (context.rootPitch.formula.size)
+    rootOffset = rootOffset.sub(mapFormula(context.rootPitch.formula, context.mapping))
   for (const modifier of node.modifiers) {
     if (modifier.kind === 'up') rootOffset = rootOffset.add(context.up)
     else if (modifier.kind === 'down') rootOffset = rootOffset.sub(context.up)

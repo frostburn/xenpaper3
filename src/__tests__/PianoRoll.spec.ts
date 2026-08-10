@@ -20,7 +20,6 @@ describe('PianoRoll', () => {
             value: Value.cents(700),
             origins: [],
           },
-          rootStaffPosition: 0,
           dynamic: new Fraction(1, 2),
           label: 'G',
           origins: [],
