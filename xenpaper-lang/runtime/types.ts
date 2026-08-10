@@ -108,6 +108,8 @@ export interface PitchContext {
   readonly lift: Value
   /** Diatonic staff steps from middle C occupied by the context root. */
   readonly rootStaffPosition: number
+  /** Authored accidental tokens on the active notation root. */
+  readonly rootStaffAccidentals: readonly string[]
 }
 
 export type EvaluatedLiteral = ScalarValue | PitchOffsetValue | AbsolutePitchValue
@@ -176,8 +178,7 @@ export interface AttackShape extends ShapeBase {
   readonly kind: 'attack'
   readonly pitch: PitchOffsetValue | (AbsolutePitchValue & { readonly value: Value })
   readonly rootStaffPosition: number
-  /** Mapped cents occupied by the active notation root. */
-  readonly rootStaffCents: number
+  readonly rootStaffAccidentals: readonly string[]
   readonly dynamic: DynamicMark
   readonly velocity: Fraction
   readonly automation?: PitchAutomation
@@ -205,7 +206,7 @@ export interface PitchAutomation {
 export interface AttackAppearance {
   readonly pitch: AttackShape['pitch']
   readonly rootStaffPosition: number
-  readonly rootStaffCents: number
+  readonly rootStaffAccidentals: readonly string[]
 }
 
 export interface RestShape extends ShapeBase {
@@ -265,7 +266,7 @@ export interface BeatTimedNoteEvent {
   readonly duration: Fraction
   readonly pitch: AttackShape['pitch']
   readonly rootStaffPosition: number
-  readonly rootStaffCents?: number
+  readonly rootStaffAccidentals?: readonly string[]
   /** Effective amplitude from either the prevailing dynamic or a one-shot velocity. */
   readonly dynamic: Fraction
   readonly automation?: PitchAutomation

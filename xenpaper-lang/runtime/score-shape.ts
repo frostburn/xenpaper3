@@ -4,7 +4,12 @@ import type { Diagnostic } from '../diagnostics'
 import { Value } from '../value'
 import { evaluateExpression } from './expressions'
 import { DYNAMIC_VELOCITIES, resolveDirective } from './directives'
-import { DEFAULT_PITCH_CONTEXT, applyPitchContextChange, mapFormula } from './pitches'
+import {
+  DEFAULT_PITCH_CONTEXT,
+  applyPitchContextChange,
+  mapFormula,
+  normalizeStaffAccidental,
+} from './pitches'
 import type {
   AttackShape,
   AttackAppearance,
@@ -214,7 +219,7 @@ function annotateRepeatAppearances(
       const ambiguous = alternateAppearances.some(
         (appearance) =>
           appearance.rootStaffPosition !== current.rootStaffPosition ||
-          appearance.rootStaffCents !== current.rootStaffCents ||
+          appearance.rootStaffAccidentals.join() !== current.rootStaffAccidentals.join() ||
           !notationValue(appearance.pitch).equals(notationValue(current.pitch)),
       )
       return {
@@ -244,6 +249,25 @@ function attacks(shape: ScoreShape): AttackShape[] {
 function contextAnnotation(
   node: Extract<Expression, { type: 'PitchContextChange' }>,
 ): AnnotationShape {
+  const pitchText = (pitch: Extract<Expression, { type: 'PitchLiteral' }>) => {
+    let text = pitch.raw
+    for (const accidental of [...pitch.accidentals].reverse()) {
+      const glyph =
+        {
+          flat: '♭',
+          sharp: '♯',
+          natural: '♮',
+          'double-flat': '𝄫',
+          'double-sharp': '𝄪',
+          'half-flat': '𝄳',
+          'half-sharp': '𝄲',
+        }[normalizeStaffAccidental(accidental.value)] ?? accidental.value
+      const start = accidental.location.start.offset - pitch.location.start.offset
+      const end = accidental.location.end.offset - pitch.location.start.offset
+      text = text.slice(0, start) + glyph + text.slice(end)
+    }
+    return text
+  }
   const text = node.statements
     .map((statement) => {
       if (statement.type !== 'ContextAssignment')
@@ -252,7 +276,7 @@ function contextAnnotation(
         statement.target.type === 'ContextNameTarget'
           ? statement.target.name
           : statement.target.type === 'ContextPitchTarget'
-            ? statement.target.pitch.raw
+            ? pitchText(statement.target.pitch)
             : statement.target.operator
       const value =
         'raw' in statement.value
@@ -472,7 +496,7 @@ export function evaluateScoreShape(
             alternatives[index]!.push({
               pitch: attack.pitch,
               rootStaffPosition: attack.rootStaffPosition,
-              rootStaffCents: attack.rootStaffCents,
+              rootStaffAccidentals: attack.rootStaffAccidentals,
             })
           }
         }
@@ -803,7 +827,7 @@ export function evaluateScoreShape(
       duration: currentPulse,
       origins: evaluated.pitch.origins,
       rootStaffPosition: context.rootStaffPosition,
-      rootStaffCents: mapFormula(context.rootFormula, context.mapping).valueOf(),
+      rootStaffAccidentals: context.rootStaffAccidentals,
       dynamic: currentDynamic,
       velocity: DYNAMIC_VELOCITIES[currentDynamic],
       ...(current.type === 'DegreeLiteral' ||

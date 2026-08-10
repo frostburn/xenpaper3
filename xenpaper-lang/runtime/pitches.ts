@@ -160,6 +160,18 @@ export function mapFormula(monzo: PrimeMonzo, mapping: PrimeMapping): Value {
   return result
 }
 
+/** Normalize a Xenpaper accidental token for use by staff renderers. */
+export function normalizeStaffAccidental(token: string): string {
+  if (token === 'b' || token === '♭') return 'flat'
+  if (token === '#' || token === '♯') return 'sharp'
+  if (token === 'x' || token === '𝄪') return 'double-sharp'
+  if (token === '𝄫') return 'double-flat'
+  if (token === 't' || token === '𝄲' || token === '‡') return 'half-sharp'
+  if (token === 'd' || token === '𝄳') return 'half-flat'
+  if (token === '_' || token === '♮') return 'natural'
+  return token
+}
+
 export function createPitchContext(mapping: PrimeMapping = DEFAULT_MAPPING): PitchContext {
   return {
     mapping,
@@ -184,6 +196,7 @@ export function createPitchContext(mapping: PrimeMapping = DEFAULT_MAPPING): Pit
       mapping,
     ),
     rootStaffPosition: 0,
+    rootStaffAccidentals: [],
   }
 }
 
@@ -211,6 +224,7 @@ export function applyPitchContextChange(
         rootDisplacement: context.rootDisplacement,
         rootFormula: context.rootFormula,
         rootStaffPosition: context.rootStaffPosition,
+        rootStaffAccidentals: context.rootStaffAccidentals,
       }
       continue
     }
@@ -245,6 +259,9 @@ export function applyPitchContextChange(
         rootFormula: target.formula,
         rootStaffPosition:
           nominalPosition + caseShift + shifts(statement.target.pitch.modifiers) * 7,
+        rootStaffAccidentals: statement.target.pitch.accidentals.map(
+          (accidental) => accidental.value,
+        ),
       }
       continue
     }

@@ -43,7 +43,7 @@ export function flattenScoreShape(shape: ScoreShape): BeatEventFlatteningResult 
         duration: copy(current.duration),
         pitch: current.pitch,
         rootStaffPosition: current.rootStaffPosition,
-        rootStaffCents: current.rootStaffCents,
+        rootStaffAccidentals: current.rootStaffAccidentals,
         dynamic: copy(current.velocity),
         automation: current.automation,
         label: current.displayLabel,
