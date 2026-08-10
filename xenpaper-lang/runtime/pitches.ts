@@ -299,14 +299,27 @@ function shifts(modifiers: readonly { kind: string }[]): number {
 
 /** Preserve the diatonic meaning of subtracting two naturally spelled pitches. */
 export function spellPitchDifference(left: AbsolutePitchValue, right: AbsolutePitchValue) {
-  const rank = (nominal: string) => {
-    const upper = nominal.toUpperCase()
+  const rank = (spelling: PitchSpelling) => {
+    const upper = spelling.nominal.toUpperCase()
     const key = GREEK_SCRIPT[upper] ?? upper
     const base = NOMINAL_RANK[key]
-    return base === undefined ? undefined : base + (nominal === nominal.toLowerCase() ? 7 : 0)
+    if (base === undefined) return undefined
+    const equaves = (spelling.modifiers ?? []).reduce(
+      (sum, modifier) =>
+        sum +
+        (modifier === 'equaveUp'
+          ? 1
+          : modifier === 'doubleEquaveUp'
+            ? 2
+            : modifier === 'equaveDown'
+              ? -1
+              : 0),
+      spelling.nominal === spelling.nominal.toLowerCase() ? 1 : 0,
+    )
+    return base + equaves * 7
   }
-  const leftStep = rank(left.spelling.nominal)
-  const rightStep = rank(right.spelling.nominal)
+  const leftStep = rank(left.spelling)
+  const rightStep = rank(right.spelling)
   if (leftStep === undefined || rightStep === undefined) return undefined
   const signedDistance = leftStep - rightStep
   const distance = Math.abs(signedDistance)
