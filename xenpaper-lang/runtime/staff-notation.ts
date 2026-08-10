@@ -1,4 +1,5 @@
 import { Value } from '../value'
+import { groupFjsInflections } from './fjs'
 import { spellIntervalFormula } from './pitches'
 import type {
   EvaluatedLiteral,
@@ -47,7 +48,7 @@ function fjsInflections(formula: PrimeMonzo | undefined): FjsSpelling[] | undefi
     for (let index = 0; index < Math.abs(exponent.n); index++)
       result.push({ direction, prime: BigInt(prime) })
   }
-  return result.length ? result : undefined
+  return result.length ? groupFjsInflections(result) : undefined
 }
 
 function inferredAccidental(chromatic: number): string | undefined {

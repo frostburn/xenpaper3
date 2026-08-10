@@ -1,5 +1,5 @@
 import { Fraction } from 'xen-dev-utils/fraction'
-import type { PrimeMonzo } from './types'
+import type { FjsSpelling, PrimeMonzo } from './types'
 
 export type FjsFlavor = '' | 'c' | 'n' | 'q' | 't' | 'h' | 'm'
 
@@ -14,6 +14,26 @@ const FOURTH = 1200 * Math.log2(4 / 3)
 const FORMAL_RADIUS = 1200 * Math.log2(65 / 63)
 const SEMIAPOTOME = 600 * Math.log2(2187 / 2048) + 1e-6
 const cache = new Map<string, PrimeMonzo>()
+
+/** Combine pairs of compatible FJS factors when their product remains a two-digit label. */
+export function groupFjsInflections(inflections: readonly FjsSpelling[]): FjsSpelling[] {
+  const result = inflections.map((inflection) => ({ ...inflection }))
+  for (let left = 0; left < result.length; left++) {
+    for (let right = left + 1; right < result.length; right++) {
+      if (
+        result[left]!.direction !== result[right]!.direction ||
+        result[left]!.flavor !== result[right]!.flavor
+      )
+        continue
+      const product = result[left]!.prime * result[right]!.prime
+      if (product >= 100n) continue
+      result[left] = { ...result[left]!, prime: product }
+      result.splice(right, 1)
+      break
+    }
+  }
+  return result
+}
 
 function circleDistance(left: number, right: number) {
   const distance = Math.abs(left - right) % 1200
