@@ -1,6 +1,6 @@
 import { Value } from '../value'
 import { groupFjsInflections } from './fjs'
-import { spellIntervalFormula } from './pitches'
+import { normalizeStaffAccidental, spellIntervalFormula } from './pitches'
 import type {
   EvaluatedLiteral,
   FjsSpelling,
@@ -77,17 +77,6 @@ function spellingChromatic(quality: string, number: number): number | undefined 
   return undefined
 }
 
-function writtenAccidental(token: string): string {
-  if (token === 'b' || token === '♭') return 'flat'
-  if (token === '#' || token === '♯') return 'sharp'
-  if (token === 'x' || token === '𝄪') return 'double-sharp'
-  if (token === '𝄫') return 'double-flat'
-  if (token === 't' || token === '𝄲' || token === '‡') return 'half-sharp'
-  if (token === 'd' || token === '𝄳') return 'half-flat'
-  if (token === '_' || token === '♮') return 'natural'
-  return token
-}
-
 function decorations(value: EvaluatedLiteral, chromatic?: number) {
   const written = value.kind === 'absolutePitch' ? value.spelling.accidentals : undefined
   const fjs =
@@ -108,7 +97,7 @@ function decorations(value: EvaluatedLiteral, chromatic?: number) {
     )
     .map((kind) => ({ kind }))
   const accidentals = written?.length
-    ? written.map(writtenAccidental)
+    ? written.map(normalizeStaffAccidental)
     : inferredAccidentals(chromatic)
   const inflections: StaffInflection[] = [...operatorInflections, ...(fjs ?? [])]
   return {
@@ -129,7 +118,7 @@ function soundingValue(value: EvaluatedLiteral): Value {
 /** Convert an evaluated Xenpaper pitch/interval into renderer-independent staff data. */
 export interface StaffNotationOptions {
   readonly rootStaffPosition?: number
-  readonly rootStaffCents?: number
+  readonly rootStaffAccidentals?: readonly string[]
 }
 
 function naturalCents(position: number): number {
@@ -153,8 +142,16 @@ export function constructStaffNotation(
 ): StaffPitch {
   const cents = soundingValue(value).valueOf()
   const rootPosition = options.rootStaffPosition ?? 0
-  const rootCents = options.rootStaffCents ?? naturalCents(rootPosition)
   if (!Number.isFinite(cents)) throw new RangeError('Staff pitch must be finite.')
+
+  if (value.kind !== 'absolutePitch' && cents === 0) {
+    return {
+      staffPosition: rootPosition,
+      accidentals: (options.rootStaffAccidentals ?? []).map(normalizeStaffAccidental),
+      notehead: 'normal',
+      cents,
+    }
+  }
 
   if (value.kind === 'absolutePitch') {
     const rawNominal = value.spelling.nominal
@@ -195,7 +192,7 @@ export function constructStaffNotation(
       (descending ? -1 : 1) * (Math.ceil(zeroBased) + equaveStaffShift(value.spelling.modifiers))
     const chromatic =
       (descending ? undefined : spellingChromatic(value.spelling.quality, numericNumber)) ??
-      Math.round((rootCents + cents - naturalCents(position)) / 50) / 2
+      Math.round((naturalCents(rootPosition) + cents - naturalCents(position)) / 50) / 2
     return {
       staffPosition: position,
       ...decorations(value, chromatic),
@@ -220,7 +217,7 @@ export function constructStaffNotation(
     }
   }
 
-  const absoluteCents = cents + rootCents
+  const absoluteCents = cents + naturalCents(rootPosition)
   const midiOffset = Math.round(absoluteCents / 100)
   const octaveOffset = Math.floor(midiOffset / 12)
   const pitchClass = ((midiOffset % 12) + 12) % 12
@@ -265,12 +262,12 @@ export function constructStaffNotationShape(shape: ScoreShape): StaffNotationSha
     case 'attack': {
       const pitch = constructStaffNotation(shape.pitch, {
         rootStaffPosition: shape.rootStaffPosition,
-        rootStaffCents: shape.rootStaffCents,
+        rootStaffAccidentals: shape.rootStaffAccidentals,
       })
       const alternatives = (shape.alternateAppearances ?? []).map((appearance) =>
         constructStaffNotation(appearance.pitch, {
           rootStaffPosition: appearance.rootStaffPosition,
-          rootStaffCents: appearance.rootStaffCents,
+          rootStaffAccidentals: appearance.rootStaffAccidentals,
         }),
       )
       const ambiguous = alternatives.some(
