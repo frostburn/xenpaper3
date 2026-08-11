@@ -74,10 +74,9 @@ describe('PianoRoll', () => {
     ])
 
     await wrapper.get('rect.note').trigger('mouseenter')
-    expect(wrapper.get('.inspection-line').attributes('x1')).toBe('0')
+    expect(wrapper.get('.inspection-line').attributes('x1')).toBe('-1000')
     expect(wrapper.get('.inspection-line').attributes('x2')).toBe('203.33333333333331')
     expect(wrapper.get('.cents-label text').text()).toBe('700.00¢')
-    expect(wrapper.get('.cents-label line').attributes('x2')).toBe('200')
     expect(wrapper.findAll('.boundary-line')).toHaveLength(2)
     expect(wrapper.findAll('.beat-label').map((label) => label.text())).toEqual(['1 1/3', '2'])
 

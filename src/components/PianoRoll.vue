@@ -17,7 +17,7 @@ const high = computed(
   () => Math.ceil((Math.max(1200, ...notes.value.map(cents)) + 100) / 100) * 100,
 )
 const rulerWidth = 70
-const rulerGuideLength = 200
+const rulerGuideStart = -1000
 const rightPadding = 50
 const gridBottom = 275
 const width = computed(() => Math.max(640, rulerWidth + duration.value * 100 + rightPadding))
@@ -82,7 +82,7 @@ const formatBeat = (value: Fraction) => {
           <template v-if="inspectedNote">
             <line
               class="inspection-line"
-              x1="0"
+              :x1="rulerGuideStart"
               :x2="x(inspectedNote.start)"
               :y1="y(cents(inspectedNote))"
               :y2="y(cents(inspectedNote))"
@@ -123,12 +123,6 @@ const formatBeat = (value: Fraction) => {
             <text x="6" :y="y(row) + 4">{{ row }}¢</text>
           </g>
           <g v-if="inspectedNote" class="cents-label">
-            <line
-              x1="0"
-              :x2="rulerGuideLength"
-              :y1="y(cents(inspectedNote))"
-              :y2="y(cents(inspectedNote))"
-            />
             <rect x="4" :y="y(cents(inspectedNote)) - 9" width="62" height="18" rx="3" />
             <text x="35" :y="y(cents(inspectedNote)) + 4">
               {{ cents(inspectedNote).toFixed(2) }}¢
