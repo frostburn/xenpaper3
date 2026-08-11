@@ -74,6 +74,18 @@ describe('Xenpaper surface grammar', () => {
     ])
   })
 
+  it.each([
+    ['{13edo}C D E', ['PitchContextChange', 'PitchLiteral', 'PitchLiteral', 'PitchLiteral']],
+    ['[C D]E', ['NormalizeToSlot', 'PitchLiteral']],
+    ['(C D)E', ['Group', 'PitchLiteral']],
+    ['C[D E]F', ['PitchLiteral', 'NormalizeToSlot', 'PitchLiteral']],
+    ['C{13edo}D', ['PitchLiteral', 'PitchContextChange', 'PitchLiteral']],
+  ])('does not require whitespace around structural notation in %s', (source, types) => {
+    const items = (parse(source).body[0] as SyntaxNode).items as SyntaxNode[]
+
+    expect(items.map((item) => item.type)).toEqual(types)
+  })
+
   it('distinguishes attached FJS inflections and prefix pitch modifiers', () => {
     const program = parse("E^5 Ebv5 P1v5 Cv5 E_ /'C '/C vDb C#")
     const items = (program.body as SyntaxNode[])[0].items as SyntaxNode[]
