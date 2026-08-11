@@ -34,6 +34,8 @@ const inspectedNote = computed(() =>
   hovered.value === undefined ? undefined : notes.value[hovered.value],
 )
 const noteEnd = (note: (typeof notes.value)[number]) => raw(note.start).add(raw(note.duration))
+const tooltip = (note: (typeof notes.value)[number]) =>
+  note.label ?? note.pitch.spelling?.raw ?? `${cents(note).toFixed(2)}¢`
 const formatBeat = (value: Fraction) => {
   const fraction = raw(value)
   const whole = Math.floor(fraction.n / fraction.d)
@@ -78,7 +80,7 @@ const formatBeat = (value: Fraction) => {
           <template v-if="inspectedNote">
             <line
               class="inspection-line"
-              :x1="rulerWidth"
+              x1="0"
               :x2="x(inspectedNote.start)"
               :y1="y(cents(inspectedNote))"
               :y2="y(cents(inspectedNote))"
@@ -109,7 +111,7 @@ const formatBeat = (value: Fraction) => {
             @mouseenter="hovered = index"
             @mouseleave="hovered = undefined"
           >
-            <title>{{ note.label ?? `${cents(note).toFixed(2)}¢` }}</title>
+            <title>{{ tooltip(note) }}</title>
           </rect>
           <text v-if="!notes.length" class="empty" x="90" y="150">No notes loaded</text>
         </svg>
@@ -119,6 +121,12 @@ const formatBeat = (value: Fraction) => {
             <text x="6" :y="y(row) + 4">{{ row }}¢</text>
           </g>
           <g v-if="inspectedNote" class="cents-label">
+            <line
+              x1="0"
+              :x2="rulerWidth"
+              :y1="y(cents(inspectedNote))"
+              :y2="y(cents(inspectedNote))"
+            />
             <rect x="4" :y="y(cents(inspectedNote)) - 9" width="62" height="18" rx="3" />
             <text x="35" :y="y(cents(inspectedNote)) + 4">
               {{ cents(inspectedNote).toFixed(2) }}¢
@@ -201,6 +209,10 @@ text {
 }
 .cents-label rect {
   fill: #fff;
+  stroke: #b33c68;
+  stroke-width: 1.5;
+}
+.cents-label line {
   stroke: #b33c68;
   stroke-width: 1.5;
 }

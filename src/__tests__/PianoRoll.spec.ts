@@ -24,6 +24,34 @@ describe('PianoRoll', () => {
           label: 'G',
           origins: [],
         },
+        {
+          kind: 'note',
+          start: new Fraction(0),
+          duration: new Fraction(1, 3),
+          pitch: {
+            kind: 'absolutePitch',
+            rootOffset: Value.cents(0),
+            value: Value.cents(0),
+            formula: new Map(),
+            spelling: { nominal: 'C', raw: 'C', system: 'latin' },
+            origins: [],
+          },
+          dynamic: new Fraction(1, 2),
+          origins: [],
+        },
+        {
+          kind: 'note',
+          start: new Fraction(1, 3),
+          duration: new Fraction(1, 3),
+          pitch: {
+            kind: 'pitchOffset',
+            value: Value.cents(700),
+            spelling: { quality: 'P', number: 5n, raw: 'P5' },
+            origins: [],
+          },
+          dynamic: new Fraction(1, 2),
+          origins: [],
+        },
       ],
     })
 
@@ -33,8 +61,12 @@ describe('PianoRoll', () => {
       }),
     )
 
-    expect(wrapper.findAll('rect.note')).toHaveLength(1)
-    expect(wrapper.get('rect.note title').text()).toBe('G')
+    expect(wrapper.findAll('rect.note')).toHaveLength(3)
+    expect(wrapper.findAll('rect.note title').map((title) => title.text())).toEqual([
+      'G',
+      'C',
+      'P5',
+    ])
     expect(wrapper.findAll('.beat-line').map((line) => line.attributes('x1'))).toEqual([
       '70',
       '170',
@@ -42,8 +74,10 @@ describe('PianoRoll', () => {
     ])
 
     await wrapper.get('rect.note').trigger('mouseenter')
+    expect(wrapper.get('.inspection-line').attributes('x1')).toBe('0')
     expect(wrapper.get('.inspection-line').attributes('x2')).toBe('203.33333333333331')
     expect(wrapper.get('.cents-label text').text()).toBe('700.00¢')
+    expect(wrapper.get('.cents-label line').attributes('x2')).toBe('70')
     expect(wrapper.findAll('.boundary-line')).toHaveLength(2)
     expect(wrapper.findAll('.beat-label').map((label) => label.text())).toEqual(['1 1/3', '2'])
 
