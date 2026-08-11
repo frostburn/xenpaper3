@@ -309,8 +309,6 @@ export function constructStaffNotationShape(shape: ScoreShape): StaffNotationSha
         pitch: ambiguous ? { ...pitch, notehead: 'x' } : pitch,
         duration: shape.duration,
         ...(shape.displayLabel ? { displayLabel: shape.displayLabel } : {}),
-        velocity: shape.velocity,
-        ...(shape.velocityExplicit ? { velocityExplicit: true } : {}),
         ...(shape.grace ? { grace: true } : {}),
         ...(shape.notatedDuration ? { notatedDuration: shape.notatedDuration } : {}),
       }

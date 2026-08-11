@@ -26,6 +26,15 @@ export interface RepeatExpansionOptions {
   readonly expansionLimit?: number
 }
 
+export interface ScoreShapeOptions {
+  readonly pulse?: import('xen-dev-utils/fraction').FractionValue
+  readonly pitchContext?: PitchContext
+}
+
+export type ScoreShapeEvaluationResult =
+  | { readonly shape: ScoreShape; readonly diagnostics: readonly Diagnostic[] }
+  | { readonly diagnostics: readonly Diagnostic[] }
+
 export interface RepeatExpansionResult {
   readonly program?: ExpandedProgram
   readonly diagnostics: readonly Diagnostic[]
@@ -131,8 +140,6 @@ export type StaffNotationShape =
       readonly pitch: StaffPitch
       readonly duration: Fraction
       readonly displayLabel?: string
-      readonly velocity?: Fraction
-      readonly velocityExplicit?: boolean
       readonly grace?: boolean
       readonly notatedDuration?: Fraction
     }
@@ -175,11 +182,7 @@ export interface AttackShape extends ShapeBase {
   readonly kind: 'attack'
   readonly pitch: PitchOffsetValue | (AbsolutePitchValue & { readonly value: Value })
   readonly rootPitch: AbsolutePitchValue
-  readonly dynamic: DynamicMark
-  readonly velocity: Fraction
   readonly automation?: PitchAutomation
-  /** True when velocity came from an authored one-shot velocity directive. */
-  readonly velocityExplicit?: boolean
   /** Grace attacks are engraved small and lead into the following donor note. */
   readonly grace?: boolean
   /** Authored rhythmic value of a grace donor before time was stolen. */

@@ -2,7 +2,7 @@ import { Fraction } from 'xen-dev-utils/fraction'
 import type { Program } from '../parser.generated.js'
 import type { Diagnostic } from '../diagnostics'
 import { expandRepeats } from './repeat-expansion'
-import { evaluateScoreShape, type ScoreShapeOptions } from './score-shape'
+import { evaluateScoreSemantics } from './score-evaluation'
 import type {
   BeatTimedEvent,
   BeatTimedNoteEvent,
@@ -10,6 +10,7 @@ import type {
   ExpandedNode,
   RepeatExpansionOptions,
   ScoreShape,
+  ScoreShapeOptions,
 } from './types'
 
 export interface BeatEventExpansionOptions extends ScoreShapeOptions, RepeatExpansionOptions {}
@@ -18,15 +19,15 @@ export type BeatEventExpansionResult =
   | { readonly score: BeatTimedScore; readonly diagnostics: readonly Diagnostic[] }
   | { readonly diagnostics: readonly Diagnostic[] }
 
-export interface BeatEventFlatteningResult {
+interface BeatEventFlatteningResult {
   readonly score: BeatTimedScore
   readonly diagnostics: readonly Diagnostic[]
 }
 
 const copy = (value: Fraction) => new Fraction(value.n, value.d)
 
-/** Flatten a score-shape tree without converting its exact beat positions to seconds. */
-export function flattenScoreShape(shape: ScoreShape): BeatEventFlatteningResult {
+/** Flatten evaluated playback semantics without converting exact beat positions to seconds. */
+function flattenScoreSemantics(shape: ScoreShape): BeatEventFlatteningResult {
   const events: BeatTimedEvent[] = []
   const diagnostics: Diagnostic[] = []
   type MutableNoteEvent = Omit<BeatTimedNoteEvent, 'duration' | 'origins'> & {
@@ -43,7 +44,9 @@ export function flattenScoreShape(shape: ScoreShape): BeatEventFlatteningResult 
         duration: copy(current.duration),
         pitch: current.pitch,
         rootPitch: current.rootPitch,
-        dynamic: copy(current.velocity),
+        dynamic: copy(
+          (current as typeof current & { readonly velocity: Fraction }).velocity,
+        ),
         automation: current.automation,
         label: current.displayLabel,
         origins: current.origins,
@@ -118,10 +121,10 @@ export function expandToBeatEvents(
     location,
     expansionPath: [],
   } as unknown as ExpandedNode
-  const evaluated = evaluateScoreShape(node as never, options)
+  const evaluated = evaluateScoreSemantics(node as never, options)
   const diagnostics = [...expanded.diagnostics, ...evaluated.diagnostics]
   if (!('shape' in evaluated)) return { diagnostics }
-  const flattened = flattenScoreShape(evaluated.shape)
+  const flattened = flattenScoreSemantics(evaluated.shape)
   const allDiagnostics = [...diagnostics, ...flattened.diagnostics]
   return allDiagnostics.some((diagnostic) => diagnostic.severity === 'error')
     ? { diagnostics: allDiagnostics }

@@ -15,6 +15,15 @@ function shape(source: string, pulse: Fraction | number = 1): ScoreShape {
 }
 
 describe('score-shape timing', () => {
+  it('keeps playback dynamics and velocity out of abstract notation attacks', () => {
+    const result = shape('@p C @velocity(4/5) D') as SequenceShape
+    const attacks = result.children.filter((child) => child.kind === 'attack')
+
+    expect(attacks).toHaveLength(2)
+    expect(attacks.every((attack) => !('dynamic' in attack) && !('velocity' in attack))).toBe(true)
+    expect(result.children).toContainEqual(expect.objectContaining({ kind: 'dynamic', mark: 'p' }))
+  })
+
   it('assigns explicit equal-division intervals to degrees and loops at the equave', () => {
     const result = shape(String.raw`{3\12 5\12 7\12 10\12 12\12} 0 1 2 3 4 5 6 -1`) as SequenceShape
     const attacks = result.children.filter((child) => child.kind === 'attack')

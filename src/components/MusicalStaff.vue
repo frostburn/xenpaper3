@@ -26,8 +26,6 @@ type StaffItemContent =
       pitch: StaffPitch
       duration: Fraction
       displayLabel?: string
-      velocity?: Fraction
-      velocityExplicit?: boolean
       grace?: boolean
       notatedDuration?: Fraction
     }
@@ -75,8 +73,6 @@ const items = computed(() => {
         pitch: shape.pitch,
         duration: shape.duration,
         displayLabel: shape.displayLabel,
-        velocity: shape.velocity,
-        velocityExplicit: shape.velocityExplicit,
         grace: shape.grace,
         notatedDuration: shape.notatedDuration,
       }
@@ -308,7 +304,6 @@ const isOpenNotehead = (duration: Fraction) => durationValue(duration) >= 2
 const hasStem = (duration: Fraction) => durationValue(duration) < 4
 const engravingDuration = (item: Extract<StaffItem, { kind: 'note' }>) =>
   item.notatedDuration ?? item.duration
-const velocityLabel = (velocity: Fraction) => `${Math.round(durationValue(velocity) * 100)}%`
 const isDotted = (duration: Fraction) => {
   const relativeToDottedHalf = durationValue(duration) / 3
   return relativeToDottedHalf > 0 && Number.isInteger(Math.log2(relativeToDottedHalf))
@@ -554,14 +549,6 @@ const restDotY = (duration: Fraction, tupletCount?: number) =>
             :y="130 + (item.displayLabelRow ?? 0) * 13"
           >
             {{ item.displayLabel }}
-          </text>
-          <text
-            v-if="item.velocityExplicit"
-            class="performance-label"
-            :x="x(item.column)"
-            :y="145 + (item.displayLabelRow ?? 0) * 13"
-          >
-            <tspan v-if="item.velocity">{{ velocityLabel(item.velocity) }}</tspan>
           </text>
         </template>
       </template>
