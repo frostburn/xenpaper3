@@ -41,12 +41,7 @@ describe('Xenpaper surface grammar', () => {
   it('parses rests attached to surrounding notes as sequence items', () => {
     const items = (parse('C. .D').body[0] as SyntaxNode).items as SyntaxNode[]
 
-    expect(items.map((item) => item.type)).toEqual([
-      'PitchLiteral',
-      'Rest',
-      'Rest',
-      'PitchLiteral',
-    ])
+    expect(items.map((item) => item.type)).toEqual(['PitchLiteral', 'Rest', 'Rest', 'PitchLiteral'])
     expect(items.map((item) => item.raw)).toEqual(['C', '.', '.', 'D'])
   })
 

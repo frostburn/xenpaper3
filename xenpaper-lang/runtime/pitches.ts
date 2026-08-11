@@ -343,12 +343,11 @@ export function spellPitchDifference(left: AbsolutePitchValue, right: AbsolutePi
     formulaSpelling && Number(formulaSpelling.number.valueOf()) === numericNumber
       ? formulaSpelling
       : undefined
-  const quality =
-    compatibleSpelling
-      ? compatibleSpelling.quality
-      : [1, 4, 5, 1.5, 4.5, 7.5].includes(simple)
-        ? 'P'
-        : 'M'
+  const quality = compatibleSpelling
+    ? compatibleSpelling.quality
+    : [1, 4, 5, 1.5, 4.5, 7.5].includes(simple)
+      ? 'P'
+      : 'M'
   const inflections = compatibleSpelling?.inflections
   return {
     quality,
