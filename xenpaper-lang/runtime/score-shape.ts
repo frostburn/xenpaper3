@@ -19,18 +19,20 @@ export function evaluateScoreShape(
 
   const abstractShape = (shape: ScoreShape): ScoreShape => {
     if (shape.kind === 'attack') {
-      const { dynamic: _dynamic, velocity: _velocity, velocityExplicit: _explicit, ...attack } =
-        shape as ScoreShape & {
-          dynamic?: unknown
-          velocity?: unknown
-          velocityExplicit?: unknown
-        }
+      const {
+        dynamic: _dynamic,
+        velocity: _velocity,
+        velocityExplicit: _explicit,
+        ...attack
+      } = shape as ScoreShape & {
+        dynamic?: unknown
+        velocity?: unknown
+        velocityExplicit?: unknown
+      }
       return attack as ScoreShape
     }
-    if (shape.kind === 'sequence')
-      return { ...shape, children: shape.children.map(abstractShape) }
-    if (shape.kind === 'parallel')
-      return { ...shape, branches: shape.branches.map(abstractShape) }
+    if (shape.kind === 'sequence') return { ...shape, children: shape.children.map(abstractShape) }
+    if (shape.kind === 'parallel') return { ...shape, branches: shape.branches.map(abstractShape) }
     return shape
   }
 

@@ -45,7 +45,11 @@ export function valMapping(divisions: number, equave: number, warts = ''): Prime
 }
 
 /** Parse patent/wart and explicit equal-division val notation. */
-export function parseVal(raw: string): { mapping: PrimeMapping; divisions: number; equave: number } {
+export function parseVal(raw: string): {
+  mapping: PrimeMapping
+  divisions: number
+  equave: number
+} {
   const explicit = /^(\d+)ed(\d+)(?:\/(\d+))?$/i.exec(raw)
   if (explicit) {
     const numerator = Number(explicit[2])
@@ -69,7 +73,11 @@ export function parseVal(raw: string): { mapping: PrimeMapping; divisions: numbe
   return { mapping: valMapping(divisions, equave, warts), divisions, equave }
 }
 
-function equalDivisionRatioMapping(divisions: number, numerator: number, denominator: number): PrimeMapping {
+function equalDivisionRatioMapping(
+  divisions: number,
+  numerator: number,
+  denominator: number,
+): PrimeMapping {
   const equave = new Value(BigInt(numerator), BigInt(denominator))
   const logarithm = Math.log(numerator / denominator)
   return {

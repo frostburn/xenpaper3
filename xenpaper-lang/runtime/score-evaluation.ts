@@ -578,7 +578,11 @@ export function evaluateScoreSemantics(
             const applyVelocity = (shape: ScoreShape): ScoreShape => {
               if (shape.kind === 'attack' && first) {
                 first = false
-                return { ...shape, velocity: pending, velocityExplicit: true } as PlaybackAttackShape
+                return {
+                  ...shape,
+                  velocity: pending,
+                  velocityExplicit: true,
+                } as PlaybackAttackShape
               }
               if (shape.kind === 'sequence')
                 return { ...shape, children: shape.children.map(applyVelocity) }

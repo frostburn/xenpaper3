@@ -66,7 +66,7 @@ describe('score-shape timing', () => {
       tritave.children
         .filter((child) => child.kind === 'attack')
         .map((attack) => attack.pitch.value.valueOf()),
-    ).toEqual([0, 1200 * Math.log2(3) / 13, 1200 * Math.log2(3)])
+    ).toEqual([0, (1200 * Math.log2(3)) / 13, 1200 * Math.log2(3)])
 
     expect(() => shape('{13ed3} C')).not.toThrow()
     expect(() => shape('{7ed3/2} C')).not.toThrow()

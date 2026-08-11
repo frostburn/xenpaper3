@@ -44,9 +44,7 @@ function flattenScoreSemantics(shape: ScoreShape): BeatEventFlatteningResult {
         duration: copy(current.duration),
         pitch: current.pitch,
         rootPitch: current.rootPitch,
-        dynamic: copy(
-          (current as typeof current & { readonly velocity: Fraction }).velocity,
-        ),
+        dynamic: copy((current as typeof current & { readonly velocity: Fraction }).velocity),
         automation: current.automation,
         label: current.authoredLabel ?? current.displayLabel,
         origins: current.origins,
