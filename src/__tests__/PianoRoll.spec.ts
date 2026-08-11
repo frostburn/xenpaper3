@@ -7,13 +7,13 @@ import { Value } from '../../xenpaper-lang/value'
 import PianoRoll from '../components/PianoRoll.vue'
 
 describe('PianoRoll', () => {
-  it('renders Value and Fraction instances received through a deep Vue proxy', () => {
+  it('renders Value and Fraction instances received through a deep Vue proxy', async () => {
     const score = reactive<BeatTimedScore>({
       duration: new Fraction(2),
       events: [
         {
           kind: 'note',
-          start: new Fraction(1, 3),
+          start: new Fraction(4, 3),
           duration: new Fraction(2, 3),
           pitch: {
             kind: 'pitchOffset',
@@ -34,11 +34,20 @@ describe('PianoRoll', () => {
     )
 
     expect(wrapper.findAll('rect.note')).toHaveLength(1)
-    expect(wrapper.get('rect.note title').text()).toContain('G — beat 0.3333333333333333')
+    expect(wrapper.get('rect.note title').text()).toBe('G')
     expect(wrapper.findAll('.beat-line').map((line) => line.attributes('x1'))).toEqual([
       '70',
       '170',
       '270',
     ])
+
+    await wrapper.get('rect.note').trigger('mouseenter')
+    expect(wrapper.get('.inspection-line').attributes('x2')).toBe('203.33333333333331')
+    expect(wrapper.get('.cents-label text').text()).toBe('700.00¢')
+    expect(wrapper.findAll('.boundary-line')).toHaveLength(2)
+    expect(wrapper.findAll('.beat-label').map((label) => label.text())).toEqual(['1 1/3', '2'])
+
+    await wrapper.get('rect.note').trigger('mouseleave')
+    expect(wrapper.find('.inspection-line').exists()).toBe(false)
   })
 })
