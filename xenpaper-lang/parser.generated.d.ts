@@ -86,7 +86,7 @@ export interface ContextExpression extends Node {
 
 export interface ContextDegreeMapping extends Node {
   type: 'ContextDegreeMapping'
-  values: EqualDivisionLiteral[]
+  values: Expression[]
 }
 
 export interface ContextNameTarget extends Node {

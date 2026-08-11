@@ -1,11 +1,12 @@
 import { Fraction } from 'xen-dev-utils/fraction'
+import { PRIMES } from 'xen-dev-utils/primes'
 import { Value } from '../value'
 import type { PrimeMapping } from './types'
 
-const PRIMES = [2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 31]
-
 function primeAtWart(wart: string): number {
-  const prime = PRIMES[wart.toLowerCase().charCodeAt(0) - 97]
+  const index = wart.toLowerCase().charCodeAt(0) - 97
+  if (index < 0 || index > 14) throw new RangeError(`Unsupported val wart ${wart}.`)
+  const prime = PRIMES[index]
   if (!prime) throw new RangeError(`Unsupported val wart ${wart}.`)
   return prime
 }

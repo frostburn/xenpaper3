@@ -330,9 +330,17 @@ PitchContextChange
     }
 
 DegreeMappingList
-  = first:EqualDivisionLiteral rest:(SequenceGap value:EqualDivisionLiteral { return value; })+ {
+  = first:DegreeMappingLiteral rest:(SequenceGap value:DegreeMappingLiteral { return value; })+ {
       return [first, ...rest];
     }
+
+DegreeMappingLiteral
+  = EqualDivisionLiteral
+  / QuantityLiteral
+  / RatioLiteral
+  / RealLiteral
+  / DecimalLiteral
+  / IntegerLiteral
 
 ContextStatementList
   = first:ContextStatement
@@ -382,6 +390,9 @@ MappingLiteral
 ContextPreset
   = raw:$(UnsignedInteger "ed"i (RatioText / UnsignedInteger)) !IdentifierContinue {
       return { kind: 'equalDivision', raw };
+    }
+  / raw:$([0-9]+ "." [0-9]+ "c"i) !IdentifierContinue {
+      return { kind: 'centEqualTemperament', raw };
     }
   / raw:$([a-zA-Z]* UnsignedInteger ("edo"i / [a-zA-Z]*)) !IdentifierContinue {
       return { kind: 'rank1', raw };

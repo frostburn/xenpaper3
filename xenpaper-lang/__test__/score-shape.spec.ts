@@ -23,6 +23,24 @@ describe('score-shape timing', () => {
     ])
   })
 
+  it('accepts every numeric interval literal and respects explicit degree equaves', () => {
+    const mixed = shape(String.raw`{123c 3/2 1201c} 0 1 2 3 4`) as SequenceShape
+    const mixedPitches = mixed.children
+      .filter((child) => child.kind === 'attack')
+      .map((attack) => attack.pitch.value.valueOf())
+    ;[0, 123, 1200 * Math.log2(3 / 2), 1201, 1324].forEach((expected, index) =>
+      expect(mixedPitches[index]).toBeCloseTo(expected),
+    )
+
+    const tritave = shape(String.raw`{1\12<3> 12\12<3>} 0 1 2`) as SequenceShape
+    const tritavePitches = tritave.children
+      .filter((child) => child.kind === 'attack')
+      .map((attack) => attack.pitch.value.valueOf())
+    ;[0, (1200 * Math.log2(3)) / 12, 1200 * Math.log2(3)].forEach((expected, index) =>
+      expect(tritavePitches[index]).toBeCloseTo(expected),
+    )
+  })
+
   it('supports patent vals, arbitrary warts, and non-octave equal divisions', () => {
     expect(parseVal('17c').mapping.mapPrime(5).valueOf()).not.toBe(
       parseVal('17cc').mapping.mapPrime(5).valueOf(),
@@ -43,6 +61,23 @@ describe('score-shape timing', () => {
 
     expect(() => shape('{13ed3} C')).not.toThrow()
     expect(() => shape('{7ed3/2} C')).not.toThrow()
+    expect(() => shape('{17oooooooooooo} C')).not.toThrow()
+  })
+
+  it('distinguishes decimal cent equal temperaments from c-wart vals', () => {
+    const cents = shape('{88.0c} 0 1 14') as SequenceShape
+    expect(
+      cents.children
+        .filter((child) => child.kind === 'attack')
+        .map((attack) => attack.pitch.value.valueOf()),
+    ).toEqual([0, 88, 1232])
+
+    const wart = shape('{88c} 0 1 88') as SequenceShape
+    expect(
+      wart.children
+        .filter((child) => child.kind === 'attack')
+        .map((attack) => attack.pitch.value.valueOf()),
+    ).toEqual([0, 1200 / 88, 1200])
   })
   it('uses 12-EDO degrees by default and updates their division with EDO presets', () => {
     const defaults = shape("0 1 2 11 '0 `0") as SequenceShape
