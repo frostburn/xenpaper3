@@ -86,9 +86,7 @@ export class Dimensions {
 }
 
 class ExactMonomial {
-  constructor(
-    readonly exponents: SparseMonzo = new Map(),
-  ) {}
+  constructor(readonly exponents: SparseMonzo = new Map()) {}
 
   static fromFraction(input: FractionValue | bigint, denominator?: bigint): ExactMonomial {
     const factors =
@@ -98,17 +96,13 @@ class ExactMonomial {
 
   mul(other: ExactMonomial): ExactMonomial {
     if (!this.sign || !other.sign) return ExactMonomial.ZERO
-    return new ExactMonomial(
-      addMonzos(this.exponents, other.exponents),
-    )
+    return new ExactMonomial(addMonzos(this.exponents, other.exponents))
   }
 
   div(other: ExactMonomial): ExactMonomial {
     if (!other.sign) throw new RangeError('Division by zero.')
     if (!this.sign) return ExactMonomial.ZERO
-    return new ExactMonomial(
-      addMonzos(this.exponents, other.exponents, true),
-    )
+    return new ExactMonomial(addMonzos(this.exponents, other.exponents, true))
   }
 
   neg(): ExactMonomial {
@@ -182,7 +176,8 @@ class ExactMonomial {
     if (this.exponents.has(0)) {
       return 0
     }
-    if (this.exponents.get(-1) % 2) {
+    const signExponent = this.exponents.get(-1)
+    if (signExponent !== undefined && new Fraction(signExponent).n % 2) {
       return -1
     }
     return 1
@@ -199,7 +194,11 @@ class ExactPitch {
   readonly logPrimes: SparseMonzo
 
   constructor(logPrimes: SparseMonzo = new Map()) {
-    this.logPrimes = new Map(logPrimes)
+    const normalized = new Map(logPrimes)
+    for (const [prime, exponent] of normalized) {
+      if (!new Fraction(exponent).n) normalized.delete(prime)
+    }
+    this.logPrimes = normalized
   }
 
   static fromCents(cents: FractionValue): ExactPitch {
@@ -529,6 +528,19 @@ export class Value {
 
   isExact(): boolean {
     return this.magnitude.kind !== 'real'
+  }
+  /** Exact prime exponents for a scalar monomial or logarithmic pitch. */
+  primeExponents(): ReadonlyMap<number, Fraction> | undefined {
+    if (this.magnitude.kind === 'real') return undefined
+    const source =
+      this.magnitude.kind === 'pitch'
+        ? this.magnitude.value.logPrimes
+        : this.magnitude.value.exponents
+    return new Map(
+      [...source]
+        .filter(([prime]) => prime > 0)
+        .map(([prime, exponent]) => [prime, new Fraction(exponent)]),
+    )
   }
   valueOf(): number {
     return this.magnitude.value.valueOf()

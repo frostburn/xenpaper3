@@ -117,11 +117,23 @@ ShiftedValueExpression
 
 AdditiveExpression
   = first:MultiplicativeExpression
-    rest:(Spacing operator:AdditiveOperator Spacing right:MultiplicativeExpression {
-      return { operator, right };
-    })* {
+    rest:(
+      operator:AttachedAdditiveOperator Spacing right:MultiplicativeExpression {
+        return { operator, right };
+      }
+      / RequiredSpacing operator:AdditiveOperator Spacing right:MultiplicativeExpression {
+        return { operator, right };
+      }
+    )* {
       return foldBinary(first, rest);
     }
+
+// Without whitespace before the operator, plus and minus are unambiguously
+// arithmetic. In particular, `G-n3` and `M3-n3` must not be mistaken for a
+// sequence whose second item is a unary-negated interval.
+AttachedAdditiveOperator
+  = "+" { return "+"; }
+  / "-" { return "-"; }
 
 AdditiveOperator
   = BinaryPlus
@@ -133,12 +145,17 @@ AdditiveOperator
 BinaryPlus
   = "+" &([ \t\r\n#] / ![0-9]) { return "+"; }
 
-// A minus immediately followed by a digit belongs to the following signed
-// integer. This makes `-1 -2` a sequence of two negative integer leaves.
+// A minus immediately followed by a digit or named interval belongs to the
+// following signed sequence item. This makes `-1 -2` a sequence of two
+// negative integer leaves and `D -n3` a D followed by a descending neutral
+// third. Whitespace after the minus keeps it binary, as in `D - n3`.
 // Write arithmetic subtraction of integer literals as `-1/1 - 2/1` or put
 // whitespace after the binary minus.
 BinaryMinus
-  = "-" &([ \t\r\n#] / ![0-9]) { return "-"; }
+  = "-" &([ \t\r\n#] / !([0-9] / NamedIntervalStart)) { return "-"; }
+
+NamedIntervalStart
+  = PitchModifier* IntervalQuality [0-9]
 
 MultiplicativeExpression
   = first:PowerExpression
@@ -161,7 +178,10 @@ BinaryDivide
 
 PowerExpression
   = left:UnaryExpression
-    tail:(Spacing "^" Spacing right:PowerExpression { return right; })? {
+    tail:(
+      "^" Spacing right:PowerExpression { return right; }
+      / RequiredSpacing "^" RequiredSpacing right:PowerExpression { return right; }
+    )? {
       return tail ? binary("^", left, tail) : left;
     }
 
@@ -201,6 +221,7 @@ PrimaryExpression
   / EqualDivisionLiteral
   / QuantityLiteral
   / RatioLiteral
+  / RealLiteral
   / DecimalLiteral
   / IntegerLiteral
   / CallExpression
@@ -217,7 +238,7 @@ NormalizedGroup
     }
 
 Rest
-  = "." { return node('Rest', { raw: "." }); }
+  = raw:$("."+) { return node('Rest', { raw }); }
 
 DetachedContinue
   = "=" { return node('DetachedContinue', { raw: "=" }); }
@@ -230,10 +251,7 @@ HardBoundary
 
 RepeatExpression
   = "|:" Spacing count:RepeatCount? Spacing body:RepeatBody? Spacing ":|" {
-      return node('Repeat', {
-        count: count ?? node('IntegerLiteral', { raw: '2', value: '2' }),
-        body: body ?? [],
-      });
+      return node('Repeat', { count, body });
     }
 
 RepeatBody
@@ -264,7 +282,7 @@ Directive
     }
 
 NumericDirectiveBody
-  = value:(UnsignedRatioLiteral / UnsignedDecimalLiteral / UnsignedIntegerLiteral)
+  = value:(UnsignedRatioLiteral / UnsignedRealLiteral / UnsignedDecimalLiteral / UnsignedIntegerLiteral)
     grace:$([?]*) {
       return {
         name: 'subdivision',
@@ -302,9 +320,40 @@ DirectiveArgument
   / AdditiveExpression
 
 PitchContextChange
-  = "{" Spacing statements:ContextStatementList? Spacing "}" {
+  = "{" Spacing values:DegreeMappingList Spacing "}" {
+      return node('PitchContextChange', {
+        statements: [node('ContextDegreeMapping', { values })],
+      });
+    }
+  / "{" Spacing statements:ContextStatementList? Spacing "}" {
       return node('PitchContextChange', { statements: statements ?? [] });
     }
+
+DegreeMappingList
+  = first:DegreeMappingLiteral rest:(SequenceGap value:DegreeMappingLiteral { return value; })+ {
+      return [first, ...rest];
+    }
+  / value:SingleDegreeMappingLiteral { return [value]; }
+
+// An integer cent token remains available for wart notation (`{88c}`), while
+// the decimal dot makes a single-entry cent scale unambiguous (`{88.0c}`).
+SingleDegreeMappingLiteral
+  = value:QuantityLiteral &{
+      return value.unit.toLowerCase() !== 'c' || value.magnitude.includes('.');
+    } { return value; }
+  / EqualDivisionLiteral
+  / RatioLiteral
+  / RealLiteral
+  / DecimalLiteral
+  / IntegerLiteral
+
+DegreeMappingLiteral
+  = EqualDivisionLiteral
+  / QuantityLiteral
+  / RatioLiteral
+  / RealLiteral
+  / DecimalLiteral
+  / IntegerLiteral
 
 ContextStatementList
   = first:ContextStatement
@@ -352,14 +401,11 @@ MappingLiteral
     }
 
 ContextPreset
-  = raw:$(UnsignedInteger ("edo"i / "p"i / "c"i)) !IdentifierContinue {
-      return { kind: 'rank1', raw };
-    }
-  / raw:$("b"i UnsignedInteger) !IdentifierContinue {
-      return { kind: 'b-val', raw };
-    }
-  / raw:$(UnsignedInteger "ed"i (RatioText / UnsignedInteger)) !IdentifierContinue {
+  = raw:$(UnsignedInteger "ed"i (RatioText / UnsignedInteger)) !IdentifierContinue {
       return { kind: 'equalDivision', raw };
+    }
+  / raw:$([a-zA-Z]* UnsignedInteger ("edo"i / [a-zA-Z]*)) !IdentifierContinue {
+      return { kind: 'rank1', raw };
     }
 
 CallExpression
@@ -379,7 +425,7 @@ IdentifierExpression
     }
 
 IntervalLiteral
-  = modifiers:PitchModifier* quality:IntervalQuality number:UnsignedInteger
+  = modifiers:PitchModifier* quality:IntervalQuality number:IntervalNumber
     inflections:FjsInflection* !IdentifierContinue {
       return node('IntervalLiteral', {
         modifiers,
@@ -391,7 +437,10 @@ IntervalLiteral
     }
 
 IntervalQuality
-  = $("A"+ / "d"+ / "P" / "M" / "m")
+  = $("S" "A"+ / "s" "d"+ / "A"+ / "d"+ / "P" / "M" / "m" / "n")
+
+IntervalNumber
+  = $(UnsignedInteger (".5" / "½")?)
 
 PitchLiteral
   = nominal:PitchNominal
@@ -431,7 +480,7 @@ ScaleDegreeLiteral
     }
 
 NumericLiteralSuffix
-  = "/" / "\\" / "."
+  = "/" / "\\" / "." [0-9]+ ("e" / "r" / UnitSuffix)
 
 BinaryOperatorAfterSpacing
   = Spacing (AdditiveOperator / MultiplicativeOperator / "^")
@@ -442,18 +491,21 @@ PitchModifier
     }
 
 PitchNominal
-  = value:$([A-Ga-g]) {
+  = value:$("alp"i / "bet"i / "gam"i / "del"i / "eps"i / "zet"i / "eta"i) {
+      return node('PitchNominal', { system: 'greek', value });
+    }
+  / value:$([A-Ga-g]) {
       return node('PitchNominal', { system: 'latin', value });
     }
   / value:$([J-Zj-z]) {
       return node('PitchNominal', { system: 'mos', value });
     }
-  / value:$([Α-Ωα-ω]) {
+  / value:$([Α-Ηα-η]) {
       return node('PitchNominal', { system: 'greek', value });
     }
 
-// Pythagorean accidentals are consumed before FJS inflections, enforcing
-// spellings such as `Eb_5` rather than `E_5b`.
+// The underscore belongs exclusively to the Pythagorean natural accidental;
+// denominator FJS inflections use the postfix `v` marker.
 PythagoreanAccidental
   = value:$("𝄪" / "𝄫" / "𝄲" / "𝄳" / "𝄬" / "𝄭" / "𝄮" / "𝄯" / "𝄰" / "𝄱" / [x♯#‡t♮d♭bpq]) {
       return node('Accidental', { value });
@@ -461,12 +513,13 @@ PythagoreanAccidental
   / "_" ![0-9] { return node('Accidental', { value: '_' }); }
 
 FjsInflection
-  = marker:$("^" / "_" / "v") prime:UnsignedInteger {
+  = marker:$("^" / "v") prime:UnsignedInteger flavor:$([cnqthm])? {
       return node('FjsInflection', {
         direction: marker === '^' ? 'numerator' : 'denominator',
         marker,
         prime,
-        raw: marker + prime,
+        flavor: flavor ?? '',
+        raw: marker + prime + (flavor ?? ''),
       });
     }
 
@@ -541,8 +594,24 @@ DecimalLiteral
     }
 
 UnsignedDecimalLiteral
-  = value:$([0-9]+ "." [0-9]*) !IdentifierContinue {
-      return node('DecimalLiteral', { value, raw: value });
+  = value:$([0-9]+ "." [0-9]+) "e" !IdentifierContinue {
+      return node('DecimalLiteral', { value, raw: text() });
+    }
+
+RealLiteral
+  = sign:Sign? body:UnsignedRealLiteral {
+      if (!sign) return body;
+      return node('RealLiteral', {
+        ...body,
+        sign,
+        raw: sign + body.raw,
+        value: sign + body.value,
+      });
+    }
+
+UnsignedRealLiteral
+  = value:$([0-9]+ "." [0-9]+) "r" !IdentifierContinue {
+      return node('RealLiteral', { value, raw: text() });
     }
 
 IntegerLiteral
@@ -578,6 +647,13 @@ IdentifierContinue
 
 SequenceGap
   = RequiredSpacing
+  // Structural notation separates adjacent sequence items without requiring
+  // whitespace on either side (`C[D E]F`, `{13edo}C`, and `E|:F G:||`).
+  / &("|:" / Barline / "[" / "(" / "{")
+  / &Rest
+  // Character codes avoid putting a closing brace inside Peggy's semantic
+  // predicate while covering bars, rests, and every structural closer: ) ] }.
+  / &{ return offset() > 0 && [41, 46, 93, 124, 125].includes(input.charCodeAt(offset() - 1)); }
 
 Spacing
   = (White / Comment)*

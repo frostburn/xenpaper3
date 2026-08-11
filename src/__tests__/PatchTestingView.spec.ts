@@ -35,7 +35,7 @@ vi.mock('../../sw-patch', () => ({
   registerMathWorklets,
 }))
 
-import App from '../App.vue'
+import PatchTestingView from '../views/PatchTestingView.vue'
 
 const contexts: MockAudioContext[] = []
 const sources: MockConstantSourceNode[] = []
@@ -101,10 +101,10 @@ beforeEach(() => {
   vi.stubGlobal('ConstantSourceNode', MockConstantSourceNode)
 })
 
-describe('App', () => {
+describe('PatchTestingView', () => {
   it('mounts and renders properly', () => {
-    const wrapper = mount(App)
-    expect(wrapper.text()).toContain('You did it!')
+    const wrapper = mount(PatchTestingView)
+    expect(wrapper.text()).toContain('sw-patch testing')
     wrapper.unmount()
   })
 
@@ -116,7 +116,7 @@ describe('App', () => {
       }),
     )
 
-    const wrapper = mount(App)
+    const wrapper = mount(PatchTestingView)
     expect(createPatch).not.toHaveBeenCalled()
 
     finishRegistration()
@@ -128,7 +128,7 @@ describe('App', () => {
   })
 
   it('resumes a suspended context before starting a note', async () => {
-    const wrapper = mount(App)
+    const wrapper = mount(PatchTestingView)
 
     dispatchKey('keydown', 65)
     await flushPromises()
@@ -147,7 +147,7 @@ describe('App', () => {
   it('releases active notes when the window loses focus', async () => {
     const off = vi.fn<NoteOff>(() => 2)
     synthOn.mockReturnValue(off)
-    const wrapper = mount(App)
+    const wrapper = mount(PatchTestingView)
     dispatchKey('keydown', 65)
     await flushPromises()
 
@@ -159,7 +159,7 @@ describe('App', () => {
   })
 
   it('routes the filter Q slider as a decibel signal', async () => {
-    const wrapper = mount(App)
+    const wrapper = mount(PatchTestingView)
 
     await wrapper.get('#filter-q').setValue('15')
 
@@ -170,7 +170,7 @@ describe('App', () => {
   it('switches between the bass and default synth patches', async () => {
     const bassOff = vi.fn<NoteOff>(() => 2)
     synthOn.mockReturnValueOnce(bassOff).mockReturnValue(vi.fn<NoteOff>(() => 2))
-    const wrapper = mount(App)
+    const wrapper = mount(PatchTestingView)
     await flushPromises()
 
     dispatchKey('keydown', 65)
@@ -191,7 +191,7 @@ describe('App', () => {
   })
 
   it('selects softsaw with the standard ADSR arguments', async () => {
-    const wrapper = mount(App)
+    const wrapper = mount(PatchTestingView)
     await flushPromises()
 
     await wrapper.get('#synth-patch').setValue('softsaw')
@@ -204,7 +204,7 @@ describe('App', () => {
   })
 
   it('recreates and disposes the synth when its oscillator config changes', async () => {
-    const wrapper = mount(App)
+    const wrapper = mount(PatchTestingView)
     await flushPromises()
 
     expect(createPatch.mock.calls[1]?.[2]).toEqual({ config: { oscillatorType: 'sawtooth' } })
@@ -217,7 +217,7 @@ describe('App', () => {
   })
 
   it('shows oscillator types supported by the selected synth patch', async () => {
-    const wrapper = mount(App)
+    const wrapper = mount(PatchTestingView)
     await flushPromises()
     const optionValues = () =>
       wrapper.findAll('#oscillator-type option').map((option) => option.attributes('value'))
@@ -236,7 +236,7 @@ describe('App', () => {
   it('removes listeners, releases notes, and closes its context on unmount', async () => {
     const off = vi.fn<NoteOff>(() => 2)
     synthOn.mockReturnValue(off)
-    const wrapper = mount(App)
+    const wrapper = mount(PatchTestingView)
     dispatchKey('keydown', 65)
     await flushPromises()
 
