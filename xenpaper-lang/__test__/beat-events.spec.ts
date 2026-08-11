@@ -11,6 +11,12 @@ const score = (source: string) => {
 }
 
 describe('beat event expansion', () => {
+  it('retains authored ratio labels for static renderers', () => {
+    const result = score('3/2')
+    expect(result.events).toHaveLength(1)
+    expect(result.events[0]).toMatchObject({ kind: 'note', label: '3/2' })
+  })
+
   it('retains exact offsets through tuplets and extends attached continuations', () => {
     const result = score('[C D E] F=')
     const notes = result.events.filter((event) => event.kind === 'note')

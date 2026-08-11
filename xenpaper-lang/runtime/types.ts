@@ -189,6 +189,8 @@ export interface AttackShape extends ShapeBase {
   readonly notatedDuration?: Fraction
   /** Authored pitch expression to show below the staff. */
   readonly displayLabel?: string
+  /** Authored pitch expression retained for non-notation renderers such as piano rolls. */
+  readonly authoredLabel?: string
   /** Other contexts in which this source attack occurs after repeat expansion. */
   readonly alternateAppearances?: readonly AttackAppearance[]
 }
@@ -267,6 +269,7 @@ export interface BeatTimedNoteEvent {
   /** Effective amplitude from either the prevailing dynamic or a one-shot velocity. */
   readonly dynamic: Fraction
   readonly automation?: PitchAutomation
+  /** Faithful authored pitch expression, when one exists. */
   readonly label?: string
   readonly origins: readonly SourceOrigin[]
 }

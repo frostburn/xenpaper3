@@ -123,7 +123,7 @@ const formatBeat = (value: Fraction) => {
           <g v-if="inspectedNote" class="cents-label">
             <line
               x1="0"
-              :x2="rulerWidth"
+              :x2="rulerWidth + 30"
               :y1="y(cents(inspectedNote))"
               :y2="y(cents(inspectedNote))"
             />
@@ -169,6 +169,7 @@ svg {
   width: 70px;
   margin-top: -320px;
   pointer-events: none;
+  overflow: visible;
 }
 .ruler-background {
   fill: #fafafa;

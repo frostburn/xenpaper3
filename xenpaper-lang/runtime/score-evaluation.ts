@@ -826,6 +826,7 @@ export function evaluateScoreSemantics(
       rootPitch: context.rootPitch,
       dynamic: currentDynamic,
       velocity: DYNAMIC_VELOCITIES[currentDynamic],
+      ...('raw' in current ? { authoredLabel: String(current.raw) } : {}),
       ...(current.type === 'DegreeLiteral' ||
       current.type === 'EqualDivisionLiteral' ||
       (current.type === 'QuantityLiteral' && current.unit === 'c')

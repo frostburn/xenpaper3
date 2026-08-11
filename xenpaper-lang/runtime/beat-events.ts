@@ -48,7 +48,7 @@ function flattenScoreSemantics(shape: ScoreShape): BeatEventFlatteningResult {
           (current as typeof current & { readonly velocity: Fraction }).velocity,
         ),
         automation: current.automation,
-        label: current.displayLabel,
+        label: current.authoredLabel ?? current.displayLabel,
         origins: current.origins,
       }
       events.push(event)
