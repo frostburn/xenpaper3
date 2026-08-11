@@ -333,6 +333,19 @@ DegreeMappingList
   = first:DegreeMappingLiteral rest:(SequenceGap value:DegreeMappingLiteral { return value; })+ {
       return [first, ...rest];
     }
+  / value:SingleDegreeMappingLiteral { return [value]; }
+
+// An integer cent token remains available for wart notation (`{88c}`), while
+// the decimal dot makes a single-entry cent scale unambiguous (`{88.0c}`).
+SingleDegreeMappingLiteral
+  = value:QuantityLiteral &{
+      return value.unit.toLowerCase() !== 'c' || value.magnitude.includes('.');
+    } { return value; }
+  / EqualDivisionLiteral
+  / RatioLiteral
+  / RealLiteral
+  / DecimalLiteral
+  / IntegerLiteral
 
 DegreeMappingLiteral
   = EqualDivisionLiteral
@@ -390,9 +403,6 @@ MappingLiteral
 ContextPreset
   = raw:$(UnsignedInteger "ed"i (RatioText / UnsignedInteger)) !IdentifierContinue {
       return { kind: 'equalDivision', raw };
-    }
-  / raw:$([0-9]+ "." [0-9]+ "c"i) !IdentifierContinue {
-      return { kind: 'centEqualTemperament', raw };
     }
   / raw:$([a-zA-Z]* UnsignedInteger ("edo"i / [a-zA-Z]*)) !IdentifierContinue {
       return { kind: 'rank1', raw };

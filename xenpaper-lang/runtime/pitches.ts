@@ -220,25 +220,19 @@ export function applyPitchContextChange(
   let context = input
   for (const statement of node.statements) {
     if (statement.type === 'ContextPreset') {
-      const cents = /^(\d+(?:\.\d+))c$/i.exec(statement.raw)
       const edo = /^(\d+)edo$/i.exec(statement.raw)
-      const parsed = cents
-        ? centEqualTemperament(Number(cents[1]))
-        : edo
+      const parsed = edo
         ? { mapping: edoMapping(Number(edo[1])), divisions: Number(edo[1]), equave: 2 }
         : parseVal(statement.raw)
       const { mapping } = parsed
       const equave = Value.pitch(new Value(parsed.equave))
-      const degreeCount = cents ? Math.round(1200 / Number(cents[1])) : parsed.divisions
-      const degrees = Array.from({ length: degreeCount }, (_, index) =>
-        cents
-          ? Value.cents((index + 1) * Number(cents[1]))
-          : Value.equalDivision(index + 1, parsed.divisions, new Value(parsed.equave)),
+      const degrees = Array.from({ length: parsed.divisions }, (_, index) =>
+        Value.equalDivision(index + 1, parsed.divisions, new Value(parsed.equave)),
       )
       context = {
         ...createPitchContext(mapping),
         degrees,
-        degreeEquave: cents ? degrees[degrees.length - 1]! : equave,
+        degreeEquave: equave,
         rootDisplacement: context.rootDisplacement,
         rootPitch: {
           ...context.rootPitch,
@@ -302,19 +296,6 @@ export function applyPitchContextChange(
     throw new TypeError('Unsupported pitch-context assignment.')
   }
   return context
-}
-
-function centEqualTemperament(step: number) {
-  if (!(step > 0) || !Number.isFinite(step))
-    throw new RangeError('Cent equal temperament step must be positive.')
-  return {
-    divisions: Math.round(1200 / step),
-    equave: 2,
-    mapping: {
-      id: `${step}cET`,
-      mapPrime: (prime: number) => Value.cents(Math.round((1200 * Math.log2(prime)) / step) * step),
-    },
-  }
 }
 
 const origin = (node: PitchLiteral | IntervalLiteral): readonly SourceOrigin[] => [

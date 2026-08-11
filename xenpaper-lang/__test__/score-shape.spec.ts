@@ -64,13 +64,18 @@ describe('score-shape timing', () => {
     expect(() => shape('{17oooooooooooo} C')).not.toThrow()
   })
 
-  it('distinguishes decimal cent equal temperaments from c-wart vals', () => {
+  it('treats decimal cent temperaments as single-entry scales and integer c as a wart', () => {
     const cents = shape('{88.0c} 0 1 14') as SequenceShape
     expect(
       cents.children
         .filter((child) => child.kind === 'attack')
         .map((attack) => attack.pitch.value.valueOf()),
     ).toEqual([0, 88, 1232])
+    const centsPitch = shape('{88.0c} E') as SequenceShape
+    const e = centsPitch.children.find((child) => child.kind === 'attack')
+    expect(e?.kind === 'attack' ? e.pitch.value.valueOf() : undefined).toBeCloseTo(
+      1200 * Math.log2(81 / 64),
+    )
 
     const wart = shape('{88c} 0 1 88') as SequenceShape
     expect(
