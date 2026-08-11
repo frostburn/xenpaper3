@@ -17,8 +17,10 @@ const high = computed(
   () => Math.ceil((Math.max(1200, ...notes.value.map(cents)) + 100) / 100) * 100,
 )
 const rulerWidth = 70
+const rulerGuideLength = 200
+const rightPadding = 50
 const gridBottom = 275
-const width = computed(() => Math.max(640, rulerWidth + duration.value * 100))
+const width = computed(() => Math.max(640, rulerWidth + duration.value * 100 + rightPadding))
 const height = 320
 const x = (value: { valueOf(): number }) => rulerWidth + beat(value) * 100
 const y = (value: number) => 15 + ((high.value - value) / (high.value - low.value)) * 255
@@ -123,7 +125,7 @@ const formatBeat = (value: Fraction) => {
           <g v-if="inspectedNote" class="cents-label">
             <line
               x1="0"
-              :x2="rulerWidth + 30"
+              :x2="rulerGuideLength"
               :y1="y(cents(inspectedNote))"
               :y2="y(cents(inspectedNote))"
             />

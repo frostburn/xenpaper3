@@ -77,11 +77,40 @@ describe('PianoRoll', () => {
     expect(wrapper.get('.inspection-line').attributes('x1')).toBe('0')
     expect(wrapper.get('.inspection-line').attributes('x2')).toBe('203.33333333333331')
     expect(wrapper.get('.cents-label text').text()).toBe('700.00¢')
-    expect(wrapper.get('.cents-label line').attributes('x2')).toBe('100')
+    expect(wrapper.get('.cents-label line').attributes('x2')).toBe('200')
     expect(wrapper.findAll('.boundary-line')).toHaveLength(2)
     expect(wrapper.findAll('.beat-label').map((label) => label.text())).toEqual(['1 1/3', '2'])
 
     await wrapper.get('rect.note').trigger('mouseleave')
     expect(wrapper.find('.inspection-line').exists()).toBe(false)
+  })
+
+  it('leaves room for the final boundary label', async () => {
+    const score: BeatTimedScore = {
+      duration: new Fraction(7),
+      events: [
+        {
+          kind: 'note',
+          start: new Fraction(6),
+          duration: new Fraction(1),
+          pitch: {
+            kind: 'pitchOffset',
+            value: Value.cents(0),
+            origins: [],
+          },
+          dynamic: new Fraction(1, 2),
+          label: '1/1',
+          origins: [],
+        },
+      ],
+    }
+    const wrapper = mount(PianoRoll, { props: { score } })
+
+    await wrapper.get('rect.note').trigger('mouseenter')
+
+    expect(wrapper.get('svg.grid').attributes('viewBox')).toBe('0 0 820 320')
+    const endLabel = wrapper.findAll('.beat-label')[1]!
+    expect(endLabel.attributes('x')).toBe('770')
+    expect(endLabel.text()).toBe('7')
   })
 })
