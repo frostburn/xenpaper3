@@ -3,7 +3,7 @@ import type { IntervalLiteral, PitchContextChange, PitchLiteral } from '../parse
 import type { Diagnostic } from '../diagnostics'
 import { Value } from '../value'
 import { applyFjsInflections, fjsPrimeComma, groupFjsInflections } from './fjs'
-import { evaluateLiteral } from './literals'
+import { evaluateExpression } from './expressions'
 import type {
   AbsolutePitchValue,
   IntervalSpelling,
@@ -181,7 +181,9 @@ export function createPitchContext(mapping: PrimeMapping = DEFAULT_MAPPING): Pit
   }
   return {
     mapping,
-    degreeStep: Value.cents(100),
+    degrees: Array.from({ length: 12 }, (_, index) =>
+      Value.equalDivision(index + 1, 12, new Value(2)),
+    ),
     degreeEquave: Value.cents(1200),
     rootDisplacement: Value.cents(0),
     rootPitch,
@@ -218,16 +220,25 @@ export function applyPitchContextChange(
   let context = input
   for (const statement of node.statements) {
     if (statement.type === 'ContextPreset') {
+      const cents = /^(\d+(?:\.\d+))c$/i.exec(statement.raw)
       const edo = /^(\d+)edo$/i.exec(statement.raw)
-      const parsed = edo
+      const parsed = cents
+        ? centEqualTemperament(Number(cents[1]))
+        : edo
         ? { mapping: edoMapping(Number(edo[1])), divisions: Number(edo[1]), equave: 2 }
         : parseVal(statement.raw)
       const { mapping } = parsed
       const equave = Value.pitch(new Value(parsed.equave))
+      const degreeCount = cents ? Math.round(1200 / Number(cents[1])) : parsed.divisions
+      const degrees = Array.from({ length: degreeCount }, (_, index) =>
+        cents
+          ? Value.cents((index + 1) * Number(cents[1]))
+          : Value.equalDivision(index + 1, parsed.divisions, new Value(parsed.equave)),
+      )
       context = {
         ...createPitchContext(mapping),
-        degreeStep: Value.equalDivision(1, parsed.divisions, new Value(parsed.equave)),
-        degreeEquave: equave,
+        degrees,
+        degreeEquave: cents ? degrees[degrees.length - 1]! : equave,
         rootDisplacement: context.rootDisplacement,
         rootPitch: {
           ...context.rootPitch,
@@ -238,10 +249,12 @@ export function applyPitchContextChange(
     }
     if (statement.type === 'ContextDegreeMapping') {
       const degrees = statement.values.map((value) => {
-        const evaluated = evaluateLiteral(value)
-        if (!('value' in evaluated) || evaluated.value.kind !== 'pitchOffset')
+        const evaluated = evaluateExpression(value, context)
+        if (!('value' in evaluated) || evaluated.value.kind === 'absolutePitch')
           throw new TypeError('Degree assignments require pitch intervals.')
-        return evaluated.value.value
+        return evaluated.value.kind === 'pitchOffset'
+          ? evaluated.value.value
+          : Value.pitch(evaluated.value.value)
       })
       if (!degrees.length) throw new TypeError('A degree assignment cannot be empty.')
       context = { ...context, degrees, degreeEquave: degrees[degrees.length - 1]! }
@@ -289,6 +302,19 @@ export function applyPitchContextChange(
     throw new TypeError('Unsupported pitch-context assignment.')
   }
   return context
+}
+
+function centEqualTemperament(step: number) {
+  if (!(step > 0) || !Number.isFinite(step))
+    throw new RangeError('Cent equal temperament step must be positive.')
+  return {
+    divisions: Math.round(1200 / step),
+    equave: 2,
+    mapping: {
+      id: `${step}cET`,
+      mapPrime: (prime: number) => Value.cents(Math.round((1200 * Math.log2(prime)) / step) * step),
+    },
+  }
 }
 
 const origin = (node: PitchLiteral | IntervalLiteral): readonly SourceOrigin[] => [
