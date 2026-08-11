@@ -37,6 +37,20 @@ interface PlaybackAttackShape extends AttackShape {
   readonly velocityExplicit?: boolean
 }
 
+const MAX_REPEAT_EXPANSION_NODES = 100_000
+
+function repeatCount(node: Extract<Expression, { type: 'Repeat' }>): number | undefined {
+  let count: bigint
+  try {
+    count = node.count ? BigInt(String(node.count.value)) : 2n
+  } catch {
+    return undefined
+  }
+  const expandedNodes = count * BigInt(Math.max(1, node.body.length))
+  if (count < 0n || expandedNodes > BigInt(MAX_REPEAT_EXPANSION_NODES)) return undefined
+  return Number(count)
+}
+
 function hasShape(
   result: ScoreShapeEvaluationResult,
 ): result is { readonly shape: ScoreShape; readonly diagnostics: readonly Diagnostic[] } {
@@ -372,7 +386,8 @@ export function evaluateScoreSemantics(
     if (current.type === 'PostfixExpression') return contextAfter(current.expression, context)
     if (current.type === 'Repeat') {
       let active = context
-      const count = Number(current.count?.value ?? 2)
+      const count = repeatCount(current)
+      if (count === undefined) return active
       for (let iteration = 0; iteration < count; iteration++) {
         active = current.body.reduce((bodyContext, item) => contextAfter(item, bodyContext), active)
       }
@@ -414,7 +429,9 @@ export function evaluateScoreSemantics(
     }
     if (current.type === 'Repeat') {
       let active = currentPulse
-      for (let iteration = 0; iteration < Number(current.count?.value ?? 2); iteration++) {
+      const count = repeatCount(current)
+      if (count === undefined) return active
+      for (let iteration = 0; iteration < count; iteration++) {
         active = current.body.reduce(
           (bodyPulse, item) => pulseAfter(item, bodyPulse, context),
           active,
@@ -458,7 +475,19 @@ export function evaluateScoreSemantics(
       return { shape: barline(current, 'double'), diagnostics: [] }
     }
     if (current.type === 'Repeat') {
-      const count = Number(current.count?.value ?? 2)
+      const count = repeatCount(current)
+      if (count === undefined) {
+        return {
+          diagnostics: [
+            {
+              code: 'XP_REPEAT_COUNT',
+              severity: 'error',
+              message: `Repeat count must be an exact non-negative integer within the ${MAX_REPEAT_EXPANSION_NODES}-node expansion limit.`,
+              locations: [current.count?.location ?? current.location],
+            },
+          ],
+        }
+      }
       let activeContext = context
       let activePulse = currentPulse
       let displayedShapes: ScoreShape[] | undefined

@@ -177,6 +177,19 @@ describe('score-shape timing', () => {
     expect(following!.duration.valueOf()).toBe(0.5)
   })
 
+  it.each(['|:(x100001) C :|', `|:(x${'1' + '0'.repeat(400)}) C :|`])(
+    'rejects an unsafe repeat without iterating it',
+    (source) => {
+      const node = parse(source).body[0] as Expression
+      const result = evaluateScoreShape(node)
+
+      expect(result).not.toHaveProperty('shape')
+      expect(result.diagnostics).toEqual([
+        expect.objectContaining({ code: 'XP_REPEAT_COUNT', severity: 'error' }),
+      ])
+    },
+  )
+
   it('normalizes attached continuation as part of the complete fragment', () => {
     const result = shape('[3/2= 4/3]') as SequenceShape
 
