@@ -1,10 +1,30 @@
 <script setup lang="ts">
-import { computed, ref, toRaw } from 'vue'
+import { computed, ref, toRaw, watch } from 'vue'
 import type { Fraction } from 'xen-dev-utils/fraction'
 import type { BeatTimedScore } from '../../xenpaper-lang'
 
 const props = defineProps<{ score?: BeatTimedScore }>()
+export interface PianoRollElementInfo {
+  index: number
+  label: string
+  kind: 'note'
+  pitchKind: string
+  cents: number
+  start: string
+  duration: string
+  end: string
+}
+
+export interface PianoRollInspection {
+  inspected?: PianoRollElementInfo
+  selected: PianoRollElementInfo[]
+}
+
+const emit = defineEmits<{ inspectionChange: [inspection: PianoRollInspection] }>()
 const hovered = ref<number>()
+const selected = ref<number[]>([])
+const selectionStart = ref<{ x: number; y: number }>()
+const selectionEnd = ref<{ x: number; y: number }>()
 const notes = computed(() => props.score?.events.filter((event) => event.kind === 'note') ?? [])
 // Values deliberately contain frozen exact-form internals. Calling methods through a deep
 // Vue proxy violates the Proxy invariants for those non-configurable properties.
@@ -46,6 +66,72 @@ const formatBeat = (value: Fraction) => {
   if (!remainder) return `${sign}${whole}`
   return whole ? `${sign}${whole} ${remainder}/${fraction.d}` : `${sign}${remainder}/${fraction.d}`
 }
+const elementInfo = (note: (typeof notes.value)[number], index: number): PianoRollElementInfo => ({
+  index,
+  label: tooltip(note),
+  kind: 'note',
+  pitchKind: note.pitch.kind,
+  cents: cents(note),
+  start: formatBeat(note.start),
+  duration: formatBeat(note.duration),
+  end: formatBeat(noteEnd(note)),
+})
+const inspection = computed<PianoRollInspection>(() => ({
+  inspected:
+    hovered.value === undefined
+      ? undefined
+      : elementInfo(notes.value[hovered.value]!, hovered.value),
+  selected: selected.value.map((index) => elementInfo(notes.value[index]!, index)),
+}))
+watch(inspection, (value) => emit('inspectionChange', value), { immediate: true })
+watch(notes, () => {
+  selected.value = []
+  hovered.value = undefined
+})
+
+const svgPoint = (event: MouseEvent) => {
+  const svg = event.currentTarget as SVGSVGElement
+  const bounds = svg.getBoundingClientRect()
+  return {
+    x: ((event.clientX - bounds.left) / (bounds.width || width.value)) * width.value,
+    y: ((event.clientY - bounds.top) / (bounds.height || height)) * height,
+  }
+}
+const startSelection = (event: MouseEvent) => {
+  selectionStart.value = svgPoint(event)
+  selectionEnd.value = selectionStart.value
+}
+const moveSelection = (event: MouseEvent) => {
+  if (selectionStart.value) selectionEnd.value = svgPoint(event)
+}
+const finishSelection = (event: MouseEvent) => {
+  if (!selectionStart.value) return
+  selectionEnd.value = svgPoint(event)
+  const left = Math.min(selectionStart.value.x, selectionEnd.value.x)
+  const right = Math.max(selectionStart.value.x, selectionEnd.value.x)
+  const top = Math.min(selectionStart.value.y, selectionEnd.value.y)
+  const bottom = Math.max(selectionStart.value.y, selectionEnd.value.y)
+  selected.value = notes.value.flatMap((note, index) => {
+    const noteLeft = x(note.start)
+    const noteRight = noteLeft + Math.max(2, beat(note.duration) * 100)
+    const noteTop = y(cents(note)) - 5
+    const noteBottom = noteTop + 10
+    return noteRight >= left && noteLeft <= right && noteBottom >= top && noteTop <= bottom
+      ? [index]
+      : []
+  })
+  selectionStart.value = undefined
+  selectionEnd.value = undefined
+}
+const selectionBox = computed(() => {
+  if (!selectionStart.value || !selectionEnd.value) return undefined
+  return {
+    x: Math.min(selectionStart.value.x, selectionEnd.value.x),
+    y: Math.min(selectionStart.value.y, selectionEnd.value.y),
+    width: Math.abs(selectionStart.value.x - selectionEnd.value.x),
+    height: Math.abs(selectionStart.value.y - selectionEnd.value.y),
+  }
+})
 </script>
 
 <template>
@@ -58,6 +144,10 @@ const formatBeat = (value: Fraction) => {
           :viewBox="`0 0 ${width} ${height}`"
           role="img"
           aria-label="Beat-timed piano roll"
+          @mousedown.self="startSelection"
+          @mousemove="moveSelection"
+          @mouseup="finishSelection"
+          @mouseleave="selectionStart = undefined"
         >
           <line
             v-for="row in rows"
@@ -105,7 +195,7 @@ const formatBeat = (value: Fraction) => {
             v-for="(note, index) in notes"
             :key="index"
             class="note"
-            :class="{ inspected: hovered === index }"
+            :class="{ inspected: hovered === index, selected: selected.includes(index) }"
             :x="x(note.start)"
             :y="y(cents(note)) - 5"
             :width="Math.max(2, beat(note.duration) * 100)"
@@ -115,6 +205,12 @@ const formatBeat = (value: Fraction) => {
           >
             <title>{{ tooltip(note) }}</title>
           </rect>
+          <rect
+            v-if="selectionBox"
+            class="selection-box"
+            v-bind="selectionBox"
+            aria-hidden="true"
+          />
           <text v-if="!notes.length" class="empty" x="90" y="150">No notes loaded</text>
         </svg>
         <svg class="ruler" :viewBox="`0 0 ${rulerWidth} ${height}`" aria-hidden="true">
@@ -187,6 +283,17 @@ svg {
 }
 .note.inspected {
   fill: #8068bd;
+}
+.note.selected {
+  fill: #b33c68;
+  stroke-width: 2;
+}
+.selection-box {
+  fill: rgb(179 60 104 / 15%);
+  stroke: #b33c68;
+  stroke-width: 1.5;
+  stroke-dasharray: 5 3;
+  pointer-events: none;
 }
 .inspection-line,
 .boundary-line {
