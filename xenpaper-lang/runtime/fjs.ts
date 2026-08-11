@@ -1,4 +1,6 @@
+import { circleDistance } from 'xen-dev-utils/core'
 import { Fraction } from 'xen-dev-utils/fraction'
+import { isPrime } from 'xen-dev-utils/primes'
 import type { FjsSpelling, PrimeMonzo } from './types'
 
 export type FjsFlavor = '' | 'c' | 'n' | 'q' | 't' | 'h' | 'm'
@@ -11,6 +13,7 @@ export interface FjsInflectionInput {
 
 const FIFTH = 1200 * Math.log2(3 / 2)
 const FOURTH = 1200 * Math.log2(4 / 3)
+const TRITAVE = 1200 * Math.log2(3)
 const FORMAL_RADIUS = 1200 * Math.log2(65 / 63)
 const SEMIAPOTOME = 600 * Math.log2(2187 / 2048) + 1e-6
 const cache = new Map<string, PrimeMonzo>()
@@ -19,7 +22,11 @@ const cache = new Map<string, PrimeMonzo>()
 export function groupFjsInflections(inflections: readonly FjsSpelling[]): FjsSpelling[] {
   const result = inflections.map((inflection) => ({ ...inflection }))
   for (let left = 0; left < result.length; left++) {
+    // 11² is already > 100
+    if (result[left]!.prime > 7n) continue
     for (let right = left + 1; right < result.length; right++) {
+      // 5*23 is already > 100
+      if (result[right]!.prime > 19n) continue
       if (
         result[left]!.direction !== result[right]!.direction ||
         result[left]!.flavor !== result[right]!.flavor
@@ -35,11 +42,6 @@ export function groupFjsInflections(inflections: readonly FjsSpelling[]): FjsSpe
   return result
 }
 
-function circleDistance(left: number, right: number) {
-  const distance = Math.abs(left - right) % 1200
-  return Math.min(distance, 1200 - distance)
-}
-
 function formalMaster(cents: number, radius: number): [number, number] {
   if (circleDistance(cents, 0) < radius) return [0, 0]
   for (let k = 1; ; k++) {
@@ -48,6 +50,7 @@ function formalMaster(cents: number, radius: number): [number, number] {
   }
 }
 
+// Bridging radius tweaked manually to be as large as possible without disrupting original NFJS commas.
 function neutralMaster(cents: number): [number, number] {
   for (let k = 0.5; ; k++) {
     if (circleDistance(cents, k * FIFTH) < 92.1) return [k, -k]
@@ -55,6 +58,7 @@ function neutralMaster(cents: number): [number, number] {
   }
 }
 
+// Bridging radius tweaked manually to align with harmonic segments preferring the large limma.
 function semiquartalMaster(cents: number): [number, number] {
   for (let k = 0.5; ; k++) {
     if (circleDistance(cents, k * FOURTH) < 137.2) return [-k - 0.5, k]
@@ -62,6 +66,7 @@ function semiquartalMaster(cents: number): [number, number] {
   }
 }
 
+// Bridging radius pulled out of a hat.
 function toneSplitterMaster(cents: number): [number, number] {
   for (let k = 0.5; ; k++) {
     const center = 600 + (k - 0.5) * FIFTH
@@ -85,7 +90,7 @@ export function fjsPrimeComma(prime: number, flavor: FjsFlavor = ''): PrimeMonzo
   else pair = formalMaster(cents, flavor === 'c' ? FORMAL_RADIUS : SEMIAPOTOME)
   let twos = pair[0]
   const threes = pair[1]
-  let commaCents = cents + 1200 * twos + 1200 * Math.log2(3) * threes
+  let commaCents = cents + 1200 * twos + TRITAVE * threes
   while (commaCents > 600) {
     commaCents -= 1200
     twos--
@@ -144,10 +149,4 @@ export function applyFjsInflections(
       else result.delete(prime)
     }
   }
-}
-
-function isPrime(value: number) {
-  for (let divisor = 2; divisor * divisor <= value; divisor++)
-    if (value % divisor === 0) return false
-  return true
 }
