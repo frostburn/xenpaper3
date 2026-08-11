@@ -27,7 +27,7 @@ const notation: StaffNotationShape = {
 }
 
 describe('MusicalStaff', () => {
-  it('renders grace notes small, tied to an unchanged donor, with performance labels', () => {
+  it('renders grace notes small, tied to an unchanged donor, with dynamic annotations', () => {
     const evaluated = evaluateScoreShape(parse('@p @4?? B @velocity(80%) c# c=').body[0]!)
     if (!('shape' in evaluated)) throw new Error('Expected a score shape.')
     const wrapper = mount(MusicalStaff, {
@@ -37,7 +37,7 @@ describe('MusicalStaff', () => {
     expect(wrapper.findAll('.grace-note')).toHaveLength(2)
     expect(wrapper.findAll('.grace-tie')).toHaveLength(2)
     expect(wrapper.findAll('.notehead--open')).toHaveLength(1)
-    expect(wrapper.findAll('.performance-label').map((label) => label.text())).toEqual(['p', '80%'])
+    expect(wrapper.findAll('.performance-label').map((label) => label.text())).toEqual(['p'])
   })
 
   it('only displays dynamics where an authored directive changes the prevailing mark', () => {

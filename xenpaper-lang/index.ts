@@ -22,11 +22,10 @@ export {
 export type { ExpressionEvaluationResult } from './runtime/expressions'
 export { DIRECTIVE_REGISTRY, DYNAMIC_VELOCITIES, resolveDirective } from './runtime/directives'
 export { evaluateScoreShape } from './runtime/score-shape'
-export { expandToBeatEvents, flattenScoreShape } from './runtime/beat-events'
+export { expandToBeatEvents } from './runtime/beat-events'
 export type {
   BeatEventExpansionOptions,
   BeatEventExpansionResult,
-  BeatEventFlatteningResult,
 } from './runtime/beat-events'
 export {
   constructStaffNotation,

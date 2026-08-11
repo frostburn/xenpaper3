@@ -24,19 +24,17 @@ if ('score' in result) {
 
 `parse()` is the generated Peggy parser and throws a Peggy syntax error for
 invalid source. Runtime stages return diagnostics for semantic errors.
-`expandToBeatEvents()` performs repeat expansion, score-shape evaluation, and
-beat-event flattening. The individual stages are also exported for callers that
-need the intermediate trees:
+Staff notation and audio scheduling are separate projections of the parsed
+source. `evaluateScoreShape()` produces an abstract, exact-duration notation
+tree; dynamics remain zero-duration annotations and velocity never changes a
+notation attack. `constructStaffNotationShape()` converts that tree to
+renderer-independent staff data.
 
-1. `expandRepeats()` clones repeat bodies and records an expansion path on each
-   occurrence.
-2. `evaluateScoreShape()` evaluates pitch contexts, directives, sequence and
-   parallel duration, normalized slots, continuations, grace notes, and
-   glissandi into an exact-duration tree.
-3. `flattenScoreShape()` produces notes and zero-duration structural markers at
-   exact beat positions.
-4. `constructStaffNotationShape()` converts a score-shape tree to
-   renderer-independent staff data.
+Independently, `expandToBeatEvents()` expands repeats and evaluates playback
+semantics directly into notes and structural markers at exact beat positions.
+It applies prevailing dynamics and one-shot velocities only in this audio
+pipeline. `expandRepeats()` remains available separately for tooling that needs
+to inspect expanded source occurrences and their expansion paths.
 
 The lower-level literal, expression, pitch, FJS, directive, and notation helpers
 are exported for focused tooling and tests. There is not yet a single
