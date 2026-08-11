@@ -3,6 +3,7 @@ import type { IntervalLiteral, PitchContextChange, PitchLiteral } from '../parse
 import type { Diagnostic } from '../diagnostics'
 import { Value } from '../value'
 import { applyFjsInflections, fjsPrimeComma, groupFjsInflections } from './fjs'
+import { evaluateLiteral } from './literals'
 import type {
   AbsolutePitchValue,
   IntervalSpelling,
@@ -13,6 +14,7 @@ import type {
   PitchContext,
   SourceOrigin,
 } from './types'
+import { parseVal, valMapping } from './val'
 
 export const DEFAULT_MAPPING: PrimeMapping = {
   id: 'untempered',
@@ -23,11 +25,8 @@ export const DEFAULT_MAPPING: PrimeMapping = {
 export function edoMapping(divisions: number): PrimeMapping {
   if (!Number.isSafeInteger(divisions) || divisions <= 0)
     throw new RangeError('EDO divisions must be a positive integer.')
-  return {
-    id: `${divisions}edo`,
-    mapPrime: (prime) =>
-      Value.cents(new Fraction(Math.round(divisions * Math.log2(prime)) * 1200, divisions)),
-  }
+  const mapping = valMapping(divisions, 2)
+  return { ...mapping, id: `${divisions}edo` }
 }
 
 function formula(entries: readonly (readonly [number, number])[]): Map<number, Fraction> {
@@ -219,19 +218,33 @@ export function applyPitchContextChange(
   let context = input
   for (const statement of node.statements) {
     if (statement.type === 'ContextPreset') {
-      const match = /^(\d+)(?:edo|p)$/i.exec(statement.raw)
-      if (!match) throw new TypeError(`Unsupported pitch preset ${statement.raw}.`)
-      const mapping = edoMapping(Number(match[1]))
+      const edo = /^(\d+)edo$/i.exec(statement.raw)
+      const parsed = edo
+        ? { mapping: edoMapping(Number(edo[1])), divisions: Number(edo[1]), equave: 2 }
+        : parseVal(statement.raw)
+      const { mapping } = parsed
+      const equave = Value.pitch(new Value(parsed.equave))
       context = {
         ...createPitchContext(mapping),
-        degreeStep: Value.cents(new Fraction(1200, Number(match[1]))),
-        degreeEquave: Value.cents(1200),
+        degreeStep: Value.equalDivision(1, parsed.divisions, new Value(parsed.equave)),
+        degreeEquave: equave,
         rootDisplacement: context.rootDisplacement,
         rootPitch: {
           ...context.rootPitch,
           rootOffset: mapFormula(context.rootPitch.formula, mapping),
         },
       }
+      continue
+    }
+    if (statement.type === 'ContextDegreeMapping') {
+      const degrees = statement.values.map((value) => {
+        const evaluated = evaluateLiteral(value)
+        if (!('value' in evaluated) || evaluated.value.kind !== 'pitchOffset')
+          throw new TypeError('Degree assignments require pitch intervals.')
+        return evaluated.value.value
+      })
+      if (!degrees.length) throw new TypeError('A degree assignment cannot be empty.')
+      context = { ...context, degrees, degreeEquave: degrees[degrees.length - 1]! }
       continue
     }
     if (statement.type !== 'ContextAssignment')

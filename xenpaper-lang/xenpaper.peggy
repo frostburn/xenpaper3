@@ -320,8 +320,18 @@ DirectiveArgument
   / AdditiveExpression
 
 PitchContextChange
-  = "{" Spacing statements:ContextStatementList? Spacing "}" {
+  = "{" Spacing values:DegreeMappingList Spacing "}" {
+      return node('PitchContextChange', {
+        statements: [node('ContextDegreeMapping', { values })],
+      });
+    }
+  / "{" Spacing statements:ContextStatementList? Spacing "}" {
       return node('PitchContextChange', { statements: statements ?? [] });
+    }
+
+DegreeMappingList
+  = first:EqualDivisionLiteral rest:(SequenceGap value:EqualDivisionLiteral { return value; })+ {
+      return [first, ...rest];
     }
 
 ContextStatementList
@@ -370,14 +380,11 @@ MappingLiteral
     }
 
 ContextPreset
-  = raw:$(UnsignedInteger ("edo"i / "p"i / "c"i)) !IdentifierContinue {
-      return { kind: 'rank1', raw };
-    }
-  / raw:$("b"i UnsignedInteger) !IdentifierContinue {
-      return { kind: 'b-val', raw };
-    }
-  / raw:$(UnsignedInteger "ed"i (RatioText / UnsignedInteger)) !IdentifierContinue {
+  = raw:$(UnsignedInteger "ed"i (RatioText / UnsignedInteger)) !IdentifierContinue {
       return { kind: 'equalDivision', raw };
+    }
+  / raw:$([a-zA-Z]* UnsignedInteger ("edo"i / [a-zA-Z]*)) !IdentifierContinue {
+      return { kind: 'rank1', raw };
     }
 
 CallExpression

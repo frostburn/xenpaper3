@@ -4,6 +4,7 @@ import { parse, type Expression } from '../parser.generated.js'
 import { evaluateScoreShape } from '../runtime/score-shape'
 import type { ParallelShape, ScoreShape, SequenceShape } from '../runtime/types'
 import { Value } from '../value'
+import { parseVal } from '../runtime/val'
 
 function shape(source: string, pulse: Fraction | number = 1): ScoreShape {
   const node = parse(source).body[0] as Expression
@@ -14,6 +15,35 @@ function shape(source: string, pulse: Fraction | number = 1): ScoreShape {
 }
 
 describe('score-shape timing', () => {
+  it('assigns explicit equal-division intervals to degrees and loops at the equave', () => {
+    const result = shape(String.raw`{3\12 5\12 7\12 10\12 12\12} 0 1 2 3 4 5 6 -1`) as SequenceShape
+    const attacks = result.children.filter((child) => child.kind === 'attack')
+    expect(attacks.map((attack) => attack.pitch.value.valueOf())).toEqual([
+      0, 300, 500, 700, 1000, 1200, 1500, -200,
+    ])
+  })
+
+  it('supports patent vals, arbitrary warts, and non-octave equal divisions', () => {
+    expect(parseVal('17c').mapping.mapPrime(5).valueOf()).not.toBe(
+      parseVal('17cc').mapping.mapPrime(5).valueOf(),
+    )
+    const wartDegrees = shape('{17c} 0 1 2') as SequenceShape
+    expect(
+      wartDegrees.children
+        .filter((child) => child.kind === 'attack')
+        .map((attack) => attack.pitch.value.valueOf()),
+    ).toEqual([0, 1200 / 17, 2400 / 17])
+
+    const tritave = shape('{b13} 0 1 13') as SequenceShape
+    expect(
+      tritave.children
+        .filter((child) => child.kind === 'attack')
+        .map((attack) => attack.pitch.value.valueOf()),
+    ).toEqual([0, 1200 * Math.log2(3) / 13, 1200 * Math.log2(3)])
+
+    expect(() => shape('{13ed3} C')).not.toThrow()
+    expect(() => shape('{7ed3/2} C')).not.toThrow()
+  })
   it('uses 12-EDO degrees by default and updates their division with EDO presets', () => {
     const defaults = shape("0 1 2 11 '0 `0") as SequenceShape
     const attacksIn = (score: ScoreShape): Extract<ScoreShape, { kind: 'attack' }>[] =>

@@ -99,6 +99,8 @@ export interface PitchContext {
   readonly mapping: PrimeMapping
   /** Numeric scale-degree step; defaults to one semitone. */
   readonly degreeStep: Value
+  /** Explicit scale degrees, with the last entry also defining the equave. */
+  readonly degrees?: readonly Value[]
   /** Displacement applied by each equave modifier on a numeric degree. */
   readonly degreeEquave: Value
   /** Sounding displacement of the current root from the default root frequency. */

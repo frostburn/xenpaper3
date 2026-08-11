@@ -24,6 +24,7 @@ export type Expression =
   | CallExpression
   | ContextAssignment
   | ContextExpression
+  | ContextDegreeMapping
   | ContextNameTarget
   | ContextOperatorTarget
   | ContextPitchTarget
@@ -81,6 +82,11 @@ export interface ContextAssignment extends Node {
 export interface ContextExpression extends Node {
   type: 'ContextExpression'
   value: Expression
+}
+
+export interface ContextDegreeMapping extends Node {
+  type: 'ContextDegreeMapping'
+  values: EqualDivisionLiteral[]
 }
 
 export interface ContextNameTarget extends Node {
