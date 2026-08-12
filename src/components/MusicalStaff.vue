@@ -225,18 +225,26 @@ const items = computed(() => {
         start++
         continue
       }
-      let count = first.duration.d
+      const engravingDuration = first.tuplets.reduce(
+        (duration, tuplet) => duration.mul(tuplet.count).div(2),
+        fraction(first.duration),
+      )
+      let count = engravingDuration.d
       while (count % 2 === 0) count /= 2
-      if (count <= 1 || !Number.isSafeInteger(count) || first.tuplets.length) {
+      if (count <= 1 || !Number.isSafeInteger(count)) {
         start++
         continue
       }
+      const containingTuplets = first.tuplets.map((tuplet) => tuplet.id).join(',')
       let end = start
       while (
         end < rhythmicItems.length &&
         rhythmicItems[end]!.duration &&
-        !rhythmicItems[end]!.tuplets.length &&
-        rhythmicItems[end]!.duration.equals(first.duration)
+        rhythmicItems[end]!.tuplets.map((tuplet) => tuplet.id).join(',') === containingTuplets &&
+        rhythmicItems[end]!.tuplets.reduce(
+          (duration, tuplet) => duration.mul(tuplet.count).div(2),
+          fraction(rhythmicItems[end]!.duration),
+        ).equals(engravingDuration)
       )
         end++
       for (let chunkStart = start; chunkStart < end; chunkStart += count) {
@@ -244,7 +252,10 @@ const items = computed(() => {
         const span: TupletSpan = {
           id: nextTupletId++,
           count,
-          level: 0,
+          level: Math.max(
+            0,
+            ...run.flatMap((item) => item.tuplets.map((tuplet) => tuplet.level + 1)),
+          ),
           startColumn: run[0]!.column,
           endColumn: run[run.length - 1]!.column,
         }

@@ -143,6 +143,21 @@ describe('MusicalStaff', () => {
     expect(wrapper.findAll('.notation-error')).toHaveLength(0)
   })
 
+  it('renders a subdivision nested inside a normalized slot', () => {
+    const evaluated = evaluateScoreShape(parse('[@5 C D E F G @1 E F]').body[0]!)
+    if (!('shape' in evaluated)) throw new Error('Expected a score shape.')
+    const wrapper = mount(MusicalStaff, {
+      props: { notation: constructStaffNotationShape(evaluated.shape) },
+    })
+
+    expect(wrapper.findAll('.tuplet-number').map((number) => number.text())).toEqual(['3', '5'])
+    expect(wrapper.findAll('.tuplet-number').map((number) => number.attributes('y'))).toEqual([
+      '31',
+      '15',
+    ])
+    expect(wrapper.findAll('.notation-error')).toHaveLength(0)
+  })
+
   it.each(['@3 C @p D E', '@3 C | D E'])(
     'keeps zero-duration events inside the inferred tuplet for %s',
     (source) => {
