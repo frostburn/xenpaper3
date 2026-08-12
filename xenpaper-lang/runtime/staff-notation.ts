@@ -1,5 +1,5 @@
 import { Value } from '../value'
-import { Fraction } from 'xen-dev-utils/fraction'
+import { Fraction, mmod } from 'xen-dev-utils/fraction'
 import { groupFjsInflections } from './fjs'
 import { normalizeStaffAccidental, spellIntervalFormula } from './pitches'
 import type {
@@ -124,13 +124,13 @@ export interface StaffNotationOptions {
 
 function naturalCents(position: number): number {
   const octave = Math.floor(position / 7)
-  const letter = ((position % 7) + 7) % 7
+  const letter = mmod(position, 7)
   return octave * 1200 + SEMITONES[letter]! * 100
 }
 
 function formulaChromatic(formula: PrimeMonzo, position: number): number | undefined {
   if ([...formula].some(([prime, exponent]) => prime > 3 && exponent.n)) return undefined
-  const letter = ((position % 7) + 7) % 7
+  const letter = mmod(position, 7)
   const threes = formula.get(3) ?? new Fraction(0)
   const chromatic = threes.sub(PYTHAGOREAN_THREES[letter]!).div(7)
   return chromatic.d <= 2 ? chromatic.valueOf() : undefined
@@ -253,7 +253,7 @@ export function constructStaffNotation(
   const absoluteCents = cents + naturalCents(rootPosition)
   const midiOffset = Math.round(absoluteCents / 100)
   const octaveOffset = Math.floor(midiOffset / 12)
-  const pitchClass = ((midiOffset % 12) + 12) % 12
+  const pitchClass = mmod(midiOffset, 12)
   let letter = 0
   let accidental: string | undefined
   let best = Infinity

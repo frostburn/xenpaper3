@@ -1,3 +1,4 @@
+import { valueToEquaveDivision } from 'xen-dev-utils/conversion'
 import { Fraction } from 'xen-dev-utils/fraction'
 import { PRIMES } from 'xen-dev-utils/primes'
 import { Value } from '../value'
@@ -37,7 +38,7 @@ export function valMapping(divisions: number, equave: number, warts = ''): Prime
   return {
     id: `${warts}${divisions}ed${equave}`,
     mapPrime: (prime) => {
-      const target = (divisions * Math.log(prime)) / Math.log(equave)
+      const target = valueToEquaveDivision(prime, divisions, equave)
       const steps = prime === equave ? divisions : valuation(target, counts.get(prime) ?? 0)
       return Value.equalDivision(new Fraction(steps), new Fraction(divisions), new Value(equave))
     },
@@ -79,12 +80,12 @@ function equalDivisionRatioMapping(
   denominator: number,
 ): PrimeMapping {
   const equave = new Value(BigInt(numerator), BigInt(denominator))
-  const logarithm = Math.log(numerator / denominator)
+  const equaveValue = numerator / denominator
   return {
     id: `${divisions}ed${numerator}/${denominator}`,
     mapPrime: (prime) =>
       Value.equalDivision(
-        new Fraction(Math.round((divisions * Math.log(prime)) / logarithm)),
+        new Fraction(Math.round(valueToEquaveDivision(prime, divisions, equaveValue))),
         new Fraction(divisions),
         equave,
       ),

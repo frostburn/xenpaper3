@@ -1,4 +1,4 @@
-import { Fraction } from 'xen-dev-utils/fraction'
+import { Fraction, mmod } from 'xen-dev-utils/fraction'
 import type { IntervalLiteral, PitchContextChange, PitchLiteral } from '../parser.generated.js'
 import type { Diagnostic } from '../diagnostics'
 import { Value } from '../value'
@@ -418,7 +418,7 @@ export function transposePitchSpelling(
   if (interval.direction === 'descending') steps = -steps
   if (subtract) steps = -steps
   const rank = base + octave * 7 + steps
-  const nominal = ['C', 'D', 'E', 'F', 'G', 'A', 'B'][((rank % 7) + 7) % 7]!
+  const nominal = ['C', 'D', 'E', 'F', 'G', 'A', 'B'][mmod(rank, 7)]!
   const targetOctave = Math.floor(rank / 7)
   const modifiers = targetOctave
     ? Array.from({ length: Math.abs(targetOctave) }, () =>
