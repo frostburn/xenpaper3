@@ -167,6 +167,25 @@ describe('score-shape timing', () => {
     expect(result.children.every((child) => child.duration.equals(new Fraction(1, 4)))).toBe(true)
   })
 
+  it('plays enumerated and inverted range chords in parallel', () => {
+    const harmonic = shape('4::7') as ParallelShape
+    expect(harmonic.branches.map((branch) => branch.kind)).toEqual([
+      'attack',
+      'attack',
+      'attack',
+      'attack',
+    ])
+
+    const minor = shape('/6::4') as ParallelShape
+    const pitches = minor.branches.map((branch) => {
+      if (branch.kind !== 'attack') throw new Error('Expected an attack.')
+      return branch.pitch.value
+    })
+    expect(pitches[0]!.equals(Value.pitch(new Value(1)))).toBe(true)
+    expect(pitches[1]!.equals(Value.pitch(new Value(6n, 5n)))).toBe(true)
+    expect(pitches[2]!.equals(Value.pitch(new Value(3n, 2n)))).toBe(true)
+  })
+
   it('treats positive irrational scalar expressions as playable ratios', () => {
     const result = shape('sqrt(2)')
 

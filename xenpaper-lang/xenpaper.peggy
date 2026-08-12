@@ -17,8 +17,18 @@
   const unary = (operator, operand, loc = location()) =>
     node('UnaryExpression', { operator, operand }, loc);
 
-  const binary = (operator, left, right, loc = location()) =>
-    node('BinaryExpression', { operator, left, right }, loc);
+  // Arithmetic broadcasts over enumerated chords.  Keeping this expansion in
+  // the surface tree means all later passes can treat the result exactly like
+  // an explicitly comma-separated chord.
+  const binary = (operator, left, right, loc = location()) => {
+    if (left.type === 'Parallel') {
+      return parallel(left.branches.map(branch => binary(operator, branch, right, loc)), loc);
+    }
+    if (right.type === 'Parallel') {
+      return parallel(right.branches.map(branch => binary(operator, left, branch, loc)), loc);
+    }
+    return node('BinaryExpression', { operator, left, right }, loc);
+  };
 
   const foldBinary = (head, tail, loc = location()) => {
     let result = head;
@@ -100,7 +110,7 @@ SequenceExpression
     }
 
 SequenceItem
-  = expression:(ShiftedValueExpression / ScaleDegreeLiteral / AdditiveExpression)
+  = expression:(EnumeratedChordArithmetic / ShiftedValueExpression / ScaleDegreeLiteral / AdditiveExpression)
     marks:AttachedPostfixMark* {
       if (!marks.length) return expression;
       return node('PostfixExpression', { expression, marks });
@@ -114,6 +124,9 @@ ShiftedValueExpression
       }
       return result;
     }
+
+EnumeratedChordArithmetic
+  = &EnumeratedChord expression:AdditiveExpression { return expression; }
 
 AdditiveExpression
   = first:MultiplicativeExpression
@@ -216,6 +229,7 @@ PrimaryExpression
   / Rest
   / DetachedContinue
   / Barline
+  / EnumeratedChord
   / MonzoLiteral
   / IntervalLiteral
   / PitchLiteral
@@ -227,6 +241,39 @@ PrimaryExpression
   / IntegerLiteral
   / CallExpression
   / IdentifierExpression
+
+// Colon chords are ratios relative to their first enumerand.  The leading
+// slash takes reciprocals before that normalization, which is equivalent to
+// reversing each resulting ratio.  Double colon fills in every intervening
+// integer (in either direction).
+EnumeratedChord
+  = inverted:"/"? first:UnsignedInteger values:(
+      "::" last:UnsignedInteger {
+        const start = Number(first);
+        const end = Number(last);
+        const step = start <= end ? 1 : -1;
+        const result = [];
+        for (let value = start; ; value += step) {
+          result.push(String(value));
+          if (value === end) break;
+        }
+        return result;
+      }
+      / rest:(":" value:UnsignedInteger { return value; })+ {
+        return [first, ...rest];
+      }
+    ) !":" {
+      const ratios = values.map(value => {
+        const numerator = inverted ? first : value;
+        const denominator = inverted ? value : first;
+        return node('RatioLiteral', {
+          numerator,
+          denominator,
+          raw: `${numerator}/${denominator}`,
+        });
+      });
+      return parallel(ratios);
+    }
 
 ParenthesizedExpression
   = "(" Spacing expression:ParallelExpression Spacing ")" {

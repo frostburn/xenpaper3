@@ -1,6 +1,47 @@
 import { describe, expect, it } from 'vitest'
 import { parse } from '../parser.generated.js'
 
+describe('enumerated chords', () => {
+  it('expands with chord-tight arithmetic precedence', () => {
+    expect(parse('3/2 * 4:5:6').body[0]).toMatchObject({
+      type: 'Parallel',
+      branches: [
+        { type: 'BinaryExpression', operator: '*', right: { numerator: '4', denominator: '4' } },
+        { type: 'BinaryExpression', operator: '*', right: { numerator: '5', denominator: '4' } },
+        { type: 'BinaryExpression', operator: '*', right: { numerator: '6', denominator: '4' } },
+      ],
+    })
+    expect(parse('4:5:6 * 3/2').body[0]).toMatchObject({
+      type: 'Parallel',
+      branches: [
+        { type: 'BinaryExpression', operator: '*', left: { numerator: '4', denominator: '4' } },
+        { type: 'BinaryExpression', operator: '*', left: { numerator: '5', denominator: '4' } },
+        { type: 'BinaryExpression', operator: '*', left: { numerator: '6', denominator: '4' } },
+      ],
+    })
+  })
+
+  it('enumerates inclusive integer ranges and inverts before normalization', () => {
+    expect(parse('4::7').body[0]).toMatchObject({
+      type: 'Parallel',
+      branches: [
+        { numerator: '4', denominator: '4' },
+        { numerator: '5', denominator: '4' },
+        { numerator: '6', denominator: '4' },
+        { numerator: '7', denominator: '4' },
+      ],
+    })
+    expect(parse('/6::4').body[0]).toMatchObject({
+      type: 'Parallel',
+      branches: [
+        { numerator: '6', denominator: '6' },
+        { numerator: '6', denominator: '5' },
+        { numerator: '6', denominator: '4' },
+      ],
+    })
+  })
+})
+
 const score = String.raw`# FJS and prefix modifiers
 E^5 Ebv5 P1v5 Cv5 E_
 /'C '/C vDb C#
