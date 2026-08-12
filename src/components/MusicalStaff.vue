@@ -247,15 +247,20 @@ const items = computed(() => {
         ).equals(engravingDuration)
       )
         end++
+      const containingIds = new Set(first.tuplets.map((tuplet) => tuplet.id))
+      if (first.tuplets.some((tuplet) => tuplet.level === 0)) {
+        staffItems.forEach((item) =>
+          item.tuplets.forEach((tuplet) => {
+            if (containingIds.has(tuplet.id)) tuplet.level++
+          }),
+        )
+      }
       for (let chunkStart = start; chunkStart < end; chunkStart += count) {
         const run = rhythmicItems.slice(chunkStart, Math.min(chunkStart + count, end))
         const span: TupletSpan = {
           id: nextTupletId++,
           count,
-          level: Math.max(
-            0,
-            ...run.flatMap((item) => item.tuplets.map((tuplet) => tuplet.level + 1)),
-          ),
+          level: 0,
           startColumn: run[0]!.column,
           endColumn: run[run.length - 1]!.column,
         }

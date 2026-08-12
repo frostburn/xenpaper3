@@ -152,8 +152,12 @@ describe('MusicalStaff', () => {
 
     expect(wrapper.findAll('.tuplet-number').map((number) => number.text())).toEqual(['3', '5'])
     expect(wrapper.findAll('.tuplet-number').map((number) => number.attributes('y'))).toEqual([
-      '31',
       '15',
+      '31',
+    ])
+    expect(wrapper.findAll('.tuplet-bracket').map((bracket) => bracket.attributes('d'))).toEqual([
+      'M 50 24 V 18 H 206 M 226 18 H 382 V 24',
+      'M 50 40 V 34 H 154 M 174 34 H 278 V 40',
     ])
     expect(wrapper.findAll('.notation-error')).toHaveLength(0)
   })
