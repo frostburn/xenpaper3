@@ -18,17 +18,17 @@ function location() {
 describe('SW Patch runtime', () => {
   it('evaluates augmented assignments and not expressions with Python-style precedence', () => {
     const patch = createPatch(
-      'fn calculate():\n'
-      + '    value = 5\n'
-      + '    value += 3\n'
-      + '    value *= 2\n'
-      + '    value -= 4\n'
-      + '    value /= 3\n'
-      + '    value **= 2\n'
-      + '    value %= 5\n'
-      + '    ret value\n'
-      + 'fn divisible(value: Number):\n'
-      + '    ret not value%3\n',
+      'fn calculate():\n' +
+        '    value = 5\n' +
+        '    value += 3\n' +
+        '    value *= 2\n' +
+        '    value -= 4\n' +
+        '    value /= 3\n' +
+        '    value **= 2\n' +
+        '    value %= 5\n' +
+        '    ret value\n' +
+        'fn divisible(value: Number):\n' +
+        '    ret not value%3\n',
       {} as BaseAudioContext,
     )
 
@@ -40,9 +40,7 @@ describe('SW Patch runtime', () => {
   it('evaluates an augmented member receiver only once', () => {
     const first = { value: 1 }
     const second = { value: 10 }
-    const getTarget = vi.fn<() => typeof first>()
-      .mockReturnValueOnce(first)
-      .mockReturnValue(second)
+    const getTarget = vi.fn<() => typeof first>().mockReturnValueOnce(first).mockReturnValue(second)
     const patch = createPatch(
       'fn increment():\n    getTarget().value += 1\n',
       {} as BaseAudioContext,
@@ -74,19 +72,19 @@ describe('SW Patch runtime', () => {
 
   it('executes for and while loops and propagates returns from their suites', () => {
     const patch = createPatch(
-      'fn total(values: List<Number>):\n'
-      + '    result = 0\n'
-      + '    for value in values:\n'
-      + '        result = result + value\n'
-      + '    remaining = 3\n'
-      + '    while remaining > 0:\n'
-      + '        result = result + 10\n'
-      + '        remaining = remaining - 1\n'
-      + '    ret result\n'
-      + 'fn first(values: List<Number>):\n'
-      + '    for value in values:\n'
-      + '        ret value\n'
-      + '    ret null\n',
+      'fn total(values: List<Number>):\n' +
+        '    result = 0\n' +
+        '    for value in values:\n' +
+        '        result = result + value\n' +
+        '    remaining = 3\n' +
+        '    while remaining > 0:\n' +
+        '        result = result + 10\n' +
+        '        remaining = remaining - 1\n' +
+        '    ret result\n' +
+        'fn first(values: List<Number>):\n' +
+        '    for value in values:\n' +
+        '        ret value\n' +
+        '    ret null\n',
       {} as BaseAudioContext,
     )
 
@@ -106,20 +104,20 @@ describe('SW Patch runtime', () => {
 
   it('provides range and supports break, continue, and pass', () => {
     const patch = createPatch(
-      'fn loops():\n'
-      + '    total = 0\n'
-      + '    for value in range(1, 10):\n'
-      + '        if value == 3:\n'
-      + '            continue\n'
-      + '        if value == 7:\n'
-      + '            break\n'
-      + '        total = total + value\n'
-      + '    while true:\n'
-      + '        pass\n'
-      + '        break\n'
-      + '    for value in range(5, 0, -2):\n'
-      + '        total = total + value\n'
-      + '    ret total\n',
+      'fn loops():\n' +
+        '    total = 0\n' +
+        '    for value in range(1, 10):\n' +
+        '        if value == 3:\n' +
+        '            continue\n' +
+        '        if value == 7:\n' +
+        '            break\n' +
+        '        total = total + value\n' +
+        '    while true:\n' +
+        '        pass\n' +
+        '        break\n' +
+        '    for value in range(5, 0, -2):\n' +
+        '        total = total + value\n' +
+        '    ret total\n',
       {} as BaseAudioContext,
     )
 
@@ -128,8 +126,9 @@ describe('SW Patch runtime', () => {
 
   it('validates range arguments and loop-control placement', () => {
     const context = {} as BaseAudioContext
-    expect(() => createPatch('for value in range(0, 3, 0):\n    pass\n', context))
-      .toThrow('step must not be zero')
+    expect(() => createPatch('for value in range(0, 3, 0):\n    pass\n', context)).toThrow(
+      'step must not be zero',
+    )
     expect(() => createPatch('break\n', context)).toThrow('outside a loop')
     expect(() => createPatch('continue\n', context)).toThrow('outside a loop')
   })
@@ -143,16 +142,22 @@ describe('SW Patch runtime', () => {
   it('provides Math constants and random scalar values', () => {
     const random = vi.spyOn(Math, 'random').mockReturnValue(0.25)
     const patch = createPatch(
-      'fn constants():\n'
-      + '    ret E + LN10 + LN2 + LOG10E + LOG2E + PI + SQRT1_2 + SQRT2\n'
-      + 'fn randomValue():\n'
-      + '    ret random()\n',
+      'fn constants():\n' +
+        '    ret E + LN10 + LN2 + LOG10E + LOG2E + PI + SQRT1_2 + SQRT2\n' +
+        'fn randomValue():\n' +
+        '    ret random()\n',
       {} as BaseAudioContext,
     )
 
     expect(Number((patch.constants as PatchFunction)())).toBeCloseTo(
-      Math.E + Math.LN10 + Math.LN2 + Math.LOG10E + Math.LOG2E
-      + Math.PI + Math.SQRT1_2 + Math.SQRT2,
+      Math.E +
+        Math.LN10 +
+        Math.LN2 +
+        Math.LOG10E +
+        Math.LOG2E +
+        Math.PI +
+        Math.SQRT1_2 +
+        Math.SQRT2,
     )
     expect((patch.randomValue as PatchFunction)()).toEqual(Quantity.scalar(0.25))
     expect(random).toHaveBeenCalledOnce()
@@ -198,20 +203,22 @@ describe('SW Patch runtime', () => {
     vi.stubGlobal('AudioWorkletNode', MockAudioWorkletNode)
     const context = { currentTime: 4 } as BaseAudioContext
     const patch = createPatch(
-      'fn sources(start: time):\n'
-      + '    t = TimeNode()\n'
-      + '    phase = PhaserNode(frequency = 2Hz, detune = 100c)\n'
-      + '    noise = RandomNode()\n'
-      + '    t.start(start)\n'
-      + '    phase.start(start)\n'
-      + '    noise.start()\n'
-      + '    ret phase\n',
+      'fn sources(start: time):\n' +
+        '    t = TimeNode()\n' +
+        '    phase = PhaserNode(frequency = 2Hz, detune = 100c)\n' +
+        '    noise = RandomNode()\n' +
+        '    t.start(start)\n' +
+        '    phase.start(start)\n' +
+        '    noise.start()\n' +
+        '    ret phase\n',
       context,
     )
 
     const phase = (patch.sources as PatchFunction)(Quantity.unit(6, 's')) as MockAudioWorkletNode
     expect(worklets.map(({ name }) => name).slice(-3)).toEqual([
-      'sw-patch-time', 'sw-patch-phaser', 'sw-patch-random',
+      'sw-patch-time',
+      'sw-patch-phaser',
+      'sw-patch-random',
     ])
     expect(phase.options).toEqual({ numberOfInputs: 0 })
     expect(phase.parameters.get('frequency')?.value).toBe(2)
@@ -235,30 +242,37 @@ describe('SW Patch runtime', () => {
     class MockAudioWorkletNode extends EventTarget {
       port = { onmessage: null, postMessage: vi.fn<(message: unknown) => void>() }
       parameters = new Map<string, { value: number }>([
-        ['frequency', { value: 440 }], ['detune', { value: 0 }], ['bite', { value: 0.5 }],
+        ['frequency', { value: 440 }],
+        ['detune', { value: 0 }],
+        ['bite', { value: 0.5 }],
       ])
       connect = vi.fn<(target: unknown) => void>()
       disconnect = vi.fn<(target?: unknown) => void>()
-      constructor(_context: BaseAudioContext, readonly name: string) {
+      constructor(
+        _context: BaseAudioContext,
+        readonly name: string,
+      ) {
         super()
         worklets.push(this)
       }
     }
     vi.stubGlobal('AudioWorkletNode', MockAudioWorkletNode)
     const patch = createPatch(
-      'fn sources():\n'
-      + '    triangle = SoftTriangleNode(bite = 10%)\n'
-      + '    sawtooth = SoftSawtoothNode(bite = 20%)\n'
-      + '    square = SoftSquareNode(bite = 30%)\n'
-      + '    parabolic = SoftParabolicNode(bite = 40%)\n',
+      'fn sources():\n' +
+        '    triangle = SoftTriangleNode(bite = 10%)\n' +
+        '    sawtooth = SoftSawtoothNode(bite = 20%)\n' +
+        '    square = SoftSquareNode(bite = 30%)\n' +
+        '    parabolic = SoftParabolicNode(bite = 40%)\n',
       { currentTime: 0 } as BaseAudioContext,
     )
 
     ;(patch.sources as PatchFunction)()
 
     expect(worklets.map(({ name }) => name)).toEqual([
-      'sw-patch-soft-triangle', 'sw-patch-soft-sawtooth',
-      'sw-patch-soft-square', 'sw-patch-soft-parabolic',
+      'sw-patch-soft-triangle',
+      'sw-patch-soft-sawtooth',
+      'sw-patch-soft-square',
+      'sw-patch-soft-parabolic',
     ])
     expect(worklets.map((node) => node.parameters.get('bite')?.value)).toEqual([0.1, 0.2, 0.3, 0.4])
     expect(worklets.every((node) => 'bite' in node)).toBe(true)
@@ -274,14 +288,19 @@ describe('SW Patch runtime', () => {
         _context: BaseAudioContext,
         readonly name: string,
         readonly options: { numberOfInputs: number },
-      ) { worklets.push(this) }
+      ) {
+        worklets.push(this)
+      }
     }
     class MockConstantSourceNode {
       connect = vi.fn<(target: unknown, output?: number, input?: number) => void>()
       disconnect = vi.fn<(target?: unknown, output?: number, input?: number) => void>()
       start = vi.fn<() => void>()
       stop = vi.fn<() => void>()
-      constructor(_context: BaseAudioContext, readonly options: { offset: number }) {}
+      constructor(
+        _context: BaseAudioContext,
+        readonly options: { offset: number },
+      ) {}
     }
     vi.stubGlobal('AudioWorkletNode', MockAudioWorkletNode)
     vi.stubGlobal('ConstantSourceNode', MockConstantSourceNode)
@@ -290,15 +309,17 @@ describe('SW Patch runtime', () => {
       disconnect: vi.fn<(target?: unknown, output?: number, input?: number) => void>(),
     }
     const patch = createPatch(
-      'fn choose():\n    ret where(signal < 0, signal % 3, -1)\n'
-      + 'fn modulo():\n    ret -5 % 3\n',
+      'fn choose():\n    ret where(signal < 0, signal % 3, -1)\n' +
+        'fn modulo():\n    ret -5 % 3\n',
       {} as BaseAudioContext,
       { globals: { signal } },
     )
 
     ;(patch.choose as PatchFunction)()
     expect(worklets.map(({ name }) => name).slice(-3)).toEqual([
-      'sw-patch-less-than', 'sw-patch-modulo', 'sw-patch-where',
+      'sw-patch-less-than',
+      'sw-patch-modulo',
+      'sw-patch-where',
     ])
     expect(worklets.at(-1)?.options).toEqual({ numberOfInputs: 3 })
     expect(Number((patch.modulo as PatchFunction)())).toBe(1)
@@ -314,14 +335,19 @@ describe('SW Patch runtime', () => {
         _context: BaseAudioContext,
         readonly name: string,
         readonly options: { numberOfInputs: number },
-      ) { worklets.push(this) }
+      ) {
+        worklets.push(this)
+      }
     }
     class MockConstantSourceNode {
       connect = vi.fn<(target: unknown, output?: number, input?: number) => void>()
       disconnect = vi.fn<(target?: unknown, output?: number, input?: number) => void>()
       start = vi.fn<() => void>()
       stop = vi.fn<() => void>()
-      constructor(_context: BaseAudioContext, readonly options: { offset: number }) {}
+      constructor(
+        _context: BaseAudioContext,
+        readonly options: { offset: number },
+      ) {}
     }
     vi.stubGlobal('AudioWorkletNode', MockAudioWorkletNode)
     vi.stubGlobal('ConstantSourceNode', MockConstantSourceNode)
@@ -330,9 +356,9 @@ describe('SW Patch runtime', () => {
       disconnect: vi.fn<(target?: unknown, output?: number, input?: number) => void>(),
     }
     const patch = createPatch(
-      'fn signalPower():\n    ret signal ** 2\n'
-      + 'fn scalarPower():\n    ret 2 ** 3 ** 2\n'
-      + 'fn unaryPrecedence():\n    ret -2 ** 2\n',
+      'fn signalPower():\n    ret signal ** 2\n' +
+        'fn scalarPower():\n    ret 2 ** 3 ** 2\n' +
+        'fn unaryPrecedence():\n    ret -2 ** 2\n',
       {} as BaseAudioContext,
       { globals: { signal } },
     )
@@ -355,14 +381,22 @@ describe('SW Patch runtime', () => {
       port = { postMessage: vi.fn<(message: string) => void>() }
       connect = vi.fn<(target: unknown) => void>()
       disconnect = vi.fn<(target?: unknown) => void>()
-      constructor(_context: BaseAudioContext, readonly name: string) { worklets.push(this) }
+      constructor(
+        _context: BaseAudioContext,
+        readonly name: string,
+      ) {
+        worklets.push(this)
+      }
     }
     class MockConstantSourceNode {
       connect = vi.fn<(target: unknown) => void>()
       disconnect = vi.fn<(target?: unknown) => void>()
       start = vi.fn<() => void>()
       stop = vi.fn<() => void>()
-      constructor(_context: BaseAudioContext, readonly options: { offset: number }) {}
+      constructor(
+        _context: BaseAudioContext,
+        readonly options: { offset: number },
+      ) {}
     }
     class MockGainNode {
       gain = {}
@@ -382,10 +416,10 @@ describe('SW Patch runtime', () => {
       disconnect: vi.fn<(target?: unknown) => void>(),
     }
     const patch = createPatch(
-      'fn divide():\n    ret numerator / denominator\n'
-      + 'fn conversions():\n    decibels = AudioSignal(+10dB)\n'
-      + '    level = dbtoa(decibels)\n'
-      + '    ret atodb(level)\n',
+      'fn divide():\n    ret numerator / denominator\n' +
+        'fn conversions():\n    decibels = AudioSignal(+10dB)\n' +
+        '    level = dbtoa(decibels)\n' +
+        '    ret atodb(level)\n',
       context,
       { globals: { denominator, numerator } },
     )
@@ -406,7 +440,12 @@ describe('SW Patch runtime', () => {
       port = { postMessage: vi.fn<(message: string) => void>() }
       connect = vi.fn<(target: unknown) => void>()
       disconnect = vi.fn<(target?: unknown) => void>()
-      constructor(_context: BaseAudioContext, readonly name: string) { worklets.push(this) }
+      constructor(
+        _context: BaseAudioContext,
+        readonly name: string,
+      ) {
+        worklets.push(this)
+      }
     }
     vi.stubGlobal('AudioWorkletNode', MockAudioWorkletNode)
     const oscillator = {
@@ -416,8 +455,7 @@ describe('SW Patch runtime', () => {
     const destination = {}
 
     const patch = createPatch(
-      'tanh(oscillator) -> destination\n'
-      + 'fn scalar():\n    ret sqrt(9) + cos(0)\n',
+      'tanh(oscillator) -> destination\n' + 'fn scalar():\n    ret sqrt(9) + cos(0)\n',
       {} as BaseAudioContext,
       { globals: { destination, oscillator } },
     )
@@ -443,7 +481,9 @@ describe('SW Patch runtime', () => {
         _context: BaseAudioContext,
         readonly name: string,
         readonly options: { numberOfInputs: number },
-      ) { worklets.push(this) }
+      ) {
+        worklets.push(this)
+      }
     }
     vi.stubGlobal('AudioWorkletNode', MockAudioWorkletNode)
     const signalA = {
@@ -455,11 +495,11 @@ describe('SW Patch runtime', () => {
       disconnect: vi.fn<(target?: unknown, output?: number, input?: number) => void>(),
     }
     const patch = createPatch(
-      'fn positional():\n    ret atan2(signalA, signalB)\n'
-      + 'fn named():\n    ret atan2(x = signalA, y = signalB)\n'
-      + 'fn atanSignature():\n'
-      + '    ret atan2(0, 1) + atan2(x = 1, y = 0)\n'
-      + 'fn scalar():\n    ret pow(2, 3) + max(1, 7, 4) + clz32(1)\n',
+      'fn positional():\n    ret atan2(signalA, signalB)\n' +
+        'fn named():\n    ret atan2(x = signalA, y = signalB)\n' +
+        'fn atanSignature():\n' +
+        '    ret atan2(0, 1) + atan2(x = 1, y = 0)\n' +
+        'fn scalar():\n    ret pow(2, 3) + max(1, 7, 4) + clz32(1)\n',
       {} as BaseAudioContext,
       { globals: { signalA, signalB } },
     )
@@ -467,7 +507,8 @@ describe('SW Patch runtime', () => {
     ;(patch.positional as PatchFunction)()
     ;(patch.named as PatchFunction)()
     expect(worklets.map(({ name }) => name).slice(0, 2)).toEqual([
-      'sw-patch-atan2', 'sw-patch-atan2',
+      'sw-patch-atan2',
+      'sw-patch-atan2',
     ])
     expect(worklets[0]?.options).toEqual({ numberOfInputs: 2 })
     expect(signalA.connect).toHaveBeenCalledWith(worklets[0], 0, 0)
@@ -485,7 +526,10 @@ describe('SW Patch runtime', () => {
       connect = vi.fn<(target: unknown) => void>()
       disconnect = vi.fn<(target?: unknown) => void>()
 
-      constructor(_context: BaseAudioContext, readonly options: { gain?: number } = {}) {
+      constructor(
+        _context: BaseAudioContext,
+        readonly options: { gain?: number } = {},
+      ) {
         created.push(this)
       }
     }
@@ -500,11 +544,11 @@ describe('SW Patch runtime', () => {
     }
 
     const patch = createPatch(
-      'fn negative():\n    ret -signalA\n'
-      + 'fn positive():\n    ret +signalA\n'
-      + 'fn sum():\n    ret signalA + signalB\n'
-      + 'fn difference():\n    ret signalA - signalB\n'
-      + 'fn product():\n    ret signalA * signalB\n',
+      'fn negative():\n    ret -signalA\n' +
+        'fn positive():\n    ret +signalA\n' +
+        'fn sum():\n    ret signalA + signalB\n' +
+        'fn difference():\n    ret signalA - signalB\n' +
+        'fn product():\n    ret signalA * signalB\n',
       {} as BaseAudioContext,
       { globals: { signalA, signalB } },
     )
@@ -544,7 +588,10 @@ describe('SW Patch runtime', () => {
       gain = {}
       connect = vi.fn<(target: unknown) => void>()
       disconnect = vi.fn<(target?: unknown) => void>()
-      constructor(_context: BaseAudioContext, readonly options: { gain?: number } = {}) {
+      constructor(
+        _context: BaseAudioContext,
+        readonly options: { gain?: number } = {},
+      ) {
         gains.push(this)
       }
     }
@@ -553,7 +600,10 @@ describe('SW Patch runtime', () => {
       disconnect = vi.fn<(target?: unknown) => void>()
       start = vi.fn<() => void>()
       stop = vi.fn<() => void>()
-      constructor(_context: BaseAudioContext, readonly options: { offset: number }) {
+      constructor(
+        _context: BaseAudioContext,
+        readonly options: { offset: number },
+      ) {
         constants.push(this)
       }
     }
@@ -569,14 +619,14 @@ describe('SW Patch runtime', () => {
       disconnect: vi.fn<(target?: unknown) => void>(),
     }
     const patch = createPatch(
-      'fn scaledLeft():\n    ret 2 * signal\n'
-      + 'fn scaledRight():\n    ret signal * 3\n'
-      + 'fn divided():\n    ret signal / 4\n'
-      + 'fn offset():\n    ret signal + 5\n'
-      + 'fn reverseDifference():\n    ret 6 - signal\n'
-      + 'until emitter:ended:\n'
-      + '    sum = signal + 7\n'
-      + '    sum -> destination\n',
+      'fn scaledLeft():\n    ret 2 * signal\n' +
+        'fn scaledRight():\n    ret signal * 3\n' +
+        'fn divided():\n    ret signal / 4\n' +
+        'fn offset():\n    ret signal + 5\n' +
+        'fn reverseDifference():\n    ret 6 - signal\n' +
+        'until emitter:ended:\n' +
+        '    sum = signal + 7\n' +
+        '    sum -> destination\n',
       {} as BaseAudioContext,
       { globals: { destination, emitter, signal } },
     )
@@ -614,14 +664,14 @@ describe('SW Patch runtime', () => {
     const input = { connect: inputConnect, disconnect: inputDisconnect }
     const output = { connect: outputConnect, disconnect: outputDisconnect }
     const nodes = [input, output]
-    const GainNode = vi.fn<() => typeof input | undefined>(function () { return nodes.shift() })
+    const GainNode = vi.fn<() => typeof input | undefined>(function () {
+      return nodes.shift()
+    })
     vi.stubGlobal('GainNode', GainNode)
     const context = {} as BaseAudioContext
 
     const effect = createPatch(
-      'input = GainNode()\n'
-      + 'output = GainNode()\n'
-      + 'input -> output\n',
+      'input = GainNode()\n' + 'output = GainNode()\n' + 'input -> output\n',
       context,
     ) as unknown as AudioNode
     const destination = {} as AudioNode
@@ -646,8 +696,8 @@ describe('SW Patch runtime', () => {
     const context = {} as BaseAudioContext
 
     createPatch(
-      'delay = DelayNode(maxDelayTime = 2s, delayTime = 250ms)\n'
-      + 'merger = ChannelMergerNode(numberOfInputs = 2)\n',
+      'delay = DelayNode(maxDelayTime = 2s, delayTime = 250ms)\n' +
+        'merger = ChannelMergerNode(numberOfInputs = 2)\n',
       context,
     )
 
@@ -657,10 +707,9 @@ describe('SW Patch runtime', () => {
 
   it('turns array literals into periodic waves and wave-shaper curves', () => {
     const periodicWave = {}
-    const createPeriodicWave = vi.fn<(
-      real: Float32Array,
-      imaginary: Float32Array,
-    ) => object>(() => periodicWave)
+    const createPeriodicWave = vi.fn<(real: Float32Array, imaginary: Float32Array) => object>(
+      () => periodicWave,
+    )
     const OscillatorNode = vi.fn<() => void>(function () {})
     const WaveShaperNode = vi.fn<() => void>(function () {})
     vi.stubGlobal('OscillatorNode', OscillatorNode)
@@ -668,8 +717,8 @@ describe('SW Patch runtime', () => {
     const context = { createPeriodicWave } as unknown as BaseAudioContext
 
     createPatch(
-      'osc = OscillatorNode(periodicWave = [[0, 0, 0], [0, 1, 0.5]])\n'
-      + 'shaper = WaveShaperNode(curve = [-1, -50%, 0, 50%, 1], oversample = \'4x\')\n',
+      'osc = OscillatorNode(periodicWave = [[0, 0, 0], [0, 1, 0.5]])\n' +
+        "shaper = WaveShaperNode(curve = [-1, -50%, 0, 50%, 1], oversample = '4x')\n",
       context,
     )
 
@@ -687,26 +736,25 @@ describe('SW Patch runtime', () => {
     const OscillatorNode = vi.fn<() => void>(function () {})
     vi.stubGlobal('OscillatorNode', OscillatorNode)
 
-    expect(() => createPatch(
-      'osc = OscillatorNode(periodicWave = [0, 1])\n',
-      { createPeriodicWave: vi.fn<() => void>() } as unknown as BaseAudioContext,
-    )).toThrow('periodicWave expects [real, imaginary] arrays')
+    expect(() =>
+      createPatch('osc = OscillatorNode(periodicWave = [0, 1])\n', {
+        createPeriodicWave: vi.fn<() => void>(),
+      } as unknown as BaseAudioContext),
+    ).toThrow('periodicWave expects [real, imaginary] arrays')
   })
 
   it('constructs PeriodicWave values with an implicit context and options', () => {
     const periodicWave = {}
-    const createPeriodicWave = vi.fn<(
-      real: Float32Array,
-      imaginary: Float32Array,
-      options?: PeriodicWaveConstraints,
-    ) => object>(() => periodicWave)
+    const createPeriodicWave = vi.fn<
+      (real: Float32Array, imaginary: Float32Array, options?: PeriodicWaveConstraints) => object
+    >(() => periodicWave)
     const OscillatorNode = vi.fn<() => void>(function () {})
     vi.stubGlobal('OscillatorNode', OscillatorNode)
     const context = { createPeriodicWave } as unknown as BaseAudioContext
 
     createPatch(
-      'wave = PeriodicWave([0, 0], [0, 1], {disableNormalization: true})\n'
-      + 'osc = OscillatorNode(periodicWave = wave)\n',
+      'wave = PeriodicWave([0, 0], [0, 1], {disableNormalization: true})\n' +
+        'osc = OscillatorNode(periodicWave = wave)\n',
       context,
     )
 
@@ -731,11 +779,16 @@ describe('SW Patch runtime', () => {
 
   it('connects and cleans up explicitly selected node ports', () => {
     const emitter = new EventTarget()
-    const source = { connect: vi.fn<(target: unknown, output?: number, input?: number) => void>(), disconnect: vi.fn<(target?: unknown, output?: number, input?: number) => void>() }
-    const destination = { connect: vi.fn<(target: unknown) => void>(), disconnect: vi.fn<() => void>() }
+    const source = {
+      connect: vi.fn<(target: unknown, output?: number, input?: number) => void>(),
+      disconnect: vi.fn<(target?: unknown, output?: number, input?: number) => void>(),
+    }
+    const destination = {
+      connect: vi.fn<(target: unknown) => void>(),
+      disconnect: vi.fn<() => void>(),
+    }
     createPatch(
-      'until emitter:ended:\n'
-      + '    source:2 -> destination:3\n',
+      'until emitter:ended:\n' + '    source:2 -> destination:3\n',
       {} as BaseAudioContext,
       { globals: { destination, emitter, source } },
     )
@@ -754,20 +807,26 @@ describe('SW Patch runtime', () => {
       location: location(),
       body: [
         {
-          type: 'IfStatement', location: location(),
+          type: 'IfStatement',
+          location: location(),
           test: { type: 'BooleanLiteral', value: false, location: location() },
           body: [],
         },
         {
-          type: 'ElseStatement', location: location(),
-          body: [{
-            type: 'ExpressionStatement', location: location(),
-            expression: {
-              type: 'CallExpression', location: location(),
-              callee: { type: 'Identifier', name: 'mark', location: location() },
-              arguments: [],
+          type: 'ElseStatement',
+          location: location(),
+          body: [
+            {
+              type: 'ExpressionStatement',
+              location: location(),
+              expression: {
+                type: 'CallExpression',
+                location: location(),
+                callee: { type: 'Identifier', name: 'mark', location: location() },
+                arguments: [],
+              },
             },
-          }],
+          ],
         },
       ],
     })
@@ -779,21 +838,28 @@ describe('SW Patch runtime', () => {
     const start = vi.fn<(when: number) => void>()
     const runtime = new PatchRuntime({} as BaseAudioContext, { globals: { osc: { start } } })
     const expression = {
-      type: 'CallExpression' as const, location: location(),
+      type: 'CallExpression' as const,
+      location: location(),
       callee: {
-        type: 'MemberExpression' as const, location: location(),
+        type: 'MemberExpression' as const,
+        location: location(),
         object: { type: 'Identifier' as const, name: 'osc', location: location() },
         property: 'start',
       },
       arguments: [],
     }
     const program: Program = {
-      type: 'Program', location: location(),
-      body: [{
-        type: 'ScheduledStatement', location: location(), automation: null,
-        at: { type: 'NumberLiteral', value: '12.5', location: location() },
-        statement: { type: 'ExpressionStatement', location: location(), expression },
-      }],
+      type: 'Program',
+      location: location(),
+      body: [
+        {
+          type: 'ScheduledStatement',
+          location: location(),
+          automation: null,
+          at: { type: 'NumberLiteral', value: '12.5', location: location() },
+          statement: { type: 'ExpressionStatement', location: location(), expression },
+        },
+      ],
     }
 
     runtime.evaluate(program)
@@ -802,30 +868,49 @@ describe('SW Patch runtime', () => {
 
   it('runs nested branches in until suites and disconnects their connections', () => {
     const emitter = new EventTarget()
-    const source = { connect: vi.fn<(node: AudioNode) => AudioNode>(), disconnect: vi.fn<(node: AudioNode) => void>() }
-    const target = { connect: vi.fn<(node: AudioNode) => AudioNode>(), disconnect: vi.fn<(node: AudioNode) => void>() }
+    const source = {
+      connect: vi.fn<(node: AudioNode) => AudioNode>(),
+      disconnect: vi.fn<(node: AudioNode) => void>(),
+    }
+    const target = {
+      connect: vi.fn<(node: AudioNode) => AudioNode>(),
+      disconnect: vi.fn<(node: AudioNode) => void>(),
+    }
     const runtime = new PatchRuntime({} as BaseAudioContext, {
       globals: { emitter, source, target },
     })
 
     runtime.evaluate({
-      type: 'Program', location: location(), body: [{
-        type: 'UntilStatement', location: location(),
-        emitter: { type: 'Identifier', name: 'emitter', location: location() },
-        event: 'ended',
-        body: [{
-          type: 'IfStatement', location: location(),
-          test: { type: 'BooleanLiteral', value: true, location: location() },
-          body: [{
-            type: 'ConnectionStatement', location: location(),
-            first: { type: 'Identifier', name: 'source', location: location() },
-            links: [{
-              operator: 'connect',
-              target: { type: 'Identifier', name: 'target', location: location() },
-            }],
-          }],
-        }],
-      }],
+      type: 'Program',
+      location: location(),
+      body: [
+        {
+          type: 'UntilStatement',
+          location: location(),
+          emitter: { type: 'Identifier', name: 'emitter', location: location() },
+          event: 'ended',
+          body: [
+            {
+              type: 'IfStatement',
+              location: location(),
+              test: { type: 'BooleanLiteral', value: true, location: location() },
+              body: [
+                {
+                  type: 'ConnectionStatement',
+                  location: location(),
+                  first: { type: 'Identifier', name: 'source', location: location() },
+                  links: [
+                    {
+                      operator: 'connect',
+                      target: { type: 'Identifier', name: 'target', location: location() },
+                    },
+                  ],
+                },
+              ],
+            },
+          ],
+        },
+      ],
     })
 
     expect(source.connect).toHaveBeenCalledWith(target)
@@ -845,25 +930,25 @@ describe('SW Patch runtime', () => {
     const filter = { Q: { value: 0 }, gain: { value: 0 } }
     const gain = { gain: { value: 0 } }
     const context = {} as BaseAudioContext
-    vi.stubGlobal('BiquadFilterNode', vi.fn(function (
-      _context: BaseAudioContext,
-      options: { Q: number; gain: number },
-    ) {
-      filter.Q.value = options.Q
-      filter.gain.value = options.gain
-      return filter
-    }))
-    vi.stubGlobal('GainNode', vi.fn(function (
-      _context: BaseAudioContext,
-      options: { gain: number },
-    ) {
-      gain.gain.value = options.gain
-      return gain
-    }))
+    vi.stubGlobal(
+      'BiquadFilterNode',
+      vi.fn(function (_context: BaseAudioContext, options: { Q: number; gain: number }) {
+        filter.Q.value = options.Q
+        filter.gain.value = options.gain
+        return filter
+      }),
+    )
+    vi.stubGlobal(
+      'GainNode',
+      vi.fn(function (_context: BaseAudioContext, options: { gain: number }) {
+        gain.gain.value = options.gain
+        return gain
+      }),
+    )
     const patch = createPatch(
-      'fn values(Q: Gain = +10dB):\n'
-      + "    filter = BiquadFilterNode(Q = Q, gain = Q)\n"
-      + '    output = GainNode(gain = -Q)\n',
+      'fn values(Q: Gain = +10dB):\n' +
+        '    filter = BiquadFilterNode(Q = Q, gain = Q)\n' +
+        '    output = GainNode(gain = -Q)\n',
       context,
     )
 
@@ -879,10 +964,11 @@ describe('SW Patch runtime', () => {
     const gain = {
       setValueAtTime: vi.fn<(value: number, time: number) => void>(),
     }
-    const node = new (class GainNode { readonly gain = gain })()
+    const node = new (class GainNode {
+      readonly gain = gain
+    })()
     const patch = createPatch(
-      'fn setGain():\n'
-      + '    @(0) node.gain = -6dB\n',
+      'fn setGain():\n' + '    @(0) node.gain = -6dB\n',
       {} as BaseAudioContext,
       { globals: { node } },
     )
@@ -897,10 +983,11 @@ describe('SW Patch runtime', () => {
     const gain = {
       setValueAtTime: vi.fn<(value: number, time: number) => void>(),
     }
-    const node = new (class BiquadFilterNode { readonly gain = gain })()
+    const node = new (class BiquadFilterNode {
+      readonly gain = gain
+    })()
     const patch = createPatch(
-      'fn setGain():\n'
-      + '    @(0) node.gain = -6dB\n',
+      'fn setGain():\n' + '    @(0) node.gain = -6dB\n',
       {} as BaseAudioContext,
       { globals: { node } },
     )
@@ -914,16 +1001,15 @@ describe('SW Patch runtime', () => {
   it('preserves decibel values through binary arithmetic', () => {
     const gain = { gain: { value: 0 } }
     const context = {} as BaseAudioContext
-    vi.stubGlobal('GainNode', vi.fn(function (
-      _context: BaseAudioContext,
-      options: { gain: number },
-    ) {
-      gain.gain.value = options.gain
-      return gain
-    }))
+    vi.stubGlobal(
+      'GainNode',
+      vi.fn(function (_context: BaseAudioContext, options: { gain: number }) {
+        gain.gain.value = options.gain
+        return gain
+      }),
+    )
     const patch = createPatch(
-      'fn values():\n'
-      + '    output = GainNode(gain = -6dB * 2)\n',
+      'fn values():\n' + '    output = GainNode(gain = -6dB * 2)\n',
       context,
     )
 
@@ -935,11 +1021,7 @@ describe('SW Patch runtime', () => {
 
   it('derives units through quantity arithmetic', () => {
     const patch = createPatch(
-      'fn period():\n'
-      + '    ret 1 / (1Hz)\n'
-      + '\n'
-      + 'fn scalar():\n'
-      + '    ret 2 * 3\n',
+      'fn period():\n' + '    ret 1 / (1Hz)\n' + '\n' + 'fn scalar():\n' + '    ret 2 * 3\n',
       {} as BaseAudioContext,
     )
 
@@ -979,8 +1061,9 @@ describe('SW Patch runtime', () => {
     const hertz = Quantity.unit(1, 'Hz')
 
     for (const operator of ['<', '>', '<=', '>=', '==', '!=']) {
-      expect(() => Quantity.binary(operator, second, hertz))
-        .toThrow('Cannot compare quantities with incompatible units')
+      expect(() => Quantity.binary(operator, second, hertz)).toThrow(
+        'Cannot compare quantities with incompatible units',
+      )
     }
   })
 })

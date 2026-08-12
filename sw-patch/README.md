@@ -178,6 +178,6 @@ third argument:
 ```ts
 const synth = createPatch(source, context, {
   config: { oscillatorType: 'sine' },
-  globals: { /* application-provided functions */ },
+  globals: {/* application-provided functions */},
 })
 ```

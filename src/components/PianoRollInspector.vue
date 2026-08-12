@@ -11,9 +11,7 @@ defineProps<{ inspection: PianoRollInspection }>()
       Inspecting <strong>{{ inspection.inspected.label }}</strong>
     </p>
     <p v-else-if="inspection.selected.length">
-      {{ inspection.selected.length }} note{{
-        inspection.selected.length === 1 ? '' : 's'
-      }}
+      {{ inspection.selected.length }} note{{ inspection.selected.length === 1 ? '' : 's' }}
       selected
     </p>
     <p v-else class="empty">Hover over, click, or drag around notes to inspect them.</p>

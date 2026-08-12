@@ -121,10 +121,7 @@ describe('SW Patch parser', () => {
   it('parses the default v3 patch', () => {
     const ast = parse(DEFAULT_PATCH)
 
-    expect(ast.body.map(({ type }) => type)).toEqual([
-      'ConfigDeclaration',
-      'FunctionDeclaration'
-    ])
+    expect(ast.body.map(({ type }) => type)).toEqual(['ConfigDeclaration', 'FunctionDeclaration'])
 
     const on = ast.body[1]
     expect(on).toMatchObject({
@@ -140,8 +137,8 @@ describe('SW Patch parser', () => {
         { name: 'attack', defaultValue: { type: 'UnitLiteral', value: '100', unit: 'ms' } },
         { name: 'decay', defaultValue: { type: 'UnitLiteral', value: '200', unit: 'ms' } },
         { name: 'sustain', defaultValue: { type: 'UnitLiteral', value: '70', unit: '%' } },
-        { name: 'release', defaultValue: { type: 'UnitLiteral', value: '300', unit: 'ms' } }
-      ]
+        { name: 'release', defaultValue: { type: 'UnitLiteral', value: '300', unit: 'ms' } },
+      ],
     })
 
     if (on?.type !== 'FunctionDeclaration') throw new Error('Expected function declaration')
@@ -153,7 +150,7 @@ describe('SW Patch parser', () => {
       type: 'FunctionDeclaration',
       name: 'off',
       once: true,
-      returned: true
+      returned: true,
     })
   })
 
@@ -174,12 +171,12 @@ if true:
 
     expect(comment).toMatchObject({
       type: 'CommentStatement',
-      value: ' First line'
+      value: ' First line',
     })
     expect(comment?.location).toEqual({
       source: undefined,
       start: { offset: 0, line: 1, column: 1 },
-      end: { offset: 12, line: 1, column: 13 }
+      end: { offset: 12, line: 1, column: 13 },
     })
 
     expect(topLevelExpression?.type).toBe('ExpressionStatement')
@@ -188,7 +185,7 @@ if true:
     }
     expect(stripLocation(topLevelExpression.expression)).toEqual({
       type: 'StringLiteral',
-      value: 'top level string'
+      value: 'top level string',
     })
 
     expect(conditional?.type).toBe('IfStatement')
@@ -201,7 +198,7 @@ if true:
     }
     expect(stripLocation(nestedExpression.expression)).toEqual({
       type: 'StringLiteral',
-      value: 'second level string'
+      value: 'second level string',
     })
 
     expect(finalExpression?.type).toBe('ExpressionStatement')
@@ -210,7 +207,7 @@ if true:
     }
     expect(stripLocation(finalExpression.expression)).toEqual({
       type: 'StringLiteral',
-      value: 'back to top level'
+      value: 'back to top level',
     })
   })
 
@@ -225,27 +222,29 @@ if true:
 
   it('parses Python-style for and while loops', () => {
     const ast = parse(
-      'for item in [1, 2]:\n'
-      + '    while item > 0:\n'
-      + '        if item == 2:\n'
-      + '            continue\n'
-      + '        break\n'
-      + 'if true:\n'
-      + '    pass\n',
+      'for item in [1, 2]:\n' +
+        '    while item > 0:\n' +
+        '        if item == 2:\n' +
+        '            continue\n' +
+        '        break\n' +
+        'if true:\n' +
+        '    pass\n',
     )
 
     expect(ast.body[0]).toMatchObject({
       type: 'ForStatement',
       target: 'item',
       iterable: { type: 'ListLiteral' },
-      body: [{
-        type: 'WhileStatement',
-        test: { type: 'BinaryExpression', operator: '>' },
-        body: [
-          { type: 'IfStatement', body: [{ type: 'ContinueStatement' }] },
-          { type: 'BreakStatement' },
-        ],
-      }],
+      body: [
+        {
+          type: 'WhileStatement',
+          test: { type: 'BinaryExpression', operator: '>' },
+          body: [
+            { type: 'IfStatement', body: [{ type: 'ContinueStatement' }] },
+            { type: 'BreakStatement' },
+          ],
+        },
+      ],
     })
     expect(ast.body[1]).toMatchObject({
       type: 'IfStatement',

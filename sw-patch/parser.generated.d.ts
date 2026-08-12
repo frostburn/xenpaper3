@@ -192,12 +192,7 @@ export interface ExpressionStatement extends Node {
   expression: Expression
 }
 
-export type TypeExpression =
-  | UnionType
-  | GenericType
-  | ObjectType
-  | StringLiteralType
-  | TypeName
+export type TypeExpression = UnionType | GenericType | ObjectType | StringLiteralType | TypeName
 
 export interface UnionType extends Node {
   type: 'UnionType'
@@ -247,20 +242,7 @@ export type Expression =
 
 export interface BinaryExpression extends Node {
   type: 'BinaryExpression'
-  operator:
-    | 'or'
-    | 'and'
-    | '<='
-    | '>='
-    | '=='
-    | '!='
-    | '<'
-    | '>'
-    | '+'
-    | '-'
-    | '*'
-    | '/'
-    | '%'
+  operator: 'or' | 'and' | '<=' | '>=' | '==' | '!=' | '<' | '>' | '+' | '-' | '*' | '/' | '%'
   left: Expression
   right: Expression
 }

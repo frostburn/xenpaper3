@@ -47,9 +47,16 @@ const RETURN = Symbol('sw-patch return')
 const BREAK = Symbol('sw-patch break')
 const CONTINUE = Symbol('sw-patch continue')
 const FORBIDDEN_MEMBERS = new Set(['constructor', 'prototype', '__proto__'])
-interface Returned { [RETURN]: true; value: unknown }
-interface Broken { [BREAK]: true }
-interface Continued { [CONTINUE]: true }
+interface Returned {
+  [RETURN]: true
+  value: unknown
+}
+interface Broken {
+  [BREAK]: true
+}
+interface Continued {
+  [CONTINUE]: true
+}
 type Completion = Returned | Broken | Continued
 
 /** A scalar expressed in canonical units together with its physical dimensions. */
@@ -66,26 +73,41 @@ export class Quantity {
 
   static unit(value: number, unit: string): Quantity {
     switch (unit.toLowerCase()) {
-      case 'ns': return new Quantity(value / 1e9, { time: 1 })
-      case 'us': return new Quantity(value / 1e6, { time: 1 })
-      case 'ms': return new Quantity(value / 1e3, { time: 1 })
-      case 's': return new Quantity(value, { time: 1 })
-      case 'khz': return new Quantity(value * 1e3, { time: -1 })
-      case 'hz': return new Quantity(value, { time: -1 })
+      case 'ns':
+        return new Quantity(value / 1e9, { time: 1 })
+      case 'us':
+        return new Quantity(value / 1e6, { time: 1 })
+      case 'ms':
+        return new Quantity(value / 1e3, { time: 1 })
+      case 's':
+        return new Quantity(value, { time: 1 })
+      case 'khz':
+        return new Quantity(value * 1e3, { time: -1 })
+      case 'hz':
+        return new Quantity(value, { time: -1 })
       case 'beats':
-      case 'beat': return new Quantity(value, { beat: 1 })
-      case 'bpm': return new Quantity(value / 60, { beat: 1, time: -1 })
-      case 'db': return new Quantity(value, { decibel: 1 })
-      case 'c': return new Quantity(value, { cent: 1 })
+      case 'beat':
+        return new Quantity(value, { beat: 1 })
+      case 'bpm':
+        return new Quantity(value / 60, { beat: 1, time: -1 })
+      case 'db':
+        return new Quantity(value, { decibel: 1 })
+      case 'c':
+        return new Quantity(value, { cent: 1 })
       case 'st':
       case 'semitone':
-      case 'semitones': return new Quantity(value * 100, { cent: 1 })
-      case '%': return new Quantity(value / 100)
-      default: return new Quantity(value)
+      case 'semitones':
+        return new Quantity(value * 100, { cent: 1 })
+      case '%':
+        return new Quantity(value / 100)
+      default:
+        return new Quantity(value)
     }
   }
 
-  static scalar(value: number): Quantity { return new Quantity(value) }
+  static scalar(value: number): Quantity {
+    return new Quantity(value)
+  }
 
   static from(value: unknown): Quantity {
     return value instanceof Quantity ? value : Quantity.scalar(Number(value))
@@ -96,45 +118,68 @@ export class Quantity {
   }
 
   static binary(operator: string, left: unknown, right: unknown): unknown {
-    if ((operator === '==' || operator === '!=')
-      && !(left instanceof Quantity) && !(right instanceof Quantity)) {
+    if (
+      (operator === '==' || operator === '!=') &&
+      !(left instanceof Quantity) &&
+      !(right instanceof Quantity)
+    ) {
       return operator === '==' ? left === right : left !== right
     }
 
-    if ((operator === '==' || operator === '!=')
-      && ((left instanceof Quantity
-        && !(right instanceof Quantity) && typeof right !== 'number')
-        || (right instanceof Quantity
-          && !(left instanceof Quantity) && typeof left !== 'number'))) {
+    if (
+      (operator === '==' || operator === '!=') &&
+      ((left instanceof Quantity && !(right instanceof Quantity) && typeof right !== 'number') ||
+        (right instanceof Quantity && !(left instanceof Quantity) && typeof left !== 'number'))
+    ) {
       return operator === '!='
     }
 
     const leftQuantity = Quantity.from(left)
     const rightQuantity = Quantity.from(right)
-    if (left instanceof Quantity && right instanceof Quantity
-      && ['<', '>', '<=', '>=', '==', '!='].includes(operator)) {
+    if (
+      left instanceof Quantity &&
+      right instanceof Quantity &&
+      ['<', '>', '<=', '>=', '==', '!='].includes(operator)
+    ) {
       leftQuantity.assertCompatible(rightQuantity, 'compare')
     }
     switch (operator) {
-      case '+': return leftQuantity.add(rightQuantity)
-      case '-': return leftQuantity.add(rightQuantity, true)
-      case '*': return leftQuantity.multiply(rightQuantity)
-      case '/': return leftQuantity.multiply(rightQuantity, true)
-      case '%': return leftQuantity.modulo(rightQuantity)
-      case '**': return leftQuantity.power(rightQuantity)
-      case '<': return leftQuantity.value < rightQuantity.value
-      case '>': return leftQuantity.value > rightQuantity.value
-      case '<=': return leftQuantity.value <= rightQuantity.value
-      case '>=': return leftQuantity.value >= rightQuantity.value
-      case '==': return leftQuantity.value === rightQuantity.value
-      case '!=': return leftQuantity.value !== rightQuantity.value
-      default: throw new Error(`Unsupported operator: ${operator}`)
+      case '+':
+        return leftQuantity.add(rightQuantity)
+      case '-':
+        return leftQuantity.add(rightQuantity, true)
+      case '*':
+        return leftQuantity.multiply(rightQuantity)
+      case '/':
+        return leftQuantity.multiply(rightQuantity, true)
+      case '%':
+        return leftQuantity.modulo(rightQuantity)
+      case '**':
+        return leftQuantity.power(rightQuantity)
+      case '<':
+        return leftQuantity.value < rightQuantity.value
+      case '>':
+        return leftQuantity.value > rightQuantity.value
+      case '<=':
+        return leftQuantity.value <= rightQuantity.value
+      case '>=':
+        return leftQuantity.value >= rightQuantity.value
+      case '==':
+        return leftQuantity.value === rightQuantity.value
+      case '!=':
+        return leftQuantity.value !== rightQuantity.value
+      default:
+        throw new Error(`Unsupported operator: ${operator}`)
     }
   }
 
-  valueOf(): number { return this.value }
+  valueOf(): number {
+    return this.value
+  }
 
-  negate(): Quantity { return new Quantity(-this.value, this.dimensions) }
+  negate(): Quantity {
+    return new Quantity(-this.value, this.dimensions)
+  }
 
   add(value: unknown, subtract = false): Quantity {
     let resultDimensions = this.dimensions
@@ -151,10 +196,7 @@ export class Quantity {
     const left = new Quantity(this.value, resultDimensions)
     left.assertCompatible(right)
 
-    return new Quantity(
-      left.value + (subtract ? -right.value : right.value),
-      resultDimensions,
-    )
+    return new Quantity(left.value + (subtract ? -right.value : right.value), resultDimensions)
   }
 
   multiply(value: unknown, divide = false): Quantity {
@@ -178,9 +220,9 @@ export class Quantity {
     if (!exponent.isUnitless) throw new Error('A power must have a unitless exponent')
     return new Quantity(
       this.value ** exponent.value,
-      Object.fromEntries(Object.entries(this.dimensions).map(([name, power]) => [
-        name, power * exponent.value,
-      ])),
+      Object.fromEntries(
+        Object.entries(this.dimensions).map(([name, power]) => [name, power * exponent.value]),
+      ),
     )
   }
 
@@ -216,8 +258,11 @@ class AudioSignal {
   }
 
   static is(value: unknown): value is Connectable {
-    return typeof value === 'object' && value !== null
-      && typeof (value as Partial<Connectable>).connect === 'function'
+    return (
+      typeof value === 'object' &&
+      value !== null &&
+      typeof (value as Partial<Connectable>).connect === 'function'
+    )
   }
 
   static binary(
@@ -287,21 +332,52 @@ class AudioSignal {
 }
 
 const UNARY_MATH_FUNCTIONS = [
-  'abs', 'acos', 'acosh', 'asin', 'asinh', 'atan', 'atanh', 'cbrt', 'ceil', 'cos', 'cosh',
-  'clz32', 'exp', 'expm1', 'floor', 'fround', 'log', 'log10', 'log1p', 'log2', 'round', 'sign', 'sin',
-  'sinh', 'sqrt', 'tan', 'tanh', 'trunc',
+  'abs',
+  'acos',
+  'acosh',
+  'asin',
+  'asinh',
+  'atan',
+  'atanh',
+  'cbrt',
+  'ceil',
+  'cos',
+  'cosh',
+  'clz32',
+  'exp',
+  'expm1',
+  'floor',
+  'fround',
+  'log',
+  'log10',
+  'log1p',
+  'log2',
+  'round',
+  'sign',
+  'sin',
+  'sinh',
+  'sqrt',
+  'tan',
+  'tanh',
+  'trunc',
 ] as const
 const MULTI_MATH_FUNCTIONS = ['atan2', 'hypot', 'imul', 'max', 'min', 'pow'] as const
 const MATH_FUNCTIONS = [...UNARY_MATH_FUNCTIONS, ...MULTI_MATH_FUNCTIONS] as const
-const MATH_CONSTANTS = [
-  'E', 'LN10', 'LN2', 'LOG10E', 'LOG2E', 'PI', 'SQRT1_2', 'SQRT2',
-] as const
-type MathFunctionName = typeof MATH_FUNCTIONS[number]
-type MathWorkletName = `sw-patch-${MathFunctionName}` | 'sw-patch-invert'
-  | 'sw-patch-atodb' | 'sw-patch-dbtoa' | 'sw-patch-modulo'
-  | 'sw-patch-less-than' | 'sw-patch-greater-than'
-  | 'sw-patch-less-than-or-equal' | 'sw-patch-greater-than-or-equal'
-  | 'sw-patch-equal' | 'sw-patch-not-equal' | 'sw-patch-where'
+const MATH_CONSTANTS = ['E', 'LN10', 'LN2', 'LOG10E', 'LOG2E', 'PI', 'SQRT1_2', 'SQRT2'] as const
+type MathFunctionName = (typeof MATH_FUNCTIONS)[number]
+type MathWorkletName =
+  | `sw-patch-${MathFunctionName}`
+  | 'sw-patch-invert'
+  | 'sw-patch-atodb'
+  | 'sw-patch-dbtoa'
+  | 'sw-patch-modulo'
+  | 'sw-patch-less-than'
+  | 'sw-patch-greater-than'
+  | 'sw-patch-less-than-or-equal'
+  | 'sw-patch-greater-than-or-equal'
+  | 'sw-patch-equal'
+  | 'sw-patch-not-equal'
+  | 'sw-patch-where'
 
 const MATH_WORKLET_SOURCE = `
 /** Base class for stoppable, sample-by-sample SW Patch worklets. */
@@ -359,16 +435,20 @@ registerProcessor('sw-patch-greater-than-or-equal', SwPatchGreaterThanOrEqualPro
 registerProcessor('sw-patch-equal', SwPatchEqualProcessor)
 registerProcessor('sw-patch-not-equal', SwPatchNotEqualProcessor)
 registerProcessor('sw-patch-where', SwPatchWhereProcessor)
-${UNARY_MATH_FUNCTIONS.map((name) => `
+${UNARY_MATH_FUNCTIONS.map(
+  (name) => `
 class SwPatchMath${name}Processor extends SwPatchWorkletProcessor {
   transform(value) { return Math.${name}(value) }
 }
-registerProcessor('sw-patch-${name}', SwPatchMath${name}Processor)`).join('')}
-${MULTI_MATH_FUNCTIONS.map((name) => `
+registerProcessor('sw-patch-${name}', SwPatchMath${name}Processor)`,
+).join('')}
+${MULTI_MATH_FUNCTIONS.map(
+  (name) => `
 class SwPatchMath${name}Processor extends SwPatchWorkletProcessor {
   transform(...values) { return Math.${name}(...values) }
 }
-registerProcessor('sw-patch-${name}', SwPatchMath${name}Processor)`).join('')}
+registerProcessor('sw-patch-${name}', SwPatchMath${name}Processor)`,
+).join('')}
 class SwPatchScheduledSourceProcessor extends AudioWorkletProcessor {
   constructor() {
     super()
@@ -525,7 +605,6 @@ export function createPatch(
 /** Alias emphasizing that source is compiled into a callable patch object. */
 export const compilePatch = createPatch
 
-
 export class PatchRuntime {
   readonly context: BaseAudioContext
   readonly options: RuntimeOptions
@@ -545,20 +624,27 @@ export class PatchRuntime {
     this.workletsReady.catch(() => {})
     this.root = new Map(Object.entries(options.globals ?? {}))
     this.audioSignalGraph = {
-      gain: (value) => this.makeNode('Gain', value ? [{ gain: value }] : []) as Connectable & {
-        gain: unknown
-      },
+      gain: (value) =>
+        this.makeNode('Gain', value ? [{ gain: value }] : []) as Connectable & {
+          gain: unknown
+        },
       constant: (value) => this.createAndStartAudioSignal(value),
       invert: () => this.createMathWorklet('sw-patch-invert'),
       convert: (name, inputs) => this.createMathWorklet(name, inputs),
-      cleanup: (cleanup) => { this.registerCleanup(cleanup) },
+      cleanup: (cleanup) => {
+        this.registerCleanup(cleanup)
+      },
     }
     this.installBuiltins()
   }
 
   evaluate(program: Program): SynthPatch {
     this.topLevelBindings.clear()
-    const patch: SynthPatch = { dispose: () => { this.dispose() } }
+    const patch: SynthPatch = {
+      dispose: () => {
+        this.dispose()
+      },
+    }
     const result = this.statements(program.body, this.root, undefined, patch)
     if (result && BREAK in result) throw new Error('`break` used outside a loop')
     if (result && CONTINUE in result) throw new Error('`continue` used outside a loop')
@@ -605,30 +691,41 @@ export class PatchRuntime {
   private installBuiltins(): void {
     this.root.set('BiquadFilterNode', (...args: unknown[]) => this.makeNode('BiquadFilter', args))
     this.root.set('ChannelMergerNode', (...args: unknown[]) => this.makeNode('ChannelMerger', args))
-    this.root.set('ChannelSplitterNode', (...args: unknown[]) => this.makeNode('ChannelSplitter', args))
+    this.root.set('ChannelSplitterNode', (...args: unknown[]) =>
+      this.makeNode('ChannelSplitter', args),
+    )
     this.root.set('DelayNode', (...args: unknown[]) => this.makeNode('Delay', args))
     this.root.set('GainNode', (...args: unknown[]) => this.makeNode('Gain', args))
     this.root.set('OscillatorNode', (...args: unknown[]) => this.makeNode('Oscillator', args))
     this.root.set('WaveShaperNode', (...args: unknown[]) => this.makeNode('WaveShaper', args))
     this.root.set('PeriodicWave', (...args: unknown[]) => this.makePeriodicWave(args))
-    this.root.set('ConstantSourceNode', (...args: unknown[]) => this.makeNode('ConstantSource', args))
+    this.root.set('ConstantSourceNode', (...args: unknown[]) =>
+      this.makeNode('ConstantSource', args),
+    )
     this.root.set('AudioSignal', this.createAndStartAudioSignal.bind(this))
     this.root.set('TimeNode', () => this.createUtilitySource('sw-patch-time'))
-    this.root.set('PhaserNode', (...args: unknown[]) => this.createUtilitySource('sw-patch-phaser', args))
-    this.root.set('SoftTriangleNode', (...args: unknown[]) => this.createUtilitySource('sw-patch-soft-triangle', args))
-    this.root.set('SoftSawtoothNode', (...args: unknown[]) => this.createUtilitySource('sw-patch-soft-sawtooth', args))
-    this.root.set('SoftSquareNode', (...args: unknown[]) => this.createUtilitySource('sw-patch-soft-square', args))
-    this.root.set('SoftParabolicNode', (...args: unknown[]) => this.createUtilitySource('sw-patch-soft-parabolic', args))
+    this.root.set('PhaserNode', (...args: unknown[]) =>
+      this.createUtilitySource('sw-patch-phaser', args),
+    )
+    this.root.set('SoftTriangleNode', (...args: unknown[]) =>
+      this.createUtilitySource('sw-patch-soft-triangle', args),
+    )
+    this.root.set('SoftSawtoothNode', (...args: unknown[]) =>
+      this.createUtilitySource('sw-patch-soft-sawtooth', args),
+    )
+    this.root.set('SoftSquareNode', (...args: unknown[]) =>
+      this.createUtilitySource('sw-patch-soft-square', args),
+    )
+    this.root.set('SoftParabolicNode', (...args: unknown[]) =>
+      this.createUtilitySource('sw-patch-soft-parabolic', args),
+    )
     this.root.set('RandomNode', () => this.createUtilitySource('sw-patch-random'))
     this.root.set('where', (...values: unknown[]) => this.where(values))
     this.root.set('atodb', (value: unknown) => this.convertMath('sw-patch-atodb', atodb, value))
     this.root.set('dbtoa', (value: unknown) => this.convertMath('sw-patch-dbtoa', dbtoa, value))
     for (const name of UNARY_MATH_FUNCTIONS) {
-      const transform: PatchFunction = (value: unknown) => this.convertMath(
-        `sw-patch-${name}`,
-        (input) => Math[name](Number(input)),
-        value,
-      )
+      const transform: PatchFunction = (value: unknown) =>
+        this.convertMath(`sw-patch-${name}`, (input) => Math[name](Number(input)), value)
       this.root.set(name, transform)
     }
     for (const name of MULTI_MATH_FUNCTIONS) {
@@ -642,14 +739,14 @@ export class PatchRuntime {
   }
 
   private range(args: unknown[]): Quantity[] {
-    if (args.length < 1 || args.length > 3) throw new Error('range() expects one to three arguments')
+    if (args.length < 1 || args.length > 3)
+      throw new Error('range() expects one to three arguments')
     const values = args.map(Number)
     if (values.some((value) => !Number.isInteger(value))) {
       throw new Error('range() arguments must be integers')
     }
-    const [start, stop, step] = args.length === 1
-      ? [0, values[0]!, 1]
-      : [values[0]!, values[1]!, values[2] ?? 1]
+    const [start, stop, step] =
+      args.length === 1 ? [0, values[0]!, 1] : [values[0]!, values[1]!, values[2] ?? 1]
     if (step === 0) throw new Error('range() step must not be zero')
     const result: Quantity[] = []
     for (let value = start; step > 0 ? value < stop : value > stop; value += step) {
@@ -668,8 +765,14 @@ export class PatchRuntime {
     if (detune && options.detune !== undefined) detune.value = Number(options.detune)
     if (bite && options.bite !== undefined) bite.value = Number(options.bite)
     Object.defineProperties(node, {
-      start: { value: (when = this.context.currentTime) => node.port.postMessage({ type: 'start', when: Number(when) }) },
-      stop: { value: (when = this.context.currentTime) => node.port.postMessage({ type: 'stop', when: Number(when) }) },
+      start: {
+        value: (when = this.context.currentTime) =>
+          node.port.postMessage({ type: 'start', when: Number(when) }),
+      },
+      stop: {
+        value: (when = this.context.currentTime) =>
+          node.port.postMessage({ type: 'stop', when: Number(when) }),
+      },
       ...(frequency ? { frequency: { value: frequency } } : {}),
       ...(detune ? { detune: { value: detune } } : {}),
       ...(bite ? { bite: { value: bite } } : {}),
@@ -700,7 +803,8 @@ export class PatchRuntime {
       const node = signal?.node ?? this.createAndStartAudioSignal(value)
       node.connect(converter, 0, index)
       this.registerCleanup(() => node.disconnect(converter, 0, index))
-      if (!signal) this.registerCleanup(() => (node as Connectable & { stop?: () => void }).stop?.())
+      if (!signal)
+        this.registerCleanup(() => (node as Connectable & { stop?: () => void }).stop?.())
     })
     return converter
   }
@@ -718,20 +822,30 @@ export class PatchRuntime {
     return converter
   }
 
-  private convertMultiMath(name: typeof MULTI_MATH_FUNCTIONS[number], provided: unknown[]): unknown {
+  private convertMultiMath(
+    name: (typeof MULTI_MATH_FUNCTIONS)[number],
+    provided: unknown[],
+  ): unknown {
     const last = provided[provided.length - 1]
     let values = provided
-    if (last && typeof last === 'object' && !AudioSignal.is(last)
-      && !(last instanceof Quantity) && !Array.isArray(last)) {
+    if (
+      last &&
+      typeof last === 'object' &&
+      !AudioSignal.is(last) &&
+      !(last instanceof Quantity) &&
+      !Array.isArray(last)
+    ) {
       const named = last as Record<string, unknown>
-      values = name === 'atan2'
-        ? [named.y, named.x]
-        : Object.values(named)
+      values = name === 'atan2' ? [named.y, named.x] : Object.values(named)
     }
     const maximumArguments = name === 'max' || name === 'min' || name === 'hypot' ? 5 : 2
-    if (values.length < (name === 'hypot' || name === 'max' || name === 'min' ? 1 : 2)
-      || values.length > maximumArguments) {
-      throw new Error(`${name}() expects ${maximumArguments === 2 ? 'two' : 'one to five'} arguments`)
+    if (
+      values.length < (name === 'hypot' || name === 'max' || name === 'min' ? 1 : 2) ||
+      values.length > maximumArguments
+    ) {
+      throw new Error(
+        `${name}() expects ${maximumArguments === 2 ? 'two' : 'one to five'} arguments`,
+      )
     }
     if (!values.some(AudioSignal.is)) {
       const scalar = Math[name] as (...arguments_: number[]) => number
@@ -740,8 +854,8 @@ export class PatchRuntime {
     const converter = this.audioSignalGraph.convert(`sw-patch-${name}`, values.length)
     values.forEach((value, index) => {
       const signal = AudioSignal.from(value, this.audioSignalGraph)
-      const node: Connectable & { stop?: () => void } = signal?.node
-        ?? this.createAndStartAudioSignal(value)
+      const node: Connectable & { stop?: () => void } =
+        signal?.node ?? this.createAndStartAudioSignal(value)
       node.connect(converter, 0, index)
       this.registerCleanup(() => node.disconnect(converter, 0, index))
       if (!signal) this.registerCleanup(() => node.stop?.())
@@ -750,28 +864,40 @@ export class PatchRuntime {
   }
 
   private makeNode(
-    kind: 'BiquadFilter' | 'ChannelMerger' | 'ChannelSplitter' | 'Delay' | 'Gain'
-      | 'Oscillator' | 'ConstantSource' | 'WaveShaper',
+    kind:
+      | 'BiquadFilter'
+      | 'ChannelMerger'
+      | 'ChannelSplitter'
+      | 'Delay'
+      | 'Gain'
+      | 'Oscillator'
+      | 'ConstantSource'
+      | 'WaveShaper',
     args: unknown[],
   ): unknown {
     const values = (args[0] ?? {}) as Record<string, unknown>
-    const options = Object.fromEntries(Object.entries(values).map(([key, value]) => {
-      if (kind === 'Oscillator' && key === 'periodicWave' && Array.isArray(value)) {
-        if (value.length !== 2 || !value.every(Array.isArray)) {
-          throw new Error('OscillatorNode periodicWave expects [real, imaginary] arrays')
+    const options = Object.fromEntries(
+      Object.entries(values).map(([key, value]) => {
+        if (kind === 'Oscillator' && key === 'periodicWave' && Array.isArray(value)) {
+          if (value.length !== 2 || !value.every(Array.isArray)) {
+            throw new Error('OscillatorNode periodicWave expects [real, imaginary] arrays')
+          }
+          const real = value[0] as unknown[]
+          const imaginary = value[1] as unknown[]
+          return [
+            key,
+            this.context.createPeriodicWave(
+              Float32Array.from(real, Number),
+              Float32Array.from(imaginary, Number),
+            ),
+          ]
         }
-        const real = value[0] as unknown[]
-        const imaginary = value[1] as unknown[]
-        return [key, this.context.createPeriodicWave(
-          Float32Array.from(real, Number),
-          Float32Array.from(imaginary, Number),
-        )]
-      }
-      if (kind === 'WaveShaper' && key === 'curve' && Array.isArray(value)) {
-        return [key, Float32Array.from(value, Number)]
-      }
-      return [key, value instanceof Quantity ? Number(value) : value]
-    }))
+        if (kind === 'WaveShaper' && key === 'curve' && Array.isArray(value)) {
+          return [key, Float32Array.from(value, Number)]
+        }
+        return [key, value instanceof Quantity ? Number(value) : value]
+      }),
+    )
     const constructorName = `${kind}Node`
     const NodeConstructor = (globalThis as unknown as Record<string, unknown>)[constructorName]
     if (typeof NodeConstructor !== 'function') {
@@ -800,8 +926,14 @@ export class PatchRuntime {
     if (!this.topLevelBindings.has('input') || !this.topLevelBindings.has('output')) return patch
     const input = this.root.get('input') as Record<string, unknown> | undefined
     const output = this.root.get('output') as Record<string, unknown> | undefined
-    if (!input || !output || typeof input.connect !== 'function'
-      || typeof output.connect !== 'function' || typeof output.disconnect !== 'function') return patch
+    if (
+      !input ||
+      !output ||
+      typeof input.connect !== 'function' ||
+      typeof output.connect !== 'function' ||
+      typeof output.disconnect !== 'function'
+    )
+      return patch
 
     // The actual input AudioNode is returned so native Web Audio nodes accept the
     // patch as a destination. Its outward methods are redirected to the patch's output.
@@ -828,11 +960,12 @@ export class PatchRuntime {
       called = true
       const scope = new Map(closure)
       declaration.parameters.forEach((parameter, index) => {
-        const value = index < provided.length
-          ? provided[index]
-          : parameter.defaultValue === null
-            ? undefined
-            : this.expression(parameter.defaultValue, scope)
+        const value =
+          index < provided.length
+            ? provided[index]
+            : parameter.defaultValue === null
+              ? undefined
+              : this.expression(parameter.defaultValue, scope)
         scope.set(parameter.name, value)
       })
       const result = this.statements(declaration.body, scope)
@@ -867,8 +1000,11 @@ export class PatchRuntime {
             if (next?.type !== 'ElifStatement' && next?.type !== 'ElseStatement') break
             index += 1
             const branch = next
-            if (!matched && (branch.type === 'ElseStatement'
-              || Quantity.truthy(this.expression(branch.test, scope)))) {
+            if (
+              !matched &&
+              (branch.type === 'ElseStatement' ||
+                Quantity.truthy(this.expression(branch.test, scope)))
+            ) {
               matched = true
               const result = this.statements(branch.body, scope, connectionCleanups, exports)
               if (result) return result
@@ -911,20 +1047,26 @@ export class PatchRuntime {
         }
         return undefined
       case 'ExpressionStatement':
-        this.expression(statement.expression, scope); return undefined
+        this.expression(statement.expression, scope)
+        return undefined
       case 'ConnectionStatement': {
         const cleanups = this.connection(statement.first, statement.links, scope)
         for (const cleanup of cleanups) this.registerCleanup(cleanup)
         return undefined
       }
       case 'ScheduledStatement':
-        this.scheduled(statement.at, statement.automation, statement.statement, scope); return undefined
+        this.scheduled(statement.at, statement.automation, statement.statement, scope)
+        return undefined
       case 'UntilStatement':
-        this.until(statement.emitter, statement.event, statement.body, scope); return undefined
+        this.until(statement.emitter, statement.event, statement.body, scope)
+        return undefined
       case 'ForStatement': {
         const value = this.expression(statement.iterable, scope)
-        if (value === null || value === undefined
-          || typeof (value as Partial<Iterable<unknown>>)[Symbol.iterator] !== 'function') {
+        if (
+          value === null ||
+          value === undefined ||
+          typeof (value as Partial<Iterable<unknown>>)[Symbol.iterator] !== 'function'
+        ) {
           throw new Error('A for loop requires an iterable value')
         }
         for (const item of value as Iterable<unknown>) {
@@ -961,11 +1103,12 @@ export class PatchRuntime {
           ? config[statement.name]
           : this.expression(statement.value, scope)
         scope.set(statement.name, value)
-        if (exports) Object.defineProperty(exports, statement.name, {
-          enumerable: true,
-          get: () => scope.get(statement.name),
-          set: (next) => scope.set(statement.name, next),
-        })
+        if (exports)
+          Object.defineProperty(exports, statement.name, {
+            enumerable: true,
+            get: () => scope.get(statement.name),
+            set: (next) => scope.set(statement.name, next),
+          })
         return undefined
       }
       case 'TypeAlias':
@@ -975,7 +1118,12 @@ export class PatchRuntime {
     }
   }
 
-  private scheduled(at: Expression, automation: Automation | null, statement: Statement, scope: Scope): void {
+  private scheduled(
+    at: Expression,
+    automation: Automation | null,
+    statement: Statement,
+    scope: Scope,
+  ): void {
     const time = Number(this.expression(at, scope))
     if (statement.type !== 'AssignmentStatement') {
       if (statement.type === 'ExpressionStatement') {
@@ -996,25 +1144,40 @@ export class PatchRuntime {
       return
     }
     const target = this.assignmentReference(statement.target, scope).get() as AudioParameter
-    const value = Number(statement.operator === '='
-      ? this.expression(statement.value, scope)
-      : this.binary(
-          statement.operator.slice(0, -1),
-          target.value,
-          () => this.expression(statement.value, scope),
-        ))
+    const value = Number(
+      statement.operator === '='
+        ? this.expression(statement.value, scope)
+        : this.binary(statement.operator.slice(0, -1), target.value, () =>
+            this.expression(statement.value, scope),
+          ),
+    )
     switch (automation?.type) {
-      case 'LinearAutomation': target.linearRampToValueAtTime(value, time); break
-      case 'ExponentialAutomation': target.exponentialRampToValueAtTime(value, time); break
+      case 'LinearAutomation':
+        target.linearRampToValueAtTime(value, time)
+        break
+      case 'ExponentialAutomation':
+        target.exponentialRampToValueAtTime(value, time)
+        break
       case 'TargetAutomation':
-        target.setTargetAtTime(value, time, Number(this.expression(automation.timeConstant, scope))); break
-      case 'HoldAutomation': target.cancelAndHoldAtTime(time); break
-      case 'CancelAutomation': target.cancelScheduledValues(time); break
-      default: target.setValueAtTime(value, time)
+        target.setTargetAtTime(value, time, Number(this.expression(automation.timeConstant, scope)))
+        break
+      case 'HoldAutomation':
+        target.cancelAndHoldAtTime(time)
+        break
+      case 'CancelAutomation':
+        target.cancelScheduledValues(time)
+        break
+      default:
+        target.setValueAtTime(value, time)
     }
   }
 
-  private until(emitterExpression: Expression, event: string, body: Statement[], scope: Scope): void {
+  private until(
+    emitterExpression: Expression,
+    event: string,
+    body: Statement[],
+    scope: Scope,
+  ): void {
     // Connections in an `until` suite are established now and torn down by the event.
     const cleanups: Array<() => void> = []
     const result = this.statements(body, scope, cleanups)
@@ -1022,23 +1185,32 @@ export class PatchRuntime {
       throw new Error(`\`${BREAK in result ? 'break' : 'continue'}\` cannot leave an until suite`)
     }
     const emitter = this.expression(emitterExpression, scope) as EventTarget
-    emitter.addEventListener(event, () => {
-      for (const cleanup of cleanups.reverse()) cleanup()
-    }, { once: true })
+    emitter.addEventListener(
+      event,
+      () => {
+        for (const cleanup of cleanups.reverse()) cleanup()
+      },
+      { once: true },
+    )
   }
 
-  private connection(first: Expression, links: {
-    operator: 'connect' | 'disconnect'
-    target: Expression
-    output?: number
-    input?: number
-  }[], scope: Scope): Array<() => void> {
+  private connection(
+    first: Expression,
+    links: {
+      operator: 'connect' | 'disconnect'
+      target: Expression
+      output?: number
+      input?: number
+    }[],
+    scope: Scope,
+  ): Array<() => void> {
     let source = this.expression(first, scope) as Connectable
     const cleanups: Array<() => void> = []
     for (const link of links) {
       const target = this.expression(link.target, scope)
       const connectedSource = this.internalConnections.get(source as object) ?? source
-      if (link.output === undefined && link.input === undefined) connectedSource[link.operator](target)
+      if (link.output === undefined && link.input === undefined)
+        connectedSource[link.operator](target)
       else connectedSource[link.operator](target, link.output ?? 0, link.input ?? 0)
       if (link.operator === 'connect') {
         const disconnect = connectedSource.disconnect.bind(connectedSource)
@@ -1054,30 +1226,35 @@ export class PatchRuntime {
 
   private assign(statement: AssignmentStatement, scope: Scope): void {
     const reference = this.assignmentReference(statement.target, scope)
-    const value = statement.operator === '='
-      ? this.expression(statement.value, scope)
-      : this.binary(
-          statement.operator.slice(0, -1),
-          reference.get(),
-          () => this.expression(statement.value, scope),
-        )
+    const value =
+      statement.operator === '='
+        ? this.expression(statement.value, scope)
+        : this.binary(statement.operator.slice(0, -1), reference.get(), () =>
+            this.expression(statement.value, scope),
+          )
     reference.set(value)
   }
 
-  private assignmentReference(target: Expression, scope: Scope): {
+  private assignmentReference(
+    target: Expression,
+    scope: Scope,
+  ): {
     get(): unknown
     set(value: unknown): void
   } {
-    if (target.type === 'Identifier') return {
-      get: () => this.expression(target, scope),
-      set: (value) => scope.set(target.name, value),
-    }
+    if (target.type === 'Identifier')
+      return {
+        get: () => this.expression(target, scope),
+        set: (value) => scope.set(target.name, value),
+      }
     if (target.type === 'MemberExpression') {
       this.assertSafeMember(target.property)
       const object = this.expression(target.object, scope) as Record<string, unknown>
       return {
         get: () => object[target.property],
-        set: (value) => { object[target.property] = value },
+        set: (value) => {
+          object[target.property] = value
+        },
       }
     }
     throw new Error('Invalid assignment target')
@@ -1086,22 +1263,39 @@ export class PatchRuntime {
   private expression(expression: Expression, scope: Scope): unknown {
     switch (expression.type) {
       case 'Identifier': {
-        if (!scope.has(expression.name)) throw new Error(`Unknown patch identifier: ${expression.name}`)
+        if (!scope.has(expression.name))
+          throw new Error(`Unknown patch identifier: ${expression.name}`)
         return scope.get(expression.name)
       }
-      case 'NumberLiteral': return Quantity.scalar(Number(expression.value))
-      case 'UnitLiteral': return Quantity.unit(Number(expression.value), expression.unit)
-      case 'StringLiteral': return expression.value
-      case 'BooleanLiteral': return expression.value
-      case 'NullLiteral': return null
-      case 'ListLiteral': return expression.elements.map((value) => this.expression(value, scope))
-      case 'ObjectLiteral': return Object.fromEntries(expression.entries.map(({ key, value }) => [key, this.expression(value, scope)]))
+      case 'NumberLiteral':
+        return Quantity.scalar(Number(expression.value))
+      case 'UnitLiteral':
+        return Quantity.unit(Number(expression.value), expression.unit)
+      case 'StringLiteral':
+        return expression.value
+      case 'BooleanLiteral':
+        return expression.value
+      case 'NullLiteral':
+        return null
+      case 'ListLiteral':
+        return expression.elements.map((value) => this.expression(value, scope))
+      case 'ObjectLiteral':
+        return Object.fromEntries(
+          expression.entries.map(({ key, value }) => [key, this.expression(value, scope)]),
+        )
       case 'MemberExpression':
         this.assertSafeMember(expression.property)
-        return (this.expression(expression.object, scope) as Record<string, unknown>)[expression.property]
-      case 'UnaryExpression': return this.unary(expression.operator, this.expression(expression.argument, scope))
-      case 'BinaryExpression': return this.binary(expression.operator, this.expression(expression.left, scope), () => this.expression(expression.right, scope))
-      case 'CallExpression': return this.call(expression.callee, expression.arguments, scope)
+        return (this.expression(expression.object, scope) as Record<string, unknown>)[
+          expression.property
+        ]
+      case 'UnaryExpression':
+        return this.unary(expression.operator, this.expression(expression.argument, scope))
+      case 'BinaryExpression':
+        return this.binary(expression.operator, this.expression(expression.left, scope), () =>
+          this.expression(expression.right, scope),
+        )
+      case 'CallExpression':
+        return this.call(expression.callee, expression.arguments, scope)
     }
   }
 
@@ -1109,7 +1303,8 @@ export class PatchRuntime {
     const positional: unknown[] = []
     const named: Record<string, unknown> = {}
     for (const argument of args) {
-      if (argument.type === 'NamedArgument') named[argument.name] = this.expression(argument.value, scope)
+      if (argument.type === 'NamedArgument')
+        named[argument.name] = this.expression(argument.value, scope)
       else positional.push(this.expression(argument.value, scope))
     }
     if (Object.keys(named).length) positional.push(named)
