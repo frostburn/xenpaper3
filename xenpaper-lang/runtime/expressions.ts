@@ -38,6 +38,7 @@ export type ExpressionEvaluationResult =
 function isNumericLiteral(node: Expression): node is NumericLiteralNode {
   return (
     node.type === 'IntegerLiteral' ||
+    node.type === 'MonzoLiteral' ||
     node.type === 'DecimalLiteral' ||
     node.type === 'RealLiteral' ||
     node.type === 'RatioLiteral' ||

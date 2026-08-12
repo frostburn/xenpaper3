@@ -216,6 +216,7 @@ PrimaryExpression
   / Rest
   / DetachedContinue
   / Barline
+  / MonzoLiteral
   / IntervalLiteral
   / PitchLiteral
   / EqualDivisionLiteral
@@ -236,6 +237,34 @@ NormalizedGroup
   = "[" Spacing expression:ParallelExpression? Spacing "]" {
       return node('NormalizeToSlot', { expression: expression ?? null });
     }
+
+MonzoLiteral
+  = "[" Spacing components:MonzoComponents? Spacing ">@" subgroup:MonzoSubgroup? {
+      return node('MonzoLiteral', {
+        components: components ?? [],
+        subgroup: subgroup?.components ?? [],
+        continuation: subgroup?.continuation ?? true,
+        raw: text(),
+      });
+    }
+
+MonzoComponents
+  = first:MonzoComponent rest:(RequiredSpacing value:MonzoComponent { return value; })* {
+      return [first, ...rest];
+    }
+
+MonzoComponent
+  = $(Sign? UnsignedInteger ("/" UnsignedInteger)?)
+
+MonzoSubgroup
+  = first:MonzoSubgroupComponent
+    rest:("." !"." value:MonzoSubgroupComponent { return value; })*
+    continuation:(".." { return true; })? {
+      return { components: [first, ...rest], continuation: continuation ?? false };
+    }
+
+MonzoSubgroupComponent
+  = $(UnsignedInteger ("/" UnsignedInteger)?)
 
 Rest
   = raw:$("."+) { return node('Rest', { raw }); }
