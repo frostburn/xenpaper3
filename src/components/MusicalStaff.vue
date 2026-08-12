@@ -267,7 +267,7 @@ const inflection = (
   const hasMatchingFactor = inflections
     .slice(0, index)
     .some((candidate) => !('kind' in candidate) && candidate.direction === value.direction)
-  const separator = hasMatchingFactor ? ',' : value.direction === 'denominator' ? '/' : '^'
+  const separator = hasMatchingFactor ? ',' : value.direction === 'denominator' ? '/' : ''
   return `${separator}${value.prime}${value.flavor ?? ''}`
 }
 

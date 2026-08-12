@@ -579,12 +579,12 @@ describe('MusicalStaff', () => {
       'v',
       '/',
       '\\',
-      '^5c',
+      '5c',
       ',11',
       '/7n',
       ',13',
     ])
-    expect(wrapper.get('.pitch-decorations').text()).toBe('^v/\\^5c,11/7n,13♭')
+    expect(wrapper.get('.pitch-decorations').text()).toBe('^v/\\5c,11/7n,13♭')
     expect(
       wrapper.get('.pitch-decorations').element.lastElementChild?.classList.contains('accidental'),
     ).toBe(true)
