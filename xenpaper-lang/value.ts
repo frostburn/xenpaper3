@@ -34,42 +34,49 @@ function monzosEqual(left: SparseMonzo, right: SparseMonzo): boolean {
   return true
 }
 
-/** Dimension exponents are deliberately numbers: they are hot, mundane state. */
-export type DimensionInput = Readonly<Record<string, number>>
+export type DimensionInput = Readonly<Record<string, FractionValue>>
 
 export class Dimensions {
-  readonly powers: ReadonlyMap<string, number>
+  readonly powers: ReadonlyMap<string, Fraction>
 
-  constructor(input: DimensionInput | ReadonlyMap<string, number> = {}) {
-    const powers = new Map(input instanceof Map ? input : Object.entries(input))
+  constructor(input: DimensionInput | ReadonlyMap<string, FractionValue> = {}) {
+    const powers = new Map(
+      [...(input instanceof Map ? input : Object.entries(input))].map(([key, power]) => [
+        key,
+        new Fraction(power),
+      ]),
+    )
     for (const [key, power] of powers) {
-      if (!Number.isFinite(power)) throw new RangeError(`Invalid power for dimension ${key}.`)
-      if (power === 0) powers.delete(key)
+      if (!power.n) powers.delete(key)
     }
     this.powers = powers
   }
 
   add(other: Dimensions): Dimensions {
     const result = new Map(this.powers)
-    for (const [key, power] of other.powers) result.set(key, (result.get(key) ?? 0) + power)
+    for (const [key, power] of other.powers)
+      result.set(key, (result.get(key) ?? new Fraction(0)).add(power))
     return new Dimensions(result)
   }
 
   sub(other: Dimensions): Dimensions {
     const result = new Map(this.powers)
-    for (const [key, power] of other.powers) result.set(key, (result.get(key) ?? 0) - power)
+    for (const [key, power] of other.powers)
+      result.set(key, (result.get(key) ?? new Fraction(0)).sub(power))
     return new Dimensions(result)
   }
 
   scale(factor: FractionValue): Dimensions {
-    const scalar = new Fraction(factor).valueOf()
-    return new Dimensions(new Map([...this.powers].map(([key, power]) => [key, power * scalar])))
+    return new Dimensions(new Map([...this.powers].map(([key, power]) => [key, power.mul(factor)])))
   }
 
   equals(other: Dimensions | DimensionInput): boolean {
     const rhs = other instanceof Dimensions ? other : new Dimensions(other)
     if (this.powers.size !== rhs.powers.size) return false
-    for (const [key, power] of this.powers) if (power !== rhs.powers.get(key)) return false
+    for (const [key, power] of this.powers) {
+      const otherPower = rhs.powers.get(key)
+      if (!otherPower || !power.equals(otherPower)) return false
+    }
     return true
   }
 
@@ -81,7 +88,12 @@ export class Dimensions {
     if (this.isDimensionless) return '1'
     return [...this.powers]
       .sort(([a], [b]) => a.localeCompare(b))
-      .map(([key, power]) => (power === 1 ? key : `${key}^${power}`))
+      .map(([key, power]) => {
+        if (power.equals(1)) return key
+        const exponent =
+          power.d === 1 ? String(power.s * power.n) : `${power.s * power.n}/${power.d}`
+        return `${key}^${exponent}`
+      })
       .join(' ')
   }
 }
@@ -283,23 +295,29 @@ export class Value {
       dimensions instanceof Dimensions ? dimensions : new Dimensions(dimensions),
     )
   }
+  private static quantity(value: ValueInput, dimensions: DimensionInput): Value {
+    const magnitude = coerceValue(value)
+    if (!magnitude.dimensions.isDimensionless)
+      throw new TypeError('A quantity magnitude must be dimensionless.')
+    return Value.fromMagnitude(magnitude.magnitude, new Dimensions(dimensions))
+  }
   static cents(value: FractionValue): Value {
     return Value.fromMagnitude(
       { kind: 'pitch', value: ExactPitch.fromCents(value) },
       new Dimensions({ pitch: 1 }),
     )
   }
-  static decibels(value: FractionValue): Value {
-    return new Value(value, { level: 1 })
+  static decibels(value: ValueInput): Value {
+    return Value.quantity(value, { level: 1 })
   }
-  static beats(value: FractionValue): Value {
-    return new Value(value, { beats: 1 })
+  static beats(value: ValueInput): Value {
+    return Value.quantity(value, { beats: 1 })
   }
-  static seconds(value: FractionValue): Value {
-    return new Value(value, { seconds: 1 })
+  static seconds(value: ValueInput): Value {
+    return Value.quantity(value, { seconds: 1 })
   }
-  static hertz(value: FractionValue): Value {
-    return new Value(value, { seconds: -1 })
+  static hertz(value: ValueInput): Value {
+    return Value.quantity(value, { seconds: -1 })
   }
 
   static pitch(input: ValueInput): Value {

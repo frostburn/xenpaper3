@@ -19,8 +19,8 @@ describe('score-shape timing', () => {
     const result = shape('440Hz')
     if (result.kind !== 'attack') throw new Error('Expected an attack.')
 
-    expect(result.pitch.notationValue?.valueOf()).toBeCloseTo(1200 * Math.log2(27 / 16))
-    expect(result.pitch.value.valueOf()).toBeCloseTo(1200 * Math.log2(27 / 16))
+    expect(result.pitch.notationValue?.valueOf()).toBeCloseTo(900)
+    expect(result.pitch.value.valueOf()).toBeCloseTo(900)
   })
 
   it('treats frequency quantities as notes relative to the current root frequency', () => {
@@ -32,7 +32,7 @@ describe('score-shape timing', () => {
     ;[0, 1200, 1200 * Math.log2(1000 / 220)].forEach((expected, index) =>
       expect(notationCents[index]).toBeCloseTo(expected),
     )
-    const middleC = 440 * (16 / 27)
+    const middleC = 440 / 2 ** (3 / 4)
     ;[
       1200 * Math.log2(220 / middleC),
       1200 * Math.log2(440 / middleC),

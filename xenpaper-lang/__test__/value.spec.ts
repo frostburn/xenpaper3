@@ -148,6 +148,18 @@ describe('Pitch displacement arithmetic', () => {
 })
 
 describe('Other quantities', () => {
+  it('retains monomial quantity magnitudes and fractional dimension powers', () => {
+    const middleC = Value.hertz(new Value(440).div(new Value(2).pow(new Fraction(3, 4))))
+    expect(middleC.isExact()).toBe(true)
+    expect(middleC.mul(new Value(2).pow(new Fraction(3, 4))).equals(Value.hertz(440))).toBe(true)
+
+    const rootSecond = Value.seconds(9).pow(new Fraction(1, 2))
+    expect(rootSecond.isExact()).toBe(true)
+    expect(rootSecond.dimensions.equals({ seconds: new Fraction(1, 2) })).toBe(true)
+    expect(rootSecond.pow(2).equals(Value.seconds(9))).toBe(true)
+    expect(rootSecond.dimensions.toString()).toBe('seconds^1/2')
+  })
+
   it('keeps decibels unitful until explicitly divided', () => {
     const exponent = Value.decibels(2).div(Value.decibels(20))
     expect(new Value(10).pow(exponent).valueOf()).toBeCloseTo(1.2589254118)
