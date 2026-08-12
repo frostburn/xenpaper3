@@ -44,6 +44,8 @@
   const parallel = (branches, loc = location()) =>
     branches.length === 1 ? branches[0] : node('Parallel', { branches }, loc);
 
+  const MAX_ENUMERATED_CHORD_SIZE = 10000n;
+
   const commentsByOffset = new Map();
 
   const rememberComment = (raw, loc = location()) => {
@@ -249,9 +251,15 @@ PrimaryExpression
 EnumeratedChord
   = inverted:"/"? first:UnsignedInteger values:(
       "::" last:UnsignedInteger {
-        const start = Number(first);
-        const end = Number(last);
-        const step = start <= end ? 1 : -1;
+        const start = BigInt(first);
+        const end = BigInt(last);
+        const distance = start <= end ? end - start : start - end;
+        if (distance + 1n > MAX_ENUMERATED_CHORD_SIZE) {
+          error(
+            `Enumerated chord exceeds the ${MAX_ENUMERATED_CHORD_SIZE}-member expansion limit.`,
+          );
+        }
+        const step = start <= end ? 1n : -1n;
         const result = [];
         for (let value = start; ; value += step) {
           result.push(String(value));

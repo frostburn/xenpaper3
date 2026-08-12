@@ -40,6 +40,25 @@ describe('enumerated chords', () => {
       ],
     })
   })
+
+  it('preserves exact integers beyond the safe Number range', () => {
+    expect(parse('9007199254740993::9007199254740994').body[0]).toMatchObject({
+      type: 'Parallel',
+      branches: [
+        { numerator: '9007199254740993', denominator: '9007199254740993' },
+        { numerator: '9007199254740994', denominator: '9007199254740993' },
+      ],
+    })
+  })
+
+  it('rejects ranges over the enumerated chord expansion limit', () => {
+    expect(() => parse('1::10001')).toThrow(
+      'Enumerated chord exceeds the 10000-member expansion limit.',
+    )
+    expect(() => parse('10001::1')).toThrow(
+      'Enumerated chord exceeds the 10000-member expansion limit.',
+    )
+  })
 })
 
 const score = String.raw`# FJS and prefix modifiers
