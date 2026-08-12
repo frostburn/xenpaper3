@@ -271,6 +271,18 @@ const inflection = (
   return `${separator}${value.prime}${value.flavor ?? ''}`
 }
 
+const orderedInflections = (inflections: readonly StaffInflection[]) =>
+  [...inflections].sort((left, right) => {
+    const rank = (value: StaffInflection) =>
+      'kind' in value ? 0 : value.direction === 'numerator' ? 1 : 2
+    return rank(left) - rank(right)
+  })
+
+const formattedInflections = (inflections: readonly StaffInflection[]) => {
+  const ordered = orderedInflections(inflections)
+  return ordered.map((value, index) => inflection(value, index, ordered))
+}
+
 const ledgerPositions = (position: number) => {
   const positions: number[] = []
   for (let current = 0; current >= position; current -= 2) positions.push(current)
@@ -486,11 +498,11 @@ const restDotY = (duration: Fraction, tupletCount?: number) =>
             :y="y(item.pitch.staffPosition) + 5"
           >
             <tspan
-              v-for="(value, inflectionIndex) in item.pitch.inflections"
+              v-for="(value, inflectionIndex) in formattedInflections(item.pitch.inflections ?? [])"
               :key="`inflection-${inflectionIndex}`"
               class="inflection"
             >
-              {{ inflection(value, inflectionIndex, item.pitch.inflections ?? []) }}
+              {{ value }}
             </tspan>
             <tspan v-if="item.pitch.accidentals.length" class="accidental">
               {{ item.pitch.accidentals.map(accidental).join('') }}
