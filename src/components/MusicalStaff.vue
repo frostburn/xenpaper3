@@ -256,11 +256,19 @@ const accidental = (value: string) =>
     'half-sharp': '𝄲',
   })[value] ?? value
 
-const inflection = (value: StaffInflection) => {
+const inflection = (
+  value: StaffInflection,
+  index: number,
+  inflections: readonly StaffInflection[],
+) => {
   if ('kind' in value) {
     return { up: '^', down: 'v', lift: '/', drop: '\\' }[value.kind]
   }
-  return `${value.direction === 'denominator' ? '/' : ''}${value.prime}${value.flavor ?? ''}`
+  const hasMatchingFactor = inflections
+    .slice(0, index)
+    .some((candidate) => !('kind' in candidate) && candidate.direction === value.direction)
+  const separator = hasMatchingFactor ? ',' : value.direction === 'denominator' ? '/' : '^'
+  return `${separator}${value.prime}${value.flavor ?? ''}`
 }
 
 const ledgerPositions = (position: number) => {
@@ -482,7 +490,7 @@ const restDotY = (duration: Fraction, tupletCount?: number) =>
               :key="`inflection-${inflectionIndex}`"
               class="inflection"
             >
-              {{ inflection(value) }}
+              {{ inflection(value, inflectionIndex, item.pitch.inflections ?? []) }}
             </tspan>
             <tspan v-if="item.pitch.accidentals.length" class="accidental">
               {{ item.pitch.accidentals.map(accidental).join('') }}
