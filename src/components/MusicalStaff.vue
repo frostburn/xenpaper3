@@ -104,9 +104,13 @@ const items = computed(() => {
       const activeSpan = fraction(state.activeSpan)
       const factor = continuedDuration.div(activeSpan)
       if (state.barlineSinceActiveItems) {
-        let continuedOffset = fraction(offset)
+        const activeStartOffset = state.activeItems.reduce(
+          (earliest, item) => (item.offset.compare(earliest) < 0 ? item.offset : earliest),
+          state.activeItems[0]!.offset,
+        )
         const continuedItems = state.activeItems.map((item) => {
           const duration = fraction(item.duration).mul(factor)
+          const continuedOffset = fraction(offset).add(item.offset.sub(activeStartOffset).mul(factor))
           const continuedItem: RhythmicLayoutItem =
             item.kind === 'note'
               ? {
@@ -117,7 +121,6 @@ const items = computed(() => {
                   tuplets: [],
                 }
               : { ...item, offset: continuedOffset, duration, tuplets: [] }
-          continuedOffset = continuedOffset.add(duration)
           layout.push(continuedItem)
           return continuedItem
         })
@@ -203,6 +206,9 @@ const items = computed(() => {
       state.activeNotes = branchStates.flatMap((branch) => branch.activeNotes)
       state.activeItems = branchStates.flatMap((branch) => branch.activeItems)
       state.activeSpan = shape.duration
+      state.barlineSinceActiveItems = branchStates.some(
+        (branch) => branch.barlineSinceActiveItems,
+      )
       return branchEnds.reduce((latest, end) => (end.compare(latest) > 0 ? end : latest), offset)
     }
     return shape.duration ? offset.add(shape.duration) : offset

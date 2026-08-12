@@ -567,6 +567,35 @@ describe('MusicalStaff', () => {
     expect(wrapper.findAll('.rest')).toHaveLength(1)
   })
 
+  it('propagates barline boundaries from parallel branches to a continuation', () => {
+    const evaluated = evaluateScoreShape(parse('[C|, E|]=').body[0]!)
+    if (!('shape' in evaluated)) throw new Error('Expected a score shape.')
+    const wrapper = mount(MusicalStaff, {
+      props: { notation: constructStaffNotationShape(evaluated.shape) },
+    })
+
+    expect(wrapper.findAll('.notehead')).toHaveLength(4)
+    expect(wrapper.findAll('.notehead--open')).toHaveLength(0)
+    expect(wrapper.findAll('.stem')).toHaveLength(4)
+    expect(wrapper.findAll('.tie')).toHaveLength(2)
+  })
+
+  it('keeps parallel continuations aligned in the same staff column', () => {
+    const evaluated = evaluateScoreShape(parse('[C,E]|=').body[0]!)
+    if (!('shape' in evaluated)) throw new Error('Expected a score shape.')
+    const wrapper = mount(MusicalStaff, {
+      props: { notation: constructStaffNotationShape(evaluated.shape) },
+    })
+
+    expect(wrapper.findAll('.notehead').map((notehead) => notehead.attributes('cx'))).toEqual([
+      '60',
+      '60',
+      '112',
+      '112',
+    ])
+    expect(wrapper.findAll('.tie')).toHaveLength(2)
+  })
+
   it('positions barlines between notes and reserves room for repeat markers', () => {
     const evaluated = evaluateScoreShape(parse('C | D |: E :| F').body[0]!)
     if (!('shape' in evaluated)) throw new Error('Expected a score shape.')
