@@ -2,62 +2,49 @@ import { describe, expect, it } from 'vitest'
 import { parse } from '../parser.generated.js'
 
 describe('enumerated chords', () => {
-  it('expands with chord-tight arithmetic precedence', () => {
+  it('preserves chords in the syntax tree with chord-tight arithmetic precedence', () => {
     expect(parse('3/2 * 4:5:6').body[0]).toMatchObject({
-      type: 'Parallel',
-      branches: [
-        { type: 'BinaryExpression', operator: '*', right: { numerator: '4', denominator: '4' } },
-        { type: 'BinaryExpression', operator: '*', right: { numerator: '5', denominator: '4' } },
-        { type: 'BinaryExpression', operator: '*', right: { numerator: '6', denominator: '4' } },
-      ],
+      type: 'BinaryExpression',
+      operator: '*',
+      right: {
+        type: 'EnumeratedChord',
+        enumerands: [{ value: '4' }, { value: '5' }, { value: '6' }],
+      },
     })
-    expect(parse('4:5:6 * 3/2').body[0]).toMatchObject({
-      type: 'Parallel',
-      branches: [
-        { type: 'BinaryExpression', operator: '*', left: { numerator: '4', denominator: '4' } },
-        { type: 'BinaryExpression', operator: '*', left: { numerator: '5', denominator: '4' } },
-        { type: 'BinaryExpression', operator: '*', left: { numerator: '6', denominator: '4' } },
+    expect(parse('4:(4+1):6').body[0]).toMatchObject({
+      type: 'EnumeratedChord',
+      enumerands: [
+        { value: '4' },
+        { type: 'Group', expression: { operator: '+' } },
+        { value: '6' },
       ],
     })
   })
 
   it('enumerates inclusive integer ranges and inverts before normalization', () => {
     expect(parse('4::7').body[0]).toMatchObject({
-      type: 'Parallel',
-      branches: [
-        { numerator: '4', denominator: '4' },
-        { numerator: '5', denominator: '4' },
-        { numerator: '6', denominator: '4' },
-        { numerator: '7', denominator: '4' },
-      ],
+      type: 'EnumeratedChord',
+      first: { value: '4' },
+      rangeEnd: { value: '7' },
     })
     expect(parse('/6::4').body[0]).toMatchObject({
-      type: 'Parallel',
-      branches: [
-        { numerator: '6', denominator: '6' },
-        { numerator: '6', denominator: '5' },
-        { numerator: '6', denominator: '4' },
-      ],
+      type: 'EnumeratedChord',
+      inverted: true,
+      first: { value: '6' },
+      rangeEnd: { value: '4' },
     })
   })
 
   it('preserves exact integers beyond the safe Number range', () => {
     expect(parse('9007199254740993::9007199254740994').body[0]).toMatchObject({
-      type: 'Parallel',
-      branches: [
-        { numerator: '9007199254740993', denominator: '9007199254740993' },
-        { numerator: '9007199254740994', denominator: '9007199254740993' },
-      ],
+      type: 'EnumeratedChord',
+      first: { value: '9007199254740993' },
+      rangeEnd: { value: '9007199254740994' },
     })
   })
 
-  it('rejects ranges over the enumerated chord expansion limit', () => {
-    expect(() => parse('1::10001')).toThrow(
-      'Enumerated chord exceeds the 10000-member expansion limit.',
-    )
-    expect(() => parse('10001::1')).toThrow(
-      'Enumerated chord exceeds the 10000-member expansion limit.',
-    )
+  it('does not expand ranges while parsing', () => {
+    expect(parse('1::1000000000').body[0]).toMatchObject({ type: 'EnumeratedChord' })
   })
 })
 

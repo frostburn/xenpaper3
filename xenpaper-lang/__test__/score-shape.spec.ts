@@ -184,6 +184,20 @@ describe('score-shape timing', () => {
     expect(pitches[0]!.equals(Value.pitch(new Value(1)))).toBe(true)
     expect(pitches[1]!.equals(Value.pitch(new Value(6n, 5n)))).toBe(true)
     expect(pitches[2]!.equals(Value.pitch(new Value(3n, 2n)))).toBe(true)
+
+    const expressions = shape('3/2 * 4:(4+1):6') as ParallelShape
+    const expressionPitches = expressions.branches.map((branch) => {
+      if (branch.kind !== 'attack') throw new Error('Expected an attack.')
+      return branch.pitch.value
+    })
+    expect(expressionPitches[0]!.equals(Value.pitch(new Value(3n, 2n)))).toBe(true)
+    expect(expressionPitches[1]!.equals(Value.pitch(new Value(15n, 8n)))).toBe(true)
+    expect(expressionPitches[2]!.equals(Value.pitch(new Value(9n, 4n)))).toBe(true)
+  })
+
+  it('reports enumerated ranges over the runtime expansion limit', () => {
+    const result = evaluateScoreShape(parse('1::10001').body[0] as Expression)
+    expect(result).toMatchObject({ diagnostics: [{ code: 'XP_EXPANSION_LIMIT' }] })
   })
 
   it('treats positive irrational scalar expressions as playable ratios', () => {

@@ -17,18 +17,8 @@
   const unary = (operator, operand, loc = location()) =>
     node('UnaryExpression', { operator, operand }, loc);
 
-  // Arithmetic broadcasts over enumerated chords.  Keeping this expansion in
-  // the surface tree means all later passes can treat the result exactly like
-  // an explicitly comma-separated chord.
-  const binary = (operator, left, right, loc = location()) => {
-    if (left.type === 'Parallel') {
-      return parallel(left.branches.map(branch => binary(operator, branch, right, loc)), loc);
-    }
-    if (right.type === 'Parallel') {
-      return parallel(right.branches.map(branch => binary(operator, left, branch, loc)), loc);
-    }
-    return node('BinaryExpression', { operator, left, right }, loc);
-  };
+  const binary = (operator, left, right, loc = location()) =>
+    node('BinaryExpression', { operator, left, right }, loc);
 
   const foldBinary = (head, tail, loc = location()) => {
     let result = head;
@@ -43,8 +33,6 @@
 
   const parallel = (branches, loc = location()) =>
     branches.length === 1 ? branches[0] : node('Parallel', { branches }, loc);
-
-  const MAX_ENUMERATED_CHORD_SIZE = 10000n;
 
   const commentsByOffset = new Map();
 
@@ -128,7 +116,20 @@ ShiftedValueExpression
     }
 
 EnumeratedChordArithmetic
-  = &EnumeratedChord expression:AdditiveExpression { return expression; }
+  = first:EnumeratedChord
+    multiplicative:(Spacing operator:MultiplicativeOperator Spacing right:PowerExpression {
+      return { operator, right };
+    })*
+    additive:(
+      operator:AttachedAdditiveOperator Spacing right:MultiplicativeExpression {
+        return { operator, right };
+      }
+      / RequiredSpacing operator:AdditiveOperator Spacing right:MultiplicativeExpression {
+        return { operator, right };
+      }
+    )* {
+      return foldBinary(foldBinary(first, multiplicative), additive);
+    }
 
 AdditiveExpression
   = first:MultiplicativeExpression
@@ -249,38 +250,34 @@ PrimaryExpression
 // reversing each resulting ratio.  Double colon fills in every intervening
 // integer (in either direction).
 EnumeratedChord
-  = inverted:"/"? first:UnsignedInteger values:(
-      "::" last:UnsignedInteger {
-        const start = BigInt(first);
-        const end = BigInt(last);
-        const distance = start <= end ? end - start : start - end;
-        if (distance + 1n > MAX_ENUMERATED_CHORD_SIZE) {
-          error(
-            `Enumerated chord exceeds the ${MAX_ENUMERATED_CHORD_SIZE}-member expansion limit.`,
-          );
-        }
-        const step = start <= end ? 1n : -1n;
-        const result = [];
-        for (let value = start; ; value += step) {
-          result.push(String(value));
-          if (value === end) break;
-        }
-        return result;
-      }
-      / rest:(":" value:UnsignedInteger { return value; })+ {
-        return [first, ...rest];
+  = &("/"? [0-9]+ ":") inverted:"/"? first:ChordEnumerand tail:(
+      "::" last:ChordEnumerand { return { rangeEnd: last, enumerands: null }; }
+      / rest:(":" value:ChordEnumerand { return value; })+ {
+        return { rangeEnd: null, enumerands: [first, ...rest] };
       }
     ) !":" {
-      const ratios = values.map(value => {
-        const numerator = inverted ? first : value;
-        const denominator = inverted ? value : first;
-        return node('RatioLiteral', {
-          numerator,
-          denominator,
-          raw: `${numerator}/${denominator}`,
-        });
+      return node('EnumeratedChord', {
+        inverted: Boolean(inverted),
+        first,
+        enumerands: tail.enumerands,
+        rangeEnd: tail.rangeEnd,
+        raw: text(),
       });
-      return parallel(ratios);
+    }
+
+ChordEnumerand
+  = ChordGroupedEnumerand
+  / QuantityLiteral
+  / RatioLiteral
+  / RealLiteral
+  / DecimalLiteral
+  / IntegerLiteral
+  / CallExpression
+  / IdentifierExpression
+
+ChordGroupedEnumerand
+  = "(" Spacing expression:AdditiveExpression Spacing ")" {
+      return node('Group', { expression });
     }
 
 ParenthesizedExpression
