@@ -44,37 +44,79 @@ function mapScoreConstruction(
   node: Expression,
   mapLeaf: (leaf: Expression) => Expression,
 ): Expression | undefined {
+  const mapItem = (item: Expression): Expression => {
+    const construction = mapScoreConstruction(item, mapLeaf)
+    if (construction) return construction
+    if (item.type === 'Group') return { ...item, expression: mapItem(item.expression) }
+    if (item.type === 'PostfixExpression') {
+      return { ...item, expression: mapItem(item.expression) }
+    }
+    if (
+      item.type === 'Rest' ||
+      item.type === 'DetachedContinue' ||
+      item.type === 'Barline' ||
+      item.type === 'HardBoundary' ||
+      item.type === 'Directive' ||
+      item.type === 'PitchContextChange'
+    ) {
+      return item
+    }
+    return mapLeaf(item)
+  }
   if (node.type === 'Sequence') {
     return {
       ...node,
-      items: node.items.map((item) => mapScoreConstruction(item, mapLeaf) ?? mapLeaf(item)),
+      items: node.items.map(mapItem),
     }
   }
   if (node.type === 'Parallel') {
     return {
       ...node,
-      branches: node.branches.map(
-        (branch) => mapScoreConstruction(branch, mapLeaf) ?? mapLeaf(branch),
-      ),
+      branches: node.branches.map(mapItem),
     }
   }
   if (node.type === 'NormalizeToSlot' && node.expression) {
     return {
       ...node,
-      expression: mapScoreConstruction(node.expression, mapLeaf) ?? mapLeaf(node.expression),
+      expression: mapItem(node.expression),
     }
   }
+  if (node.type === 'Repeat') {
+    return { ...node, body: node.body.map(mapItem) }
+  }
   if (node.type === 'Group') {
+    const expression = mapScoreConstruction(node.expression, mapLeaf)
+    if (expression) return { ...node, expression }
+  }
+  if (node.type === 'PostfixExpression') {
     const expression = mapScoreConstruction(node.expression, mapLeaf)
     if (expression) return { ...node, expression }
   }
   return undefined
 }
 
+function isScalarOperand(node: Expression): boolean {
+  if (mapScoreConstruction(node, (leaf) => leaf)) return false
+  if (node.type === 'Group') return isScalarOperand(node.expression)
+  return ![
+    'Rest',
+    'DetachedContinue',
+    'Barline',
+    'HardBoundary',
+    'Directive',
+    'PitchContextChange',
+    'PostfixExpression',
+    'EnumeratedChord',
+  ].includes(node.type)
+}
+
 function broadcastScalarOperation(node: Expression): Expression | undefined {
   if (node.type !== 'BinaryExpression') return undefined
-  const overLeft = mapScoreConstruction(node.left, (left) => ({ ...node, left }))
+  const overLeft = isScalarOperand(node.right)
+    ? mapScoreConstruction(node.left, (left) => ({ ...node, left }))
+    : undefined
   if (overLeft) return overLeft
+  if (!isScalarOperand(node.left)) return undefined
   return mapScoreConstruction(node.right, (right) => ({ ...node, right }))
 }
 

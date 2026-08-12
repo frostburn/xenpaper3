@@ -243,6 +243,30 @@ describe('score-shape timing', () => {
     },
   )
 
+  it('preserves structural score items while broadcasting', () => {
+    const result = shape('[3/2 . @ff 4/3] * 2') as SequenceShape
+
+    expect(result.children.map((child) => child.kind)).toEqual([
+      'attack',
+      'rest',
+      'dynamic',
+      'attack',
+    ])
+    const attacks = result.children.filter((child) => child.kind === 'attack')
+    ;[3, 8 / 3].forEach((ratio, index) =>
+      expect(attacks[index]!.pitch.notationValue?.valueOf()).toBeCloseTo(1200 * Math.log2(ratio)),
+    )
+  })
+
+  it('rejects broadcasting between two score constructions', () => {
+    const result = evaluateScoreShape(parse('[3/2 4/3] * [5/4 6/5]').body[0] as Expression)
+
+    expect(result.diagnostics).not.toHaveLength(0)
+    expect(result.diagnostics.every((diagnostic) => diagnostic.code === 'XP_TYPE_MISMATCH')).toBe(
+      true,
+    )
+  })
+
   it('applies subdivision directives to following notes', () => {
     const result = shape('C @2 D E @1 F G') as SequenceShape
     const attacks = result.children.filter((child) => child.kind === 'attack')
