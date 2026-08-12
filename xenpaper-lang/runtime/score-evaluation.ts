@@ -40,6 +40,44 @@ interface PlaybackAttackShape extends AttackShape {
 const MAX_REPEAT_EXPANSION_NODES = 100_000
 const MAX_ENUMERATED_CHORD_SIZE = 10_000n
 
+function mapScoreConstruction(
+  node: Expression,
+  mapLeaf: (leaf: Expression) => Expression,
+): Expression | undefined {
+  if (node.type === 'Sequence') {
+    return {
+      ...node,
+      items: node.items.map((item) => mapScoreConstruction(item, mapLeaf) ?? mapLeaf(item)),
+    }
+  }
+  if (node.type === 'Parallel') {
+    return {
+      ...node,
+      branches: node.branches.map(
+        (branch) => mapScoreConstruction(branch, mapLeaf) ?? mapLeaf(branch),
+      ),
+    }
+  }
+  if (node.type === 'NormalizeToSlot' && node.expression) {
+    return {
+      ...node,
+      expression: mapScoreConstruction(node.expression, mapLeaf) ?? mapLeaf(node.expression),
+    }
+  }
+  if (node.type === 'Group') {
+    const expression = mapScoreConstruction(node.expression, mapLeaf)
+    if (expression) return { ...node, expression }
+  }
+  return undefined
+}
+
+function broadcastScalarOperation(node: Expression): Expression | undefined {
+  if (node.type !== 'BinaryExpression') return undefined
+  const overLeft = mapScoreConstruction(node.left, (left) => ({ ...node, left }))
+  if (overLeft) return overLeft
+  return mapScoreConstruction(node.right, (right) => ({ ...node, right }))
+}
+
 function expandEnumeratedChord(
   node: Expression,
   context: PitchContext,
@@ -566,6 +604,8 @@ export function evaluateScoreSemantics(
     currentPulse: Fraction = pulse,
     currentDynamic: DynamicMark = 'mf',
   ): ScoreShapeEvaluationResult => {
+    const broadcast = broadcastScalarOperation(current)
+    if (broadcast) return visit(broadcast, context, currentPulse, currentDynamic)
     const expandedChord = expandEnumeratedChord(current, context)
     if (expandedChord.diagnostics.length) return { diagnostics: expandedChord.diagnostics }
     if (expandedChord.expressions.length !== 1 || expandedChord.expressions[0] !== current) {
