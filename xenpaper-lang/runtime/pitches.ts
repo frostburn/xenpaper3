@@ -259,6 +259,26 @@ export function applyPitchContextChange(
     }
     if (statement.type !== 'ContextAssignment')
       throw new TypeError('Unsupported pitch-context statement.')
+    if (statement.target.type === 'ContextPitchTarget') {
+      const evaluated = evaluateExpression(statement.value, context)
+      if ('value' in evaluated && evaluated.value.kind === 'scalar') {
+        const frequency = evaluated.value.value
+        if (!frequency.dimensions.equals({ seconds: -1 }) || frequency.valueOf() <= 0)
+          throw new TypeError('A pitch frequency assignment requires a positive frequency quantity.')
+        const ratio = frequency.div(context.rootFrequency)
+        context = {
+          ...context,
+          rootDisplacement: context.rootDisplacement.add(Value.pitch(ratio)),
+          rootFrequency: frequency,
+        }
+        const target = evaluatePitchLiteral(statement.target.pitch, {
+          ...context,
+          rootPitch: createPitchContext(context.mapping).rootPitch,
+        })
+        context = { ...context, rootPitch: target }
+        continue
+      }
+    }
     if (
       statement.target.type === 'ContextNameTarget' &&
       statement.target.name === 'root' &&
