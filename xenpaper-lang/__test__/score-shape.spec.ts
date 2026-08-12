@@ -15,6 +15,14 @@ function shape(source: string, pulse: Fraction | number = 1): ScoreShape {
 }
 
 describe('score-shape timing', () => {
+  it('uses middle C below A4 = 440 Hz as the default frequency root', () => {
+    const result = shape('440Hz')
+    if (result.kind !== 'attack') throw new Error('Expected an attack.')
+
+    expect(result.pitch.notationValue?.valueOf()).toBeCloseTo(1200 * Math.log2(27 / 16))
+    expect(result.pitch.value.valueOf()).toBeCloseTo(1200 * Math.log2(27 / 16))
+  })
+
   it('treats frequency quantities as notes relative to the current root frequency', () => {
     const result = shape('{root = 220Hz} 220Hz 0.44kHz (1 / 0.001s)') as SequenceShape
     const attacks = result.children.filter((child) => child.kind === 'attack')
@@ -24,9 +32,12 @@ describe('score-shape timing', () => {
     ;[0, 1200, 1200 * Math.log2(1000 / 220)].forEach((expected, index) =>
       expect(notationCents[index]).toBeCloseTo(expected),
     )
-    ;[-1200, 0, 1200 * Math.log2(1000 / 440)].forEach((expected, index) =>
-      expect(soundingCents[index]).toBeCloseTo(expected),
-    )
+    const middleC = 440 * (16 / 27)
+    ;[
+      1200 * Math.log2(220 / middleC),
+      1200 * Math.log2(440 / middleC),
+      1200 * Math.log2(1000 / middleC),
+    ].forEach((expected, index) => expect(soundingCents[index]).toBeCloseTo(expected))
   })
 
   it('keeps playback dynamics and velocity out of abstract notation attacks', () => {

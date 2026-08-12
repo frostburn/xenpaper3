@@ -186,7 +186,8 @@ export function createPitchContext(mapping: PrimeMapping = DEFAULT_MAPPING): Pit
     ),
     degreeEquave: Value.cents(1200),
     rootDisplacement: Value.cents(0),
-    rootFrequency: Value.hertz(440),
+    // Middle C, using the Pythagorean 27:16 major sixth below A4 = 440 Hz.
+    rootFrequency: Value.hertz(new Fraction(7040, 27)),
     rootPitch,
     up: mapFormula(
       new Map([

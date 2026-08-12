@@ -269,6 +269,7 @@ describe('arithmetic expression evaluation', () => {
       throw new Error('Expected pitches.')
     expect(a.value.rootOffset.equals(Value.cents(0))).toBe(true)
     expect(b.value.rootOffset.equals(Value.pitch(new Value(9n, 8n)))).toBe(true)
+    expect(context.rootFrequency.equals(Value.hertz(new Fraction(7040, 27)))).toBe(true)
   })
 
   it('moves the root frequency when assigning a pitch to root', () => {
@@ -285,6 +286,7 @@ describe('arithmetic expression evaluation', () => {
     )
       throw new Error('Expected pitches.')
     expect(context.rootDisplacement.equals(Value.pitch(new Value(9n, 8n)))).toBe(true)
+    expect(context.rootFrequency.equals(Value.hertz(new Fraction(880, 3)))).toBe(true)
     expect(c.value.rootOffset.equals(Value.cents(0))).toBe(true)
     expect(d.value.rootOffset.equals(Value.pitch(new Value(9n, 8n)))).toBe(true)
   })
