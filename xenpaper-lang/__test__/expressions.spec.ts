@@ -273,6 +273,23 @@ describe('arithmetic expression evaluation', () => {
     expect(context.rootFrequency.equals(middleC)).toBe(true)
   })
 
+  it('uses a pitch frequency assignment as a root frequency and spelling shorthand', () => {
+    const shorthand = parse('{A = 440Hz}').body[0]
+    const expanded = parse('{root = 440Hz; A = root}').body[0]
+    if (shorthand.type !== 'PitchContextChange' || expanded.type !== 'PitchContextChange')
+      throw new Error('Expected context changes.')
+
+    const shorthandContext = applyPitchContextChange(shorthand, DEFAULT_PITCH_CONTEXT)
+    const expandedContext = applyPitchContextChange(expanded, DEFAULT_PITCH_CONTEXT)
+
+    expect(shorthandContext.rootFrequency.equals(expandedContext.rootFrequency)).toBe(true)
+    expect(shorthandContext.rootDisplacement.equals(expandedContext.rootDisplacement)).toBe(true)
+    expect(shorthandContext.rootPitch.rootOffset.equals(expandedContext.rootPitch.rootOffset)).toBe(
+      true,
+    )
+    expect(shorthandContext.rootPitch.spelling).toEqual(expandedContext.rootPitch.spelling)
+  })
+
   it('moves the root frequency when assigning a pitch to root', () => {
     const change = parse('{root = D}').body[0]
     if (change.type !== 'PitchContextChange') throw new Error('Expected a context change.')
