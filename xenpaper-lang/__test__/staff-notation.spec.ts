@@ -14,6 +14,27 @@ function notation(source: string) {
 }
 
 describe('staff notation construction', () => {
+  it('only infers FJS accidentals from rational frequency ratios', () => {
+    const node = parse('300Hz').body[0] as Expression
+    const evaluated = evaluateScoreShape(node)
+    if (!('shape' in evaluated) || evaluated.shape.kind !== 'attack')
+      throw new Error('Expected an attack.')
+
+    const staff = constructStaffNotationShape(evaluated.shape)
+    if (staff.kind !== 'note') throw new Error('Expected a staff note.')
+    expect(staff.pitch.inflections).toBeUndefined()
+
+    const rationalNode = parse('{root = 100Hz} 500Hz').body[0] as Expression
+    const rational = evaluateScoreShape(rationalNode)
+    if (!('shape' in rational)) throw new Error('Expected a score shape.')
+    const rationalStaff = constructStaffNotationShape(rational.shape)
+    if (rationalStaff.kind !== 'sequence' || rationalStaff.children[1]?.kind !== 'note')
+      throw new Error('Expected a frequency note after the root assignment.')
+    expect(rationalStaff.children[1].pitch.inflections).toEqual([
+      { direction: 'numerator', prime: 5n },
+    ])
+  })
+
   it('places just ratios relative to middle C and retains FJS inflections', () => {
     expect(notation('1/1')).toMatchObject({ staffPosition: 0 })
     expect(notation('3/2')).toMatchObject({ staffPosition: 4 })

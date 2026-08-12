@@ -337,6 +337,20 @@ function playablePitch(
     }
   }
   const ratio = evaluated.value.value
+  if (ratio.dimensions.equals({ seconds: -1 }) && ratio.valueOf() > 0) {
+    const notationRatio = ratio.div(context.rootFrequency)
+    const formula = notationRatio.exactRational() ? notationRatio.primeExponents() : new Map()
+    return {
+      pitch: {
+        kind: 'pitchOffset',
+        value: Value.pitch(notationRatio).add(context.rootDisplacement),
+        notationValue: Value.pitch(notationRatio),
+        formula,
+        origins: evaluated.value.origins,
+      },
+      diagnostics: evaluated.diagnostics,
+    }
+  }
   if (!ratio.dimensions.isDimensionless || ratio.valueOf() <= 0) {
     return {
       diagnostics: [
