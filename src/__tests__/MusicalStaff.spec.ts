@@ -27,6 +27,17 @@ const notation: StaffNotationShape = {
 }
 
 describe('MusicalStaff', () => {
+  it('renders hertz notes relative to the active root frequency', () => {
+    const evaluated = evaluateScoreShape(parse('{root = 220Hz} 220Hz 440Hz').body[0]!)
+    if (!('shape' in evaluated)) throw new Error('Expected shape.')
+    const wrapper = mount(MusicalStaff, {
+      props: { notation: constructStaffNotationShape(evaluated.shape) },
+    })
+
+    expect(wrapper.findAll('.notehead')).toHaveLength(2)
+    expect(wrapper.findAll('.notation-error')).toHaveLength(0)
+  })
+
   it('renders grace notes small, tied to an unchanged donor, with dynamic annotations', () => {
     const evaluated = evaluateScoreShape(parse('@p @4?? B @velocity(80%) c# c=').body[0]!)
     if (!('shape' in evaluated)) throw new Error('Expected a score shape.')

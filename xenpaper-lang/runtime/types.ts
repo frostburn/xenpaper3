@@ -112,6 +112,8 @@ export interface PitchContext {
   readonly degreeEquave: Value
   /** Sounding displacement of the current root from the default root frequency. */
   readonly rootDisplacement: Value
+  /** Absolute frequency used to turn frequency quantities into root-relative notation. */
+  readonly rootFrequency: Value
   /** Absolute pitch used as the notation root. */
   readonly rootPitch: AbsolutePitchValue
   readonly up: Value

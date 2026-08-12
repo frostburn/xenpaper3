@@ -15,6 +15,20 @@ function shape(source: string, pulse: Fraction | number = 1): ScoreShape {
 }
 
 describe('score-shape timing', () => {
+  it('treats frequency quantities as notes relative to the current root frequency', () => {
+    const result = shape('{root = 220Hz} 220Hz 0.44kHz (1 / 0.001s)') as SequenceShape
+    const attacks = result.children.filter((child) => child.kind === 'attack')
+
+    const notationCents = attacks.map((attack) => attack.pitch.notationValue?.valueOf())
+    const soundingCents = attacks.map((attack) => attack.pitch.value.valueOf())
+    ;[0, 1200, 1200 * Math.log2(1000 / 220)].forEach((expected, index) =>
+      expect(notationCents[index]).toBeCloseTo(expected),
+    )
+    ;[-1200, 0, 1200 * Math.log2(1000 / 440)].forEach((expected, index) =>
+      expect(soundingCents[index]).toBeCloseTo(expected),
+    )
+  })
+
   it('keeps playback dynamics and velocity out of abstract notation attacks', () => {
     const result = shape('@p C @velocity(4/5) D') as SequenceShape
     const attacks = result.children.filter((child) => child.kind === 'attack')

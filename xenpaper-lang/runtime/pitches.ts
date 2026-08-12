@@ -186,6 +186,7 @@ export function createPitchContext(mapping: PrimeMapping = DEFAULT_MAPPING): Pit
     ),
     degreeEquave: Value.cents(1200),
     rootDisplacement: Value.cents(0),
+    rootFrequency: Value.hertz(440),
     rootPitch,
     up: mapFormula(
       new Map([
@@ -234,6 +235,7 @@ export function applyPitchContextChange(
         degrees,
         degreeEquave: equave,
         rootDisplacement: context.rootDisplacement,
+        rootFrequency: context.rootFrequency,
         rootPitch: {
           ...context.rootPitch,
           rootOffset: mapFormula(context.rootPitch.formula, mapping),
@@ -262,7 +264,26 @@ export function applyPitchContextChange(
       statement.value.type === 'PitchLiteral'
     ) {
       const target = evaluatePitchLiteral(statement.value, context)
-      context = { ...context, rootDisplacement: context.rootDisplacement.add(target.rootOffset) }
+      context = {
+        ...context,
+        rootDisplacement: context.rootDisplacement.add(target.rootOffset),
+        rootFrequency: context.rootFrequency.mul(Value.ratio(target.rootOffset)),
+      }
+      continue
+    }
+    if (statement.target.type === 'ContextNameTarget' && statement.target.name === 'root') {
+      const evaluated = evaluateExpression(statement.value, context)
+      if (!('value' in evaluated) || evaluated.value.kind !== 'scalar')
+        throw new TypeError('A root frequency assignment requires a frequency quantity.')
+      const frequency = evaluated.value.value
+      if (!frequency.dimensions.equals({ seconds: -1 }) || frequency.valueOf() <= 0)
+        throw new TypeError('A root frequency assignment requires a positive frequency quantity.')
+      const ratio = frequency.div(context.rootFrequency)
+      context = {
+        ...context,
+        rootDisplacement: context.rootDisplacement.add(Value.pitch(ratio)),
+        rootFrequency: frequency,
+      }
       continue
     }
     if (
