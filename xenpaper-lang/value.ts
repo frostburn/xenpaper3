@@ -1,5 +1,6 @@
 import { Fraction, type FractionValue } from 'xen-dev-utils/fraction'
 import { primeFactorize } from 'xen-dev-utils/monzo'
+import { centsToValue, valueToCents } from 'xen-dev-utils/conversion'
 
 type SparseMonzo = ReadonlyMap<number, FractionValue>
 
@@ -232,7 +233,7 @@ class ExactPitch {
   valueOf(): number {
     let octaves = 0
     for (const [prime, exponent] of this.logPrimes) {
-      octaves += Math.log2(prime) * new Fraction(exponent).valueOf()
+      octaves += (valueToCents(prime) / 1200) * new Fraction(exponent).valueOf()
     }
     return 1200 * octaves
   }
@@ -311,7 +312,7 @@ export class Value {
         new Dimensions({ pitch: 1 }),
       )
     if (!(ratio.valueOf() > 0)) throw new RangeError('Pitch conversion requires a positive ratio.')
-    return Value.real(1200 * Math.log2(ratio.valueOf()), { pitch: 1 })
+    return Value.real(valueToCents(ratio.valueOf()), { pitch: 1 })
   }
 
   static ratio(offset: Value): Value {
@@ -322,7 +323,7 @@ export class Value {
         { kind: 'exact', value: offset.magnitude.value.toRatio() },
         new Dimensions(),
       )
-    return Value.real(Math.pow(2, offset.valueOf() / 1200))
+    return Value.real(centsToValue(offset.valueOf()))
   }
 
   static equalDivision(

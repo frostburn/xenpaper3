@@ -1,4 +1,5 @@
 import { circleDistance } from 'xen-dev-utils/core'
+import { valueToCents } from 'xen-dev-utils/conversion'
 import { Fraction } from 'xen-dev-utils/fraction'
 import { isPrime } from 'xen-dev-utils/primes'
 import type { FjsSpelling, PrimeMonzo } from './types'
@@ -11,11 +12,11 @@ export interface FjsInflectionInput {
   readonly flavor?: string
 }
 
-const FIFTH = 1200 * Math.log2(3 / 2)
-const FOURTH = 1200 * Math.log2(4 / 3)
-const TRITAVE = 1200 * Math.log2(3)
-const FORMAL_RADIUS = 1200 * Math.log2(65 / 63)
-const SEMIAPOTOME = 600 * Math.log2(2187 / 2048) + 1e-6
+const FIFTH = valueToCents(3 / 2)
+const FOURTH = valueToCents(4 / 3)
+const TRITAVE = valueToCents(3)
+const FORMAL_RADIUS = valueToCents(65 / 63)
+const SEMIAPOTOME = valueToCents(2187 / 2048) / 2 + 1e-6
 const cache = new Map<string, PrimeMonzo>()
 
 /** Combine pairs of compatible FJS factors when their product remains a two-digit label. */
@@ -82,7 +83,7 @@ export function fjsPrimeComma(prime: number, flavor: FjsFlavor = ''): PrimeMonzo
   const key = `${prime}:${flavor}`
   const cached = cache.get(key)
   if (cached) return cached
-  const cents = 1200 * Math.log2(prime)
+  const cents = valueToCents(prime)
   let pair: [number, number]
   if (flavor === 'n') pair = neutralMaster(cents)
   else if (flavor === 'q') pair = semiquartalMaster(cents)
