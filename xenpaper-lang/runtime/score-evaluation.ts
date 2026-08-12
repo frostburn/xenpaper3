@@ -339,14 +339,13 @@ function playablePitch(
   const ratio = evaluated.value.value
   if (ratio.dimensions.equals({ seconds: -1 }) && ratio.valueOf() > 0) {
     const notationRatio = ratio.div(context.rootFrequency)
+    const formula = notationRatio.exactRational() ? notationRatio.primeExponents() : new Map()
     return {
       pitch: {
         kind: 'pitchOffset',
         value: Value.pitch(notationRatio).add(context.rootDisplacement),
         notationValue: Value.pitch(notationRatio),
-        // A frequency divided by the 12-EDO middle-C reference is generally
-        // not a just ratio, even when the frequency literal is rational.
-        formula: new Map(),
+        formula,
         origins: evaluated.value.origins,
       },
       diagnostics: evaluated.diagnostics,
