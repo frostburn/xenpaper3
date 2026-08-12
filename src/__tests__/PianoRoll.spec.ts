@@ -5,6 +5,7 @@ import { Fraction } from 'xen-dev-utils/fraction'
 import type { BeatTimedScore } from '../../xenpaper-lang/runtime/types'
 import { Value } from '../../xenpaper-lang/value'
 import PianoRoll from '../components/PianoRoll.vue'
+import PianoRollInspector from '../components/PianoRollInspector.vue'
 
 describe('PianoRoll', () => {
   it('renders Value and Fraction instances received through a deep Vue proxy', async () => {
@@ -111,5 +112,172 @@ describe('PianoRoll', () => {
     const endLabel = wrapper.findAll('.beat-label')[1]!
     expect(endLabel.attributes('x')).toBe('770')
     expect(endLabel.text()).toBe('7')
+  })
+
+  it('box-selects notes and emits inspectable element information', async () => {
+    const score: BeatTimedScore = {
+      duration: new Fraction(2),
+      events: [
+        {
+          kind: 'note',
+          start: new Fraction(0),
+          duration: new Fraction(1),
+          pitch: { kind: 'pitchOffset', value: Value.cents(700), origins: [] },
+          dynamic: new Fraction(1, 2),
+          label: 'selected G',
+          origins: [],
+        },
+        {
+          kind: 'note',
+          start: new Fraction(1),
+          duration: new Fraction(1),
+          pitch: { kind: 'pitchOffset', value: Value.cents(0), origins: [] },
+          dynamic: new Fraction(1, 2),
+          label: 'not selected',
+          origins: [],
+        },
+      ],
+    }
+    const wrapper = mount(PianoRoll, { props: { score } })
+    const grid = wrapper.get('svg.grid')
+
+    await grid.trigger('mousedown', { clientX: 65, clientY: 120 })
+    await grid.trigger('mousemove', { clientX: 175, clientY: 135 })
+    expect(wrapper.get('.selection-box').attributes()).toMatchObject({
+      x: '65',
+      y: '120',
+      width: '110',
+      height: '15',
+    })
+    await grid.trigger('mouseup', { clientX: 175, clientY: 135 })
+
+    expect(wrapper.findAll('.note.selected')).toHaveLength(1)
+    expect(wrapper.find('.selection-box').exists()).toBe(false)
+    const inspectionEvents = wrapper.emitted('inspectionChange')!
+    expect(inspectionEvents[inspectionEvents.length - 1]![0]).toEqual({
+      inspected: undefined,
+      selected: [
+        {
+          index: 0,
+          label: 'selected G',
+          kind: 'note',
+          pitchKind: 'pitchOffset',
+          cents: 700,
+          start: '0',
+          duration: '1',
+          end: '1',
+        },
+      ],
+    })
+  })
+
+  it('maps box-selection coordinates through the SVG screen transform', async () => {
+    const score: BeatTimedScore = {
+      duration: new Fraction(1),
+      events: [
+        {
+          kind: 'note',
+          start: new Fraction(0),
+          duration: new Fraction(1),
+          pitch: { kind: 'pitchOffset', value: Value.cents(700), origins: [] },
+          dynamic: new Fraction(1, 2),
+          origins: [],
+        },
+      ],
+    }
+    const wrapper = mount(PianoRoll, { props: { score } })
+    const grid = wrapper.get('svg.grid')
+    const svg = grid.element as SVGSVGElement
+    const inverse = { coordinateSpace: 'viewBox' } as unknown as DOMMatrix
+    Object.assign(svg, {
+      getScreenCTM: () => ({ inverse: () => inverse }),
+      createSVGPoint: () => ({
+        x: 0,
+        y: 0,
+        matrixTransform(matrix: DOMMatrix) {
+          expect(matrix).toBe(inverse)
+          return { x: (this.x - 200) / 2, y: (this.y - 40) / 2 }
+        },
+      }),
+    })
+
+    await grid.trigger('mousedown', { clientX: 330, clientY: 280 })
+    await grid.trigger('mousemove', { clientX: 540, clientY: 310 })
+
+    expect(wrapper.get('.selection-box').attributes()).toMatchObject({
+      x: '65',
+      y: '120',
+      width: '105',
+      height: '15',
+    })
+  })
+
+  it('starts box selection on grid lines and selects a note with a single click', async () => {
+    const score: BeatTimedScore = {
+      duration: new Fraction(1),
+      events: [
+        {
+          kind: 'note',
+          start: new Fraction(0),
+          duration: new Fraction(1),
+          pitch: { kind: 'pitchOffset', value: Value.cents(700), origins: [] },
+          dynamic: new Fraction(1, 2),
+          label: 'G',
+          origins: [],
+        },
+      ],
+    }
+    const wrapper = mount(PianoRoll, { props: { score } })
+    const grid = wrapper.get('svg.grid')
+
+    await wrapper.get('.pitch-line').trigger('mousedown', { clientX: 65, clientY: 120 })
+    await grid.trigger('mousemove', { clientX: 175, clientY: 135 })
+    expect(wrapper.find('.selection-box').exists()).toBe(true)
+    await grid.trigger('mouseup', { clientX: 175, clientY: 135 })
+
+    await wrapper.get('.note').trigger('click')
+    expect(wrapper.get('.note').classes()).toContain('selected')
+    const inspectionEvents = wrapper.emitted('inspectionChange')!
+    expect(inspectionEvents[inspectionEvents.length - 1]![0]).toMatchObject({
+      selected: [{ index: 0, label: 'G' }],
+    })
+  })
+
+  it('renders inspection details in a separate expandable inspector', () => {
+    const wrapper = mount(PianoRollInspector, {
+      props: {
+        inspection: {
+          selected: [
+            {
+              index: 2,
+              label: 'P5',
+              kind: 'note',
+              pitchKind: 'pitchOffset',
+              cents: 701.955,
+              start: '1/2',
+              duration: '1',
+              end: '1 1/2',
+            },
+          ],
+        },
+      },
+    })
+
+    expect(wrapper.get('p').text()).toBe('1 note selected')
+    expect(wrapper.get('details').attributes()).not.toHaveProperty('open')
+    expect(wrapper.get('summary').text()).toBe('Element details')
+    expect(wrapper.get('.selected-elements li').text()).toContain('1/2–1 1/2 beats, 701.96¢')
+  })
+
+  it('keeps element details available with placeholder content when nothing is active', () => {
+    const wrapper = mount(PianoRollInspector, {
+      props: { inspection: { selected: [] } },
+    })
+
+    expect(wrapper.get('details').attributes()).not.toHaveProperty('open')
+    expect(wrapper.get('summary').text()).toBe('Element details')
+    expect(wrapper.get('.details-placeholder').text()).toBe(
+      'Select or hover over an element to see its details here.',
+    )
   })
 })

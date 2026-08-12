@@ -11,10 +11,13 @@ import {
 } from '../../xenpaper-lang'
 import MusicalStaff from '../components/MusicalStaff.vue'
 import PianoRoll from '../components/PianoRoll.vue'
+import type { PianoRollInspection } from '../components/PianoRoll.vue'
+import PianoRollInspector from '../components/PianoRollInspector.vue'
 
 const source = ref('C D E F G')
 const notation = ref<StaffNotationShape>()
 const pianoRoll = ref<BeatTimedScore>()
+const pianoRollInspection = ref<PianoRollInspection>({ selected: [] })
 
 const logParsedOutput = () => {
   console.log(parse(source.value))
@@ -69,7 +72,8 @@ const logStaffNotation = () => {
       <button type="button" @click="logStaffNotation">Log staff notation</button>
     </div>
   </div>
-  <PianoRoll :score="pianoRoll" />
+  <PianoRoll :score="pianoRoll" @inspection-change="pianoRollInspection = $event" />
+  <PianoRollInspector :inspection="pianoRollInspection" />
   <MusicalStaff :notation="notation" />
 </template>
 
