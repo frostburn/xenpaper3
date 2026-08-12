@@ -30,6 +30,14 @@ describe('numeric literal evaluation', () => {
     expect(evaluateLiteral(literal('[1 2>@4..'))).toMatchObject({
       diagnostics: [{ code: 'XP_LITERAL', message: expect.stringContaining('after a prime') }],
     })
+    expect(evaluateLiteral(literal('[1 2>@7927..'))).toMatchObject({
+      diagnostics: [{ code: 'XP_LITERAL', message: expect.stringContaining('supported range') }],
+    })
+    expect(evaluateLiteral(literal('[1 2>@7919..'))).toMatchObject({
+      diagnostics: [
+        { code: 'XP_LITERAL', message: expect.stringContaining('supported prime range') },
+      ],
+    })
   })
   it('constructs decimals exactly from their source digits', () => {
     expect(decimalFraction('1.95').equals(new Fraction(39, 20))).toBe(true)

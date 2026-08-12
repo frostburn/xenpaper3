@@ -1,5 +1,5 @@
 import { Fraction } from 'xen-dev-utils/fraction'
-import { nthPrime } from 'xen-dev-utils/primes'
+import { PRIMES } from 'xen-dev-utils/primes'
 import type {
   DecimalLiteral,
   EqualDivisionLiteral,
@@ -56,31 +56,20 @@ function rationalLiteral(
   return new Value(BigInt(signed(node.numerator, node.sign)), BigInt(node.denominator))
 }
 
-/** Find the zero-based ordinal of a prime without materializing all preceding primes. */
-function primeIndex(prime: number): number {
-  let low = 0
-  let high = 1
-  while (nthPrime(high) < prime) high *= 2
-  while (low < high) {
-    const middle = Math.floor((low + high) / 2)
-    if (nthPrime(middle) < prime) low = middle + 1
-    else high = middle
-  }
-  return low
-}
-
 function monzoLiteral(node: MonzoLiteral): Value {
   const bases = node.subgroup.map((component) => new Fraction(component))
   if (node.continuation) {
     const last = bases[bases.length - 1] ?? new Fraction(1)
-    const lastPrimeIndex = bases.length && last.d === 1 ? primeIndex(last.n) : -1
-    if (bases.length && (lastPrimeIndex < 0 || nthPrime(lastPrimeIndex) !== last.n))
-      throw new TypeError('A monzo subgroup may only continue after a prime.')
-    let index = lastPrimeIndex + 1
-    while (bases.length < node.components.length) {
-      bases.push(new Fraction(nthPrime(index)))
-      index += 1
-    }
+    const lastPrimeIndex = bases.length && last.d === 1 ? PRIMES.indexOf(last.n) : -1
+    if (bases.length && lastPrimeIndex < 0)
+      throw new TypeError(
+        'A monzo subgroup may only continue after a prime in the supported range.',
+      )
+    const missing = node.components.length - bases.length
+    const continuation = PRIMES.slice(lastPrimeIndex + 1, lastPrimeIndex + 1 + missing)
+    if (continuation.length < missing)
+      throw new TypeError('Monzo subgroup continuation exceeds the supported prime range.')
+    bases.push(...continuation.map((prime) => new Fraction(prime)))
   }
   if (bases.length !== node.components.length)
     throw new TypeError('The monzo vector and subgroup must have the same number of components.')
