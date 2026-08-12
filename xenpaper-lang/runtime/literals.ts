@@ -1,4 +1,5 @@
 import { Fraction } from 'xen-dev-utils/fraction'
+import { isPrime, primes } from 'xen-dev-utils/primes'
 import type {
   DecimalLiteral,
   EqualDivisionLiteral,
@@ -55,20 +56,6 @@ function rationalLiteral(
   return new Value(BigInt(signed(node.numerator, node.sign)), BigInt(node.denominator))
 }
 
-function isPrime(value: number): boolean {
-  if (!Number.isSafeInteger(value) || value < 2) return false
-  if (value % 2 === 0) return value === 2
-  for (let divisor = 3; divisor * divisor <= value; divisor += 2)
-    if (value % divisor === 0) return false
-  return true
-}
-
-function nextPrime(value: number): number {
-  let candidate = value + 1
-  while (!isPrime(candidate)) candidate += 1
-  return candidate
-}
-
 function monzoLiteral(node: MonzoLiteral): Value {
   const bases = node.subgroup.map((component) => new Fraction(component))
   if (node.continuation) {
@@ -77,7 +64,7 @@ function monzoLiteral(node: MonzoLiteral): Value {
       throw new TypeError('A monzo subgroup may only continue after a prime.')
     let prime = last.n
     while (bases.length < node.components.length) {
-      prime = nextPrime(prime)
+      prime = primes(prime + 1, prime * 2)[0]!
       bases.push(new Fraction(prime))
     }
   }
