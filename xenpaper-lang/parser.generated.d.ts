@@ -40,6 +40,7 @@ export type Expression =
   | IntegerLiteral
   | IntervalLiteral
   | MappingLiteral
+  | MonzoLiteral
   | NamedArgument
   | NormalizeToSlot
   | Parallel
@@ -189,6 +190,14 @@ export interface MappingLiteral extends Node {
   type: 'MappingLiteral'
   values: Expression[]
   closingDelimiter: ']' | '>'
+}
+
+export interface MonzoLiteral extends Node {
+  type: 'MonzoLiteral'
+  components: string[]
+  subgroup: string[]
+  continuation: boolean
+  raw: string
 }
 
 export interface NamedArgument extends Node {

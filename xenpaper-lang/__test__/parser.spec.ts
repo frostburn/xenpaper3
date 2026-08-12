@@ -34,6 +34,19 @@ type SyntaxNode = {
 }
 
 describe('Xenpaper surface grammar', () => {
+  it('parses monzo vectors and optional subgroups', () => {
+    expect(parse('[-4 4 -1>@').body[0]).toMatchObject({
+      type: 'MonzoLiteral',
+      components: ['-4', '4', '-1'],
+      subgroup: [],
+      continuation: true,
+    })
+    expect(parse('[1 -2 0 -2>@101.2..').body[0]).toMatchObject({
+      type: 'MonzoLiteral',
+      subgroup: ['101', '2'],
+      continuation: true,
+    })
+  })
   it('parses adjacent dots as a single cluster rest', () => {
     expect(parse('...').body[0]).toMatchObject({ type: 'Rest', raw: '...' })
   })

@@ -1,8 +1,10 @@
 import { Fraction } from 'xen-dev-utils/fraction'
+import { PRIMES } from 'xen-dev-utils/primes'
 import type {
   DecimalLiteral,
   EqualDivisionLiteral,
   IntegerLiteral,
+  MonzoLiteral,
   QuantityLiteral,
   RealLiteral,
   RatioLiteral,
@@ -15,6 +17,7 @@ export type NumericLiteralNode =
   | DecimalLiteral
   | EqualDivisionLiteral
   | IntegerLiteral
+  | MonzoLiteral
   | QuantityLiteral
   | RealLiteral
   | RatioLiteral
@@ -51,6 +54,33 @@ function rationalLiteral(
   if (node.type === 'DecimalLiteral')
     return new Value(decimalFraction(signed(node.value, node.sign)))
   return new Value(BigInt(signed(node.numerator, node.sign)), BigInt(node.denominator))
+}
+
+function monzoLiteral(node: MonzoLiteral): Value {
+  const bases = node.subgroup.map((component) => new Fraction(component))
+  if (node.continuation) {
+    const last = bases[bases.length - 1] ?? new Fraction(1)
+    const lastPrimeIndex = bases.length && last.d === 1 ? PRIMES.indexOf(last.n) : -1
+    if (bases.length && lastPrimeIndex < 0)
+      throw new TypeError(
+        'A monzo subgroup may only continue after a prime in the supported range.',
+      )
+    const missing = node.components.length - bases.length
+    const continuation = PRIMES.slice(lastPrimeIndex + 1, lastPrimeIndex + 1 + missing)
+    if (continuation.length < missing)
+      throw new TypeError('Monzo subgroup continuation exceeds the supported prime range.')
+    bases.push(...continuation.map((prime) => new Fraction(prime)))
+  }
+  if (bases.length !== node.components.length)
+    throw new TypeError('The monzo vector and subgroup must have the same number of components.')
+
+  let ratio = new Value(1)
+  for (let index = 0; index < node.components.length; index += 1) {
+    const base = bases[index]!
+    if (!(base.valueOf() > 0)) throw new TypeError('Monzo subgroup components must be positive.')
+    ratio = ratio.mul(new Value(base).pow(new Fraction(node.components[index]!)))
+  }
+  return Value.pitch(ratio)
 }
 
 function scalar(value: Value, node: NumericLiteralNode): EvaluatedLiteral {
@@ -95,6 +125,8 @@ export function evaluateLiteral(
   equave: Value = new Value(2),
 ): LiteralEvaluationResult {
   try {
+    if (node.type === 'MonzoLiteral')
+      return { value: pitchOffset(monzoLiteral(node), node), diagnostics: [] }
     if (node.type === 'QuantityLiteral') return { value: quantity(node), diagnostics: [] }
     if (node.type !== 'EqualDivisionLiteral') {
       return { value: scalar(rationalLiteral(node), node), diagnostics: [] }

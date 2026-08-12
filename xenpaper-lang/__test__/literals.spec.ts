@@ -18,6 +18,27 @@ function value(source: string, equave?: Value): Value {
 }
 
 describe('numeric literal evaluation', () => {
+  it('evaluates monzo literals in the prime and custom subgroups', () => {
+    expect(value('[-4 4 -1>@').equals(Value.pitch(new Fraction(81, 80)))).toBe(true)
+    expect(value('[1 -2 0 -2>@101.2..').equals(Value.pitch(new Fraction(101, 100)))).toBe(true)
+    expect(
+      value('[1/2>@4/9').equals(Value.pitch(new Value(new Fraction(4, 9)).pow(new Fraction(1, 2)))),
+    ).toBe(true)
+  })
+
+  it('rejects subgroup continuation after a non-prime', () => {
+    expect(evaluateLiteral(literal('[1 2>@4..'))).toMatchObject({
+      diagnostics: [{ code: 'XP_LITERAL', message: expect.stringContaining('after a prime') }],
+    })
+    expect(evaluateLiteral(literal('[1 2>@7927..'))).toMatchObject({
+      diagnostics: [{ code: 'XP_LITERAL', message: expect.stringContaining('supported range') }],
+    })
+    expect(evaluateLiteral(literal('[1 2>@7919..'))).toMatchObject({
+      diagnostics: [
+        { code: 'XP_LITERAL', message: expect.stringContaining('supported prime range') },
+      ],
+    })
+  })
   it('constructs decimals exactly from their source digits', () => {
     expect(decimalFraction('1.95').equals(new Fraction(39, 20))).toBe(true)
     expect(decimalFraction('-0.125').equals(new Fraction(-1, 8))).toBe(true)
