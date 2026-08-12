@@ -562,8 +562,10 @@ describe('MusicalStaff', () => {
           { kind: 'down' },
           { kind: 'lift' },
           { kind: 'drop' },
-          { direction: 'numerator', prime: 5n, flavor: 'c' },
           { direction: 'denominator', prime: 7n, flavor: 'n' },
+          { direction: 'numerator', prime: 5n, flavor: 'c' },
+          { direction: 'denominator', prime: 13n },
+          { direction: 'numerator', prime: 11n },
         ],
         accidentals: ['flat'],
         notehead: 'normal',
@@ -578,9 +580,11 @@ describe('MusicalStaff', () => {
       '/',
       '\\',
       '5c',
+      ',11',
       '/7n',
+      ',13',
     ])
-    expect(wrapper.get('.pitch-decorations').text()).toBe('^v/\\5c/7n♭')
+    expect(wrapper.get('.pitch-decorations').text()).toBe('^v/\\5c,11/7n,13♭')
     expect(
       wrapper.get('.pitch-decorations').element.lastElementChild?.classList.contains('accidental'),
     ).toBe(true)
