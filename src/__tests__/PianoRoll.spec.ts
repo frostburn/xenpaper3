@@ -268,4 +268,16 @@ describe('PianoRoll', () => {
     expect(wrapper.get('summary').text()).toBe('Element details')
     expect(wrapper.get('.selected-elements li').text()).toContain('1/2–1 1/2 beats, 701.96¢')
   })
+
+  it('keeps element details available with placeholder content when nothing is active', () => {
+    const wrapper = mount(PianoRollInspector, {
+      props: { inspection: { selected: [] } },
+    })
+
+    expect(wrapper.get('details').attributes()).not.toHaveProperty('open')
+    expect(wrapper.get('summary').text()).toBe('Element details')
+    expect(wrapper.get('.details-placeholder').text()).toBe(
+      'Select or hover over an element to see its details here.',
+    )
+  })
 })

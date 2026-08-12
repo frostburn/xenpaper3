@@ -13,9 +13,12 @@ defineProps<{ inspection: PianoRollInspection }>()
     <p v-else-if="inspection.selected.length">
       {{ inspection.selected.length }} note{{ inspection.selected.length === 1 ? '' : 's' }} selected
     </p>
-    <p v-else class="empty">Hover over a note or drag an empty part of the roll to select notes.</p>
-    <details v-if="inspection.inspected || inspection.selected.length">
+    <p v-else class="empty">Hover over, click, or drag around notes to inspect them.</p>
+    <details>
       <summary>Element details</summary>
+      <p v-if="!inspection.inspected && !inspection.selected.length" class="details-placeholder">
+        Select or hover over an element to see its details here.
+      </p>
       <dl v-if="inspection.inspected">
         <template v-for="(value, key) in inspection.inspected" :key="key">
           <dt>{{ key }}</dt>
@@ -46,6 +49,11 @@ p {
 }
 .empty {
   color: #666;
+}
+.details-placeholder {
+  margin-top: 0.75rem;
+  color: #666;
+  font-style: italic;
 }
 summary {
   cursor: pointer;
