@@ -74,6 +74,7 @@ const items = computed(() => {
     activeItems: RhythmicLayoutItem[]
     activeNotes: NoteLayoutItem[]
     activeSpan?: Fraction
+    barlineSinceActiveItems?: boolean
   }
   const visit = (
     shape: StaffNotationShape,
@@ -97,14 +98,42 @@ const items = computed(() => {
       state.activeItems = [note]
       state.activeNotes = [note]
       state.activeSpan = shape.duration
+      state.barlineSinceActiveItems = false
     } else if (shape.kind === 'continue' && state.activeItems.length && state.activeSpan) {
       const continuedDuration = fraction(shape.duration)
       const activeSpan = fraction(state.activeSpan)
       const factor = continuedDuration.div(activeSpan)
-      state.activeItems.forEach((item) => {
-        const duration = fraction(item.duration)
-        item.duration = duration.add(duration.mul(factor))
-      })
+      if (state.barlineSinceActiveItems) {
+        let continuedOffset = fraction(offset)
+        const continuedItems = state.activeItems.map((item) => {
+          const duration = fraction(item.duration).mul(factor)
+          const continuedItem: RhythmicLayoutItem =
+            item.kind === 'note'
+              ? {
+                  ...item,
+                  offset: continuedOffset,
+                  duration,
+                  tiedFromOffset: item.offset,
+                  tuplets: [],
+                }
+              : { ...item, offset: continuedOffset, duration, tuplets: [] }
+          continuedOffset = continuedOffset.add(duration)
+          layout.push(continuedItem)
+          return continuedItem
+        })
+        state.activeItems = continuedItems
+        state.activeNotes = continuedItems.filter(
+          (item): item is NoteLayoutItem => item.kind === 'note',
+        )
+        state.activeSpan = continuedDuration
+        state.barlineSinceActiveItems = false
+      } else {
+        state.activeItems.forEach((item) => {
+          const duration = fraction(item.duration)
+          item.duration = duration.add(duration.mul(factor))
+        })
+        state.activeSpan = activeSpan.add(continuedDuration)
+      }
       const tupletIds = state.activeNotes[0]?.tuplets.map((tuplet) => tuplet.id) ?? []
       const resolvesToRegularNotes = state.activeNotes.every(
         (note) =>
@@ -116,14 +145,15 @@ const items = computed(() => {
           note.tuplets = []
         })
       }
-      state.activeSpan = activeSpan.add(continuedDuration)
     } else if (shape.kind === 'rest') {
       state.activeItems = []
       state.activeNotes = []
       state.activeSpan = undefined
+      state.barlineSinceActiveItems = false
       layout.push({ kind: 'rest', offset, duration: shape.duration, tuplets: [], voice })
     } else if (shape.kind === 'barline') {
       layout.push({ kind: 'barline', offset, style: shape.style, tuplets: [], voice })
+      if (state.activeItems.length) state.barlineSinceActiveItems = true
     } else if (shape.kind === 'annotation') {
       layout.push({ kind: 'annotation', offset, text: shape.text, tuplets: [], voice })
     } else if (shape.kind === 'dynamic') {

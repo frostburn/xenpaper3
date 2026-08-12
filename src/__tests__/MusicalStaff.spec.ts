@@ -529,7 +529,7 @@ describe('MusicalStaff', () => {
     expect(wrapper.find('.tuplet-bracket').exists()).toBe(false)
   })
 
-  it('renders barlines without interrupting continued notes', () => {
+  it('splits continued notes at barlines and joins the repeated notehead with a tie', () => {
     const barred: StaffNotationShape = {
       kind: 'sequence',
       duration: notation.duration,
@@ -546,10 +546,25 @@ describe('MusicalStaff', () => {
     const wrapper = mount(MusicalStaff, { props: { notation: barred } })
 
     expect(wrapper.findAll('.barline')).toHaveLength(1)
-    expect(wrapper.findAll('.notehead')).toHaveLength(1)
+    expect(wrapper.findAll('.notehead')).toHaveLength(2)
     expect(wrapper.findAll('.notehead--open')).toHaveLength(1)
-    expect(wrapper.findAll('.tie')).toHaveLength(0)
+    expect(wrapper.findAll('.tie')).toHaveLength(1)
     expect(wrapper.get('.barline line').attributes('x1')).toBe('86')
+  })
+
+  it('respects a barline between continues', () => {
+    const evaluated = evaluateScoreShape(parse('C=|=.').body[0]!)
+    if (!('shape' in evaluated)) throw new Error('Expected a score shape.')
+    const wrapper = mount(MusicalStaff, {
+      props: { notation: constructStaffNotationShape(evaluated.shape) },
+    })
+
+    expect(wrapper.findAll('.notehead')).toHaveLength(2)
+    expect(wrapper.findAll('.notehead--open')).toHaveLength(1)
+    expect(wrapper.findAll('.stem')).toHaveLength(2)
+    expect(wrapper.findAll('.barline')).toHaveLength(1)
+    expect(wrapper.findAll('.tie')).toHaveLength(1)
+    expect(wrapper.findAll('.rest')).toHaveLength(1)
   })
 
   it('positions barlines between notes and reserves room for repeat markers', () => {
