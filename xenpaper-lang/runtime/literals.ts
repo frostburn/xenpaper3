@@ -1,5 +1,5 @@
 import { Fraction } from 'xen-dev-utils/fraction'
-import { isPrime, primes } from 'xen-dev-utils/primes'
+import { isPrime, nthPrime, primes } from 'xen-dev-utils/primes'
 import type {
   DecimalLiteral,
   EqualDivisionLiteral,
@@ -62,10 +62,10 @@ function monzoLiteral(node: MonzoLiteral): Value {
     const last = bases[bases.length - 1] ?? new Fraction(1)
     if (bases.length && (last.d !== 1 || !isPrime(last.n)))
       throw new TypeError('A monzo subgroup may only continue after a prime.')
-    let prime = last.n
+    let primeIndex = primes(2, last.n).length
     while (bases.length < node.components.length) {
-      prime = primes(prime + 1, prime * 2)[0]!
-      bases.push(new Fraction(prime))
+      bases.push(new Fraction(nthPrime(primeIndex)))
+      primeIndex += 1
     }
   }
   if (bases.length !== node.components.length)
