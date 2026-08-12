@@ -100,7 +100,7 @@ SequenceExpression
     }
 
 SequenceItem
-  = expression:(ShiftedValueExpression / ScaleDegreeLiteral / AdditiveExpression)
+  = expression:(EnumeratedChordArithmetic / ShiftedValueExpression / ScaleDegreeLiteral / AdditiveExpression)
     marks:AttachedPostfixMark* {
       if (!marks.length) return expression;
       return node('PostfixExpression', { expression, marks });
@@ -113,6 +113,22 @@ ShiftedValueExpression
         result = unary(modifiers[index].raw, result);
       }
       return result;
+    }
+
+EnumeratedChordArithmetic
+  = first:EnumeratedChord
+    multiplicative:(Spacing operator:MultiplicativeOperator Spacing right:PowerExpression {
+      return { operator, right };
+    })*
+    additive:(
+      operator:AttachedAdditiveOperator Spacing right:MultiplicativeExpression {
+        return { operator, right };
+      }
+      / RequiredSpacing operator:AdditiveOperator Spacing right:MultiplicativeExpression {
+        return { operator, right };
+      }
+    )* {
+      return foldBinary(foldBinary(first, multiplicative), additive);
     }
 
 AdditiveExpression
@@ -216,6 +232,7 @@ PrimaryExpression
   / Rest
   / DetachedContinue
   / Barline
+  / EnumeratedChord
   / MonzoLiteral
   / IntervalLiteral
   / PitchLiteral
@@ -227,6 +244,41 @@ PrimaryExpression
   / IntegerLiteral
   / CallExpression
   / IdentifierExpression
+
+// Colon chords are ratios relative to their first enumerand.  The leading
+// slash takes reciprocals before that normalization, which is equivalent to
+// reversing each resulting ratio.  Double colon fills in every intervening
+// integer (in either direction).
+EnumeratedChord
+  = &("/"? [0-9]+ ":") inverted:"/"? first:ChordEnumerand tail:(
+      "::" last:ChordEnumerand { return { rangeEnd: last, enumerands: null }; }
+      / rest:(":" value:ChordEnumerand { return value; })+ {
+        return { rangeEnd: null, enumerands: [first, ...rest] };
+      }
+    ) !":" {
+      return node('EnumeratedChord', {
+        inverted: Boolean(inverted),
+        first,
+        enumerands: tail.enumerands,
+        rangeEnd: tail.rangeEnd,
+        raw: text(),
+      });
+    }
+
+ChordEnumerand
+  = ChordGroupedEnumerand
+  / QuantityLiteral
+  / RatioLiteral
+  / RealLiteral
+  / DecimalLiteral
+  / IntegerLiteral
+  / CallExpression
+  / IdentifierExpression
+
+ChordGroupedEnumerand
+  = "(" Spacing expression:AdditiveExpression Spacing ")" {
+      return node('Group', { expression });
+    }
 
 ParenthesizedExpression
   = "(" Spacing expression:ParallelExpression Spacing ")" {

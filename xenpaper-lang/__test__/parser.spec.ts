@@ -1,6 +1,53 @@
 import { describe, expect, it } from 'vitest'
 import { parse } from '../parser.generated.js'
 
+describe('enumerated chords', () => {
+  it('preserves chords in the syntax tree with chord-tight arithmetic precedence', () => {
+    expect(parse('3/2 * 4:5:6').body[0]).toMatchObject({
+      type: 'BinaryExpression',
+      operator: '*',
+      right: {
+        type: 'EnumeratedChord',
+        enumerands: [{ value: '4' }, { value: '5' }, { value: '6' }],
+      },
+    })
+    expect(parse('4:(4+1):6').body[0]).toMatchObject({
+      type: 'EnumeratedChord',
+      enumerands: [
+        { value: '4' },
+        { type: 'Group', expression: { operator: '+' } },
+        { value: '6' },
+      ],
+    })
+  })
+
+  it('enumerates inclusive integer ranges and inverts before normalization', () => {
+    expect(parse('4::7').body[0]).toMatchObject({
+      type: 'EnumeratedChord',
+      first: { value: '4' },
+      rangeEnd: { value: '7' },
+    })
+    expect(parse('/6::4').body[0]).toMatchObject({
+      type: 'EnumeratedChord',
+      inverted: true,
+      first: { value: '6' },
+      rangeEnd: { value: '4' },
+    })
+  })
+
+  it('preserves exact integers beyond the safe Number range', () => {
+    expect(parse('9007199254740993::9007199254740994').body[0]).toMatchObject({
+      type: 'EnumeratedChord',
+      first: { value: '9007199254740993' },
+      rangeEnd: { value: '9007199254740994' },
+    })
+  })
+
+  it('does not expand ranges while parsing', () => {
+    expect(parse('1::1000000000').body[0]).toMatchObject({ type: 'EnumeratedChord' })
+  })
+})
+
 const score = String.raw`# FJS and prefix modifiers
 E^5 Ebv5 P1v5 Cv5 E_
 /'C '/C vDb C#

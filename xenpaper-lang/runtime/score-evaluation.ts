@@ -38,6 +38,109 @@ interface PlaybackAttackShape extends AttackShape {
 }
 
 const MAX_REPEAT_EXPANSION_NODES = 100_000
+const MAX_ENUMERATED_CHORD_SIZE = 10_000n
+
+function expandEnumeratedChord(
+  node: Expression,
+  context: PitchContext,
+): { readonly expressions: readonly Expression[]; readonly diagnostics: readonly Diagnostic[] } {
+  if (node.type === 'EnumeratedChord') {
+    let enumerands = node.enumerands
+    if (!enumerands) {
+      const endpoint = node.rangeEnd!
+      const evaluated = [
+        evaluateExpression(node.first, context),
+        evaluateExpression(endpoint, context),
+      ]
+      const diagnostics = evaluated.flatMap((result) => result.diagnostics)
+      const integers = evaluated.map((result) => {
+        if (!('value' in result) || result.value.kind !== 'scalar') return undefined
+        const exact = result.value.value.exactRational()
+        return exact?.d === 1 ? BigInt(exact.s * exact.n) : undefined
+      })
+      if (integers.some((value) => value === undefined)) {
+        return {
+          expressions: [],
+          diagnostics: [
+            ...diagnostics,
+            {
+              code: 'XP_TYPE_MISMATCH',
+              severity: 'error',
+              message: 'Enumerated chord range endpoints must be exact integers.',
+              locations: [node.location],
+            },
+          ],
+        }
+      }
+      const [start, end] = integers as [bigint, bigint]
+      const distance = start <= end ? end - start : start - end
+      if (distance + 1n > MAX_ENUMERATED_CHORD_SIZE) {
+        return {
+          expressions: [],
+          diagnostics: [
+            ...diagnostics,
+            {
+              code: 'XP_EXPANSION_LIMIT',
+              severity: 'error',
+              message: `Enumerated chord exceeds the ${MAX_ENUMERATED_CHORD_SIZE}-member expansion limit.`,
+              locations: [node.location],
+            },
+          ],
+        }
+      }
+      const step = start <= end ? 1n : -1n
+      enumerands = []
+      for (let value = start; ; value += step) {
+        enumerands.push({
+          type: 'IntegerLiteral',
+          value: String(value),
+          raw: String(value),
+          location: node.location,
+        })
+        if (value === end) break
+      }
+    }
+    return {
+      expressions: enumerands.map((enumerand) => ({
+        type: 'BinaryExpression',
+        operator: '/',
+        left: node.inverted ? node.first : enumerand,
+        right: node.inverted ? enumerand : node.first,
+        location: node.location,
+      })),
+      diagnostics: [],
+    }
+  }
+  if (node.type === 'BinaryExpression') {
+    const left = expandEnumeratedChord(node.left, context)
+    const right = expandEnumeratedChord(node.right, context)
+    if (
+      left.expressions.length === 1 &&
+      left.expressions[0] === node.left &&
+      right.expressions.length === 1 &&
+      right.expressions[0] === node.right
+    ) {
+      return { expressions: [node], diagnostics: [...left.diagnostics, ...right.diagnostics] }
+    }
+    return {
+      expressions: left.expressions.flatMap((lhs) =>
+        right.expressions.map((rhs) => ({ ...node, left: lhs, right: rhs })),
+      ),
+      diagnostics: [...left.diagnostics, ...right.diagnostics],
+    }
+  }
+  if (node.type === 'Group') {
+    const expanded = expandEnumeratedChord(node.expression, context)
+    if (expanded.expressions.length === 1 && expanded.expressions[0] === node.expression) {
+      return { expressions: [node], diagnostics: expanded.diagnostics }
+    }
+    return {
+      expressions: expanded.expressions.map((expression) => ({ ...node, expression })),
+      diagnostics: expanded.diagnostics,
+    }
+  }
+  return { expressions: [node], diagnostics: [] }
+}
 
 function repeatCount(node: Extract<Expression, { type: 'Repeat' }>): number | undefined {
   let count: bigint
@@ -463,6 +566,29 @@ export function evaluateScoreSemantics(
     currentPulse: Fraction = pulse,
     currentDynamic: DynamicMark = 'mf',
   ): ScoreShapeEvaluationResult => {
+    const expandedChord = expandEnumeratedChord(current, context)
+    if (expandedChord.diagnostics.length) return { diagnostics: expandedChord.diagnostics }
+    if (expandedChord.expressions.length !== 1 || expandedChord.expressions[0] !== current) {
+      const results = expandedChord.expressions.map((expression) =>
+        visit(expression, context, currentPulse, currentDynamic),
+      )
+      const diagnostics = results.flatMap((result) => result.diagnostics)
+      if (!results.every(hasShape)) return { diagnostics }
+      const branches = results.map((result) => result.shape)
+      const duration = branches.reduce(
+        (maximum, branch) => (branch.duration.compare(maximum) > 0 ? branch.duration : maximum),
+        new Fraction(0),
+      )
+      return {
+        shape: {
+          kind: 'parallel',
+          duration,
+          branches: branches.map((branch) => pad(branch, duration)),
+          origins: [origin(current)],
+        },
+        diagnostics,
+      }
+    }
     if (current.type === 'Rest') {
       return {
         shape: {

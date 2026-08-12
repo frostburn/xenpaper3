@@ -34,6 +34,7 @@ export type Expression =
   | Directive
   | DetachedContinue
   | EqualDivisionLiteral
+  | EnumeratedChord
   | Group
   | HardBoundary
   | Identifier
@@ -66,6 +67,15 @@ export interface BinaryExpression extends Node {
   operator: string
   left: Expression
   right: Expression
+}
+
+export interface EnumeratedChord extends Node {
+  type: 'EnumeratedChord'
+  inverted: boolean
+  first: Expression
+  enumerands: Expression[] | null
+  rangeEnd: Expression | null
+  raw: string
 }
 
 export interface CallExpression extends Node {
