@@ -171,6 +171,78 @@ describe('PianoRoll', () => {
     })
   })
 
+  it('maps box-selection coordinates through the SVG screen transform', async () => {
+    const score: BeatTimedScore = {
+      duration: new Fraction(1),
+      events: [
+        {
+          kind: 'note',
+          start: new Fraction(0),
+          duration: new Fraction(1),
+          pitch: { kind: 'pitchOffset', value: Value.cents(700), origins: [] },
+          dynamic: new Fraction(1, 2),
+          origins: [],
+        },
+      ],
+    }
+    const wrapper = mount(PianoRoll, { props: { score } })
+    const grid = wrapper.get('svg.grid')
+    const svg = grid.element as SVGSVGElement
+    const inverse = { coordinateSpace: 'viewBox' } as unknown as DOMMatrix
+    Object.assign(svg, {
+      getScreenCTM: () => ({ inverse: () => inverse }),
+      createSVGPoint: () => ({
+        x: 0,
+        y: 0,
+        matrixTransform(matrix: DOMMatrix) {
+          expect(matrix).toBe(inverse)
+          return { x: (this.x - 200) / 2, y: (this.y - 40) / 2 }
+        },
+      }),
+    })
+
+    await grid.trigger('mousedown', { clientX: 330, clientY: 280 })
+    await grid.trigger('mousemove', { clientX: 540, clientY: 310 })
+
+    expect(wrapper.get('.selection-box').attributes()).toMatchObject({
+      x: '65',
+      y: '120',
+      width: '105',
+      height: '15',
+    })
+  })
+
+  it('starts box selection on grid lines and selects a note with a single click', async () => {
+    const score: BeatTimedScore = {
+      duration: new Fraction(1),
+      events: [
+        {
+          kind: 'note',
+          start: new Fraction(0),
+          duration: new Fraction(1),
+          pitch: { kind: 'pitchOffset', value: Value.cents(700), origins: [] },
+          dynamic: new Fraction(1, 2),
+          label: 'G',
+          origins: [],
+        },
+      ],
+    }
+    const wrapper = mount(PianoRoll, { props: { score } })
+    const grid = wrapper.get('svg.grid')
+
+    await wrapper.get('.pitch-line').trigger('mousedown', { clientX: 65, clientY: 120 })
+    await grid.trigger('mousemove', { clientX: 175, clientY: 135 })
+    expect(wrapper.find('.selection-box').exists()).toBe(true)
+    await grid.trigger('mouseup', { clientX: 175, clientY: 135 })
+
+    await wrapper.get('.note').trigger('click')
+    expect(wrapper.get('.note').classes()).toContain('selected')
+    const inspectionEvents = wrapper.emitted('inspectionChange')!
+    expect(inspectionEvents[inspectionEvents.length - 1]![0]).toMatchObject({
+      selected: [{ index: 0, label: 'G' }],
+    })
+  })
+
   it('renders inspection details in a separate expandable inspector', () => {
     const wrapper = mount(PianoRollInspector, {
       props: {

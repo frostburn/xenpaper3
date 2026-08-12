@@ -91,6 +91,16 @@ watch(notes, () => {
 
 const svgPoint = (event: MouseEvent) => {
   const svg = event.currentTarget as SVGSVGElement
+  const screenMatrix = svg.getScreenCTM?.()
+  if (screenMatrix && svg.createSVGPoint) {
+    const point = svg.createSVGPoint()
+    point.x = event.clientX
+    point.y = event.clientY
+    const transformed = point.matrixTransform(screenMatrix.inverse())
+    return { x: transformed.x, y: transformed.y }
+  }
+
+  // getScreenCTM is unavailable in non-rendering DOM implementations such as jsdom.
   const bounds = svg.getBoundingClientRect()
   return {
     x: ((event.clientX - bounds.left) / (bounds.width || width.value)) * width.value,
@@ -98,11 +108,15 @@ const svgPoint = (event: MouseEvent) => {
   }
 }
 const startSelection = (event: MouseEvent) => {
+  if ((event.target as Element).closest('.note')) return
   selectionStart.value = svgPoint(event)
   selectionEnd.value = selectionStart.value
 }
 const moveSelection = (event: MouseEvent) => {
   if (selectionStart.value) selectionEnd.value = svgPoint(event)
+}
+const selectNote = (index: number) => {
+  selected.value = [index]
 }
 const finishSelection = (event: MouseEvent) => {
   if (!selectionStart.value) return
@@ -144,7 +158,7 @@ const selectionBox = computed(() => {
           :viewBox="`0 0 ${width} ${height}`"
           role="img"
           aria-label="Beat-timed piano roll"
-          @mousedown.self="startSelection"
+          @mousedown="startSelection"
           @mousemove="moveSelection"
           @mouseup="finishSelection"
           @mouseleave="selectionStart = undefined"
@@ -202,6 +216,7 @@ const selectionBox = computed(() => {
             height="10"
             @mouseenter="hovered = index"
             @mouseleave="hovered = undefined"
+            @click="selectNote(index)"
           >
             <title>{{ tooltip(note) }}</title>
           </rect>
