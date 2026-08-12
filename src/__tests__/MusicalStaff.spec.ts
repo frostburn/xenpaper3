@@ -131,6 +131,45 @@ describe('MusicalStaff', () => {
     expect(wrapper.findAll('.notation-error')).toHaveLength(0)
   })
 
+  it('renders incomplete non-binary subdivisions as tuplets', () => {
+    const evaluated = evaluateScoreShape(parse('@3 C D').body[0]!)
+    if (!('shape' in evaluated)) throw new Error('Expected a score shape.')
+    const wrapper = mount(MusicalStaff, {
+      props: { notation: constructStaffNotationShape(evaluated.shape) },
+    })
+
+    expect(wrapper.get('.tuplet-number').text()).toBe('3')
+    expect(wrapper.findAll('.notehead')).toHaveLength(2)
+    expect(wrapper.findAll('.notation-error')).toHaveLength(0)
+  })
+
+  it.each(['@3 C @p D E', '@3 C | D E'])(
+    'keeps zero-duration events inside the inferred tuplet for %s',
+    (source) => {
+      const evaluated = evaluateScoreShape(parse(source).body[0]!)
+      if (!('shape' in evaluated)) throw new Error('Expected a score shape.')
+      const wrapper = mount(MusicalStaff, {
+        props: { notation: constructStaffNotationShape(evaluated.shape) },
+      })
+
+      expect(wrapper.findAll('.tuplet-number')).toHaveLength(1)
+      expect(wrapper.findAll('.notehead')).toHaveLength(3)
+      expect(wrapper.findAll('.notation-error')).toHaveLength(0)
+    },
+  )
+
+  it('infers subdivision tuplets independently within parallel voices', () => {
+    const evaluated = evaluateScoreShape(parse('@3 C D, @3 E').body[0]!)
+    if (!('shape' in evaluated)) throw new Error('Expected a score shape.')
+    const wrapper = mount(MusicalStaff, {
+      props: { notation: constructStaffNotationShape(evaluated.shape) },
+    })
+
+    expect(wrapper.findAll('.tuplet-number').map((number) => number.text())).toEqual(['3', '3'])
+    expect(wrapper.findAll('.tuplet-bracket')).toHaveLength(2)
+    expect(wrapper.findAll('.notation-error')).toHaveLength(0)
+  })
+
   it('brackets the full extent of a quintuplet', () => {
     const expression = parse('C [D E F G G] F').body[0]!
     const evaluated = evaluateScoreShape(expression)

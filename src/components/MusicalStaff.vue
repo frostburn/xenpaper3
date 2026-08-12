@@ -37,6 +37,7 @@ type StaffItemContent =
 
 type StaffItem = StaffItemContent & {
   column: number
+  voice: number
   tuplets: TupletSpan[]
   tiedFromColumn?: number
   tiedToColumn?: number
@@ -47,6 +48,7 @@ type StaffItem = StaffItemContent & {
 type LayoutItem = StaffItemContent & {
   tuplets: LayoutTuplet[]
   offset: Fraction
+  voice: number
   tiedFromOffset?: Fraction
 }
 
@@ -67,12 +69,18 @@ const fraction = (duration: Fraction) => new Fraction(duration.n, duration.d)
 const items = computed(() => {
   const layout: LayoutItem[] = []
   let nextTupletId = 0
+  let nextVoiceId = 1
   type VisitState = {
     activeItems: RhythmicLayoutItem[]
     activeNotes: NoteLayoutItem[]
     activeSpan?: Fraction
   }
-  const visit = (shape: StaffNotationShape, offset: Fraction, state: VisitState): Fraction => {
+  const visit = (
+    shape: StaffNotationShape,
+    offset: Fraction,
+    state: VisitState,
+    voice: number,
+  ): Fraction => {
     if (shape.kind === 'note') {
       const note: NoteLayoutItem = {
         kind: 'note',
@@ -83,6 +91,7 @@ const items = computed(() => {
         grace: shape.grace,
         notatedDuration: shape.notatedDuration,
         tuplets: [],
+        voice,
       }
       layout.push(note)
       state.activeItems = [note]
@@ -112,18 +121,18 @@ const items = computed(() => {
       state.activeItems = []
       state.activeNotes = []
       state.activeSpan = undefined
-      layout.push({ kind: 'rest', offset, duration: shape.duration, tuplets: [] })
+      layout.push({ kind: 'rest', offset, duration: shape.duration, tuplets: [], voice })
     } else if (shape.kind === 'barline') {
-      layout.push({ kind: 'barline', offset, style: shape.style, tuplets: [] })
+      layout.push({ kind: 'barline', offset, style: shape.style, tuplets: [], voice })
     } else if (shape.kind === 'annotation') {
-      layout.push({ kind: 'annotation', offset, text: shape.text, tuplets: [] })
+      layout.push({ kind: 'annotation', offset, text: shape.text, tuplets: [], voice })
     } else if (shape.kind === 'dynamic') {
-      layout.push({ kind: 'dynamic', offset, mark: shape.mark, tuplets: [] })
+      layout.push({ kind: 'dynamic', offset, mark: shape.mark, tuplets: [], voice })
     } else if (shape.kind === 'sequence') {
       const startOffset = offset
       const startIndex = layout.length
       shape.children.forEach((child) => {
-        offset = visit(child, offset, state)
+        offset = visit(child, offset, state, voice)
       })
       if (shape.normalized || shape.tuplet) {
         const rhythmicItems = layout
@@ -159,7 +168,7 @@ const items = computed(() => {
         (): VisitState => ({ activeItems: [], activeNotes: [] }),
       )
       const branchEnds = shape.branches.map((branch, index) =>
-        visit(branch, offset, branchStates[index]!),
+        visit(branch, offset, branchStates[index]!, nextVoiceId++),
       )
       state.activeNotes = branchStates.flatMap((branch) => branch.activeNotes)
       state.activeItems = branchStates.flatMap((branch) => branch.activeItems)
@@ -168,7 +177,8 @@ const items = computed(() => {
     }
     return shape.duration ? offset.add(shape.duration) : offset
   }
-  if (props.notation) visit(props.notation, new Fraction(0), { activeItems: [], activeNotes: [] })
+  if (props.notation)
+    visit(props.notation, new Fraction(0), { activeItems: [], activeNotes: [] }, 0)
 
   const offsets = [
     ...layout.map((item) => item.offset),
@@ -197,49 +207,52 @@ const items = computed(() => {
     }
   }) as StaffItem[]
 
-  // A non-binary subdivision directive (for example @3) produces an ordinary
-  // sequence of exact durations rather than a normalized sequence node. Group
-  // complete runs so they are engraved with the same bracket as explicit tuplets.
-  for (let start = 0; start < staffItems.length;) {
-    const first = staffItems[start]
-    if (
-      !first ||
-      (first.kind !== 'note' && first.kind !== 'rest') ||
-      !first.duration ||
-      first.tuplets.length
-    ) {
-      start++
-      continue
-    }
-    let count = first.duration.d
-    while (count % 2 === 0) count /= 2
-    if (count <= 1 || !Number.isSafeInteger(count)) {
-      start++
-      continue
-    }
-    const run = staffItems.slice(start, start + count)
-    if (
-      run.length !== count ||
-      run.some(
-        (item) =>
-          (item.kind !== 'note' && item.kind !== 'rest') ||
-          item.tuplets.length ||
-          !item.duration.equals(first.duration),
+  // A non-binary subdivision directive (for example @3) produces ordinary
+  // exact-duration items rather than a normalized sequence node. Infer spans
+  // independently in each voice, ignoring zero-duration staff events. A final
+  // short group is deliberately retained: `@3 C D` is a valid incomplete triplet.
+  const voices = new Map<number, Extract<StaffItem, { kind: 'note' | 'rest' }>[]>()
+  staffItems.forEach((item) => {
+    if (item.kind !== 'note' && item.kind !== 'rest') return
+    const rhythmicItems = voices.get(item.voice) ?? []
+    rhythmicItems.push(item)
+    voices.set(item.voice, rhythmicItems)
+  })
+  voices.forEach((rhythmicItems) => {
+    for (let start = 0; start < rhythmicItems.length;) {
+      const first = rhythmicItems[start]!
+      if (!first.duration) {
+        start++
+        continue
+      }
+      let count = first.duration.d
+      while (count % 2 === 0) count /= 2
+      if (count <= 1 || !Number.isSafeInteger(count) || first.tuplets.length) {
+        start++
+        continue
+      }
+      let end = start
+      while (
+        end < rhythmicItems.length &&
+        rhythmicItems[end]!.duration &&
+        !rhythmicItems[end]!.tuplets.length &&
+        rhythmicItems[end]!.duration.equals(first.duration)
       )
-    ) {
-      start++
-      continue
+        end++
+      for (let chunkStart = start; chunkStart < end; chunkStart += count) {
+        const run = rhythmicItems.slice(chunkStart, Math.min(chunkStart + count, end))
+        const span: TupletSpan = {
+          id: nextTupletId++,
+          count,
+          level: 0,
+          startColumn: run[0]!.column,
+          endColumn: run[run.length - 1]!.column,
+        }
+        run.forEach((item) => item.tuplets.push(span))
+      }
+      start = end
     }
-    const span: TupletSpan = {
-      id: nextTupletId++,
-      count,
-      level: 0,
-      startColumn: run[0]!.column,
-      endColumn: run[run.length - 1]!.column,
-    }
-    run.forEach((item) => item.tuplets.push(span))
-    start += count
-  }
+  })
 
   staffItems.forEach((item, index) => {
     if (item.kind !== 'note' || !item.grace) return
