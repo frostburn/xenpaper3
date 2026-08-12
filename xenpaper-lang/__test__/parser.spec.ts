@@ -74,6 +74,21 @@ describe('Xenpaper surface grammar', () => {
     ])
   })
 
+  it('starts new notes immediately after attached continues', () => {
+    const compact = parse('0.2.3...3=2=0==.').body[0] as SyntaxNode
+    const spaced = parse('0 . 2 . 3 ... 3= 2= 0== .').body[0] as SyntaxNode
+    const summarize = (sequence: SyntaxNode) =>
+      (sequence.items as SyntaxNode[]).map((item) => ({
+        type: item.type,
+        raw: item.raw,
+        degree: item.degree,
+        expression: (item.expression as SyntaxNode | undefined)?.degree,
+        continues: (item.marks as SyntaxNode[] | undefined)?.length,
+      }))
+
+    expect(summarize(compact)).toEqual(summarize(spaced))
+  })
+
   it('compiles and parses the representative score syntax', () => {
     const program = parse(score)
 

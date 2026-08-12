@@ -681,8 +681,9 @@ SequenceGap
   / &("|:" / Barline / "[" / "(" / "{")
   / &Rest
   // Character codes avoid putting a closing brace inside Peggy's semantic
-  // predicate while covering bars, rests, and every structural closer: ) ] }.
-  / &{ return offset() > 0 && [41, 46, 93, 124, 125].includes(input.charCodeAt(offset() - 1)); }
+  // predicate while covering continues, bars, rests, and every structural
+  // closer: = ) ] }.
+  / &{ return offset() > 0 && [41, 46, 61, 93, 124, 125].includes(input.charCodeAt(offset() - 1)); }
 
 Spacing
   = (White / Comment)*
