@@ -13,11 +13,12 @@ const props = defineProps<{
   notation?: StaffNotationShape
 }>()
 
-type TupletItem = {
-  tupletPosition?: number
-  tupletCount?: number
-  tupletStartColumn?: number
-  tupletEndColumn?: number
+type TupletSpan = {
+  id: number
+  count: number
+  level: number
+  startColumn: number
+  endColumn: number
 }
 
 type StaffItemContent =
@@ -34,22 +35,27 @@ type StaffItemContent =
   | { kind: 'annotation'; text: string }
   | { kind: 'dynamic'; mark: DynamicMark }
 
-type StaffItem = TupletItem &
-  StaffItemContent & {
-    column: number
-    tiedFromColumn?: number
-    tiedToColumn?: number
-    tiedToPosition?: number
-    displayLabelRow?: number
-  }
+type StaffItem = StaffItemContent & {
+  column: number
+  tuplets: TupletSpan[]
+  tiedFromColumn?: number
+  tiedToColumn?: number
+  tiedToPosition?: number
+  displayLabelRow?: number
+}
 
 type LayoutItem = StaffItemContent & {
-  tupletPosition?: number
-  tupletCount?: number
+  tuplets: LayoutTuplet[]
   offset: Fraction
   tiedFromOffset?: Fraction
-  tupletStartOffset?: Fraction
-  tupletEndOffset?: Fraction
+}
+
+type LayoutTuplet = {
+  id: number
+  count: number
+  level: number
+  startOffset: Fraction
+  endOffset: Fraction
 }
 
 type NoteLayoutItem = Extract<LayoutItem, { kind: 'note' }>
@@ -60,6 +66,7 @@ const fraction = (duration: Fraction) => new Fraction(duration.n, duration.d)
 
 const items = computed(() => {
   const layout: LayoutItem[] = []
+  let nextTupletId = 0
   type VisitState = {
     activeItems: RhythmicLayoutItem[]
     activeNotes: NoteLayoutItem[]
@@ -75,6 +82,7 @@ const items = computed(() => {
         displayLabel: shape.displayLabel,
         grace: shape.grace,
         notatedDuration: shape.notatedDuration,
+        tuplets: [],
       }
       layout.push(note)
       state.activeItems = [note]
@@ -88,18 +96,15 @@ const items = computed(() => {
         const duration = fraction(item.duration)
         item.duration = duration.add(duration.mul(factor))
       })
-      const tupletCount = state.activeNotes[0]?.tupletCount
+      const tupletIds = state.activeNotes[0]?.tuplets.map((tuplet) => tuplet.id) ?? []
       const resolvesToRegularNotes = state.activeNotes.every(
         (note) =>
-          note.tupletCount === tupletCount &&
+          note.tuplets.map((tuplet) => tuplet.id).join(',') === tupletIds.join(',') &&
           Number.isInteger(Math.log2(durationValue(note.duration))),
       )
-      if (tupletCount && resolvesToRegularNotes) {
+      if (tupletIds.length && resolvesToRegularNotes) {
         state.activeNotes.forEach((note) => {
-          delete note.tupletPosition
-          delete note.tupletCount
-          delete note.tupletStartOffset
-          delete note.tupletEndOffset
+          note.tuplets = []
         })
       }
       state.activeSpan = activeSpan.add(continuedDuration)
@@ -107,13 +112,13 @@ const items = computed(() => {
       state.activeItems = []
       state.activeNotes = []
       state.activeSpan = undefined
-      layout.push({ kind: 'rest', offset, duration: shape.duration })
+      layout.push({ kind: 'rest', offset, duration: shape.duration, tuplets: [] })
     } else if (shape.kind === 'barline') {
-      layout.push({ kind: 'barline', offset, style: shape.style })
+      layout.push({ kind: 'barline', offset, style: shape.style, tuplets: [] })
     } else if (shape.kind === 'annotation') {
-      layout.push({ kind: 'annotation', offset, text: shape.text })
+      layout.push({ kind: 'annotation', offset, text: shape.text, tuplets: [] })
     } else if (shape.kind === 'dynamic') {
-      layout.push({ kind: 'dynamic', offset, mark: shape.mark })
+      layout.push({ kind: 'dynamic', offset, mark: shape.mark, tuplets: [] })
     } else if (shape.kind === 'sequence') {
       const startOffset = offset
       const startIndex = layout.length
@@ -125,14 +130,18 @@ const items = computed(() => {
           .slice(startIndex)
           .filter((item) => item.kind === 'note' || item.kind === 'rest')
         if (shape.tuplet) {
-          rhythmicItems.forEach((item, position) =>
-            Object.assign(item, {
-              tupletPosition: position,
-              tupletCount: shape.tuplet,
-              tupletStartOffset: startOffset,
-              tupletEndOffset: rhythmicItems[rhythmicItems.length - 1]?.offset ?? startOffset,
-            }),
+          const level = Math.max(
+            0,
+            ...rhythmicItems.flatMap((item) => item.tuplets.map((t) => t.level + 1)),
           )
+          const span: LayoutTuplet = {
+            id: nextTupletId++,
+            count: shape.tuplet,
+            level,
+            startOffset,
+            endOffset: rhythmicItems[rhythmicItems.length - 1]?.offset ?? startOffset,
+          }
+          rhythmicItems.forEach((item) => item.tuplets.push(span))
         }
         let lastRest = -1
         rhythmicItems.forEach((item, index) => {
@@ -163,7 +172,7 @@ const items = computed(() => {
 
   const offsets = [
     ...layout.map((item) => item.offset),
-    ...layout.flatMap((item) => (item.tupletEndOffset ? [item.tupletEndOffset] : [])),
+    ...layout.flatMap((item) => item.tuplets.map((tuplet) => tuplet.endOffset)),
   ].sort((a, b) => a.compare(b))
   const uniqueOffsets = offsets.filter(
     (offset, index) => !index || !offset.equals(offsets[index - 1]!),
@@ -171,19 +180,66 @@ const items = computed(() => {
   const column = (offset: Fraction) =>
     uniqueOffsets.findIndex((candidate) => candidate.equals(offset))
 
-  const staffItems = layout.map(
-    ({ offset, tiedFromOffset, tupletStartOffset, tupletEndOffset, ...item }) => {
-      const itemColumn = column(offset)
+  const staffItems = layout.map(({ offset, tiedFromOffset, tuplets, ...item }) => {
+    const itemColumn = column(offset)
 
-      return {
-        ...item,
-        column: itemColumn,
-        tiedFromColumn: tiedFromOffset ? column(tiedFromOffset) : undefined,
-        tupletStartColumn: tupletStartOffset ? column(tupletStartOffset) : undefined,
-        tupletEndColumn: tupletEndOffset ? column(tupletEndOffset) : undefined,
-      }
-    },
-  ) as StaffItem[]
+    return {
+      ...item,
+      column: itemColumn,
+      tuplets: tuplets.map((tuplet) => ({
+        id: tuplet.id,
+        count: tuplet.count,
+        level: tuplet.level,
+        startColumn: column(tuplet.startOffset),
+        endColumn: column(tuplet.endOffset),
+      })),
+      tiedFromColumn: tiedFromOffset ? column(tiedFromOffset) : undefined,
+    }
+  }) as StaffItem[]
+
+  // A non-binary subdivision directive (for example @3) produces an ordinary
+  // sequence of exact durations rather than a normalized sequence node. Group
+  // complete runs so they are engraved with the same bracket as explicit tuplets.
+  for (let start = 0; start < staffItems.length;) {
+    const first = staffItems[start]
+    if (
+      !first ||
+      (first.kind !== 'note' && first.kind !== 'rest') ||
+      !first.duration ||
+      first.tuplets.length
+    ) {
+      start++
+      continue
+    }
+    let count = first.duration.d
+    while (count % 2 === 0) count /= 2
+    if (count <= 1 || !Number.isSafeInteger(count)) {
+      start++
+      continue
+    }
+    const run = staffItems.slice(start, start + count)
+    if (
+      run.length !== count ||
+      run.some(
+        (item) =>
+          (item.kind !== 'note' && item.kind !== 'rest') ||
+          item.tuplets.length ||
+          !item.duration.equals(first.duration),
+      )
+    ) {
+      start++
+      continue
+    }
+    const span: TupletSpan = {
+      id: nextTupletId++,
+      count,
+      level: 0,
+      startColumn: run[0]!.column,
+      endColumn: run[run.length - 1]!.column,
+    }
+    run.forEach((item) => item.tuplets.push(span))
+    start += count
+  }
 
   staffItems.forEach((item, index) => {
     if (item.kind !== 'note' || !item.grace) return
@@ -213,6 +269,18 @@ const items = computed(() => {
 
   return staffItems
 })
+
+const tupletSpans = computed(() => {
+  const spans = new Map<number, TupletSpan>()
+  items.value.forEach((item) => item.tuplets.forEach((span) => spans.set(span.id, span)))
+  return [...spans.values()]
+})
+
+const tupletCount = (item: StaffItem) =>
+  item.tuplets.length
+    ? item.tuplets.reduce((factor, tuplet) => factor * tuplet.count, 1) /
+      2 ** (item.tuplets.length - 1)
+    : undefined
 
 const repeatMarkerColumns = computed(
   () =>
@@ -379,45 +447,45 @@ const restDotY = (duration: Fraction, tupletCount?: number) =>
     </g>
     <text class="clef" x="25" y="98">𝄞</text>
     <text v-if="!items.length" class="empty-message" x="70" y="126">No notation loaded</text>
+    <g v-for="tuplet in tupletSpans" :key="`tuplet-${tuplet.id}`" class="tuplet">
+      <text
+        class="tuplet-number"
+        :x="(x(tuplet.startColumn) + x(tuplet.endColumn)) / 2"
+        :y="31 - tuplet.level * 16"
+      >
+        {{ tuplet.count }}
+      </text>
+      <path
+        class="tuplet-bracket"
+        :d="`M ${x(tuplet.startColumn) - 10} ${40 - tuplet.level * 16} V ${34 - tuplet.level * 16} H ${(x(tuplet.startColumn) + x(tuplet.endColumn)) / 2 - 10} M ${(x(tuplet.startColumn) + x(tuplet.endColumn)) / 2 + 10} ${34 - tuplet.level * 16} H ${x(tuplet.endColumn) + 10} V ${40 - tuplet.level * 16}`"
+      />
+    </g>
     <g
       v-for="(item, index) in items"
       :key="index"
       :class="{ 'grace-note': item.kind === 'note' && item.grace }"
     >
-      <text
-        v-if="item.tupletPosition === Math.floor((item.tupletCount ?? 0) / 2)"
-        class="tuplet-number"
-        :x="(x(item.tupletStartColumn!) + x(item.tupletEndColumn!)) / 2"
-        y="31"
-      >
-        {{ item.tupletCount }}
-      </text>
-      <path
-        v-if="item.tupletPosition === Math.floor((item.tupletCount ?? 0) / 2)"
-        class="tuplet-bracket"
-        :d="`M ${x(item.tupletStartColumn!) - 10} 40 V 34 H ${(x(item.tupletStartColumn!) + x(item.tupletEndColumn!)) / 2 - 10} M ${(x(item.tupletStartColumn!) + x(item.tupletEndColumn!)) / 2 + 10} 34 H ${x(item.tupletEndColumn!) + 10} V 40`"
-      />
       <template v-if="item.kind === 'rest'">
         <rect
-          v-if="restBox(item.duration, item.tupletCount)"
+          v-if="restBox(item.duration, tupletCount(item))"
           class="rest rest-box"
-          :class="`rest-box--${restBox(item.duration, item.tupletCount)}`"
+          :class="`rest-box--${restBox(item.duration, tupletCount(item))}`"
           :x="x(item.column) - 7"
-          :y="restBox(item.duration, item.tupletCount) === 'whole' ? 64 : 70"
+          :y="restBox(item.duration, tupletCount(item)) === 'whole' ? 64 : 70"
           width="14"
           height="6"
         />
         <text v-else class="rest" :x="x(item.column)" y="79">
-          {{ restSymbol(item.duration, item.tupletCount) }}
+          {{ restSymbol(item.duration, tupletCount(item)) }}
         </text>
         <circle
           v-if="
-            isSupportedRestDuration(item.duration, item.tupletCount) &&
-            isDotted(effectiveDuration(item.duration, item.tupletCount))
+            isSupportedRestDuration(item.duration, tupletCount(item)) &&
+            isDotted(effectiveDuration(item.duration, tupletCount(item)))
           "
           class="augmentation-dot rest-dot"
           :cx="x(item.column) + 17"
-          :cy="restDotY(item.duration, item.tupletCount)"
+          :cy="restDotY(item.duration, tupletCount(item))"
           r="2"
         />
       </template>
@@ -466,7 +534,7 @@ const restDotY = (duration: Fraction, tupletCount?: number) =>
           :d="`M ${x(item.column) + 5} ${y(item.pitch.staffPosition) + 5} Q ${(x(item.column) + x(item.tiedToColumn)) / 2} ${Math.max(y(item.pitch.staffPosition), y(item.tiedToPosition)) + 15} ${x(item.tiedToColumn) - 7} ${y(item.tiedToPosition) + 7}`"
         />
         <text
-          v-if="!isSupportedNoteDuration(engravingDuration(item), item.tupletCount)"
+          v-if="!isSupportedNoteDuration(engravingDuration(item), tupletCount(item))"
           class="notation-error"
           :x="x(item.column)"
           :y="y(item.pitch.staffPosition) + 5"
@@ -557,7 +625,7 @@ const restDotY = (duration: Fraction, tupletCount?: number) =>
             :y2="y(item.pitch.staffPosition) - 30"
           />
           <path
-            v-for="flag in flagCount(engravingDuration(item), item.tupletCount)"
+            v-for="flag in flagCount(engravingDuration(item), tupletCount(item))"
             :key="`flag-${flag}`"
             class="flag"
             :d="`M ${x(item.column) + 6} ${y(item.pitch.staffPosition) - 30 + (flag - 1) * 7} Q ${x(item.column) + 20} ${y(item.pitch.staffPosition) - 23 + (flag - 1) * 7} ${x(item.column) + 12} ${y(item.pitch.staffPosition) - 13 + (flag - 1) * 7}`"

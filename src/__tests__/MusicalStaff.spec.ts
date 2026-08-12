@@ -102,6 +102,35 @@ describe('MusicalStaff', () => {
     expect(wrapper.findAll('.tuplet-bracket')).toHaveLength(1)
   })
 
+  it('renders nested normalized slots as independently stacked tuplets', () => {
+    const evaluated = evaluateScoreShape(parse('[C D [E F G]]').body[0]!)
+    if (!('shape' in evaluated)) throw new Error('Expected a score shape.')
+    const wrapper = mount(MusicalStaff, {
+      props: { notation: constructStaffNotationShape(evaluated.shape) },
+    })
+
+    expect(wrapper.findAll('.tuplet-number').map((number) => number.text())).toEqual(['3', '3'])
+    expect(wrapper.findAll('.tuplet-bracket')).toHaveLength(2)
+    expect(wrapper.findAll('.tuplet-number').map((number) => number.attributes('y'))).toEqual([
+      '15',
+      '31',
+    ])
+    expect(wrapper.findAll('.notation-error')).toHaveLength(0)
+  })
+
+  it('groups non-binary subdivision directives with tuplet notation', () => {
+    const evaluated = evaluateScoreShape(parse('@3 C D E').body[0]!)
+    if (!('shape' in evaluated)) throw new Error('Expected a score shape.')
+    const wrapper = mount(MusicalStaff, {
+      props: { notation: constructStaffNotationShape(evaluated.shape) },
+    })
+
+    expect(wrapper.get('.tuplet-number').text()).toBe('3')
+    expect(wrapper.findAll('.tuplet-bracket')).toHaveLength(1)
+    expect(wrapper.findAll('.flag')).toHaveLength(3)
+    expect(wrapper.findAll('.notation-error')).toHaveLength(0)
+  })
+
   it('brackets the full extent of a quintuplet', () => {
     const expression = parse('C [D E F G G] F').body[0]!
     const evaluated = evaluateScoreShape(expression)
