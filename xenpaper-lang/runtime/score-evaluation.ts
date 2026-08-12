@@ -344,6 +344,9 @@ function playablePitch(
         kind: 'pitchOffset',
         value: Value.pitch(notationRatio).add(context.rootDisplacement),
         notationValue: Value.pitch(notationRatio),
+        // A frequency divided by the 12-EDO middle-C reference is generally
+        // not a just ratio, even when the frequency literal is rational.
+        formula: new Map(),
         origins: evaluated.value.origins,
       },
       diagnostics: evaluated.diagnostics,

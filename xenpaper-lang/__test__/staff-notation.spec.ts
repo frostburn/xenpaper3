@@ -14,6 +14,17 @@ function notation(source: string) {
 }
 
 describe('staff notation construction', () => {
+  it('does not infer FJS accidentals from rational frequency magnitudes', () => {
+    const node = parse('300Hz').body[0] as Expression
+    const evaluated = evaluateScoreShape(node)
+    if (!('shape' in evaluated) || evaluated.shape.kind !== 'attack')
+      throw new Error('Expected an attack.')
+
+    const staff = constructStaffNotationShape(evaluated.shape)
+    if (staff.kind !== 'note') throw new Error('Expected a staff note.')
+    expect(staff.pitch.inflections).toBeUndefined()
+  })
+
   it('places just ratios relative to middle C and retains FJS inflections', () => {
     expect(notation('1/1')).toMatchObject({ staffPosition: 0 })
     expect(notation('3/2')).toMatchObject({ staffPosition: 4 })
