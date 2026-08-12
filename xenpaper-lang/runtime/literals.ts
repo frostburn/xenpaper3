@@ -1,5 +1,5 @@
 import { Fraction } from 'xen-dev-utils/fraction'
-import { isPrime, nthPrime, primes } from 'xen-dev-utils/primes'
+import { nthPrime } from 'xen-dev-utils/primes'
 import type {
   DecimalLiteral,
   EqualDivisionLiteral,
@@ -56,16 +56,30 @@ function rationalLiteral(
   return new Value(BigInt(signed(node.numerator, node.sign)), BigInt(node.denominator))
 }
 
+/** Find the zero-based ordinal of a prime without materializing all preceding primes. */
+function primeIndex(prime: number): number {
+  let low = 0
+  let high = 1
+  while (nthPrime(high) < prime) high *= 2
+  while (low < high) {
+    const middle = Math.floor((low + high) / 2)
+    if (nthPrime(middle) < prime) low = middle + 1
+    else high = middle
+  }
+  return low
+}
+
 function monzoLiteral(node: MonzoLiteral): Value {
   const bases = node.subgroup.map((component) => new Fraction(component))
   if (node.continuation) {
     const last = bases[bases.length - 1] ?? new Fraction(1)
-    if (bases.length && (last.d !== 1 || !isPrime(last.n)))
+    const lastPrimeIndex = bases.length && last.d === 1 ? primeIndex(last.n) : -1
+    if (bases.length && (lastPrimeIndex < 0 || nthPrime(lastPrimeIndex) !== last.n))
       throw new TypeError('A monzo subgroup may only continue after a prime.')
-    let primeIndex = primes(2, last.n).length
+    let index = lastPrimeIndex + 1
     while (bases.length < node.components.length) {
-      bases.push(new Fraction(nthPrime(primeIndex)))
-      primeIndex += 1
+      bases.push(new Fraction(nthPrime(index)))
+      index += 1
     }
   }
   if (bases.length !== node.components.length)
