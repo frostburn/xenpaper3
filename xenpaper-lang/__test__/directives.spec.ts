@@ -125,10 +125,13 @@ describe('directive runtime', () => {
 
   it('keeps the glide duration separate from a held target', () => {
     const targetHold = notes('@gliss C G')
+    const continuedTargetHold = notes('@gliss C G =')
     const extendedGlide = notes('@gliss C= G?')
 
     expect(targetHold[0]!.duration.valueOf()).toBe(2)
     expect(targetHold[0]!.automation?.duration.valueOf()).toBe(1)
+    expect(continuedTargetHold[0]!.duration.valueOf()).toBe(3)
+    expect(continuedTargetHold[0]!.automation?.duration.valueOf()).toBe(1)
     expect(extendedGlide[0]!.duration.valueOf()).toBe(2)
     expect(extendedGlide[0]!.automation?.duration.valueOf()).toBe(2)
   })
