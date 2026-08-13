@@ -19,6 +19,13 @@ export const DIRECTIVE_REGISTRY = Object.freeze({
   subdivision: 'subdivision',
   velocity: 'velocity',
   gliss: 'gliss',
+  art: 'articulation',
+  'articulation-shorthand': 'articulation',
+  staccatissimo: 'articulation',
+  staccato: 'articulation',
+  portato: 'articulation',
+  tenuto: 'articulation',
+  legato: 'articulation',
   ppp: 'dynamic',
   pp: 'dynamic',
   p: 'dynamic',
@@ -35,6 +42,7 @@ export type ResolvedDirective =
   | { kind: 'dynamic'; mark: DynamicMark; velocity: Fraction }
   | { kind: 'velocity'; velocity: Fraction }
   | { kind: 'gliss'; curve: 'linear' }
+  | { kind: 'articulation'; ratio: Fraction; mark?: string; shorthand: boolean }
   | { kind: 'unknown' }
 
 export function resolveDirective(
@@ -65,6 +73,56 @@ export function resolveDirective(
     return {
       directive: { kind: 'dynamic', mark, velocity: DYNAMIC_VELOCITIES[mark] },
       diagnostics: [],
+    }
+  }
+  if (registered === 'articulation') {
+    const shorthand = (node as Directive & { articulationMark?: string }).articulationMark
+    const ratios: Record<string, Fraction> = {
+      "'": new Fraction(1, 4),
+      '.': new Fraction(1, 2),
+      ':': new Fraction(17, 20),
+      '-': new Fraction(1),
+      _: new Fraction(11, 10),
+      staccatissimo: new Fraction(1, 4),
+      staccato: new Fraction(1, 2),
+      portato: new Fraction(17, 20),
+      tenuto: new Fraction(1),
+      legato: new Fraction(11, 10),
+    }
+    if (shorthand) {
+      if (node.arguments.length) return fail(`@${shorthand} does not accept arguments.`)
+      return {
+        directive: {
+          kind: 'articulation',
+          ratio: ratios[shorthand]!,
+          mark: shorthand,
+          shorthand: true,
+        },
+        diagnostics: [],
+      }
+    }
+    if (node.name !== 'art') {
+      if (node.arguments.length) return fail(`@${node.name} does not accept arguments.`)
+      return {
+        directive: { kind: 'articulation', ratio: ratios[node.name]!, shorthand: false },
+        diagnostics: [],
+      }
+    }
+    if (node.arguments.length !== 1 || node.arguments[0]?.type === 'NamedArgument')
+      return fail('@art requires one non-negative dimensionless exact rational argument.')
+    const evaluated = evaluateExpression(node.arguments[0] as Expression, context)
+    if (
+      !('value' in evaluated) ||
+      evaluated.value.kind !== 'scalar' ||
+      !evaluated.value.value.dimensions.isDimensionless
+    )
+      return fail('@art requires one non-negative dimensionless exact rational argument.')
+    const exact = evaluated.value.value.exactRational()
+    if (!exact || exact.compare(0) < 0)
+      return fail('@art requires one non-negative dimensionless exact rational argument.')
+    return {
+      directive: { kind: 'articulation', ratio: new Fraction(exact), shorthand: false },
+      diagnostics: [...evaluated.diagnostics],
     }
   }
   if (registered === 'gliss') {

@@ -144,6 +144,7 @@ export type StaffNotationShape =
       readonly displayLabel?: string
       readonly grace?: boolean
       readonly notatedDuration?: Fraction
+      readonly articulationMarks?: readonly string[]
     }
   | { readonly kind: 'rest'; readonly duration: Fraction; readonly generated: boolean }
   | { readonly kind: 'continue'; readonly duration: Fraction }
@@ -198,6 +199,10 @@ export interface AttackShape extends ShapeBase {
   readonly displayLabel?: string
   /** Authored pitch expression retained for non-notation renderers such as piano rolls. */
   readonly authoredLabel?: string
+  /** Sounding duration as a proportion of the occupied rhythmic duration. */
+  readonly articulation?: Fraction
+  /** Shorthand marks retained for staff engraving. */
+  readonly articulationMarks?: readonly string[]
   /** Other contexts in which this source attack occurs after repeat expansion. */
   readonly alternateAppearances?: readonly AttackAppearance[]
 }

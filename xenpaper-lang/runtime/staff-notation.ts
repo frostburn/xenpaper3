@@ -311,6 +311,7 @@ export function constructStaffNotationShape(shape: ScoreShape): StaffNotationSha
         ...(shape.displayLabel ? { displayLabel: shape.displayLabel } : {}),
         ...(shape.grace ? { grace: true } : {}),
         ...(shape.notatedDuration ? { notatedDuration: shape.notatedDuration } : {}),
+        ...(shape.articulationMarks?.length ? { articulationMarks: shape.articulationMarks } : {}),
       }
     }
     case 'rest':
