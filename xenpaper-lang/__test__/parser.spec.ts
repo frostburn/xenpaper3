@@ -58,6 +58,22 @@ describe('enumerated chords', () => {
       ],
     })
   })
+
+  it('parses integer scale entries as degrees', () => {
+    expect(parse('{3 6 8}').body[0]).toMatchObject({
+      type: 'PitchContextChange',
+      statements: [
+        {
+          type: 'ContextDegreeMapping',
+          values: [
+            { type: 'DegreeLiteral', degree: '3' },
+            { type: 'DegreeLiteral', degree: '6' },
+            { type: 'DegreeLiteral', degree: '8' },
+          ],
+        },
+      ],
+    })
+  })
 })
 
 const score = String.raw`# FJS and prefix modifiers
