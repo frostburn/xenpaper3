@@ -13,6 +13,13 @@ export interface PianoRollElementInfo {
   start: string
   duration: string
   end: string
+  dynamic: string
+  glissando?: {
+    curve: string
+    fromCents: number
+    toCents: number
+    duration: string
+  }
 }
 
 export interface PianoRollInspection {
@@ -66,6 +73,11 @@ const formatBeat = (value: Fraction) => {
   if (!remainder) return `${sign}${whole}`
   return whole ? `${sign}${whole} ${remainder}/${fraction.d}` : `${sign}${remainder}/${fraction.d}`
 }
+const formatDynamic = (value: Fraction) => {
+  const dynamic = raw(value)
+  return `${formatBeat(dynamic)} (${(dynamic.valueOf() * 100).toFixed(2)}%)`
+}
+const pitchCents = (pitch: (typeof notes.value)[number]['pitch']) => beat(pitch.value)
 const elementInfo = (note: (typeof notes.value)[number], index: number): PianoRollElementInfo => ({
   index,
   label: tooltip(note),
@@ -75,6 +87,17 @@ const elementInfo = (note: (typeof notes.value)[number], index: number): PianoRo
   start: formatBeat(note.start),
   duration: formatBeat(note.duration),
   end: formatBeat(noteEnd(note)),
+  dynamic: formatDynamic(note.dynamic),
+  ...(note.automation
+    ? {
+        glissando: {
+          curve: note.automation.curve,
+          fromCents: pitchCents(note.automation.from),
+          toCents: pitchCents(note.automation.to),
+          duration: formatBeat(note.automation.duration),
+        },
+      }
+    : {}),
 })
 const inspection = computed<PianoRollInspection>(() => ({
   inspected:

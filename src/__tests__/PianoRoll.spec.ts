@@ -166,6 +166,7 @@ describe('PianoRoll', () => {
           start: '0',
           duration: '1',
           end: '1',
+          dynamic: '1/2 (50.00%)',
         },
       ],
     })
@@ -257,6 +258,13 @@ describe('PianoRoll', () => {
               start: '1/2',
               duration: '1',
               end: '1 1/2',
+              dynamic: '4/5 (80.00%)',
+              glissando: {
+                curve: 'linear',
+                fromCents: 701.955,
+                toCents: 1200,
+                duration: '1',
+              },
             },
           ],
         },
@@ -267,6 +275,37 @@ describe('PianoRoll', () => {
     expect(wrapper.get('details').attributes()).not.toHaveProperty('open')
     expect(wrapper.get('summary').text()).toBe('Element details')
     expect(wrapper.get('.selected-elements li').text()).toContain('1/2–1 1/2 beats, 701.96¢')
+    expect(wrapper.get('.selected-elements li').text()).toContain('Dynamic: 4/5 (80.00%)')
+    expect(wrapper.get('.selected-elements li').text()).toContain(
+      'Glissando: linear, 701.96¢ → 1200.00¢ over 1 beats',
+    )
+  })
+
+  it('shows dynamics and glissando details for the inspected note', () => {
+    const wrapper = mount(PianoRollInspector, {
+      props: {
+        inspection: {
+          inspected: {
+            index: 0,
+            label: 'C',
+            kind: 'note',
+            pitchKind: 'absolutePitch',
+            cents: 0,
+            start: '0',
+            duration: '2',
+            end: '2',
+            dynamic: '3/10 (30.00%)',
+            glissando: { curve: 'linear', fromCents: 0, toCents: 700, duration: '2' },
+          },
+          selected: [],
+        },
+      },
+    })
+
+    expect(wrapper.get('.element-details').text()).toContain('Dynamic3/10 (30.00%)')
+    expect(wrapper.get('.element-details').text()).toContain(
+      'Glissandolinear, 0.00¢ → 700.00¢ over 2 beats',
+    )
   })
 
   it('keeps element details available with placeholder content when nothing is active', () => {

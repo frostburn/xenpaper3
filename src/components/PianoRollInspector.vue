@@ -20,16 +20,41 @@ defineProps<{ inspection: PianoRollInspection }>()
       <p v-if="!inspection.inspected && !inspection.selected.length" class="details-placeholder">
         Select or hover over an element to see its details here.
       </p>
-      <dl v-if="inspection.inspected">
-        <template v-for="(value, key) in inspection.inspected" :key="key">
-          <dt>{{ key }}</dt>
-          <dd>{{ value }}</dd>
+      <dl v-if="inspection.inspected" class="element-details">
+        <dt>Type</dt>
+        <dd>{{ inspection.inspected.kind }}</dd>
+        <dt>Pitch type</dt>
+        <dd>{{ inspection.inspected.pitchKind }}</dd>
+        <dt>Pitch</dt>
+        <dd>{{ inspection.inspected.cents.toFixed(2) }}¢</dd>
+        <dt>Start</dt>
+        <dd>{{ inspection.inspected.start }} beats</dd>
+        <dt>Duration</dt>
+        <dd>{{ inspection.inspected.duration }} beats</dd>
+        <dt>End</dt>
+        <dd>{{ inspection.inspected.end }} beats</dd>
+        <dt>Dynamic</dt>
+        <dd>{{ inspection.inspected.dynamic }}</dd>
+        <template v-if="inspection.inspected.glissando">
+          <dt>Glissando</dt>
+          <dd>
+            {{ inspection.inspected.glissando.curve }},
+            {{ inspection.inspected.glissando.fromCents.toFixed(2) }}¢ →
+            {{ inspection.inspected.glissando.toCents.toFixed(2) }}¢ over
+            {{ inspection.inspected.glissando.duration }} beats
+          </dd>
         </template>
       </dl>
       <ol v-if="inspection.selected.length" class="selected-elements">
         <li v-for="element in inspection.selected" :key="element.index">
           <strong>{{ element.label }}</strong>
           <span>{{ element.start }}–{{ element.end }} beats, {{ element.cents.toFixed(2) }}¢</span>
+          <span>Dynamic: {{ element.dynamic }}</span>
+          <span v-if="element.glissando">
+            Glissando: {{ element.glissando.curve }}, {{ element.glissando.fromCents.toFixed(2) }}¢
+            → {{ element.glissando.toCents.toFixed(2) }}¢ over
+            {{ element.glissando.duration }} beats
+          </span>
         </li>
       </ol>
     </details>
