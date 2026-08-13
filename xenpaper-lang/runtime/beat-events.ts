@@ -73,7 +73,7 @@ function flattenScoreSemantics(shape: ScoreShape): BeatEventFlatteningResult {
         for (const event of state.active) {
           event.start = activeStart.add(event.start.sub(activeStart).mul(scale))
           event.duration = event.duration.mul(scale)
-          if (event.automation)
+          if (event.automation && current.extendsAutomation !== false)
             event.automation = {
               ...event.automation,
               duration: copy(event.duration),

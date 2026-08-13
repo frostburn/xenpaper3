@@ -228,6 +228,8 @@ export interface RestShape extends ShapeBase {
 
 export interface ContinueShape extends ShapeBase {
   readonly kind: 'continue'
+  /** Whether this continuation also stretches pitch automation on the active attack. */
+  readonly extendsAutomation?: boolean
 }
 
 export interface BarlineShape extends ShapeBase {

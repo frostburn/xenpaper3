@@ -104,11 +104,15 @@ describe('directive runtime', () => {
     expect(parallel.every(({ automation }) => automation?.curve === 'linear')).toBe(true)
   })
 
-  it('scales gliss automation with a continued normalized slot', () => {
+  it('keeps gliss automation separate from a continued normalized target', () => {
     const events = notes('@gliss [C D E]= [D E F]')
 
     expect(events.map((event) => event.duration.valueOf())).toEqual([1, 1, 1])
-    expect(events.map((event) => event.automation?.duration.valueOf())).toEqual([1, 1, 1])
+    expect(events.map((event) => event.automation?.duration.toFraction())).toEqual([
+      '2/3',
+      '2/3',
+      '2/3',
+    ])
   })
 
   it('holds a duration-bearing gliss target and rejects mismatched trees', () => {
@@ -117,6 +121,16 @@ describe('directive runtime', () => {
     expect(held[0]!.duration.valueOf()).toBe(3)
     const mismatch = compile('@gliss (F C)= [E, D]?')
     expect(mismatch.diagnostics).toContainEqual(expect.objectContaining({ code: 'XP_GLISS_SHAPE' }))
+  })
+
+  it('keeps the glide duration separate from a held target', () => {
+    const targetHold = notes('@gliss C G')
+    const extendedGlide = notes('@gliss C= G?')
+
+    expect(targetHold[0]!.duration.valueOf()).toBe(2)
+    expect(targetHold[0]!.automation?.duration.valueOf()).toBe(1)
+    expect(extendedGlide[0]!.duration.valueOf()).toBe(2)
+    expect(extendedGlide[0]!.automation?.duration.valueOf()).toBe(2)
   })
 
   it('trims composite tails without rescaling earlier notes', () => {
