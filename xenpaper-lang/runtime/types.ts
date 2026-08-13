@@ -259,6 +259,14 @@ export interface DynamicShape extends ShapeBase {
   readonly mark: DynamicMark
 }
 
+/** A playback timing cycle. The authored template is retained so staff notation can
+ * show the swing equivalence without applying it to engraved note positions. */
+export interface GrooveShape extends ShapeBase {
+  readonly kind: 'groove'
+  readonly template?: ScoreShape
+  readonly annotation?: string
+}
+
 export type BarlineStyle =
   | 'single'
   | 'double'
@@ -288,6 +296,7 @@ export type ScoreShape =
   | BarlineShape
   | AnnotationShape
   | DynamicShape
+  | GrooveShape
   | SequenceShape
   | ParallelShape
 

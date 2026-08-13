@@ -19,6 +19,7 @@ export const DIRECTIVE_REGISTRY = Object.freeze({
   subdivision: 'subdivision',
   velocity: 'velocity',
   gliss: 'gliss',
+  groove: 'groove',
   art: 'articulation',
   'articulation-shorthand': 'articulation',
   staccatissimo: 'articulation',
@@ -42,6 +43,7 @@ export type ResolvedDirective =
   | { kind: 'dynamic'; mark: DynamicMark; velocity: Fraction }
   | { kind: 'velocity'; velocity: Fraction }
   | { kind: 'gliss'; curve: 'linear' }
+  | { kind: 'groove'; argument?: Expression }
   | { kind: 'articulation'; ratio: Fraction; mark?: string; shorthand: boolean }
   | { kind: 'unknown' }
 
@@ -72,6 +74,14 @@ export function resolveDirective(
     const mark = node.name as DynamicMark
     return {
       directive: { kind: 'dynamic', mark, velocity: DYNAMIC_VELOCITIES[mark] },
+      diagnostics: [],
+    }
+  }
+  if (registered === 'groove') {
+    if (node.arguments.length > 1 || node.arguments[0]?.type === 'NamedArgument')
+      return fail('@groove accepts one score argument, or no argument to turn it off.')
+    return {
+      directive: { kind: 'groove', argument: node.arguments[0] as Expression | undefined },
       diagnostics: [],
     }
   }

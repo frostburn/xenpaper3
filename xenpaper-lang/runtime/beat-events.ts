@@ -3,6 +3,7 @@ import type { Program } from '../parser.generated.js'
 import type { Diagnostic } from '../diagnostics'
 import { expandRepeats } from './repeat-expansion'
 import { evaluateScoreSemantics } from './score-evaluation'
+import { DYNAMIC_VELOCITIES } from './directives'
 import type {
   BeatTimedEvent,
   BeatTimedNoteEvent,
@@ -41,16 +42,56 @@ function flattenScoreSemantics(shape: ScoreShape): BeatEventFlatteningResult {
   }
   type State = { active: MutableNoteEvent[]; activeStart?: Fraction; activeSpan?: Fraction }
   const completedAutomations = new WeakSet<MutableNoteEvent>()
+  type Groove = {
+    origin: Fraction
+    cycle: Fraction
+    points: { nominal: Fraction; actual: Fraction; dynamic: Fraction; articulation: Fraction }[]
+  }
+  let groove: Groove | undefined
+
+  const interpolate = (value: Fraction, key: 'actual' | 'dynamic' | 'articulation') => {
+    if (!groove) return copy(value)
+    const relative = value.sub(groove.origin)
+    const cycleIndex = Math.floor(relative.div(groove.cycle).valueOf())
+    const local = relative.sub(groove.cycle.mul(cycleIndex))
+    const points = groove.points
+    let left = points[0]!
+    let right = { ...points[0]!, nominal: groove.cycle, actual: groove.cycle }
+    for (let index = 1; index < points.length; index++) {
+      if (local.compare(points[index]!.nominal) <= 0) {
+        right = points[index]!
+        break
+      }
+      left = points[index]!
+    }
+    const span = right.nominal.sub(left.nominal)
+    const ratio = span.n ? local.sub(left.nominal).div(span) : new Fraction(0)
+    const interpolated = left[key].add(right[key].sub(left[key]).mul(ratio))
+    return key === 'actual'
+      ? groove.origin.add(groove.cycle.mul(cycleIndex)).add(interpolated)
+      : interpolated
+  }
 
   const visit = (current: ScoreShape, start: Fraction, state: State): Fraction => {
     if (current.kind === 'attack') {
+      const warpedStart = interpolate(start, 'actual')
+      const rhythmicEnd = interpolate(start.add(current.duration), 'actual')
+      const grooveDynamic = groove
+        ? interpolate(start, 'dynamic').div(DYNAMIC_VELOCITIES.mf)
+        : new Fraction(1)
+      const grooveArticulation = groove ? interpolate(start, 'articulation') : new Fraction(1)
       const event: MutableNoteEvent = {
         kind: 'note',
-        start: copy(start),
-        duration: current.duration.mul(current.articulation ?? new Fraction(1)),
+        start: warpedStart,
+        duration: rhythmicEnd
+          .sub(warpedStart)
+          .mul(current.articulation ?? new Fraction(1))
+          .mul(grooveArticulation),
         pitch: current.pitch,
         rootPitch: current.rootPitch,
-        dynamic: copy((current as typeof current & { readonly velocity: Fraction }).velocity),
+        dynamic: copy((current as typeof current & { readonly velocity: Fraction }).velocity).mul(
+          grooveDynamic,
+        ),
         automation: current.automation,
         label: current.authoredLabel ?? current.displayLabel,
         origins: current.origins,
@@ -88,6 +129,31 @@ function flattenScoreSemantics(shape: ScoreShape): BeatEventFlatteningResult {
       state.active = []
       state.activeStart = undefined
       state.activeSpan = undefined
+    } else if (current.kind === 'groove') {
+      if (!current.template) groove = undefined
+      else {
+        const flattened = flattenScoreSemantics(current.template)
+        const controls = flattened.score.events.filter(
+          (event): event is BeatTimedNoteEvent => event.kind === 'note',
+        )
+        if (controls.length >= 2 && flattened.score.duration.compare(0) > 0) {
+          const cycle = flattened.score.duration
+          groove = {
+            origin: copy(start),
+            cycle,
+            points: controls.map((control, index) => {
+              const nextStart = controls[index + 1]?.start ?? cycle
+              const occupied = nextStart.sub(control.start)
+              return {
+                nominal: cycle.mul(index).div(controls.length),
+                actual: control.start,
+                dynamic: control.dynamic,
+                articulation: occupied.n ? control.duration.div(occupied) : new Fraction(1),
+              }
+            }),
+          }
+        }
+      }
     } else if (
       current.kind === 'barline' ||
       current.kind === 'annotation' ||
