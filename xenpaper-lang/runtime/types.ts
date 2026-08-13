@@ -214,6 +214,17 @@ export interface PitchAutomation {
   readonly from: AttackShape['pitch']
   readonly to: AttackShape['pitch']
   readonly duration: Fraction
+  /** Consecutive glides, including this automation's first segment. */
+  readonly segments?: readonly PitchAutomationSegment[]
+}
+
+export interface PitchAutomationSegment {
+  readonly curve: 'linear'
+  readonly from: AttackShape['pitch']
+  readonly to: AttackShape['pitch']
+  /** Offset from the beginning of the owning attack. */
+  readonly start: Fraction
+  readonly duration: Fraction
 }
 
 export interface AttackAppearance {

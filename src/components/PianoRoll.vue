@@ -15,10 +15,14 @@ export interface PianoRollElementInfo {
   end: string
   dynamic: string
   glissando?: {
-    curve: string
-    fromCents: number
-    toCents: number
-    duration: string
+    segments: {
+      curve: string
+      fromCents: number
+      toCents: number
+      start: string
+      duration: string
+    }[]
+    holdDuration: string
   }
 }
 
@@ -78,6 +82,10 @@ const formatDynamic = (value: Fraction) => {
   return `${formatBeat(dynamic)} (${(dynamic.valueOf() * 100).toFixed(2)}%)`
 }
 const pitchCents = (pitch: (typeof notes.value)[number]['pitch']) => beat(pitch.value)
+const finalAutomationSegment = (note: (typeof notes.value)[number]) => {
+  const segments = note.automation?.segments
+  return segments?.[segments.length - 1]
+}
 const elementInfo = (note: (typeof notes.value)[number], index: number): PianoRollElementInfo => ({
   index,
   label: tooltip(note),
@@ -91,10 +99,27 @@ const elementInfo = (note: (typeof notes.value)[number], index: number): PianoRo
   ...(note.automation
     ? {
         glissando: {
-          curve: note.automation.curve,
-          fromCents: pitchCents(note.automation.from),
-          toCents: pitchCents(note.automation.to),
-          duration: formatBeat(note.automation.duration),
+          segments: (
+            note.automation.segments ?? [
+              {
+                ...note.automation,
+                start: raw(note.duration).sub(note.duration),
+              },
+            ]
+          ).map((segment) => ({
+            curve: segment.curve,
+            fromCents: pitchCents(segment.from),
+            toCents: pitchCents(segment.to),
+            start: formatBeat(segment.start),
+            duration: formatBeat(segment.duration),
+          })),
+          holdDuration: formatBeat(
+            raw(note.duration).sub(
+              (finalAutomationSegment(note)?.start ?? raw(note.duration).sub(note.duration)).add(
+                finalAutomationSegment(note)?.duration ?? note.automation.duration,
+              ),
+            ),
+          ),
         },
       }
     : {}),

@@ -142,6 +142,15 @@ describe('directive runtime', () => {
     expect(chained).toHaveLength(1)
     expect(chained[0]!.duration.valueOf()).toBe(3)
     expect(chained[0]!.automation?.duration.valueOf()).toBe(1)
+    const segments = chained[0]!.automation?.segments
+    expect(segments).toHaveLength(2)
+    expect(segments?.map(({ start, duration }) => [start.valueOf(), duration.valueOf()])).toEqual([
+      [0, 1],
+      [1, 1],
+    ])
+    expect(segments?.[0]!.to.value.valueOf()).toBeCloseTo(segments?.[1]!.from.value.valueOf() ?? 0)
+    expect(segments?.[0]!.from.value.valueOf()).toBeCloseTo(407.82)
+    expect(segments?.[1]!.to.value.valueOf()).toBeCloseTo(701.955)
   })
 
   it('trims composite tails without rescaling earlier notes', () => {
