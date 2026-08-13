@@ -348,6 +348,36 @@ export function applyPitchContextChange(
       }
       continue
     }
+    if (statement.target.type === 'ContextNameTarget' && statement.target.name === 'mode') {
+      const evaluated = evaluateExpression(statement.value, context)
+      if (
+        !('value' in evaluated) ||
+        evaluated.value.kind !== 'scalar' ||
+        !evaluated.value.value.dimensions.isDimensionless
+      )
+        throw new TypeError('A mode assignment requires a dimensionless integer.')
+      const exact = evaluated.value.value.exactRational()
+      if (!exact || exact.d !== 1)
+        throw new TypeError('A mode assignment requires a dimensionless integer.')
+
+      const degreeCount = context.degrees.length
+      const rotation = mmod(Number(exact.s * exact.n), degreeCount)
+      if (!rotation) continue
+      const unison = Value.cents(0)
+      const pivot = context.degrees[rotation - 1]!
+      const degrees = Array.from({ length: degreeCount }, (_, index) => {
+        const unwrappedIndex = rotation + index + 1
+        const degree =
+          unwrappedIndex % degreeCount === 0
+            ? unison
+            : context.degrees[(unwrappedIndex % degreeCount) - 1]!
+        return degree
+          .add(context.degreeEquave.mul(new Value(Math.floor(unwrappedIndex / degreeCount))))
+          .sub(pivot)
+      })
+      context = { ...context, degrees, degreeEquave: degrees[degreeCount - 1]! }
+      continue
+    }
     if (
       statement.target.type === 'ContextPitchTarget' &&
       statement.value.type === 'Identifier' &&

@@ -82,6 +82,40 @@ describe('score-shape timing', () => {
     expected.forEach((pitch, index) => expect(pitches[index]).toBeCloseTo(pitch))
   })
 
+  it('rotates scale modes while preserving the equave', () => {
+    const attacksIn = (score: ScoreShape): Extract<ScoreShape, { kind: 'attack' }>[] =>
+      score.kind === 'attack'
+        ? [score]
+        : score.kind === 'sequence'
+          ? score.children.flatMap(attacksIn)
+          : score.kind === 'parallel'
+            ? score.branches.flatMap(attacksIn)
+            : []
+    const pitches = attacksIn(shape('{4/3 3/2 2/1}{mode = 1} 0 1 2 3') as SequenceShape).map(
+      (attack) => attack.pitch.value,
+    )
+
+    ;[1, 9 / 8, 3 / 2, 2].forEach((ratio, index) =>
+      expect(pitches[index]!.equals(Value.pitch(new Value(ratio)))).toBe(true),
+    )
+  })
+
+  it('supports zero, negative, and wrapping mode rotations', () => {
+    const pitchRatios = (source: string) => {
+      const result = shape(source) as SequenceShape
+      return result.children
+        .filter((child) => child.kind === 'attack')
+        .map((attack) => 2 ** (attack.pitch.value.valueOf() / 1200))
+    }
+
+    ;[0, 3].forEach((mode) => {
+      const unrotated = pitchRatios(`{4/3 3/2 2/1}{mode = ${mode}} 0 1 2 3`)
+      ;[1, 4 / 3, 3 / 2, 2].forEach((ratio, index) => expect(unrotated[index]).toBeCloseTo(ratio))
+    })
+    const negative = pitchRatios('{4/3 3/2 2/1}{mode = -1} 0 1 2 3')
+    ;[1, 4 / 3, 16 / 9, 2].forEach((ratio, index) => expect(negative[index]).toBeCloseTo(ratio))
+  })
+
   it('accepts every numeric interval literal and respects explicit degree equaves', () => {
     const mixed = shape(String.raw`{123c 3/2 1201c} 0 1 2 3 4`) as SequenceShape
     const mixedPitches = mixed.children
