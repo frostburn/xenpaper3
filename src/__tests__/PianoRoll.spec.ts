@@ -269,7 +269,6 @@ describe('PianoRoll', () => {
                     duration: '1',
                   },
                 ],
-                holdDuration: '0',
               },
             },
           ],
@@ -283,8 +282,9 @@ describe('PianoRoll', () => {
     expect(wrapper.get('.selected-elements li').text()).toContain('1/2–1 1/2 beats, 701.96¢')
     expect(wrapper.get('.selected-elements li').text()).toContain('Dynamic: 4/5 (80.00%)')
     expect(wrapper.get('.selected-elements li').text()).toContain(
-      'Glissando: linear, 701.96¢ → 1200.00¢ from beat 0 over 1 beats  ; hold for 0 beats',
+      'Glissando: linear, 701.96¢ → 1200.00¢ from beat 0 over 1 beats',
     )
+    expect(wrapper.get('.selected-elements li').text()).not.toContain('hold')
   })
 
   it('shows dynamics and glissando details for the inspected note', () => {

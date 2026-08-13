@@ -22,7 +22,7 @@ export interface PianoRollElementInfo {
       start: string
       duration: string
     }[]
-    holdDuration: string
+    holdDuration?: string
   }
 }
 
@@ -86,6 +86,31 @@ const finalAutomationSegment = (note: (typeof notes.value)[number]) => {
   const segments = note.automation?.segments
   return segments?.[segments.length - 1]
 }
+const glissandoInfo = (note: (typeof notes.value)[number]) => {
+  const automation = note.automation!
+  const zero = raw(note.duration).sub(note.duration)
+  const finalSegment = finalAutomationSegment(note)
+  const holdDuration = raw(note.duration).sub(
+    (finalSegment?.start ?? zero).add(finalSegment?.duration ?? automation.duration),
+  )
+  return {
+    segments: (
+      automation.segments ?? [
+        {
+          ...automation,
+          start: zero,
+        },
+      ]
+    ).map((segment) => ({
+      curve: segment.curve,
+      fromCents: pitchCents(segment.from),
+      toCents: pitchCents(segment.to),
+      start: formatBeat(segment.start),
+      duration: formatBeat(segment.duration),
+    })),
+    ...(holdDuration.n ? { holdDuration: formatBeat(holdDuration) } : {}),
+  }
+}
 const elementInfo = (note: (typeof notes.value)[number], index: number): PianoRollElementInfo => ({
   index,
   label: tooltip(note),
@@ -98,29 +123,7 @@ const elementInfo = (note: (typeof notes.value)[number], index: number): PianoRo
   dynamic: formatDynamic(note.dynamic),
   ...(note.automation
     ? {
-        glissando: {
-          segments: (
-            note.automation.segments ?? [
-              {
-                ...note.automation,
-                start: raw(note.duration).sub(note.duration),
-              },
-            ]
-          ).map((segment) => ({
-            curve: segment.curve,
-            fromCents: pitchCents(segment.from),
-            toCents: pitchCents(segment.to),
-            start: formatBeat(segment.start),
-            duration: formatBeat(segment.duration),
-          })),
-          holdDuration: formatBeat(
-            raw(note.duration).sub(
-              (finalAutomationSegment(note)?.start ?? raw(note.duration).sub(note.duration)).add(
-                finalAutomationSegment(note)?.duration ?? note.automation.duration,
-              ),
-            ),
-          ),
-        },
+        glissando: glissandoInfo(note),
       }
     : {}),
 })

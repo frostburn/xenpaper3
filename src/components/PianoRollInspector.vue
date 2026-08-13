@@ -43,7 +43,9 @@ defineProps<{ inspection: PianoRollInspection }>()
               {{ segment.toCents.toFixed(2) }}¢ from beat {{ segment.start }} over
               {{ segment.duration }} beats
             </span>
-            <span> ; hold for {{ inspection.inspected.glissando.holdDuration }} beats</span>
+            <span v-if="inspection.inspected.glissando.holdDuration">
+              ; hold for {{ inspection.inspected.glissando.holdDuration }} beats
+            </span>
           </dd>
         </template>
       </dl>
@@ -59,7 +61,9 @@ defineProps<{ inspection: PianoRollInspection }>()
               → {{ segment.toCents.toFixed(2) }}¢ from beat {{ segment.start }} over
               {{ segment.duration }} beats
             </span>
-            ; hold for {{ element.glissando.holdDuration }} beats
+            <template v-if="element.glissando.holdDuration">
+              ; hold for {{ element.glissando.holdDuration }} beats
+            </template>
           </span>
         </li>
       </ol>
