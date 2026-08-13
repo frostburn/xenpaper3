@@ -340,7 +340,7 @@ RepeatEndings
     rest:(Spacing number:NextEndingMarker Spacing body:EndingParallelExpression? {
       return { number, body: body ? [body] : [] };
     })*
-    Spacing terminal:("||" / "|") {
+    Spacing terminal:("||" / "|" / !. { return null; }) {
       return { endings: [{ number: firstNumber, body: firstBody ? [firstBody] : [] }, ...rest], terminal };
     }
   / Spacing ":|" { return { endings: [], terminal: ":|" }; }

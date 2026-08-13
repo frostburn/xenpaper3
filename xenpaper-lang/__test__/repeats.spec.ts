@@ -123,4 +123,16 @@ describe('repeat expansion', () => {
     const repeat = (program.body[0] as { items: Array<{ type: string }> }).items[0]
     expect(repeat).toMatchObject({ type: 'Repeat', terminal: '|' })
   })
+
+  it('accepts the end of the document as an alternate-ending terminal', () => {
+    const source = '|: 1 2 |¹ 3 4 :|² 5 6'
+    const repeat = parse(source).body[0]
+
+    expect(repeat).toMatchObject({ type: 'Repeat', terminal: null })
+    expect(
+      body(source).flatMap((node) =>
+        (node.items as ExpandedNode[]).map((item) => item.degree as string),
+      ),
+    ).toEqual(['1', '2', '3', '4', '1', '2', '5', '6'])
+  })
 })
