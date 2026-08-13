@@ -1246,6 +1246,7 @@ export function evaluateScoreSemantics(
                       kind: 'continue',
                       duration: target.shape.duration,
                       origins: target.shape.origins,
+                      extendsAutomation: false,
                     },
                   }
                 : { ...target, shape: sequence([], target.shape.origins) }

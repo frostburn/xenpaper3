@@ -40,6 +40,7 @@ function flattenScoreSemantics(shape: ScoreShape): BeatEventFlatteningResult {
     origins: readonly BeatTimedNoteEvent['origins'][number][]
   }
   type State = { active: MutableNoteEvent[]; activeStart?: Fraction; activeSpan?: Fraction }
+  const completedAutomations = new WeakSet<MutableNoteEvent>()
 
   const visit = (current: ScoreShape, start: Fraction, state: State): Fraction => {
     if (current.kind === 'attack') {
@@ -73,7 +74,8 @@ function flattenScoreSemantics(shape: ScoreShape): BeatEventFlatteningResult {
         for (const event of state.active) {
           event.start = activeStart.add(event.start.sub(activeStart).mul(scale))
           event.duration = event.duration.mul(scale)
-          if (event.automation)
+          if (current.extendsAutomation === false) completedAutomations.add(event)
+          if (event.automation && !completedAutomations.has(event))
             event.automation = {
               ...event.automation,
               duration: copy(event.duration),
