@@ -30,11 +30,12 @@ const copy = (value: Fraction) => new Fraction(value.n, value.d)
 function flattenScoreSemantics(shape: ScoreShape): BeatEventFlatteningResult {
   const events: BeatTimedEvent[] = []
   const diagnostics: Diagnostic[] = []
-  type MutableNoteEvent = Omit<BeatTimedNoteEvent, 'duration' | 'origins'> & {
+  type MutableNoteEvent = Omit<BeatTimedNoteEvent, 'start' | 'duration' | 'origins'> & {
+    start: Fraction
     duration: Fraction
     origins: readonly BeatTimedNoteEvent['origins'][number][]
   }
-  type State = { active: MutableNoteEvent[]; activeSpan?: Fraction }
+  type State = { active: MutableNoteEvent[]; activeStart?: Fraction; activeSpan?: Fraction }
 
   const visit = (current: ScoreShape, start: Fraction, state: State): Fraction => {
     if (current.kind === 'attack') {
@@ -51,6 +52,7 @@ function flattenScoreSemantics(shape: ScoreShape): BeatEventFlatteningResult {
       }
       events.push(event)
       state.active = [event]
+      state.activeStart = copy(start)
       state.activeSpan = copy(current.duration)
     } else if (current.kind === 'continue') {
       if (!state.active.length) {
@@ -61,16 +63,19 @@ function flattenScoreSemantics(shape: ScoreShape): BeatEventFlatteningResult {
           locations: current.origins.map((origin) => origin.location),
         })
       } else {
+        const activeStart = state.activeStart ?? state.active[0]!.start
         const activeSpan = state.activeSpan ?? current.duration
-        const factor = current.duration.div(activeSpan)
+        const scale = activeSpan.add(current.duration).div(activeSpan)
         for (const event of state.active) {
-          event.duration = event.duration.add(event.duration.mul(factor))
+          event.start = activeStart.add(event.start.sub(activeStart).mul(scale))
+          event.duration = event.duration.mul(scale)
           event.origins = [...event.origins, ...current.origins]
         }
         state.activeSpan = activeSpan.add(current.duration)
       }
     } else if (current.kind === 'rest') {
       state.active = []
+      state.activeStart = undefined
       state.activeSpan = undefined
     } else if (
       current.kind === 'barline' ||
@@ -97,6 +102,7 @@ function flattenScoreSemantics(shape: ScoreShape): BeatEventFlatteningResult {
         state.active = events
           .slice(firstEvent)
           .filter((event): event is MutableNoteEvent => event.kind === 'note')
+        state.activeStart = copy(start)
         state.activeSpan = copy(current.duration)
       }
       return start.add(current.duration)
@@ -104,6 +110,7 @@ function flattenScoreSemantics(shape: ScoreShape): BeatEventFlatteningResult {
       const states = current.branches.map((): State => ({ active: [] }))
       current.branches.forEach((branch, index) => visit(branch, start, states[index]!))
       state.active = states.flatMap((branch) => branch.active)
+      state.activeStart = copy(start)
       state.activeSpan = copy(current.duration)
       return start.add(current.duration)
     }

@@ -21,11 +21,11 @@ describe('beat event expansion', () => {
       1 / 3,
       2 / 3,
       1,
-      4 / 3,
       5 / 3,
+      7 / 3,
       3,
-      10 / 3,
-      11 / 3,
+      13 / 3,
+      17 / 3,
     ])
     expect(notes.map((note) => note.duration.valueOf())).toEqual([
       1 / 3,
@@ -37,6 +37,17 @@ describe('beat event expansion', () => {
       4 / 3,
       4 / 3,
       4 / 3,
+    ])
+    expect(notes.map((note) => note.start.add(note.duration).valueOf())).toEqual([
+      1 / 3,
+      2 / 3,
+      1,
+      5 / 3,
+      7 / 3,
+      3,
+      13 / 3,
+      17 / 3,
+      7,
     ])
   })
 
