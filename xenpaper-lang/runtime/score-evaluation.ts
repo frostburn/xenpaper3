@@ -110,12 +110,65 @@ function isScalarOperand(node: Expression): boolean {
   ].includes(node.type)
 }
 
+function zipScoreConstructions(
+  left: Expression,
+  right: Expression,
+  combine: (left: Expression, right: Expression) => Expression,
+): Expression | undefined {
+  const zipItems = (leftItems: Expression[], rightItems: Expression[]) => {
+    if (leftItems.length !== rightItems.length) return undefined
+    const items = leftItems.map((leftItem, index) => {
+      const rightItem = rightItems[index]!
+      return (
+        zipScoreConstructions(leftItem, rightItem, combine) ??
+        (isScalarOperand(leftItem) && isScalarOperand(rightItem)
+          ? combine(leftItem, rightItem)
+          : undefined)
+      )
+    })
+    return items.every((item) => item !== undefined) ? items : undefined
+  }
+
+  if (left.type === 'NormalizeToSlot' && right.type === 'NormalizeToSlot') {
+    if (!left.expression || !right.expression) return undefined
+    const expression =
+      zipScoreConstructions(left.expression, right.expression, combine) ??
+      (isScalarOperand(left.expression) && isScalarOperand(right.expression)
+        ? combine(left.expression, right.expression)
+        : undefined)
+    return expression ? { ...left, expression } : undefined
+  }
+  if (left.type === 'Sequence' && right.type === 'Sequence') {
+    const items = zipItems(left.items, right.items)
+    return items ? { ...left, items } : undefined
+  }
+  if (left.type === 'Parallel' && right.type === 'Parallel') {
+    const branches = zipItems(left.branches, right.branches)
+    return branches ? { ...left, branches } : undefined
+  }
+  if (left.type === 'Group' && right.type === 'Group') {
+    const expression =
+      zipScoreConstructions(left.expression, right.expression, combine) ??
+      (isScalarOperand(left.expression) && isScalarOperand(right.expression)
+        ? combine(left.expression, right.expression)
+        : undefined)
+    return expression ? { ...left, expression } : undefined
+  }
+  return undefined
+}
+
 function broadcastScalarOperation(node: Expression): Expression | undefined {
   if (node.type !== 'BinaryExpression') return undefined
   const left = broadcastScalarOperation(node.left)
   if (left) return { ...node, left }
   const right = broadcastScalarOperation(node.right)
   if (right) return { ...node, right }
+  const zipped = zipScoreConstructions(node.left, node.right, (left, right) => ({
+    ...node,
+    left,
+    right,
+  }))
+  if (zipped) return zipped
   const overLeft = isScalarOperand(node.right)
     ? mapScoreConstruction(node.left, (left) => ({ ...node, left }))
     : undefined

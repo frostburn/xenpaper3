@@ -258,8 +258,17 @@ describe('score-shape timing', () => {
     )
   })
 
-  it('rejects broadcasting between two score constructions', () => {
-    const result = evaluateScoreShape(parse('[3/2 4/3] * [5/4 6/5]').body[0] as Expression)
+  it('combines matching score constructions elementwise', () => {
+    const result = shape('[3/2 4/3] * [5/4 6/5]') as SequenceShape
+    const attacks = result.children.filter((child) => child.kind === 'attack')
+
+    ;[15 / 8, 8 / 5].forEach((ratio, index) =>
+      expect(attacks[index]!.pitch.notationValue?.valueOf()).toBeCloseTo(1200 * Math.log2(ratio)),
+    )
+  })
+
+  it('rejects broadcasting between differently shaped score constructions', () => {
+    const result = evaluateScoreShape(parse('[3/2 4/3] * (5/4, 6/5)').body[0] as Expression)
 
     expect(result.diagnostics).not.toHaveLength(0)
     expect(result.diagnostics.every((diagnostic) => diagnostic.code === 'XP_TYPE_MISMATCH')).toBe(
