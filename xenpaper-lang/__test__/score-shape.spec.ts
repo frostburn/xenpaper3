@@ -57,6 +57,27 @@ describe('score-shape timing', () => {
     ])
   })
 
+  it('flattens sequence and parallel expressions into degree mappings', () => {
+    const result = shape('{3/2 5/4, 2/1} 0 1 2 3') as SequenceShape
+    const pitches = result.children
+      .filter((child) => child.kind === 'attack')
+      .map((attack) => attack.pitch.value.valueOf())
+
+    ;[1, 3 / 2, 5 / 4, 2].forEach((ratio, index) =>
+      expect(pitches[index]).toBeCloseTo(1200 * Math.log2(ratio)),
+    )
+  })
+
+  it('rejects non-pitches inside degree mapping expressions at runtime', () => {
+    const node = parse('{3/2 @p 2/1} 0').body[0] as Expression
+    const result = evaluateScoreShape(node)
+
+    expect(result.diagnostics).toEqual([
+      expect.objectContaining({ message: 'Degree assignments require pitch intervals.' }),
+    ])
+    expect(result).not.toHaveProperty('shape')
+  })
+
   it('defines future scales with degrees from the current scale', () => {
     const result = shape(`{19edo}{3 6 8 11 14 17 19}
 0 1 2 3 4 5 6 7=`) as SequenceShape
