@@ -49,13 +49,15 @@ describe('directive runtime', () => {
 
   it('broadcasts a continued scalar using maximum note duration', () => {
     const events = notes('(M2=) + [P1 M2 P5]')
-    expect(events.map((note) => note.start.valueOf())).toEqual([0, 1 / 3, 2 / 3])
-    expect(events.map((note) => note.duration.valueOf())).toEqual([1 / 3, 1 / 3, 1 / 3])
+    const explicit = notes('M2 + ([P1 M2 P5]=)')
+    expect(events.map((note) => [note.start.toFraction(), note.duration.toFraction()])).toEqual(
+      explicit.map((note) => [note.start.toFraction(), note.duration.toFraction()]),
+    )
   })
 
   it('max-coalesces continuations on both sides of broadcasting', () => {
     const events = notes('(M2=) + [P1= M2== P5]')
-    expect(events.map((note) => note.duration.toFraction())).toEqual(['2/7', '3/7', '2/7'])
+    expect(events.map((note) => note.duration.toFraction())).toEqual(['2/3', '1', '1/3'])
   })
 
   it('steals time for a grace cluster', () => {

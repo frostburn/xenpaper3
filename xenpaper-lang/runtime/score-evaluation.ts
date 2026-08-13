@@ -117,7 +117,7 @@ function isScalarOperand(node: Expression): boolean {
 type BroadcastScalar = {
   expression: Expression
   articulation: Fraction
-  continuationCount: number
+  continuations: Extract<Expression, { type: 'PostfixExpression' }>['marks']
 }
 
 /** Unwrap a single pitch expression together with the performance context authored around it. */
@@ -131,9 +131,10 @@ function broadcastScalarOperand(
     if (!scalar) return undefined
     return {
       ...scalar,
-      continuationCount:
-        scalar.continuationCount +
-        node.marks.filter((mark) => mark.type === 'DetachedContinue').length,
+      continuations: [
+        ...scalar.continuations,
+        ...node.marks.filter((mark) => mark.type === 'DetachedContinue'),
+      ],
     }
   }
   if (node.type === 'Sequence') {
@@ -177,8 +178,29 @@ function broadcastScalarOperand(
     return scalar ? { ...scalar, articulation } : undefined
   }
   return isScalarOperand(node)
-    ? { expression: node, articulation: new Fraction(1), continuationCount: 0 }
+    ? { expression: node, articulation: new Fraction(1), continuations: [] }
     : undefined
+}
+
+function applyBroadcastContinuations(
+  expression: Expression,
+  continuations: BroadcastScalar['continuations'],
+): Expression {
+  if (!continuations.length) return expression
+  if (expression.type === 'PostfixExpression') {
+    const existing = expression.marks.filter((mark) => mark.type === 'DetachedContinue')
+    if (existing.length >= continuations.length) return expression
+    return {
+      ...expression,
+      marks: [...expression.marks, ...continuations.slice(existing.length)],
+    }
+  }
+  return {
+    type: 'PostfixExpression',
+    expression,
+    marks: continuations,
+    location: expression.location,
+  }
 }
 
 function zipScoreConstructions(
@@ -255,9 +277,8 @@ function broadcastScalarOperation(node: Expression, context: PitchContext): Expr
       left: leftScalar.expression,
       right,
       broadcastArticulation: leftScalar.articulation,
-      broadcastContinuationCount: leftScalar.continuationCount,
     }))
-    if (mapped) return mapped
+    if (mapped) return applyBroadcastContinuations(mapped, leftScalar.continuations)
   }
   const rightScalar = broadcastScalarOperand(node.right, context)
   if (rightScalar) {
@@ -266,9 +287,8 @@ function broadcastScalarOperation(node: Expression, context: PitchContext): Expr
       left,
       right: rightScalar.expression,
       broadcastArticulation: rightScalar.articulation,
-      broadcastContinuationCount: rightScalar.continuationCount,
     }))
-    if (mapped) return mapped
+    if (mapped) return applyBroadcastContinuations(mapped, rightScalar.continuations)
   }
   const overLeft = isScalarOperand(node.right)
     ? mapScoreConstruction(node.left, (left) => ({ ...node, left }))
@@ -1370,17 +1390,12 @@ export function evaluateScoreSemantics(
         base = trimShape(base, base.duration.sub(removed))
       }
       const continuations = current.marks.filter((mark) => mark.type === 'DetachedContinue')
-      const broadcastContinuationCount = (
-        current.expression as Expression & { readonly broadcastContinuationCount?: number }
-      ).broadcastContinuationCount
-      const additionalContinuations = continuations.slice(broadcastContinuationCount ?? 0)
-      if (!additionalContinuations.length)
-        return { shape: base, diagnostics: evaluated.diagnostics }
+      if (!continuations.length) return { shape: base, diagnostics: evaluated.diagnostics }
       return {
         shape: sequence(
           [
             base,
-            ...additionalContinuations.map<ContinueShape>((mark) => ({
+            ...continuations.map<ContinueShape>((mark) => ({
               kind: 'continue',
               duration: currentPulse,
               origins: [origin(mark, 'duration')],
@@ -1399,18 +1414,16 @@ export function evaluateScoreSemantics(
     if (!('pitch' in evaluated)) return evaluated
     const broadcastContext = current as Expression & {
       readonly broadcastArticulation?: Fraction
-      readonly broadcastContinuationCount?: number
     }
     const broadcastArticulation = broadcastContext.broadcastArticulation
     const articulation =
       broadcastArticulation && broadcastArticulation.compare(currentArticulation) > 0
         ? broadcastArticulation
         : currentArticulation
-    const duration = currentPulse.mul(1 + (broadcastContext.broadcastContinuationCount ?? 0))
     const shape: PlaybackAttackShape = {
       kind: 'attack',
       pitch: evaluated.pitch,
-      duration,
+      duration: currentPulse,
       origins: evaluated.pitch.origins,
       rootPitch: context.rootPitch,
       dynamic: currentDynamic,
