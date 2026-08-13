@@ -1,4 +1,4 @@
-import type { Expression } from '../parser.generated.js'
+import type { Expression, Program } from '../parser.generated.js'
 import { evaluateScoreSemantics } from './score-evaluation'
 import type { ScoreShape, ScoreShapeEvaluationResult, ScoreShapeOptions } from './types'
 
@@ -37,4 +37,17 @@ export function evaluateScoreShape(
   }
 
   return { shape: abstractShape(result.shape), diagnostics: result.diagnostics }
+}
+
+/** Build one score shape for a complete program so context changes cross hard boundaries. */
+export function evaluateProgramShape(
+  program: Program,
+  options: ScoreShapeOptions = {},
+): ScoreShapeEvaluationResult {
+  const sequence = {
+    type: 'Sequence',
+    items: program.body,
+    location: program.location,
+  } as Expression
+  return evaluateScoreShape(sequence, options)
 }

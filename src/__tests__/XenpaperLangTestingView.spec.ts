@@ -2,13 +2,13 @@ import { mount } from '@vue/test-utils'
 import { describe, expect, it, vi } from 'vitest'
 import XenpaperLangTestingView from '../views/XenpaperLangTestingView.vue'
 
-const { constructStaffNotationShape, evaluateScoreShape, expandToBeatEvents, parse } = vi.hoisted(
+const { constructStaffNotationShape, evaluateProgramShape, expandToBeatEvents, parse } = vi.hoisted(
   () => ({
     constructStaffNotationShape: vi.fn<(shape: object) => object>(() => ({
       kind: 'note',
       pitch: { staffPosition: 0, accidentals: [], notehead: 'normal', cents: 0 },
     })),
-    evaluateScoreShape: vi.fn<(expression: object) => object>(() => ({
+    evaluateProgramShape: vi.fn<(program: object) => object>(() => ({
       shape: { kind: 'attack' },
       diagnostics: [],
     })),
@@ -24,7 +24,7 @@ const { constructStaffNotationShape, evaluateScoreShape, expandToBeatEvents, par
 )
 vi.mock('../../xenpaper-lang', () => ({
   constructStaffNotationShape,
-  evaluateScoreShape,
+  evaluateProgramShape,
   expandToBeatEvents,
   parse,
 }))
@@ -47,7 +47,10 @@ describe('XenpaperLangTestingView', () => {
     await wrapper.findAll('button')[1]!.trigger('click')
 
     expect(parse).toHaveBeenCalledWith('C D E')
-    expect(evaluateScoreShape).toHaveBeenCalledWith({ type: 'Sequence' })
+    expect(evaluateProgramShape).toHaveBeenCalledWith({
+      type: 'Program',
+      body: [{ type: 'Sequence' }],
+    })
     expect(constructStaffNotationShape).toHaveBeenCalledWith({ kind: 'attack' })
     expect(expandToBeatEvents).toHaveBeenCalled()
     expect(wrapper.getComponent({ name: 'PianoRoll' }).props('score')).toMatchObject({ events: [] })
@@ -74,7 +77,7 @@ describe('XenpaperLangTestingView', () => {
 
   it('does not populate either visualiser when beat expansion rejects the score', async () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
-    evaluateScoreShape.mockClear()
+    evaluateProgramShape.mockClear()
     expandToBeatEvents.mockReturnValueOnce({
       diagnostics: [{ code: 'XP_CONTINUE_WITHOUT_ATTACK', severity: 'error' }],
     })
@@ -82,7 +85,7 @@ describe('XenpaperLangTestingView', () => {
     await wrapper.get('textarea').setValue('= C D E F G')
     await wrapper.findAll('button')[1]!.trigger('click')
 
-    expect(evaluateScoreShape).not.toHaveBeenCalled()
+    expect(evaluateProgramShape).not.toHaveBeenCalled()
     expect(wrapper.getComponent({ name: 'PianoRoll' }).props('score')).toBeUndefined()
     expect(wrapper.getComponent({ name: 'MusicalStaff' }).props('notation')).toBeUndefined()
     expect(warn).toHaveBeenCalledWith([{ code: 'XP_CONTINUE_WITHOUT_ATTACK', severity: 'error' }])

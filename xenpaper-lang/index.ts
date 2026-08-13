@@ -21,7 +21,7 @@ export {
 } from './runtime/pitches'
 export type { ExpressionEvaluationResult } from './runtime/expressions'
 export { DIRECTIVE_REGISTRY, DYNAMIC_VELOCITIES, resolveDirective } from './runtime/directives'
-export { evaluateScoreShape } from './runtime/score-shape'
+export { evaluateProgramShape, evaluateScoreShape } from './runtime/score-shape'
 export { expandToBeatEvents } from './runtime/beat-events'
 export type { BeatEventExpansionOptions, BeatEventExpansionResult } from './runtime/beat-events'
 export {

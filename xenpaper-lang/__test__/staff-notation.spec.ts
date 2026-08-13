@@ -3,7 +3,7 @@ import { parse, type Expression } from '../parser.generated.js'
 import { evaluateExpression } from '../runtime/expressions'
 import { constructStaffNotation } from '../runtime/staff-notation'
 import { constructStaffNotationShape } from '../runtime/staff-notation'
-import { evaluateScoreShape } from '../runtime/score-shape'
+import { evaluateProgramShape, evaluateScoreShape } from '../runtime/score-shape'
 
 function notation(source: string) {
   const directive = parse(`@test(${source})`).body[0]
@@ -177,6 +177,24 @@ describe('staff notation construction', () => {
       { kind: 'note' },
     ])
     expect(staff.children[4]).not.toHaveProperty('displayLabel')
+  })
+
+  it('retains scale context across hard boundaries and parallel degrees', () => {
+    const evaluated = evaluateProgramShape(
+      parse('{5 7 12}\n0 1 2 3 4 5 6 ||\n0,1,2,3,4,5,6 ||'),
+    )
+    if (!('shape' in evaluated)) throw new Error('Expected shape.')
+
+    const staff = constructStaffNotationShape(evaluated.shape)
+    if (staff.kind !== 'sequence') throw new Error('Expected a sequence.')
+    const parallel = staff.children.find((child) => child.kind === 'parallel')
+    if (!parallel) throw new Error('Expected a parallel chord.')
+    expect(parallel.branches.map((branch) => branch.kind === 'note' && branch.pitch.cents)).toEqual([
+      0, 500, 700, 1200, 1700, 1900, 2400,
+    ])
+    expect(
+      parallel.branches.map((branch) => branch.kind === 'note' && branch.pitch.staffPosition),
+    ).toEqual([0, 3, 4, 7, 10, 11, 14])
   })
 
   it('carries exact durations and rests from score construction', () => {
