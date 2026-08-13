@@ -112,6 +112,10 @@ function isScalarOperand(node: Expression): boolean {
 
 function broadcastScalarOperation(node: Expression): Expression | undefined {
   if (node.type !== 'BinaryExpression') return undefined
+  const left = broadcastScalarOperation(node.left)
+  if (left) return { ...node, left }
+  const right = broadcastScalarOperation(node.right)
+  if (right) return { ...node, right }
   const overLeft = isScalarOperand(node.right)
     ? mapScoreConstruction(node.left, (left) => ({ ...node, left }))
     : undefined

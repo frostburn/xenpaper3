@@ -267,6 +267,23 @@ describe('score-shape timing', () => {
     )
   })
 
+  it('broadcasts nested scalar arithmetic before transposing a construction', () => {
+    const result = shape('G + [P1 M2, M3, P5] / 2') as ParallelShape
+
+    expect(result.branches).toHaveLength(3)
+    expect(result.branches.map((branch) => branch.kind)).toEqual([
+      'sequence',
+      'sequence',
+      'sequence',
+    ])
+    expect(
+      result.branches.map(
+        (branch) =>
+          (branch as SequenceShape).children.filter((child) => child.kind === 'attack').length,
+      ),
+    ).toEqual([2, 1, 1])
+  })
+
   it('applies subdivision directives to following notes', () => {
     const result = shape('C @2 D E @1 F G') as SequenceShape
     const attacks = result.children.filter((child) => child.kind === 'attack')
