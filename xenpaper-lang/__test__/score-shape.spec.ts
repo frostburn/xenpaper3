@@ -519,6 +519,13 @@ describe('score-shape timing', () => {
     expect(result.tuplet).toBe(3)
   })
 
+  it('adds a complete pulse for every continuation on a normalized slot', () => {
+    const result = shape('[0 2 7] [0 2 7]= [0 2 7]===') as SequenceShape
+    const groups = result.children as SequenceShape[]
+
+    expect(groups.map((group) => group.duration.valueOf())).toEqual([1, 2, 4])
+  })
+
   it('makes an empty slot one authored pulse of rest', () => {
     expect(shape('[]')).toMatchObject({ kind: 'rest', generated: false })
     expect(shape('[]').duration.equals(1)).toBe(true)

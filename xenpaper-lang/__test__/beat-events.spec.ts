@@ -11,6 +11,53 @@ const score = (source: string) => {
 }
 
 describe('beat event expansion', () => {
+  it('scales every note when a normalized slot is continued', () => {
+    const result = score('[0 2 7] [0 2 7]= [0 2 7]===')
+    const notes = result.events.filter((event) => event.kind === 'note')
+
+    expect(result.duration.valueOf()).toBe(7)
+    expect(notes.map((note) => note.start.valueOf())).toEqual([
+      0,
+      1 / 3,
+      2 / 3,
+      1,
+      5 / 3,
+      7 / 3,
+      3,
+      13 / 3,
+      17 / 3,
+    ])
+    expect(notes.map((note) => note.duration.valueOf())).toEqual([
+      1 / 3,
+      1 / 3,
+      1 / 3,
+      2 / 3,
+      2 / 3,
+      2 / 3,
+      4 / 3,
+      4 / 3,
+      4 / 3,
+    ])
+    expect(notes.map((note) => note.start.add(note.duration).valueOf())).toEqual([
+      1 / 3,
+      2 / 3,
+      1,
+      5 / 3,
+      7 / 3,
+      3,
+      13 / 3,
+      17 / 3,
+      7,
+    ])
+  })
+
+  it('distributes a continuation over every note of an uneven parallel', () => {
+    const result = score('(C, D E) =')
+    const notes = result.events.filter((event) => event.kind === 'note')
+
+    expect(notes.map((note) => note.duration.valueOf())).toEqual([2, 2, 2])
+  })
+
   it('retains authored ratio labels for static renderers', () => {
     const result = score('3/2')
     expect(result.events).toHaveLength(1)

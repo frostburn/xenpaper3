@@ -75,6 +75,7 @@ const items = computed(() => {
     activeNotes: NoteLayoutItem[]
     activeSpan?: Fraction
     barlineSinceActiveItems?: boolean
+    hasFollowingContinuation?: boolean
   }
   const visit = (
     shape: StaffNotationShape,
@@ -99,16 +100,16 @@ const items = computed(() => {
       state.activeNotes = [note]
       state.activeSpan = shape.duration
       state.barlineSinceActiveItems = false
-    } else if (shape.kind === 'continue' && state.activeItems.length && state.activeSpan) {
+    } else if (shape.kind === 'continue' && state.activeItems.length) {
       const continuedDuration = fraction(shape.duration)
-      const activeSpan = fraction(state.activeSpan)
-      const factor = continuedDuration.div(activeSpan)
+      const activeSpan = state.activeSpan ? fraction(state.activeSpan) : undefined
       if (state.barlineSinceActiveItems) {
         const activeStartOffset = state.activeItems.reduce(
           (earliest, item) => (item.offset.compare(earliest) < 0 ? item.offset : earliest),
           state.activeItems[0]!.offset,
         )
         const continuedItems = state.activeItems.map((item) => {
+          const factor = continuedDuration.div(activeSpan ?? item.duration)
           const duration = fraction(item.duration).mul(factor)
           const continuedOffset = fraction(offset).add(item.offset.sub(activeStartOffset).mul(factor))
           const continuedItem: RhythmicLayoutItem =
@@ -133,9 +134,10 @@ const items = computed(() => {
       } else {
         state.activeItems.forEach((item) => {
           const duration = fraction(item.duration)
+          const factor = continuedDuration.div(activeSpan ?? duration)
           item.duration = duration.add(duration.mul(factor))
         })
-        state.activeSpan = activeSpan.add(continuedDuration)
+        state.activeSpan = activeSpan?.add(continuedDuration)
       }
       const tupletIds = state.activeNotes[0]?.tuplets.map((tuplet) => tuplet.id) ?? []
       const resolvesToRegularNotes = state.activeNotes.every(
@@ -143,7 +145,7 @@ const items = computed(() => {
           note.tuplets.map((tuplet) => tuplet.id).join(',') === tupletIds.join(',') &&
           Number.isInteger(Math.log2(durationValue(note.duration))),
       )
-      if (tupletIds.length && resolvesToRegularNotes) {
+      if (!state.hasFollowingContinuation && tupletIds.length && resolvesToRegularNotes) {
         state.activeNotes.forEach((note) => {
           note.tuplets = []
         })
@@ -164,9 +166,14 @@ const items = computed(() => {
     } else if (shape.kind === 'sequence') {
       const startOffset = offset
       const startIndex = layout.length
-      shape.children.forEach((child) => {
+      const inheritedFollowingContinuation = state.hasFollowingContinuation
+      shape.children.forEach((child, index) => {
+        state.hasFollowingContinuation =
+          inheritedFollowingContinuation ||
+          shape.children[index + 1]?.kind === 'continue'
         offset = visit(child, offset, state, voice)
       })
+      state.hasFollowingContinuation = inheritedFollowingContinuation
       if (shape.normalized || shape.tuplet) {
         const rhythmicItems = layout
           .slice(startIndex)
@@ -197,15 +204,20 @@ const items = computed(() => {
       }
       return offset
     } else if (shape.kind === 'parallel') {
+      const startIndex = layout.length
       const branchStates = shape.branches.map(
         (): VisitState => ({ activeItems: [], activeNotes: [] }),
       )
       const branchEnds = shape.branches.map((branch, index) =>
         visit(branch, offset, branchStates[index]!, nextVoiceId++),
       )
-      state.activeNotes = branchStates.flatMap((branch) => branch.activeNotes)
-      state.activeItems = branchStates.flatMap((branch) => branch.activeItems)
-      state.activeSpan = shape.duration
+      state.activeItems = layout
+        .slice(startIndex)
+        .filter((item): item is RhythmicLayoutItem => item.kind === 'note' || item.kind === 'rest')
+      state.activeNotes = state.activeItems.filter(
+        (item): item is NoteLayoutItem => item.kind === 'note',
+      )
+      state.activeSpan = undefined
       state.barlineSinceActiveItems = branchStates.some(
         (branch) => branch.barlineSinceActiveItems,
       )
@@ -668,21 +680,25 @@ const restDotY = (duration: Fraction, tupletCount?: number) =>
           <ellipse
             v-else
             class="notehead"
-            :class="{ 'notehead--open': isOpenNotehead(engravingDuration(item)) }"
+            :class="{
+              'notehead--open': isOpenNotehead(
+                effectiveDuration(engravingDuration(item), tupletCount(item)),
+              ),
+            }"
             :cx="x(item.column)"
             :cy="y(item.pitch.staffPosition)"
             rx="7"
             ry="5"
           />
           <circle
-            v-if="isDotted(engravingDuration(item))"
+            v-if="isDotted(effectiveDuration(engravingDuration(item), tupletCount(item)))"
             class="augmentation-dot"
             :cx="x(item.column) + 13"
             :cy="y(item.pitch.staffPosition) - (item.pitch.staffPosition % 2 ? 0 : 3)"
             r="2"
           />
           <line
-            v-if="hasStem(engravingDuration(item))"
+            v-if="hasStem(effectiveDuration(engravingDuration(item), tupletCount(item)))"
             class="stem"
             :x1="x(item.column) + 6"
             :x2="x(item.column) + 6"

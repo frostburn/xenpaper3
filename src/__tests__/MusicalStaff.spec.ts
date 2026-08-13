@@ -113,6 +113,23 @@ describe('MusicalStaff', () => {
     expect(wrapper.findAll('.tuplet-bracket')).toHaveLength(1)
   })
 
+  it('scales continued triplets through half-note engraving', () => {
+    const evaluated = evaluateScoreShape(parse('[0 2 7] [0 2 7]= [0 2 7]===').body[0]!)
+    if (!('shape' in evaluated)) throw new Error('Expected a score shape.')
+    const wrapper = mount(MusicalStaff, {
+      props: { notation: constructStaffNotationShape(evaluated.shape) },
+    })
+
+    expect(wrapper.findAll('.tuplet-number').map((number) => number.text())).toEqual([
+      '3',
+      '3',
+      '3',
+    ])
+    expect(wrapper.findAll('.flag')).toHaveLength(3)
+    expect(wrapper.findAll('.notehead--open')).toHaveLength(3)
+    expect(wrapper.findAll('.notation-error')).toHaveLength(0)
+  })
+
   it('renders nested normalized slots as independently stacked tuplets', () => {
     const evaluated = evaluateScoreShape(parse('[C D [E F G]]').body[0]!)
     if (!('shape' in evaluated)) throw new Error('Expected a score shape.')
@@ -538,6 +555,27 @@ describe('MusicalStaff', () => {
     expect(wrapper.findAll('.flag')).toHaveLength(0)
     expect(wrapper.find('.tuplet-number').exists()).toBe(false)
     expect(wrapper.find('.tuplet-bracket').exists()).toBe(false)
+  })
+
+  it('does not borrow a continuation from the next attack when resolving a tuplet', () => {
+    const evaluated = evaluateScoreShape(parse('[C E G] = = D =').body[0]!)
+    if (!('shape' in evaluated)) throw new Error('Expected a score shape.')
+    const wrapper = mount(MusicalStaff, {
+      props: { notation: constructStaffNotationShape(evaluated.shape) },
+    })
+
+    expect(wrapper.findAll('.tuplet-number')).toHaveLength(0)
+    expect(wrapper.findAll('.tuplet-bracket')).toHaveLength(0)
+  })
+
+  it('distributes a continuation over every note of an uneven parallel', () => {
+    const evaluated = evaluateScoreShape(parse('(C, D E) =').body[0]!)
+    if (!('shape' in evaluated)) throw new Error('Expected a score shape.')
+    const wrapper = mount(MusicalStaff, {
+      props: { notation: constructStaffNotationShape(evaluated.shape) },
+    })
+
+    expect(wrapper.findAll('.notehead--open')).toHaveLength(3)
   })
 
   it('splits continued notes at barlines and joins the repeated notehead with a tie', () => {

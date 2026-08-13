@@ -56,6 +56,13 @@ describe('directive runtime', () => {
     expect(parallel.every(({ automation }) => automation?.curve === 'linear')).toBe(true)
   })
 
+  it('scales gliss automation with a continued normalized slot', () => {
+    const events = notes('@gliss [C D E]= [D E F]')
+
+    expect(events.map((event) => event.duration.valueOf())).toEqual([1, 1, 1])
+    expect(events.map((event) => event.automation?.duration.valueOf())).toEqual([1, 1, 1])
+  })
+
   it('holds a duration-bearing gliss target and rejects mismatched trees', () => {
     const held = notes('@gliss F= C')
     expect(held).toHaveLength(1)
