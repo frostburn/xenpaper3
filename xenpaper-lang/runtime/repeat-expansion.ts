@@ -94,8 +94,16 @@ export function expandRepeats(
         ]
         const endings = (node.endings as { number: SyntaxNode & { value?: unknown }; body: SyntaxNode[] }[]) ?? []
         const ending = endings.find(({ number }) => BigInt(String(number.value)) === iteration + 1n)
-        for (const child of [...((node.body as SyntaxNode[]) ?? []), ...(ending?.body ?? [])]) {
-          result.push(...cloneNode(child, iterationPath))
+        const children = [...((node.body as SyntaxNode[]) ?? []), ...(ending?.body ?? [])].flatMap(
+          (child) => cloneNode(child, iterationPath),
+        )
+        if (endings.length && children.length) {
+          const items = children.flatMap((child) =>
+            child.type === 'Sequence' ? ((child.items as ExpandedNode[]) ?? []) : [child],
+          )
+          result.push(makeSequence(items, node.location, iterationPath))
+        } else {
+          result.push(...children)
         }
       }
       return result

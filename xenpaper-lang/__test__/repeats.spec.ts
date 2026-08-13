@@ -114,4 +114,13 @@ describe('repeat expansion', () => {
 
     expect(degrees(body(source))).toEqual(expected)
   })
+
+  it('ends alternate endings at a single barline and continues the document', () => {
+    const program = parse(`|: 0 2 4 5 |¹ 7 5 4 2 :|² 7 11 12= |
+12 11 9 7 | 5 4 2 -1 | 0=== ||`)
+
+    expect(program.body[0]).toMatchObject({ type: 'Sequence' })
+    const repeat = (program.body[0] as { items: Array<{ type: string }> }).items[0]
+    expect(repeat).toMatchObject({ type: 'Repeat', terminal: '|' })
+  })
 })

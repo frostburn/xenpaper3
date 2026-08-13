@@ -267,6 +267,7 @@ export interface Repeat extends Node {
   count: IntegerLiteral | null
   body: Expression[]
   endings: RepeatEnding[]
+  terminal: ':|' | '|' | '||'
 }
 
 export interface RepeatEnding {

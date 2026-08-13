@@ -331,19 +331,36 @@ HardBoundary
   = "||" { return node('HardBoundary', { raw: "||" }); }
 
 RepeatExpression
-  = "|:" Spacing count:RepeatCount? Spacing body:RepeatBody? endings:RepeatEndings {
-      return node('Repeat', { count, body: body ?? [], endings });
+  = "|:" Spacing count:RepeatCount? Spacing body:RepeatBody? result:RepeatEndings {
+      return node('Repeat', { count, body: body ?? [], endings: result.endings, terminal: result.terminal });
     }
 
 RepeatEndings
-  = Spacing firstNumber:FirstEndingMarker Spacing firstBody:ParallelExpression?
-    rest:(Spacing number:NextEndingMarker Spacing body:ParallelExpression? {
+  = Spacing firstNumber:FirstEndingMarker Spacing firstBody:EndingParallelExpression?
+    rest:(Spacing number:NextEndingMarker Spacing body:EndingParallelExpression? {
       return { number, body: body ? [body] : [] };
     })*
-    Spacing "||" {
-      return [{ number: firstNumber, body: firstBody ? [firstBody] : [] }, ...rest];
+    Spacing terminal:("||" / "|") {
+      return { endings: [{ number: firstNumber, body: firstBody ? [firstBody] : [] }, ...rest], terminal };
     }
-  / Spacing ":|" { return []; }
+  / Spacing ":|" { return { endings: [], terminal: ":|" }; }
+
+EndingParallelExpression
+  = first:EndingSequenceExpression
+    rest:(Spacing "," Spacing branch:EndingSequenceExpression { return branch; })* {
+      return parallel([first, ...rest]);
+    }
+
+EndingSequenceExpression
+  = first:SequenceItem rest:(EndingSequenceGap item:SequenceItem { return item; })* {
+      return sequence([first, ...rest]);
+    }
+
+EndingSequenceGap
+  = RequiredSpacing !("|" Spacing)
+  / &("|:" / "[" / "(" / "{")
+  / &Rest
+  / PreviousItemBoundary
 
 FirstEndingMarker
   = "|" number:EndingNumber { return number; }

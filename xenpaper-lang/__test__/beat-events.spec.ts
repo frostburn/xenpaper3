@@ -102,6 +102,16 @@ describe('beat event expansion', () => {
     expect(result.duration.equals(new Fraction(4))).toBe(true)
   })
 
+  it('carries directives from a common repeat body into alternate endings', () => {
+    const result = score('|: @p C |@^1 D :|@^2 E ||')
+
+    expect(
+      result.events
+        .filter((event) => event.kind === 'note')
+        .map((event) => event.dynamic.toFraction()),
+    ).toEqual(['3/10', '3/10', '3/10', '3/10'])
+  })
+
   it('incorporates prevailing dynamics into a single effective dynamic field', () => {
     const notes = score('C @ff D E').events.filter((event) => event.kind === 'note')
 

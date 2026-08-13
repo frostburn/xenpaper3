@@ -685,6 +685,20 @@ describe('MusicalStaff', () => {
     expect(wrapper.findAll('.barline--repeat-end circle')).toHaveLength(2)
   })
 
+  it('renders numbered brackets for alternate endings', () => {
+    const evaluated = evaluateScoreShape(parse('|: C D |¹ E F :|² G A ||').body[0]!)
+    if (!('shape' in evaluated)) throw new Error('Expected a score shape.')
+    const wrapper = mount(MusicalStaff, {
+      props: { notation: constructStaffNotationShape(evaluated.shape) },
+    })
+
+    expect(wrapper.findAll('.alternate-ending-bracket')).toHaveLength(2)
+    expect(wrapper.findAll('.alternate-ending-number').map((label) => label.text())).toEqual([
+      '1.',
+      '2.',
+    ])
+  })
+
   it('renders an x notehead for context-dependent repeat appearances', () => {
     const crossed: StaffNotationShape = {
       kind: 'note',
