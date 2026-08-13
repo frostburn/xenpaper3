@@ -29,6 +29,7 @@ type StaffItemContent =
       displayLabel?: string
       grace?: boolean
       notatedDuration?: Fraction
+      articulationMarks?: readonly string[]
     }
   | { kind: 'rest'; duration: Fraction }
   | { kind: 'barline'; style: BarlineStyle; endingNumber?: number }
@@ -92,6 +93,7 @@ const items = computed(() => {
         displayLabel: shape.displayLabel,
         grace: shape.grace,
         notatedDuration: shape.notatedDuration,
+        articulationMarks: shape.articulationMarks,
         tuplets: [],
         voice,
       }
@@ -111,7 +113,9 @@ const items = computed(() => {
         const continuedItems = state.activeItems.map((item) => {
           const factor = continuedDuration.div(activeSpan ?? item.duration)
           const duration = fraction(item.duration).mul(factor)
-          const continuedOffset = fraction(offset).add(item.offset.sub(activeStartOffset).mul(factor))
+          const continuedOffset = fraction(offset).add(
+            item.offset.sub(activeStartOffset).mul(factor),
+          )
           const continuedItem: RhythmicLayoutItem =
             item.kind === 'note'
               ? {
@@ -176,8 +180,7 @@ const items = computed(() => {
       const inheritedFollowingContinuation = state.hasFollowingContinuation
       shape.children.forEach((child, index) => {
         state.hasFollowingContinuation =
-          inheritedFollowingContinuation ||
-          shape.children[index + 1]?.kind === 'continue'
+          inheritedFollowingContinuation || shape.children[index + 1]?.kind === 'continue'
         offset = visit(child, offset, state, voice)
       })
       state.hasFollowingContinuation = inheritedFollowingContinuation
@@ -225,9 +228,7 @@ const items = computed(() => {
         (item): item is NoteLayoutItem => item.kind === 'note',
       )
       state.activeSpan = undefined
-      state.barlineSinceActiveItems = branchStates.some(
-        (branch) => branch.barlineSinceActiveItems,
-      )
+      state.barlineSinceActiveItems = branchStates.some((branch) => branch.barlineSinceActiveItems)
       return branchEnds.reduce((latest, end) => (end.compare(latest) > 0 ? end : latest), offset)
     }
     return shape.duration ? offset.add(shape.duration) : offset
@@ -376,9 +377,7 @@ const endingSpans = computed(() =>
           candidate.kind === 'barline' &&
           (candidate.style === 'repeat-end' || candidate.style === 'ending-end'),
       )
-    return end?.kind === 'barline'
-      ? [{ start: item, end, number: item.endingNumber }]
-      : []
+    return end?.kind === 'barline' ? [{ start: item, end, number: item.endingNumber }] : []
   }),
 )
 
@@ -547,11 +546,7 @@ const restDotY = (duration: Fraction, tupletCount?: number) =>
     </g>
     <text class="clef" x="25" y="98">𝄞</text>
     <text v-if="!items.length" class="empty-message" x="70" y="126">No notation loaded</text>
-    <g
-      v-for="(ending, index) in endingSpans"
-      :key="`ending-${index}`"
-      class="alternate-ending"
-    >
+    <g v-for="(ending, index) in endingSpans" :key="`ending-${index}`" class="alternate-ending">
       <path
         class="alternate-ending-bracket"
         :d="`M ${barlineX(ending.start)} 45 V 34 H ${barlineX(ending.end)}`"
@@ -615,8 +610,12 @@ const restDotY = (duration: Fraction, tupletCount?: number) =>
       </text>
       <g v-else-if="item.kind === 'barline'" class="barline" :class="`barline--${item.style}`">
         <line
-          :x1="barlineX(item) - (item.style === 'single' || item.style.startsWith('ending-') ? 0 : 3)"
-          :x2="barlineX(item) - (item.style === 'single' || item.style.startsWith('ending-') ? 0 : 3)"
+          :x1="
+            barlineX(item) - (item.style === 'single' || item.style.startsWith('ending-') ? 0 : 3)
+          "
+          :x2="
+            barlineX(item) - (item.style === 'single' || item.style.startsWith('ending-') ? 0 : 3)
+          "
           y1="52"
           y2="100"
         />
@@ -726,6 +725,16 @@ const restDotY = (duration: Fraction, tupletCount?: number) =>
             rx="7"
             ry="5"
           />
+          <text
+            v-for="(mark, markIndex) in item.articulationMarks"
+            v-if="item.tiedFromColumn === undefined"
+            :key="`articulation-${markIndex}`"
+            class="articulation-mark"
+            :x="x(item.column)"
+            :y="y(item.pitch.staffPosition) + 18 + markIndex * 10"
+          >
+            {{ mark === "'" ? '▾' : mark === ':' ? '•̲' : mark === '_' ? '⌒' : mark }}
+          </text>
           <circle
             v-if="isDotted(effectiveDuration(engravingDuration(item), tupletCount(item)))"
             class="augmentation-dot"
@@ -821,6 +830,11 @@ const restDotY = (duration: Fraction, tupletCount?: number) =>
 
 .notehead {
   fill: currentColor;
+}
+
+.articulation-mark {
+  font-size: 14px;
+  text-anchor: middle;
 }
 
 .notehead--open {

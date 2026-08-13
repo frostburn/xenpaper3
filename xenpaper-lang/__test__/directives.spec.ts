@@ -12,6 +12,54 @@ const notes = (source: string) => {
 }
 
 describe('directive runtime', () => {
+  it('shortens sounding notes without changing their rhythmic spacing', () => {
+    const result = compile('@art(50%) 0 1 2 3')
+    if (!('score' in result)) throw new Error('Expected score.')
+    const events = result.score.events.filter(
+      (event): event is BeatTimedNoteEvent => event.kind === 'note',
+    )
+    expect(events.map(({ start }) => start.valueOf())).toEqual([0, 1, 2, 3])
+    expect(events.map(({ duration }) => duration.valueOf())).toEqual([0.5, 0.5, 0.5, 0.5])
+    expect(result.score.duration.valueOf()).toBe(4)
+  })
+
+  it.each([
+    ["@'", 0.25],
+    ['@staccatissimo', 0.25],
+    ['@.', 0.5],
+    ['@staccato', 0.5],
+    ['@:', 0.85],
+    ['@portato', 0.85],
+    ['@-', 1],
+    ['@tenuto', 1],
+    ['@_', 1.1],
+    ['@legato', 1.1],
+  ])('resolves articulation %s', (directive, duration) => {
+    expect(notes(`${directive} C`)[0]!.duration.valueOf()).toBe(duration)
+  })
+
+  it.each([
+    ['M2 + [@. P1 M2 P5]', ['1/3', '1/3', '1/3']],
+    ['(@. M2) + [P1 M2 P5]', ['1/3', '1/3', '1/3']],
+    ['(@art(50%) M2) + [P1 M2 P5]', ['1/3', '1/3', '1/3']],
+    ['(@_ M2) + [P1 M2 P5]', ['11/30', '11/30', '11/30']],
+  ])('max-coalesces articulation while broadcasting: %s', (source, durations) => {
+    expect(notes(source).map((note) => note.duration.toFraction())).toEqual(durations)
+  })
+
+  it('broadcasts a continued scalar using maximum note duration', () => {
+    const events = notes('(M2=) + [P1 M2 P5]')
+    const explicit = notes('M2 + ([P1 M2 P5]=)')
+    expect(events.map((note) => [note.start.toFraction(), note.duration.toFraction()])).toEqual(
+      explicit.map((note) => [note.start.toFraction(), note.duration.toFraction()]),
+    )
+  })
+
+  it('max-coalesces continuations on both sides of broadcasting', () => {
+    const events = notes('(M2=) + [P1= M2== P5]')
+    expect(events.map((note) => note.duration.toFraction())).toEqual(['2/3', '1', '1/3'])
+  })
+
   it('steals time for a grace cluster', () => {
     const events = notes('@4?? B c# c=')
     expect(events.map((event) => event.duration.valueOf())).toEqual([0.25, 0.25, 1.5])

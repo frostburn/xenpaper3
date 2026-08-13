@@ -114,6 +114,95 @@ function isScalarOperand(node: Expression): boolean {
   ].includes(node.type)
 }
 
+type BroadcastScalar = {
+  expression: Expression
+  articulation: Fraction
+  continuations: Extract<Expression, { type: 'PostfixExpression' }>['marks']
+}
+
+/** Unwrap a single pitch expression together with the performance context authored around it. */
+function broadcastScalarOperand(
+  node: Expression,
+  context: PitchContext,
+): BroadcastScalar | undefined {
+  if (node.type === 'Group') return broadcastScalarOperand(node.expression, context)
+  if (node.type === 'PostfixExpression') {
+    const scalar = broadcastScalarOperand(node.expression, context)
+    if (!scalar) return undefined
+    return {
+      ...scalar,
+      continuations: [
+        ...scalar.continuations,
+        ...node.marks.filter((mark) => mark.type === 'DetachedContinue'),
+      ],
+    }
+  }
+  if (node.type === 'Sequence') {
+    let articulation = new Fraction(1)
+    let scalar: BroadcastScalar | undefined
+    for (const item of node.items) {
+      if (item.type === 'Directive') {
+        const names: Record<string, Fraction> = {
+          'articulation-shorthand': new Fraction(1),
+          art: new Fraction(1),
+          staccatissimo: new Fraction(1, 4),
+          staccato: new Fraction(1, 2),
+          portato: new Fraction(17, 20),
+          tenuto: new Fraction(1),
+          legato: new Fraction(11, 10),
+        }
+        const shorthand = (item as typeof item & { articulationMark?: string }).articulationMark
+        const shorthandRatios: Record<string, Fraction> = {
+          "'": new Fraction(1, 4),
+          '.': new Fraction(1, 2),
+          ':': new Fraction(17, 20),
+          '-': new Fraction(1),
+          _: new Fraction(11, 10),
+        }
+        if (shorthand) articulation = shorthandRatios[shorthand]!
+        else if (item.name !== 'art') {
+          const named = names[item.name]
+          if (!named) return undefined
+          articulation = named
+        } else {
+          const resolved = resolveDirective(item, context).directive
+          if (resolved?.kind !== 'articulation') return undefined
+          articulation = resolved.ratio
+        }
+        continue
+      }
+      if (scalar) return undefined
+      scalar = broadcastScalarOperand(item, context)
+      if (!scalar) return undefined
+    }
+    return scalar ? { ...scalar, articulation } : undefined
+  }
+  return isScalarOperand(node)
+    ? { expression: node, articulation: new Fraction(1), continuations: [] }
+    : undefined
+}
+
+function applyBroadcastContinuations(
+  expression: Expression,
+  continuations: BroadcastScalar['continuations'],
+): Expression {
+  if (!continuations.length) return expression
+  if (expression.type === 'PostfixExpression') {
+    const existing = expression.marks.filter((mark) => mark.type === 'DetachedContinue')
+    if (existing.length >= continuations.length) return expression
+    return {
+      ...expression,
+      marks: [...expression.marks, ...continuations.slice(existing.length)],
+    }
+  }
+  return {
+    type: 'PostfixExpression',
+    expression,
+    marks: continuations,
+    location: expression.location,
+  }
+}
+
 function zipScoreConstructions(
   left: Expression,
   right: Expression,
@@ -161,19 +250,19 @@ function zipScoreConstructions(
   return undefined
 }
 
-function broadcastScalarOperation(node: Expression): Expression | undefined {
+function broadcastScalarOperation(node: Expression, context: PitchContext): Expression | undefined {
   if (node.type === 'Group') {
-    const expression = broadcastScalarOperation(node.expression)
+    const expression = broadcastScalarOperation(node.expression, context)
     return expression ? { ...node, expression } : undefined
   }
   if (node.type === 'PostfixExpression') {
-    const expression = broadcastScalarOperation(node.expression)
+    const expression = broadcastScalarOperation(node.expression, context)
     return expression ? { ...node, expression } : undefined
   }
   if (node.type !== 'BinaryExpression') return undefined
-  const left = broadcastScalarOperation(node.left)
+  const left = broadcastScalarOperation(node.left, context)
   if (left) return { ...node, left }
-  const right = broadcastScalarOperation(node.right)
+  const right = broadcastScalarOperation(node.right, context)
   if (right) return { ...node, right }
   const zipped = zipScoreConstructions(node.left, node.right, (left, right) => ({
     ...node,
@@ -181,6 +270,26 @@ function broadcastScalarOperation(node: Expression): Expression | undefined {
     right,
   }))
   if (zipped) return zipped
+  const leftScalar = broadcastScalarOperand(node.left, context)
+  if (leftScalar) {
+    const mapped = mapScoreConstruction(node.right, (right) => ({
+      ...node,
+      left: leftScalar.expression,
+      right,
+      broadcastArticulation: leftScalar.articulation,
+    }))
+    if (mapped) return applyBroadcastContinuations(mapped, leftScalar.continuations)
+  }
+  const rightScalar = broadcastScalarOperand(node.right, context)
+  if (rightScalar) {
+    const mapped = mapScoreConstruction(node.left, (left) => ({
+      ...node,
+      left,
+      right: rightScalar.expression,
+      broadcastArticulation: rightScalar.articulation,
+    }))
+    if (mapped) return applyBroadcastContinuations(mapped, rightScalar.continuations)
+  }
   const overLeft = isScalarOperand(node.right)
     ? mapScoreConstruction(node.left, (left) => ({ ...node, left }))
     : undefined
@@ -341,7 +450,13 @@ function generatedRest(duration: Fraction): RestShape {
 }
 
 function barline(node: Expression, style: BarlineStyle, endingNumber?: number): BarlineShape {
-  return { kind: 'barline', style, duration: new Fraction(0), origins: [origin(node)], endingNumber }
+  return {
+    kind: 'barline',
+    style,
+    duration: new Fraction(0),
+    origins: [origin(node)],
+    endingNumber,
+  }
 }
 
 function pad(shape: ScoreShape, duration: Fraction): ScoreShape {
@@ -723,19 +838,58 @@ export function evaluateScoreSemantics(
     return currentPulse
   }
 
+  const articulationAfter = (
+    current: Expression,
+    ratio: Fraction,
+    marks: readonly string[],
+    context: PitchContext,
+  ): { ratio: Fraction; marks: readonly string[] } => {
+    if (current.type === 'Directive') {
+      const resolved = resolveDirective(current, context).directive
+      if (resolved?.kind !== 'articulation') return { ratio, marks }
+      return {
+        ratio: resolved.ratio,
+        marks: resolved.shorthand && resolved.mark !== '-' ? [...marks, resolved.mark!] : [],
+      }
+    }
+    if (current.type === 'Sequence')
+      return current.items.reduce(
+        (active, item) => articulationAfter(item, active.ratio, active.marks, context),
+        { ratio, marks },
+      )
+    return { ratio, marks }
+  }
+
   const visit = (
     current: Expression,
     context: PitchContext,
     currentPulse: Fraction = pulse,
     currentDynamic: DynamicMark = 'mf',
+    currentArticulation: Fraction = new Fraction(1),
+    currentArticulationMarks: readonly string[] = [],
   ): ScoreShapeEvaluationResult => {
-    const broadcast = broadcastScalarOperation(current)
-    if (broadcast) return visit(broadcast, context, currentPulse, currentDynamic)
+    const broadcast = broadcastScalarOperation(current, context)
+    if (broadcast)
+      return visit(
+        broadcast,
+        context,
+        currentPulse,
+        currentDynamic,
+        currentArticulation,
+        currentArticulationMarks,
+      )
     const expandedChord = expandEnumeratedChord(current, context)
     if (expandedChord.diagnostics.length) return { diagnostics: expandedChord.diagnostics }
     if (expandedChord.expressions.length !== 1 || expandedChord.expressions[0] !== current) {
       const results = expandedChord.expressions.map((expression) =>
-        visit(expression, context, currentPulse, currentDynamic),
+        visit(
+          expression,
+          context,
+          currentPulse,
+          currentDynamic,
+          currentArticulation,
+          currentArticulationMarks,
+        ),
       )
       const diagnostics = results.flatMap((result) => result.diagnostics)
       if (!results.every(hasShape)) return { diagnostics }
@@ -809,7 +963,14 @@ export function evaluateScoreSemantics(
           items: [...repeatBody(current, iteration)],
           location: current.location,
         }
-        const result = visit(iterationNode, iterationContext, iterationPulse)
+        const result = visit(
+          iterationNode,
+          iterationContext,
+          iterationPulse,
+          currentDynamic,
+          currentArticulation,
+          currentArticulationMarks,
+        )
         iterationPulse = pulseAfter(iterationNode, iterationPulse, iterationContext)
         iterationContext = contextAfter(iterationNode, iterationContext)
         diagnostics.push(...result.diagnostics)
@@ -849,7 +1010,20 @@ export function evaluateScoreSemantics(
       }
       const endingContext = contextAfter(commonNode, context)
       const endingPulse = pulseAfter(commonNode, currentPulse, context)
-      const commonResult = visit(commonNode, context, currentPulse)
+      const endingArticulation = articulationAfter(
+        commonNode,
+        currentArticulation,
+        currentArticulationMarks,
+        context,
+      )
+      const commonResult = visit(
+        commonNode,
+        context,
+        currentPulse,
+        currentDynamic,
+        currentArticulation,
+        currentArticulationMarks,
+      )
       diagnostics.push(...commonResult.diagnostics)
       const commonShapes = hasShape(commonResult) ? [commonResult.shape] : []
       const endingShapes = current.endings.map((ending) => {
@@ -858,7 +1032,14 @@ export function evaluateScoreSemantics(
           items: ending.body,
           location: current.location,
         }
-        const result = visit(endingNode, endingContext, endingPulse)
+        const result = visit(
+          endingNode,
+          endingContext,
+          endingPulse,
+          currentDynamic,
+          endingArticulation.ratio,
+          endingArticulation.marks,
+        )
         diagnostics.push(...result.diagnostics)
         return hasShape(result) ? [result.shape] : []
       })
@@ -883,6 +1064,8 @@ export function evaluateScoreSemantics(
       let activeContext = context
       let activePulse = currentPulse
       let activeDynamic = currentDynamic
+      let activeArticulation = currentArticulation
+      let activeArticulationMarks = [...currentArticulationMarks]
       let velocity: Fraction | undefined
       let grace: { duration: Fraction; count: number; indices: number[] } | undefined
       let gliss: number[] | undefined
@@ -915,6 +1098,13 @@ export function evaluateScoreSemantics(
           else if (directive?.kind === 'grace')
             grace = { duration: directive.duration, count: directive.count, indices: [] }
           else if (directive?.kind === 'gliss') gliss = []
+          else if (directive?.kind === 'articulation') {
+            activeArticulation = directive.ratio
+            activeArticulationMarks =
+              directive.shorthand && directive.mark !== '-'
+                ? [...activeArticulationMarks, directive.mark!]
+                : []
+          }
           const shape: ScoreShape =
             directive?.kind === 'unknown'
               ? {
@@ -934,7 +1124,14 @@ export function evaluateScoreSemantics(
           results.push({ shape, diagnostics: resolved.diagnostics })
           continue
         }
-        let result = visit(item, activeContext, activePulse, activeDynamic)
+        let result = visit(
+          item,
+          activeContext,
+          activePulse,
+          activeDynamic,
+          activeArticulation,
+          activeArticulationMarks,
+        )
         const index = results.length
         if ('shape' in result && attacks(result.shape).length) {
           if (velocity) {
@@ -1078,7 +1275,14 @@ export function evaluateScoreSemantics(
     }
     if (current.type === 'Parallel') {
       const results = current.branches.map((branch) =>
-        visit(branch, context, currentPulse, currentDynamic),
+        visit(
+          branch,
+          context,
+          currentPulse,
+          currentDynamic,
+          currentArticulation,
+          currentArticulationMarks,
+        ),
       )
       const diagnostics = results.flatMap((result) => result.diagnostics)
       if (!results.every(hasShape)) return { diagnostics }
@@ -1096,7 +1300,14 @@ export function evaluateScoreSemantics(
       return { shape, diagnostics }
     }
     if (current.type === 'Group')
-      return visit(current.expression, context, currentPulse, currentDynamic)
+      return visit(
+        current.expression,
+        context,
+        currentPulse,
+        currentDynamic,
+        currentArticulation,
+        currentArticulationMarks,
+      )
     if (current.type === 'NormalizeToSlot') {
       if (!current.expression) {
         return {
@@ -1109,7 +1320,14 @@ export function evaluateScoreSemantics(
           diagnostics: [],
         }
       }
-      const evaluated = visit(current.expression, context, currentPulse, currentDynamic)
+      const evaluated = visit(
+        current.expression,
+        context,
+        currentPulse,
+        currentDynamic,
+        currentArticulation,
+        currentArticulationMarks,
+      )
       if (!('shape' in evaluated)) return evaluated
       if (!evaluated.shape.duration.n) {
         return {
@@ -1144,7 +1362,14 @@ export function evaluateScoreSemantics(
       }
     }
     if (current.type === 'PostfixExpression') {
-      const evaluated = visit(current.expression, context, currentPulse, currentDynamic)
+      const evaluated = visit(
+        current.expression,
+        context,
+        currentPulse,
+        currentDynamic,
+        currentArticulation,
+        currentArticulationMarks,
+      )
       if (!('shape' in evaluated)) return evaluated
       const elimination = current.marks.find((mark) => mark.type === 'TailElimination')
       let base = evaluated.shape
@@ -1187,6 +1412,14 @@ export function evaluateScoreSemantics(
     }
     const evaluated = playablePitch(current, context)
     if (!('pitch' in evaluated)) return evaluated
+    const broadcastContext = current as Expression & {
+      readonly broadcastArticulation?: Fraction
+    }
+    const broadcastArticulation = broadcastContext.broadcastArticulation
+    const articulation =
+      broadcastArticulation && broadcastArticulation.compare(currentArticulation) > 0
+        ? broadcastArticulation
+        : currentArticulation
     const shape: PlaybackAttackShape = {
       kind: 'attack',
       pitch: evaluated.pitch,
@@ -1195,6 +1428,8 @@ export function evaluateScoreSemantics(
       rootPitch: context.rootPitch,
       dynamic: currentDynamic,
       velocity: DYNAMIC_VELOCITIES[currentDynamic],
+      articulation,
+      ...(currentArticulationMarks.length ? { articulationMarks: currentArticulationMarks } : {}),
       ...('raw' in current ? { authoredLabel: String(current.raw) } : {}),
       ...(current.type === 'DegreeLiteral' ||
       current.type === 'EqualDivisionLiteral' ||

@@ -14,6 +14,37 @@ function notation(source: string) {
 }
 
 describe('staff notation construction', () => {
+  it('retains shorthand articulation marks until a named articulation resets them', () => {
+    const node = parse("@. C D @' E @staccato F @. G @- A").body[0] as Expression
+    const evaluated = evaluateScoreShape(node)
+    if (!('shape' in evaluated)) throw new Error('Expected a score shape.')
+    const staff = constructStaffNotationShape(evaluated.shape)
+    if (staff.kind !== 'sequence') throw new Error('Expected a staff sequence.')
+    const notes = staff.children.filter((item) => item.kind === 'note')
+    expect(notes.map((note) => note.articulationMarks)).toEqual([
+      ['.'],
+      ['.'],
+      ['.', "'"],
+      undefined,
+      ['.'],
+      undefined,
+    ])
+  })
+
+  it('carries shorthand articulation from a repeat body into alternate endings', () => {
+    const node = parse('|: @. C |@^1 D :|@^2 E ||').body[0] as Expression
+    const evaluated = evaluateScoreShape(node)
+    if (!('shape' in evaluated)) throw new Error('Expected a score shape.')
+    const staff = constructStaffNotationShape(evaluated.shape)
+    const collect = (shape: typeof staff): readonly (readonly string[] | undefined)[] => {
+      if (shape.kind === 'note') return [shape.articulationMarks]
+      if (shape.kind === 'sequence') return shape.children.flatMap(collect)
+      if (shape.kind === 'parallel') return shape.branches.flatMap(collect)
+      return []
+    }
+    expect(collect(staff)).toEqual([['.'], ['.'], ['.']])
+  })
+
   it('only infers FJS accidentals from rational frequency ratios', () => {
     const node = parse('300Hz').body[0] as Expression
     const evaluated = evaluateScoreShape(node)
@@ -180,18 +211,16 @@ describe('staff notation construction', () => {
   })
 
   it('retains scale context across hard boundaries and parallel degrees', () => {
-    const evaluated = evaluateProgramShape(
-      parse('{5 7 12}\n0 1 2 3 4 5 6 ||\n0,1,2,3,4,5,6 ||'),
-    )
+    const evaluated = evaluateProgramShape(parse('{5 7 12}\n0 1 2 3 4 5 6 ||\n0,1,2,3,4,5,6 ||'))
     if (!('shape' in evaluated)) throw new Error('Expected shape.')
 
     const staff = constructStaffNotationShape(evaluated.shape)
     if (staff.kind !== 'sequence') throw new Error('Expected a sequence.')
     const parallel = staff.children.find((child) => child.kind === 'parallel')
     if (!parallel) throw new Error('Expected a parallel chord.')
-    expect(parallel.branches.map((branch) => branch.kind === 'note' && branch.pitch.cents)).toEqual([
-      0, 500, 700, 1200, 1700, 1900, 2400,
-    ])
+    expect(parallel.branches.map((branch) => branch.kind === 'note' && branch.pitch.cents)).toEqual(
+      [0, 500, 700, 1200, 1700, 1900, 2400],
+    )
     expect(
       parallel.branches.map((branch) => branch.kind === 'note' && branch.pitch.staffPosition),
     ).toEqual([0, 3, 4, 7, 10, 11, 14])

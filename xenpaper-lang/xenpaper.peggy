@@ -399,8 +399,19 @@ RepeatCount
     }
 
 Directive
-  = "@" body:(NumericDirectiveBody / NamedDirectiveBody) {
+  = "@" body:(ArticulationShorthandBody / NumericDirectiveBody / NamedDirectiveBody) {
       return node('Directive', body);
+    }
+
+ArticulationShorthandBody
+  = mark:$(['.':_\-]) {
+      return {
+        name: 'articulation-shorthand',
+        rawName: '@' + mark,
+        arguments: [],
+        graceCount: 0,
+        articulationMark: mark,
+      };
     }
 
 NumericDirectiveBody

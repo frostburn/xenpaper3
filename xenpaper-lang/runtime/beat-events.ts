@@ -46,7 +46,7 @@ function flattenScoreSemantics(shape: ScoreShape): BeatEventFlatteningResult {
       const event: MutableNoteEvent = {
         kind: 'note',
         start: copy(start),
-        duration: copy(current.duration),
+        duration: current.duration.mul(current.articulation ?? new Fraction(1)),
         pitch: current.pitch,
         rootPitch: current.rootPitch,
         dynamic: copy((current as typeof current & { readonly velocity: Fraction }).velocity),
