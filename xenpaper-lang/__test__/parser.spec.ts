@@ -46,6 +46,18 @@ describe('enumerated chords', () => {
   it('does not expand ranges while parsing', () => {
     expect(parse('1::1000000000').body[0]).toMatchObject({ type: 'EnumeratedChord' })
   })
+
+  it('preserves an enumerated chord used as a scale', () => {
+    expect(parse('{/6::3}').body[0]).toMatchObject({
+      type: 'PitchContextChange',
+      statements: [
+        {
+          type: 'ContextDegreeMapping',
+          values: [{ type: 'EnumeratedChord', inverted: true, rangeEnd: { value: '3' } }],
+        },
+      ],
+    })
+  })
 })
 
 const score = String.raw`# FJS and prefix modifiers

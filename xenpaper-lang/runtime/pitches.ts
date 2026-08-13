@@ -245,7 +245,46 @@ export function applyPitchContextChange(
       continue
     }
     if (statement.type === 'ContextDegreeMapping') {
-      const degrees = statement.values.map((value) => {
+      let values = statement.values
+      const enumerated = values.length === 1 ? values[0] : undefined
+      if (enumerated?.type === 'EnumeratedChord') {
+        let enumerands = enumerated.enumerands
+        if (!enumerands) {
+          const endpoints = [enumerated.first, enumerated.rangeEnd!].map((endpoint) => {
+            const evaluated = evaluateExpression(endpoint, context)
+            if (!('value' in evaluated) || evaluated.value.kind !== 'scalar') return undefined
+            const exact = evaluated.value.value.exactRational()
+            return exact?.d === 1 ? BigInt(exact.s * exact.n) : undefined
+          })
+          if (endpoints.some((endpoint) => endpoint === undefined))
+            throw new TypeError('Enumerated scale range endpoints must be exact integers.')
+          const [start, end] = endpoints as [bigint, bigint]
+          const distance = start <= end ? end - start : start - end
+          if (distance > 10_000n)
+            throw new RangeError('Enumerated scale exceeds the 10000-member expansion limit.')
+          const step = start <= end ? 1n : -1n
+          enumerands = []
+          for (let value = start; ; value += step) {
+            enumerands.push({
+              type: 'IntegerLiteral',
+              value: String(value),
+              raw: String(value),
+              location: enumerated.location,
+            })
+            if (value === end) break
+          }
+        }
+        // Unlike a chord used as notes, a scale already has an implicit unison.
+        // Drop the first enumerand rather than storing a redundant 1/1 degree.
+        values = enumerands.slice(1).map((enumerand) => ({
+          type: 'BinaryExpression',
+          operator: '/',
+          left: enumerated.inverted ? enumerated.first : enumerand,
+          right: enumerated.inverted ? enumerand : enumerated.first,
+          location: enumerated.location,
+        }))
+      }
+      const degrees = values.map((value) => {
         const evaluated = evaluateExpression(value, context)
         if (!('value' in evaluated) || evaluated.value.kind === 'absolutePitch')
           throw new TypeError('Degree assignments require pitch intervals.')
@@ -264,7 +303,9 @@ export function applyPitchContextChange(
       if ('value' in evaluated && evaluated.value.kind === 'scalar') {
         const frequency = evaluated.value.value
         if (!frequency.dimensions.equals({ seconds: -1 }) || frequency.valueOf() <= 0)
-          throw new TypeError('A pitch frequency assignment requires a positive frequency quantity.')
+          throw new TypeError(
+            'A pitch frequency assignment requires a positive frequency quantity.',
+          )
         const ratio = frequency.div(context.rootFrequency)
         context = {
           ...context,

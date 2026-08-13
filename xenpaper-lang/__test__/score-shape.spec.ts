@@ -75,6 +75,17 @@ describe('score-shape timing', () => {
     )
   })
 
+  it('uses enumerated chords as scales without a redundant unison degree', () => {
+    const result = shape('{/6::3} 0 1 2 3 4') as SequenceShape
+    const pitches = result.children
+      .filter((child) => child.kind === 'attack')
+      .map((attack) => attack.pitch.value.valueOf())
+
+    ;[1, 6 / 5, 6 / 4, 6 / 3, (6 / 5) * 2].forEach((expected, index) =>
+      expect(pitches[index]).toBeCloseTo(1200 * Math.log2(expected)),
+    )
+  })
+
   it('supports patent vals, arbitrary warts, and non-octave equal divisions', () => {
     expect(parseVal('17c').mapping.mapPrime(5).valueOf()).not.toBe(
       parseVal('17cc').mapping.mapPrime(5).valueOf(),
