@@ -82,6 +82,25 @@ describe('score-shape timing', () => {
     expected.forEach((pitch, index) => expect(pitches[index]).toBeCloseTo(pitch))
   })
 
+  it('defines scales with absolute Latin pitches', () => {
+    const result = shape('{D E F♯ G A B C♯ 2/1} 0 1 2 3 4 5 6 7 8') as SequenceShape
+    const pitches = result.children
+      .filter((child) => child.kind === 'attack')
+      .map((attack) => attack.pitch.value.valueOf())
+
+    ;[1, 9 / 8, 81 / 64, 729 / 512, 3 / 2, 27 / 16, 243 / 128, 2187 / 2048, 2].forEach(
+      (ratio, index) => expect(pitches[index]).toBeCloseTo(1200 * Math.log2(ratio)),
+    )
+  })
+
+  it('moves the root to a scale degree', () => {
+    const result = shape('{200c 400c 700c 1200c}{root = 3} 0 1') as SequenceShape
+    const attacks = result.children.filter((child) => child.kind === 'attack')
+
+    expect(attacks[0]?.pitch.value.valueOf()).toBeCloseTo(700)
+    expect(attacks[1]?.pitch.value.valueOf()).toBeCloseTo(900)
+  })
+
   it('rotates scale modes while preserving the equave', () => {
     const attacksIn = (score: ScoreShape): Extract<ScoreShape, { kind: 'attack' }>[] =>
       score.kind === 'attack'

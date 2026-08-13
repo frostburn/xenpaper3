@@ -74,6 +74,12 @@ describe('enumerated chords', () => {
       ],
     })
   })
+
+  it('parses a root integer assignment as a scale degree', () => {
+    expect(parse('{root = 3}').body[0]).toMatchObject({
+      statements: [{ target: { name: 'root' }, value: { type: 'DegreeLiteral', degree: '3' } }],
+    })
+  })
 })
 
 const score = String.raw`# FJS and prefix modifiers
