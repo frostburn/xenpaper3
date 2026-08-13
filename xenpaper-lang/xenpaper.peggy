@@ -325,14 +325,38 @@ DetachedContinue
   = "=" { return node('DetachedContinue', { raw: "=" }); }
 
 Barline
-  = "|" !("|" / ":") { return node('Barline', { raw: "|" }); }
+  = "|" !("|" / ":" / "@^" / [⁰¹²³⁴⁵⁶⁷⁸⁹]) { return node('Barline', { raw: "|" }); }
 
 HardBoundary
   = "||" { return node('HardBoundary', { raw: "||" }); }
 
 RepeatExpression
-  = "|:" Spacing count:RepeatCount? Spacing body:RepeatBody? Spacing ":|" {
-      return node('Repeat', { count, body });
+  = "|:" Spacing count:RepeatCount? Spacing body:RepeatBody? endings:RepeatEndings {
+      return node('Repeat', { count, body: body ?? [], endings });
+    }
+
+RepeatEndings
+  = Spacing firstNumber:FirstEndingMarker Spacing firstBody:ParallelExpression?
+    rest:(Spacing number:NextEndingMarker Spacing body:ParallelExpression? {
+      return { number, body: body ? [body] : [] };
+    })*
+    Spacing "||" {
+      return [{ number: firstNumber, body: firstBody ? [firstBody] : [] }, ...rest];
+    }
+  / Spacing ":|" { return []; }
+
+FirstEndingMarker
+  = "|" number:EndingNumber { return number; }
+
+NextEndingMarker
+  = ":|" number:EndingNumber { return number; }
+
+EndingNumber
+  = "@^" value:UnsignedInteger {
+      return node('IntegerLiteral', { raw: value, value });
+    }
+  / value:SuperscriptUnsignedInteger {
+      return node('IntegerLiteral', { raw: value.raw, value: value.value });
     }
 
 RepeatBody
@@ -350,11 +374,11 @@ RepeatBody
     }
 
 RepeatCount
-  = "(" Spacing "x"i Spacing value:UnsignedInteger Spacing ")" {
+  = "@x"i value:UnsignedInteger {
       return node('IntegerLiteral', { raw: value, value });
     }
-  / "ˣ" value:UnsignedInteger {
-      return node('IntegerLiteral', { raw: value, value });
+  / "ˣ" value:SuperscriptUnsignedInteger {
+      return node('IntegerLiteral', { raw: value.raw, value: value.value });
     }
 
 Directive
@@ -705,6 +729,12 @@ UnsignedDecimalOrInteger
 
 UnsignedInteger
   = $([0-9]+)
+
+SuperscriptUnsignedInteger
+  = raw:$([⁰¹²³⁴⁵⁶⁷⁸⁹]+) {
+      const digits = "⁰¹²³⁴⁵⁶⁷⁸⁹";
+      return { raw, value: [...raw].map(character => digits.indexOf(character)).join("") };
+    }
 
 Sign
   = $("+" / "-")

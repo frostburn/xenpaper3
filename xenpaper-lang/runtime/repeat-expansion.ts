@@ -92,7 +92,9 @@ export function expandRepeats(
           ...path,
           { repeatOffset: node.location.start.offset, iteration: Number(iteration) },
         ]
-        for (const child of (node.body as SyntaxNode[]) ?? []) {
+        const endings = (node.endings as { number: SyntaxNode & { value?: unknown }; body: SyntaxNode[] }[]) ?? []
+        const ending = endings.find(({ number }) => BigInt(String(number.value)) === iteration + 1n)
+        for (const child of [...((node.body as SyntaxNode[]) ?? []), ...(ending?.body ?? [])]) {
           result.push(...cloneNode(child, iterationPath))
         }
       }

@@ -497,7 +497,7 @@ describe('score-shape timing', () => {
     expect(following!.duration.valueOf()).toBe(0.5)
   })
 
-  it.each(['|:(x100001) C :|', `|:(x${'1' + '0'.repeat(400)}) C :|`])(
+  it.each(['|:@x100001 C :|', `|:@x${'1' + '0'.repeat(400)} C :|`])(
     'rejects an unsafe repeat without iterating it',
     (source) => {
       const node = parse(source).body[0] as Expression

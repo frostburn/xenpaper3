@@ -30,7 +30,7 @@ describe('repeat expansion', () => {
   })
 
   it('expands nested repeats and composes occurrence paths', () => {
-    const expanded = body('|:(x2) C |:(x2) D :| :|')
+    const expanded = body('|:@x2 C |:@x2 D :| :|')
 
     const occurrences = expanded.flatMap((node) => node.items as ExpandedNode[])
 
@@ -44,16 +44,16 @@ describe('repeat expansion', () => {
     ])
     expect(occurrences[2]!.expansionPath).toEqual([
       { repeatOffset: 0, iteration: 0 },
-      { repeatOffset: 9, iteration: 1 },
+      { repeatOffset: 8, iteration: 1 },
     ])
     expect(occurrences[5]!.expansionPath).toEqual([
       { repeatOffset: 0, iteration: 1 },
-      { repeatOffset: 9, iteration: 1 },
+      { repeatOffset: 8, iteration: 1 },
     ])
   })
 
   it('does not mutate the parser tree', () => {
-    const program = parse('|:(x2) C :|')
+    const program = parse('|:@x2 C :|')
     expandRepeats(program)
 
     expect(program.body[0]!.type).toBe('Repeat')
@@ -61,24 +61,24 @@ describe('repeat expansion', () => {
   })
 
   it('supports an empty zero-count repeat', () => {
-    expect(body('|:(x0) C :|')).toEqual([])
+    expect(body('|:@x0 C :|')).toEqual([])
   })
 
   it('returns a diagnostic and no partial program at the expansion limit', () => {
-    const result = expandRepeats(parse('|:(x3) C D :|'), { expansionLimit: 5 })
+    const result = expandRepeats(parse('|:@x3 C D :|'), { expansionLimit: 5 })
 
     expect(result.program).toBeUndefined()
     expect(result.diagnostics).toMatchObject([
       {
         code: 'XP_REPEAT_EXPANSION_LIMIT',
         severity: 'error',
-        locations: [{ start: { offset: 7 } }],
+        locations: [{ start: { offset: 6 } }],
       },
     ])
   })
 
   it('keeps a repeated parallel branch grouped as one branch', () => {
-    const [parallel] = body('C, |:(x2) D :|')
+    const [parallel] = body('C, |:@x2 D :|')
     const branches = parallel!.branches as ExpandedNode[]
 
     expect(branches.map((branch) => branch.type)).toEqual(['PitchLiteral', 'Sequence'])
@@ -89,12 +89,29 @@ describe('repeat expansion', () => {
   })
 
   it('retains the same source location across expanded occurrences', () => {
-    const expanded = body('|:(x3) C :|')
+    const expanded = body('|:@x3 C :|')
 
     expect(expanded.map((node) => node.location)).toEqual([
       expanded[0]!.location,
       expanded[0]!.location,
       expanded[0]!.location,
     ])
+  })
+
+  it.each([
+    ['|: 1 2 |@^1 3 4 :|@^2 5 6 ||', ['1', '2', '3', '4', '1', '2', '5', '6']],
+    [
+      '|:ˣ³ 1 2 |¹ 3 4 :|² 5 6 :|³ 7 8 ||',
+      ['1', '2', '3', '4', '1', '2', '5', '6', '1', '2', '7', '8'],
+    ],
+  ])('expands numbered alternate endings in %s', (source, expected) => {
+    const degrees = (nodes: readonly ExpandedNode[]): string[] =>
+      nodes.flatMap((node) =>
+        node.type === 'DegreeLiteral'
+          ? [node.degree as string]
+          : degrees(((node.items as ExpandedNode[] | undefined) ?? [])),
+      )
+
+    expect(degrees(body(source))).toEqual(expected)
   })
 })

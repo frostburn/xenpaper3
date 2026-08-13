@@ -82,7 +82,11 @@ function mapScoreConstruction(
     }
   }
   if (node.type === 'Repeat') {
-    return { ...node, body: node.body.map(mapItem) }
+    return {
+      ...node,
+      body: node.body.map(mapItem),
+      endings: node.endings.map((ending) => ({ ...ending, body: ending.body.map(mapItem) })),
+    }
   }
   if (node.type === 'Group') {
     const expression = mapScoreConstruction(node.expression, mapLeaf)
@@ -294,9 +298,18 @@ function repeatCount(node: Extract<Expression, { type: 'Repeat' }>): number | un
   } catch {
     return undefined
   }
-  const expandedNodes = count * BigInt(Math.max(1, node.body.length))
+  const longestEnding = Math.max(0, ...node.endings.map((ending) => ending.body.length))
+  const expandedNodes = count * BigInt(Math.max(1, node.body.length + longestEnding))
   if (count < 0n || expandedNodes > BigInt(MAX_REPEAT_EXPANSION_NODES)) return undefined
   return Number(count)
+}
+
+function repeatBody(
+  node: Extract<Expression, { type: 'Repeat' }>,
+  iteration: number,
+): readonly Expression[] {
+  const ending = node.endings.find(({ number }) => BigInt(number.value) === BigInt(iteration + 1))
+  return ending ? [...node.body, ...ending.body] : node.body
 }
 
 function hasShape(
@@ -651,7 +664,10 @@ export function evaluateScoreSemantics(
       const count = repeatCount(current)
       if (count === undefined) return active
       for (let iteration = 0; iteration < count; iteration++) {
-        active = current.body.reduce((bodyContext, item) => contextAfter(item, bodyContext), active)
+        active = repeatBody(current, iteration).reduce(
+          (bodyContext, item) => contextAfter(item, bodyContext),
+          active,
+        )
       }
       return active
     }
@@ -694,7 +710,7 @@ export function evaluateScoreSemantics(
       const count = repeatCount(current)
       if (count === undefined) return active
       for (let iteration = 0; iteration < count; iteration++) {
-        active = current.body.reduce(
+        active = repeatBody(current, iteration).reduce(
           (bodyPulse, item) => pulseAfter(item, bodyPulse, context),
           active,
         )
@@ -787,7 +803,7 @@ export function evaluateScoreSemantics(
         let iterationContext = activeContext
         let iterationPulse = activePulse
         const results: ScoreShapeEvaluationResult[] = []
-        for (const item of current.body) {
+        for (const item of repeatBody(current, iteration)) {
           results.push(visit(item, iterationContext, iterationPulse))
           iterationPulse = pulseAfter(item, iterationPulse, iterationContext)
           iterationContext = contextAfter(item, iterationContext)

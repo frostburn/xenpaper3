@@ -95,7 +95,7 @@ describe('beat event expansion', () => {
   })
 
   it('expands repeats and preserves simultaneous branch timing', () => {
-    const result = score('|:(x2) C, E G :|')
+    const result = score('|:@x2 C, E G :|')
     const notes = result.events.filter((event) => event.kind === 'note')
 
     expect(notes.map((note) => note.start.toFraction())).toEqual(['0', '0', '1', '2', '2', '3'])
