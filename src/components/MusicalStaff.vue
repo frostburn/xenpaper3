@@ -75,6 +75,7 @@ const items = computed(() => {
     activeNotes: NoteLayoutItem[]
     activeSpan?: Fraction
     barlineSinceActiveItems?: boolean
+    hasFollowingContinuation?: boolean
   }
   const visit = (
     shape: StaffNotationShape,
@@ -143,7 +144,7 @@ const items = computed(() => {
           note.tuplets.map((tuplet) => tuplet.id).join(',') === tupletIds.join(',') &&
           Number.isInteger(Math.log2(durationValue(note.duration))),
       )
-      if (tupletIds.length && resolvesToRegularNotes) {
+      if (!state.hasFollowingContinuation && tupletIds.length && resolvesToRegularNotes) {
         state.activeNotes.forEach((note) => {
           note.tuplets = []
         })
@@ -164,9 +165,14 @@ const items = computed(() => {
     } else if (shape.kind === 'sequence') {
       const startOffset = offset
       const startIndex = layout.length
-      shape.children.forEach((child) => {
+      const inheritedFollowingContinuation = state.hasFollowingContinuation
+      shape.children.forEach((child, index) => {
+        state.hasFollowingContinuation =
+          inheritedFollowingContinuation ||
+          shape.children.slice(index + 1).some((following) => following.kind === 'continue')
         offset = visit(child, offset, state, voice)
       })
+      state.hasFollowingContinuation = inheritedFollowingContinuation
       if (shape.normalized || shape.tuplet) {
         const rhythmicItems = layout
           .slice(startIndex)
@@ -668,21 +674,25 @@ const restDotY = (duration: Fraction, tupletCount?: number) =>
           <ellipse
             v-else
             class="notehead"
-            :class="{ 'notehead--open': isOpenNotehead(engravingDuration(item)) }"
+            :class="{
+              'notehead--open': isOpenNotehead(
+                effectiveDuration(engravingDuration(item), tupletCount(item)),
+              ),
+            }"
             :cx="x(item.column)"
             :cy="y(item.pitch.staffPosition)"
             rx="7"
             ry="5"
           />
           <circle
-            v-if="isDotted(engravingDuration(item))"
+            v-if="isDotted(effectiveDuration(engravingDuration(item), tupletCount(item)))"
             class="augmentation-dot"
             :cx="x(item.column) + 13"
             :cy="y(item.pitch.staffPosition) - (item.pitch.staffPosition % 2 ? 0 : 3)"
             r="2"
           />
           <line
-            v-if="hasStem(engravingDuration(item))"
+            v-if="hasStem(effectiveDuration(engravingDuration(item), tupletCount(item)))"
             class="stem"
             :x1="x(item.column) + 6"
             :x2="x(item.column) + 6"
