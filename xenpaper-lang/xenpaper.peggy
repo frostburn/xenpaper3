@@ -446,7 +446,8 @@ ContextStatementList
     }
 
 ContextStatement
-  = name:$('root'i) !IdentifierContinue Spacing "=" Spacing value:ScaleDegreeLiteral {
+  = name:$('root'i) !IdentifierContinue Spacing "=" Spacing
+    value:(ShiftedValueExpression / ScaleDegreeLiteral) {
       return node('ContextAssignment', {
         target: node('ContextNameTarget', { name: name.toLowerCase() }),
         value,

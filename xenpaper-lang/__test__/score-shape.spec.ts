@@ -101,6 +101,14 @@ describe('score-shape timing', () => {
     expect(attacks[1]?.pitch.value.valueOf()).toBeCloseTo(900)
   })
 
+  it('moves the root to an equave-shifted scale degree expression', () => {
+    const result = shape("{root = '0} 0 1") as SequenceShape
+    const attacks = result.children.filter((child) => child.kind === 'attack')
+
+    expect(attacks[0]?.pitch.value.valueOf()).toBeCloseTo(1200)
+    expect(attacks[1]?.pitch.value.valueOf()).toBeCloseTo(1300)
+  })
+
   it('rotates scale modes while preserving the equave', () => {
     const attacksIn = (score: ScoreShape): Extract<ScoreShape, { kind: 'attack' }>[] =>
       score.kind === 'attack'
