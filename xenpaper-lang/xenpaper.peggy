@@ -471,7 +471,9 @@ ContextPreset
   = raw:$(UnsignedInteger "ed"i (RatioText / UnsignedInteger)) !IdentifierContinue {
       return { kind: 'equalDivision', raw };
     }
-  / raw:$([a-zA-Z]* UnsignedInteger ("edo"i / [a-zA-Z]*)) !IdentifierContinue {
+  / raw:$([a-zA-Z]* UnsignedInteger ("edo"i / [a-zA-Z]*))
+    &{ return !/^\d+$/.test(raw); }
+    !IdentifierContinue {
       return { kind: 'rank1', raw };
     }
 

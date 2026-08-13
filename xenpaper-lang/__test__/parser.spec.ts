@@ -96,6 +96,17 @@ describe('enumerated chords', () => {
     })
   })
 
+  it('keeps a single bare integer as a degree mapping rather than a preset', () => {
+    expect(parse('{2}').body[0]).toMatchObject({
+      statements: [
+        {
+          type: 'ContextDegreeMapping',
+          values: [{ type: 'DegreeLiteral', degree: '2' }],
+        },
+      ],
+    })
+  })
+
   it('parses a root integer assignment as a scale degree', () => {
     expect(parse('{root = 3}').body[0]).toMatchObject({
       statements: [{ target: { name: 'root' }, value: { type: 'DegreeLiteral', degree: '3' } }],
