@@ -94,9 +94,14 @@ export function expandRepeats(
         ]
         const endings = (node.endings as { number: SyntaxNode & { value?: unknown }; body: SyntaxNode[] }[]) ?? []
         const ending = endings.find(({ number }) => BigInt(String(number.value)) === iteration + 1n)
-        const children = [...((node.body as SyntaxNode[]) ?? []), ...(ending?.body ?? [])].flatMap(
-          (child) => cloneNode(child, iterationPath),
-        )
+        const children = [...((node.body as SyntaxNode[]) ?? []), ...(ending?.body ?? [])]
+          .flatMap((child) => cloneNode(child, iterationPath))
+          // A repeat is an AST splice, not an evaluation boundary. The grammar
+          // represents a run of score items as a Sequence, so retaining that
+          // wrapper per iteration would incorrectly isolate stateful directives.
+          .flatMap((child) =>
+            child.type === 'Sequence' ? ((child.items as ExpandedNode[]) ?? []) : [child],
+          )
         if (endings.length && children.length) {
           const items = children.flatMap((child) =>
             child.type === 'Sequence' ? ((child.items as ExpandedNode[]) ?? []) : [child],
@@ -143,7 +148,11 @@ export function expandRepeats(
   }
 
   try {
-    const body = program.body.flatMap((node) => cloneNode(node as unknown as SyntaxNode, []))
+    const body = program.body
+      .flatMap((node) => cloneNode(node as unknown as SyntaxNode, []))
+      .flatMap((node) =>
+        node.type === 'Sequence' ? ((node.items as ExpandedNode[]) ?? []) : [node],
+      )
     return {
       program: { ...program, body, expansionPath: [] },
       diagnostics,

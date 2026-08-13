@@ -32,9 +32,7 @@ describe('repeat expansion', () => {
   it('expands nested repeats and composes occurrence paths', () => {
     const expanded = body('|:@x2 C |:@x2 D :| :|')
 
-    const occurrences = expanded.flatMap((node) => node.items as ExpandedNode[])
-
-    expect(occurrences.map((node) => node.type)).toEqual([
+    expect(expanded.map((node) => node.type)).toEqual([
       'PitchLiteral',
       'PitchLiteral',
       'PitchLiteral',
@@ -42,14 +40,22 @@ describe('repeat expansion', () => {
       'PitchLiteral',
       'PitchLiteral',
     ])
-    expect(occurrences[2]!.expansionPath).toEqual([
+    expect(expanded[2]!.expansionPath).toEqual([
       { repeatOffset: 0, iteration: 0 },
       { repeatOffset: 8, iteration: 1 },
     ])
-    expect(occurrences[5]!.expansionPath).toEqual([
+    expect(expanded[5]!.expansionPath).toEqual([
       { repeatOffset: 0, iteration: 1 },
       { repeatOffset: 8, iteration: 1 },
     ])
+  })
+
+  it('splices repeats into the surrounding AST like explicitly authored copies', () => {
+    const repeated = body('|: C D E F @. G :|')
+    const authored = body('C D E F @. G C D E F @. G')
+
+    expect(repeated.map((node) => node.type)).toEqual(authored.map((node) => node.type))
+    expect(repeated.some((node) => node.type === 'Repeat' || node.type === 'Sequence')).toBe(false)
   })
 
   it('does not mutate the parser tree', () => {
@@ -129,10 +135,15 @@ describe('repeat expansion', () => {
     const repeat = parse(source).body[0]
 
     expect(repeat).toMatchObject({ type: 'Repeat', terminal: null })
-    expect(
-      body(source).flatMap((node) =>
-        (node.items as ExpandedNode[]).map((item) => item.degree as string),
-      ),
-    ).toEqual(['1', '2', '3', '4', '1', '2', '5', '6'])
+    expect(body(source).map((node) => node.degree as string)).toEqual([
+      '1',
+      '2',
+      '3',
+      '4',
+      '1',
+      '2',
+      '5',
+      '6',
+    ])
   })
 })
