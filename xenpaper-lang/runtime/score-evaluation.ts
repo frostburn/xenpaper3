@@ -1399,8 +1399,8 @@ export function evaluateScoreSemantics(
       }
       return { shape, diagnostics }
     }
-    if (current.type === 'Group')
-      return visit(
+    if (current.type === 'Group') {
+      const grouped = visit(
         current.expression,
         context,
         currentPulse,
@@ -1408,6 +1408,12 @@ export function evaluateScoreSemantics(
         currentArticulation,
         currentArticulationMarks,
       )
+      if (!('shape' in grouped)) return grouped
+      return {
+        ...grouped,
+        shape: { ...grouped.shape, isolatedDirectiveScope: true },
+      }
+    }
     if (current.type === 'NormalizeToSlot') {
       if (!current.expression) {
         return {
@@ -1452,12 +1458,15 @@ export function evaluateScoreSemantics(
         !Number.isInteger(Math.log2(tuplet))
       ) {
         return {
-          shape: { ...normalized, normalized: true, tuplet },
+          shape: { ...normalized, normalized: true, isolatedDirectiveScope: true, tuplet },
           diagnostics: evaluated.diagnostics,
         }
       }
       return {
-        shape: normalized.kind === 'sequence' ? { ...normalized, normalized: true } : normalized,
+        shape:
+          normalized.kind === 'sequence'
+            ? { ...normalized, normalized: true, isolatedDirectiveScope: true }
+            : { ...normalized, isolatedDirectiveScope: true },
         diagnostics: evaluated.diagnostics,
       }
     }

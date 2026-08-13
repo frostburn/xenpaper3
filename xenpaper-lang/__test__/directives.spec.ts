@@ -112,6 +112,36 @@ describe('directive runtime', () => {
     ).toEqual(['0', '2/3', '1', '3/2'])
   })
 
+  it('isolates grooves in groups and parallel branches', () => {
+    expect(notes('(@groove([0= 0]) [1 2]) [3 4]').map(({ start }) => start.toFraction())).toEqual([
+      '0',
+      '2/3',
+      '1',
+      '3/2',
+    ])
+    expect(notes('[@groove([0= 0]) [1 2], [3 4]]').map(({ start }) => start.toFraction())).toEqual([
+      '0',
+      '0',
+      '1/2',
+      '2/3',
+    ])
+  })
+
+  it('warps normalized attacks after continuation rescaling', () => {
+    expect(notes('@groove([0= 0]) [1 2]=').map(({ start }) => start.toFraction())).toEqual([
+      '0',
+      '1',
+    ])
+  })
+
+  it('rejects playback-invalid groove templates', () => {
+    const result = compile('@groove([= 0 0]) 1')
+    expect(result.diagnostics).toContainEqual(
+      expect.objectContaining({ code: 'XP_CONTINUE_WITHOUT_ATTACK', severity: 'error' }),
+    )
+    expect('score' in result).toBe(false)
+  })
+
   it('multiplies interpolated groove dynamics and articulation', () => {
     const events = notes('@p @groove([@f @. 0 0]) [1 2 3]')
     expect(events[0]!.dynamic.valueOf()).toBeCloseTo(0.39)

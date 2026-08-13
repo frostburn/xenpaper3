@@ -184,6 +184,8 @@ export interface SourceOrigin {
 export interface ShapeBase {
   readonly duration: Fraction
   readonly origins: readonly SourceOrigin[]
+  /** Directive state within this shape does not escape to its parent scope. */
+  readonly isolatedDirectiveScope?: boolean
 }
 
 export interface AttackShape extends ShapeBase {

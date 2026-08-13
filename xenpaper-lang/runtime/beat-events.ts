@@ -33,24 +33,33 @@ function flattenScoreSemantics(shape: ScoreShape): BeatEventFlatteningResult {
   const diagnostics: Diagnostic[] = []
   type MutableNoteEvent = Omit<
     BeatTimedNoteEvent,
-    'start' | 'duration' | 'automation' | 'origins'
+    'start' | 'duration' | 'dynamic' | 'automation' | 'origins'
   > & {
     start: Fraction
     duration: Fraction
+    dynamic: Fraction
     automation?: BeatTimedNoteEvent['automation']
     origins: readonly BeatTimedNoteEvent['origins'][number][]
+    groove?: Groove
+    articulation: Fraction
   }
-  type State = { active: MutableNoteEvent[]; activeStart?: Fraction; activeSpan?: Fraction }
+  type State = {
+    active: MutableNoteEvent[]
+    activeStart?: Fraction
+    activeSpan?: Fraction
+    groove?: Groove
+  }
   const completedAutomations = new WeakSet<MutableNoteEvent>()
   type Groove = {
     origin: Fraction
     cycle: Fraction
     points: { nominal: Fraction; actual: Fraction; dynamic: Fraction; articulation: Fraction }[]
   }
-  let groove: Groove | undefined
-
-  const interpolate = (value: Fraction, key: 'actual' | 'dynamic' | 'articulation') => {
-    if (!groove) return copy(value)
+  const interpolate = (
+    groove: Groove,
+    value: Fraction,
+    key: 'actual' | 'dynamic' | 'articulation',
+  ) => {
     const relative = value.sub(groove.origin)
     const cycleIndex = Math.floor(relative.div(groove.cycle).valueOf())
     const local = relative.sub(groove.cycle.mul(cycleIndex))
@@ -73,28 +82,29 @@ function flattenScoreSemantics(shape: ScoreShape): BeatEventFlatteningResult {
   }
 
   const visit = (current: ScoreShape, start: Fraction, state: State): Fraction => {
+    if (!current.isolatedDirectiveScope) return visitCurrent(current, start, state)
+    const isolatedState = { ...state }
+    const end = visitCurrent(current, start, isolatedState)
+    state.active = isolatedState.active
+    state.activeStart = isolatedState.activeStart
+    state.activeSpan = isolatedState.activeSpan
+    return end
+  }
+
+  const visitCurrent = (current: ScoreShape, start: Fraction, state: State): Fraction => {
     if (current.kind === 'attack') {
-      const warpedStart = interpolate(start, 'actual')
-      const rhythmicEnd = interpolate(start.add(current.duration), 'actual')
-      const grooveDynamic = groove
-        ? interpolate(start, 'dynamic').div(DYNAMIC_VELOCITIES.mf)
-        : new Fraction(1)
-      const grooveArticulation = groove ? interpolate(start, 'articulation') : new Fraction(1)
       const event: MutableNoteEvent = {
         kind: 'note',
-        start: warpedStart,
-        duration: rhythmicEnd
-          .sub(warpedStart)
-          .mul(current.articulation ?? new Fraction(1))
-          .mul(grooveArticulation),
+        start: copy(start),
+        duration: copy(current.duration),
         pitch: current.pitch,
         rootPitch: current.rootPitch,
-        dynamic: copy((current as typeof current & { readonly velocity: Fraction }).velocity).mul(
-          grooveDynamic,
-        ),
+        dynamic: copy((current as typeof current & { readonly velocity: Fraction }).velocity),
         automation: current.automation,
         label: current.authoredLabel ?? current.displayLabel,
         origins: current.origins,
+        groove: state.groove,
+        articulation: current.articulation ?? new Fraction(1),
       }
       events.push(event)
       state.active = [event]
@@ -130,15 +140,20 @@ function flattenScoreSemantics(shape: ScoreShape): BeatEventFlatteningResult {
       state.activeStart = undefined
       state.activeSpan = undefined
     } else if (current.kind === 'groove') {
-      if (!current.template) groove = undefined
+      if (!current.template) state.groove = undefined
       else {
         const flattened = flattenScoreSemantics(current.template)
+        diagnostics.push(...flattened.diagnostics)
         const controls = flattened.score.events.filter(
           (event): event is BeatTimedNoteEvent => event.kind === 'note',
         )
-        if (controls.length >= 2 && flattened.score.duration.compare(0) > 0) {
+        if (
+          !flattened.diagnostics.some(({ severity }) => severity === 'error') &&
+          controls.length >= 2 &&
+          flattened.score.duration.compare(0) > 0
+        ) {
           const cycle = flattened.score.duration
-          groove = {
+          state.groove = {
             origin: copy(start),
             cycle,
             points: controls.map((control, index) => {
@@ -185,7 +200,7 @@ function flattenScoreSemantics(shape: ScoreShape): BeatEventFlatteningResult {
       return start.add(current.duration)
     } else {
       const firstEvent = events.length
-      const states = current.branches.map((): State => ({ active: [] }))
+      const states = current.branches.map((): State => ({ active: [], groove: state.groove }))
       current.branches.forEach((branch, index) => visit(branch, start, states[index]!))
       // A continuation after a parallel distributes over every attack in the
       // construction, rather than only the last attack in each branch.
@@ -202,6 +217,26 @@ function flattenScoreSemantics(shape: ScoreShape): BeatEventFlatteningResult {
   }
 
   visit(shape, new Fraction(0), { active: [] })
+  for (const event of events) {
+    if (event.kind !== 'note') continue
+    const mutable = event as MutableNoteEvent
+    const nominalStart = mutable.start
+    const nominalEnd = nominalStart.add(mutable.duration)
+    if (mutable.groove) {
+      const warpedStart = interpolate(mutable.groove, nominalStart, 'actual')
+      const warpedEnd = interpolate(mutable.groove, nominalEnd, 'actual')
+      mutable.start = warpedStart
+      mutable.duration = warpedEnd
+        .sub(warpedStart)
+        .mul(mutable.articulation)
+        .mul(interpolate(mutable.groove, nominalStart, 'articulation'))
+      mutable.dynamic = mutable.dynamic.mul(
+        interpolate(mutable.groove, nominalStart, 'dynamic').div(DYNAMIC_VELOCITIES.mf),
+      )
+    } else mutable.duration = mutable.duration.mul(mutable.articulation)
+    delete mutable.groove
+    delete (mutable as Partial<MutableNoteEvent>).articulation
+  }
   events.sort((left, right) => left.start.compare(right.start))
   return { score: { duration: copy(shape.duration), events }, diagnostics }
 }
