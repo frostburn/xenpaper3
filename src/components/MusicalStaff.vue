@@ -100,16 +100,16 @@ const items = computed(() => {
       state.activeNotes = [note]
       state.activeSpan = shape.duration
       state.barlineSinceActiveItems = false
-    } else if (shape.kind === 'continue' && state.activeItems.length && state.activeSpan) {
+    } else if (shape.kind === 'continue' && state.activeItems.length) {
       const continuedDuration = fraction(shape.duration)
-      const activeSpan = fraction(state.activeSpan)
-      const factor = continuedDuration.div(activeSpan)
+      const activeSpan = state.activeSpan ? fraction(state.activeSpan) : undefined
       if (state.barlineSinceActiveItems) {
         const activeStartOffset = state.activeItems.reduce(
           (earliest, item) => (item.offset.compare(earliest) < 0 ? item.offset : earliest),
           state.activeItems[0]!.offset,
         )
         const continuedItems = state.activeItems.map((item) => {
+          const factor = continuedDuration.div(activeSpan ?? item.duration)
           const duration = fraction(item.duration).mul(factor)
           const continuedOffset = fraction(offset).add(item.offset.sub(activeStartOffset).mul(factor))
           const continuedItem: RhythmicLayoutItem =
@@ -134,9 +134,10 @@ const items = computed(() => {
       } else {
         state.activeItems.forEach((item) => {
           const duration = fraction(item.duration)
+          const factor = continuedDuration.div(activeSpan ?? duration)
           item.duration = duration.add(duration.mul(factor))
         })
-        state.activeSpan = activeSpan.add(continuedDuration)
+        state.activeSpan = activeSpan?.add(continuedDuration)
       }
       const tupletIds = state.activeNotes[0]?.tuplets.map((tuplet) => tuplet.id) ?? []
       const resolvesToRegularNotes = state.activeNotes.every(
@@ -203,15 +204,20 @@ const items = computed(() => {
       }
       return offset
     } else if (shape.kind === 'parallel') {
+      const startIndex = layout.length
       const branchStates = shape.branches.map(
         (): VisitState => ({ activeItems: [], activeNotes: [] }),
       )
       const branchEnds = shape.branches.map((branch, index) =>
         visit(branch, offset, branchStates[index]!, nextVoiceId++),
       )
-      state.activeNotes = branchStates.flatMap((branch) => branch.activeNotes)
-      state.activeItems = branchStates.flatMap((branch) => branch.activeItems)
-      state.activeSpan = shape.duration
+      state.activeItems = layout
+        .slice(startIndex)
+        .filter((item): item is RhythmicLayoutItem => item.kind === 'note' || item.kind === 'rest')
+      state.activeNotes = state.activeItems.filter(
+        (item): item is NoteLayoutItem => item.kind === 'note',
+      )
+      state.activeSpan = undefined
       state.barlineSinceActiveItems = branchStates.some(
         (branch) => branch.barlineSinceActiveItems,
       )

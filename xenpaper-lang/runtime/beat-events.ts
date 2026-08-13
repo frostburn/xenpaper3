@@ -116,9 +116,14 @@ function flattenScoreSemantics(shape: ScoreShape): BeatEventFlatteningResult {
       }
       return start.add(current.duration)
     } else {
+      const firstEvent = events.length
       const states = current.branches.map((): State => ({ active: [] }))
       current.branches.forEach((branch, index) => visit(branch, start, states[index]!))
-      state.active = states.flatMap((branch) => branch.active)
+      // A continuation after a parallel distributes over every attack in the
+      // construction, rather than only the last attack in each branch.
+      state.active = events
+        .slice(firstEvent)
+        .filter((event): event is MutableNoteEvent => event.kind === 'note')
       // Unlike a normalized sequence, an uneven parallel has no single active
       // span: only the final notes of its longest branches remain active.
       state.activeStart = undefined

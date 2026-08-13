@@ -51,11 +51,11 @@ describe('beat event expansion', () => {
     ])
   })
 
-  it('adds a continuation to the active note of an uneven parallel', () => {
+  it('distributes a continuation over every note of an uneven parallel', () => {
     const result = score('(C, D E) =')
     const notes = result.events.filter((event) => event.kind === 'note')
 
-    expect(notes.map((note) => note.duration.valueOf())).toEqual([1, 1, 2])
+    expect(notes.map((note) => note.duration.valueOf())).toEqual([2, 2, 2])
   })
 
   it('retains authored ratio labels for static renderers', () => {

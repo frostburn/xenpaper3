@@ -568,6 +568,16 @@ describe('MusicalStaff', () => {
     expect(wrapper.findAll('.tuplet-bracket')).toHaveLength(0)
   })
 
+  it('distributes a continuation over every note of an uneven parallel', () => {
+    const evaluated = evaluateScoreShape(parse('(C, D E) =').body[0]!)
+    if (!('shape' in evaluated)) throw new Error('Expected a score shape.')
+    const wrapper = mount(MusicalStaff, {
+      props: { notation: constructStaffNotationShape(evaluated.shape) },
+    })
+
+    expect(wrapper.findAll('.notehead--open')).toHaveLength(3)
+  })
+
   it('splits continued notes at barlines and joins the repeated notehead with a tie', () => {
     const barred: StaffNotationShape = {
       kind: 'sequence',
