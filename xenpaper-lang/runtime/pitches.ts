@@ -348,6 +348,17 @@ export function applyPitchContextChange(
       }
       continue
     }
+    if (statement.target.type === 'ContextNameTarget' && statement.target.name === 'equave') {
+      const evaluated = evaluateExpression(statement.value, context)
+      if (!('value' in evaluated) || evaluated.value.kind === 'absolutePitch')
+        throw new TypeError('An equave assignment requires a pitch interval.')
+      const degreeEquave =
+        evaluated.value.kind === 'pitchOffset'
+          ? evaluated.value.value
+          : Value.pitch(evaluated.value.value)
+      context = { ...context, degreeEquave }
+      continue
+    }
     if (statement.target.type === 'ContextNameTarget' && statement.target.name === 'mode') {
       const evaluated = evaluateExpression(statement.value, context)
       if (
@@ -375,7 +386,7 @@ export function applyPitchContextChange(
           .add(context.degreeEquave.mul(new Value(Math.floor(unwrappedIndex / degreeCount))))
           .sub(pivot)
       })
-      context = { ...context, degrees, degreeEquave: degrees[degreeCount - 1]! }
+      context = { ...context, degrees }
       continue
     }
     if (

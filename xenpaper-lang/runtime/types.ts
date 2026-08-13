@@ -106,9 +106,9 @@ export interface PrimeMapping {
 
 export interface PitchContext {
   readonly mapping: PrimeMapping
-  /** Scale degrees, with the last entry also defining the equave. */
+  /** Scale degrees. Plain scale declarations initially use the last entry as the equave. */
   readonly degrees: readonly Value[]
-  /** Displacement applied by each equave modifier on a numeric degree. */
+  /** Displacement applied when numeric degrees wrap and by each equave modifier. */
   readonly degreeEquave: Value
   /** Sounding displacement of the current root from the default root frequency. */
   readonly rootDisplacement: Value

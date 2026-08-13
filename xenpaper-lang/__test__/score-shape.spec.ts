@@ -116,6 +116,33 @@ describe('score-shape timing', () => {
     ;[1, 4 / 3, 16 / 9, 2].forEach((ratio, index) => expect(negative[index]).toBeCloseTo(ratio))
   })
 
+  it('assigns an equave independently of the scale degrees', () => {
+    const result = shape('{4/3 3/2 2/1}{equave = 3/1} 0 1 2 3 4') as SequenceShape
+    const pitches = result.children
+      .filter((child) => child.kind === 'attack')
+      .map((attack) => attack.pitch.value)
+
+    ;[1, 4 / 3, 3 / 2, 2, 4].forEach((ratio, index) =>
+      expect(pitches[index]!.valueOf()).toBeCloseTo(1200 * Math.log2(ratio)),
+    )
+  })
+
+  it('rotates non-monotonic scales without changing their equave', () => {
+    const result = shape('{3/2 4/3 2/1}{equave = 3/1}{mode = 1} 0 1 2 3') as SequenceShape
+    const pitches = result.children
+      .filter((child) => child.kind === 'attack')
+      .map((attack) => attack.pitch.value)
+
+    ;[
+      [1n, 1n],
+      [8n, 9n],
+      [2n, 1n],
+      [3n, 1n],
+    ].forEach(([numerator, denominator], index) =>
+      expect(pitches[index]!.equals(Value.pitch(new Value(numerator!, denominator!)))).toBe(true),
+    )
+  })
+
   it('accepts every numeric interval literal and respects explicit degree equaves', () => {
     const mixed = shape(String.raw`{123c 3/2 1201c} 0 1 2 3 4`) as SequenceShape
     const mixedPitches = mixed.children
