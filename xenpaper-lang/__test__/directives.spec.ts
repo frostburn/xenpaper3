@@ -136,6 +136,14 @@ describe('directive runtime', () => {
     expect(extendedGlide[0]!.automation?.duration.valueOf()).toBe(2)
   })
 
+  it('chains adjacent gliss directives into one held note', () => {
+    const chained = notes('@gliss E @gliss F G')
+
+    expect(chained).toHaveLength(1)
+    expect(chained[0]!.duration.valueOf()).toBe(3)
+    expect(chained[0]!.automation?.duration.valueOf()).toBe(1)
+  })
+
   it('trims composite tails without rescaling earlier notes', () => {
     expect(notes('(C D)?').map((event) => event.duration.valueOf())).toEqual([1, 0])
   })
