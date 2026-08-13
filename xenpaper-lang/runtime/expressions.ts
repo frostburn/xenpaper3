@@ -246,8 +246,12 @@ export function evaluateExpression(
       const context = 'rootPitch' in mapping ? mapping : createPitchContext(mapping)
       const degree = Number(node.degree)
       const degrees = context.degrees
-      const value = degrees[mmod(degree - 1, degrees.length)]!.add(
-        context.degreeEquave.mul(new Value(Math.floor((degree - 1) / degrees.length))),
+      const value = (
+        degree
+          ? degrees[mmod(degree - 1, degrees.length)]!.add(
+              context.degreeEquave.mul(new Value(Math.floor((degree - 1) / degrees.length))),
+            )
+          : Value.cents(0)
       ).add(context.degreeEquave.mul(new Value(equaveShifts(node.modifiers))))
       return {
         value: result('pitchOffset', value, [{ location: node.location, role: 'literal' }]),
