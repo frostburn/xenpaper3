@@ -1,5 +1,10 @@
 import { Fraction, mmod } from 'xen-dev-utils/fraction'
-import type { IntervalLiteral, PitchContextChange, PitchLiteral } from '../parser.generated.js'
+import type {
+  Expression,
+  IntervalLiteral,
+  PitchContextChange,
+  PitchLiteral,
+} from '../parser.generated.js'
 import type { Diagnostic } from '../diagnostics'
 import { Value } from '../value'
 import { applyFjsInflections, fjsPrimeComma, groupFjsInflections } from './fjs'
@@ -245,9 +250,13 @@ export function applyPitchContextChange(
       continue
     }
     if (statement.type === 'ContextDegreeMapping') {
-      let values = statement.values
-      const enumerated = values.length === 1 ? values[0] : undefined
-      if (enumerated?.type === 'EnumeratedChord') {
+      const expandDegreeExpression = (expression: Expression): Expression[] => {
+        if (expression.type === 'Sequence') return expression.items.flatMap(expandDegreeExpression)
+        if (expression.type === 'Parallel')
+          return expression.branches.flatMap(expandDegreeExpression)
+        if (expression.type !== 'EnumeratedChord') return [expression]
+
+        const enumerated = expression
         let enumerands = enumerated.enumerands
         if (!enumerands) {
           const endpoints = [enumerated.first, enumerated.rangeEnd!].map((endpoint) => {
@@ -276,7 +285,7 @@ export function applyPitchContextChange(
         }
         // Unlike a chord used as notes, a scale already has an implicit unison.
         // Drop the first enumerand rather than storing a redundant 1/1 degree.
-        values = enumerands.slice(1).map((enumerand) => ({
+        return enumerands.slice(1).map((enumerand) => ({
           type: 'BinaryExpression',
           operator: '/',
           left: enumerated.inverted ? enumerated.first : enumerand,
@@ -284,6 +293,7 @@ export function applyPitchContextChange(
           location: enumerated.location,
         }))
       }
+      const values = statement.values.flatMap(expandDegreeExpression)
       const degrees = values.map((value) => {
         const evaluated = evaluateExpression(value, context)
         if (!('value' in evaluated))

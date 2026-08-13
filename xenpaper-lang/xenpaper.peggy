@@ -401,43 +401,22 @@ DirectiveArgument
   / AdditiveExpression
 
 PitchContextChange
-  = "{" Spacing values:DegreeMappingList Spacing "}" {
+  = "{" Spacing preset:ContextPreset Spacing "}" {
       return node('PitchContextChange', {
-        statements: [node('ContextDegreeMapping', { values })],
+        statements: [node('ContextPreset', preset)],
       });
     }
-  / "{" Spacing statements:ContextStatementList? Spacing "}" {
-      return node('PitchContextChange', { statements: statements ?? [] });
+  / "{" Spacing statements:ContextStatementList Spacing "}" {
+      return node('PitchContextChange', { statements });
     }
-
-DegreeMappingList
-  = chord:EnumeratedChord { return [chord]; }
-  / first:DegreeMappingLiteral rest:(SequenceGap value:DegreeMappingLiteral { return value; })+ {
-      return [first, ...rest];
+  / "{" Spacing expression:ParallelExpression Spacing "}" {
+      return node('PitchContextChange', {
+        statements: [node('ContextDegreeMapping', { values: [expression] })],
+      });
     }
-  / value:SingleDegreeMappingLiteral { return [value]; }
-
-// An integer cent token remains available for wart notation (`{88c}`), while
-// the decimal dot makes a single-entry cent scale unambiguous (`{88.0c}`).
-SingleDegreeMappingLiteral
-  = value:QuantityLiteral &{
-      return value.unit.toLowerCase() !== 'c' || value.magnitude.includes('.');
-    } { return value; }
-  / EqualDivisionLiteral
-  / RatioLiteral
-  / RealLiteral
-  / DecimalLiteral
-  / PitchLiteral
-  / ScaleDegreeLiteral
-
-DegreeMappingLiteral
-  = EqualDivisionLiteral
-  / QuantityLiteral
-  / RatioLiteral
-  / RealLiteral
-  / DecimalLiteral
-  / PitchLiteral
-  / ScaleDegreeLiteral
+  / "{" Spacing "}" {
+      return node('PitchContextChange', { statements: [] });
+    }
 
 ContextStatementList
   = first:ContextStatement
@@ -458,9 +437,6 @@ ContextStatement
     }
   / preset:ContextPreset {
       return node('ContextPreset', preset);
-    }
-  / value:AdditiveExpression {
-      return node('ContextExpression', { value });
     }
 
 ContextAssignmentTarget
@@ -495,7 +471,9 @@ ContextPreset
   = raw:$(UnsignedInteger "ed"i (RatioText / UnsignedInteger)) !IdentifierContinue {
       return { kind: 'equalDivision', raw };
     }
-  / raw:$([a-zA-Z]* UnsignedInteger ("edo"i / [a-zA-Z]*)) !IdentifierContinue {
+  / raw:$([a-zA-Z]* UnsignedInteger ("edo"i / [a-zA-Z]*))
+    &{ return !/^\d+$/.test(raw); }
+    !IdentifierContinue {
       return { kind: 'rank1', raw };
     }
 

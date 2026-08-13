@@ -66,10 +66,42 @@ describe('enumerated chords', () => {
         {
           type: 'ContextDegreeMapping',
           values: [
-            { type: 'DegreeLiteral', degree: '3' },
-            { type: 'DegreeLiteral', degree: '6' },
-            { type: 'DegreeLiteral', degree: '8' },
+            {
+              type: 'Sequence',
+              items: [
+                { type: 'DegreeLiteral', degree: '3' },
+                { type: 'DegreeLiteral', degree: '6' },
+                { type: 'DegreeLiteral', degree: '8' },
+              ],
+            },
           ],
+        },
+      ],
+    })
+  })
+
+  it('parses degree mappings with the ordinary sequence and parallel grammar', () => {
+    expect(parse('{3/2 5/4, 7/4}').body[0]).toMatchObject({
+      statements: [
+        {
+          type: 'ContextDegreeMapping',
+          values: [
+            {
+              type: 'Parallel',
+              branches: [{ type: 'Sequence' }, { type: 'RatioLiteral' }],
+            },
+          ],
+        },
+      ],
+    })
+  })
+
+  it('keeps a single bare integer as a degree mapping rather than a preset', () => {
+    expect(parse('{2}').body[0]).toMatchObject({
+      statements: [
+        {
+          type: 'ContextDegreeMapping',
+          values: [{ type: 'DegreeLiteral', degree: '2' }],
         },
       ],
     })
