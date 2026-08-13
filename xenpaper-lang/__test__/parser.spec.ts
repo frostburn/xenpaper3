@@ -144,7 +144,7 @@ A B . ||
 {root = 220Hz}
 {${'`'}A = root}
 {41edo}
-|:(x10)
+|:@x10
 [${'`'}A, Cv5, E]
 [Cv5, E, Gv5]
 [${'`'}B, Dv5, Gv5]
@@ -271,7 +271,7 @@ describe('Xenpaper surface grammar', () => {
   })
 
   it('keeps parallel branches and repeats as syntax-tree nodes', () => {
-    const program = parse('C D,\nE F G,\nA B . ||\n|:(x10) [C, E, G] :|')
+    const program = parse('C D,\nE F G,\nA B . ||\n|:@x10 [C, E, G] :|')
     const body = program.body as SyntaxNode[]
 
     expect(body.map((item) => item.type)).toEqual(['Parallel', 'HardBoundary', 'Repeat'])

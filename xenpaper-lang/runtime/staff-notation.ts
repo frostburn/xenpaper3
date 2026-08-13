@@ -318,7 +318,12 @@ export function constructStaffNotationShape(shape: ScoreShape): StaffNotationSha
     case 'continue':
       return { kind: 'continue', duration: shape.duration }
     case 'barline':
-      return { kind: 'barline', style: shape.style, duration: shape.duration }
+      return {
+        kind: 'barline',
+        style: shape.style,
+        duration: shape.duration,
+        endingNumber: shape.endingNumber,
+      }
     case 'annotation':
       return { kind: 'annotation', text: shape.text, duration: shape.duration }
     case 'dynamic':

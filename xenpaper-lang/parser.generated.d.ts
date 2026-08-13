@@ -266,6 +266,13 @@ export interface Repeat extends Node {
   type: 'Repeat'
   count: IntegerLiteral | null
   body: Expression[]
+  endings: RepeatEnding[]
+  terminal: ':|' | '|' | '||' | null
+}
+
+export interface RepeatEnding {
+  number: IntegerLiteral
+  body: Expression[]
 }
 
 export interface Rest extends Node {

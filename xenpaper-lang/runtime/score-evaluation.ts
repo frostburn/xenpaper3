@@ -82,7 +82,11 @@ function mapScoreConstruction(
     }
   }
   if (node.type === 'Repeat') {
-    return { ...node, body: node.body.map(mapItem) }
+    return {
+      ...node,
+      body: node.body.map(mapItem),
+      endings: node.endings.map((ending) => ({ ...ending, body: ending.body.map(mapItem) })),
+    }
   }
   if (node.type === 'Group') {
     const expression = mapScoreConstruction(node.expression, mapLeaf)
@@ -294,9 +298,20 @@ function repeatCount(node: Extract<Expression, { type: 'Repeat' }>): number | un
   } catch {
     return undefined
   }
-  const expandedNodes = count * BigInt(Math.max(1, node.body.length))
+  const longestEnding = Math.max(0, ...node.endings.map((ending) => ending.body.length))
+  const expandedNodes = count * BigInt(Math.max(1, node.body.length + longestEnding))
   if (count < 0n || expandedNodes > BigInt(MAX_REPEAT_EXPANSION_NODES)) return undefined
   return Number(count)
+}
+
+function repeatBody(
+  node: Extract<Expression, { type: 'Repeat' }>,
+  iteration: number,
+): readonly Expression[] {
+  const ending = node.endings.find(({ number }) => BigInt(number.value) === BigInt(iteration + 1))
+  return [...node.body, ...(ending?.body ?? [])].flatMap((item) =>
+    item.type === 'Sequence' ? item.items : [item],
+  )
 }
 
 function hasShape(
@@ -325,8 +340,8 @@ function generatedRest(duration: Fraction): RestShape {
   return { kind: 'rest', duration, generated: true, origins: [] }
 }
 
-function barline(node: Expression, style: BarlineStyle): BarlineShape {
-  return { kind: 'barline', style, duration: new Fraction(0), origins: [origin(node)] }
+function barline(node: Expression, style: BarlineStyle, endingNumber?: number): BarlineShape {
+  return { kind: 'barline', style, duration: new Fraction(0), origins: [origin(node)], endingNumber }
 }
 
 function pad(shape: ScoreShape, duration: Fraction): ScoreShape {
@@ -651,7 +666,10 @@ export function evaluateScoreSemantics(
       const count = repeatCount(current)
       if (count === undefined) return active
       for (let iteration = 0; iteration < count; iteration++) {
-        active = current.body.reduce((bodyContext, item) => contextAfter(item, bodyContext), active)
+        active = repeatBody(current, iteration).reduce(
+          (bodyContext, item) => contextAfter(item, bodyContext),
+          active,
+        )
       }
       return active
     }
@@ -694,7 +712,7 @@ export function evaluateScoreSemantics(
       const count = repeatCount(current)
       if (count === undefined) return active
       for (let iteration = 0; iteration < count; iteration++) {
-        active = current.body.reduce(
+        active = repeatBody(current, iteration).reduce(
           (bodyPulse, item) => pulseAfter(item, bodyPulse, context),
           active,
         )
@@ -786,15 +804,17 @@ export function evaluateScoreSemantics(
       for (let iteration = 0; iteration < iterations; iteration++) {
         let iterationContext = activeContext
         let iterationPulse = activePulse
-        const results: ScoreShapeEvaluationResult[] = []
-        for (const item of current.body) {
-          results.push(visit(item, iterationContext, iterationPulse))
-          iterationPulse = pulseAfter(item, iterationPulse, iterationContext)
-          iterationContext = contextAfter(item, iterationContext)
+        const iterationNode: Expression = {
+          type: 'Sequence',
+          items: [...repeatBody(current, iteration)],
+          location: current.location,
         }
-        diagnostics.push(...results.flatMap((result) => result.diagnostics))
-        if (!results.every(hasShape)) return { diagnostics }
-        const iterationShapes = results.map((result) => result.shape)
+        const result = visit(iterationNode, iterationContext, iterationPulse)
+        iterationPulse = pulseAfter(iterationNode, iterationPulse, iterationContext)
+        iterationContext = contextAfter(iterationNode, iterationContext)
+        diagnostics.push(...result.diagnostics)
+        if (!hasShape(result)) return { diagnostics }
+        const iterationShapes = [result.shape]
         if (!displayedShapes) {
           displayedShapes = iterationShapes
           displayedAttacks = iterationShapes.flatMap(attacks)
@@ -822,9 +842,38 @@ export function evaluateScoreSemantics(
         sequence(displayedShapes ?? [], [origin(current)]),
         alternatives,
       ) as SequenceShape
+      const commonNode: Expression = {
+        type: 'Sequence',
+        items: current.body,
+        location: current.location,
+      }
+      const endingContext = contextAfter(commonNode, context)
+      const endingPulse = pulseAfter(commonNode, currentPulse, context)
+      const commonResult = visit(commonNode, context, currentPulse)
+      diagnostics.push(...commonResult.diagnostics)
+      const commonShapes = hasShape(commonResult) ? [commonResult.shape] : []
+      const endingShapes = current.endings.map((ending) => {
+        const endingNode: Expression = {
+          type: 'Sequence',
+          items: ending.body,
+          location: current.location,
+        }
+        const result = visit(endingNode, endingContext, endingPulse)
+        diagnostics.push(...result.diagnostics)
+        return hasShape(result) ? [result.shape] : []
+      })
+      const endingMarkers = current.endings.flatMap((ending, index): ScoreShape[] => [
+        barline(current, 'ending-start', Number(ending.number.value)),
+        ...endingShapes[index]!,
+        barline(current, index === current.endings.length - 1 ? 'ending-end' : 'repeat-end'),
+      ])
       return {
         shape: sequence(
-          [barline(current, 'repeat-start'), ...displayed.children, barline(current, 'repeat-end')],
+          [
+            barline(current, 'repeat-start'),
+            ...(current.endings.length ? [...commonShapes, ...endingMarkers] : displayed.children),
+            ...(current.endings.length ? [] : [barline(current, 'repeat-end')]),
+          ],
           [origin(current)],
         ),
         diagnostics,

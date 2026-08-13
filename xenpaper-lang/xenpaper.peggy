@@ -325,14 +325,55 @@ DetachedContinue
   = "=" { return node('DetachedContinue', { raw: "=" }); }
 
 Barline
-  = "|" !("|" / ":") { return node('Barline', { raw: "|" }); }
+  = "|" !("|" / ":" / "@^" / [⁰¹²³⁴⁵⁶⁷⁸⁹]) { return node('Barline', { raw: "|" }); }
 
 HardBoundary
   = "||" { return node('HardBoundary', { raw: "||" }); }
 
 RepeatExpression
-  = "|:" Spacing count:RepeatCount? Spacing body:RepeatBody? Spacing ":|" {
-      return node('Repeat', { count, body });
+  = "|:" Spacing count:RepeatCount? Spacing body:RepeatBody? result:RepeatEndings {
+      return node('Repeat', { count, body: body ?? [], endings: result.endings, terminal: result.terminal });
+    }
+
+RepeatEndings
+  = Spacing firstNumber:FirstEndingMarker Spacing firstBody:EndingParallelExpression?
+    rest:(Spacing number:NextEndingMarker Spacing body:EndingParallelExpression? {
+      return { number, body: body ? [body] : [] };
+    })*
+    Spacing terminal:("||" / "|" / !. { return null; }) {
+      return { endings: [{ number: firstNumber, body: firstBody ? [firstBody] : [] }, ...rest], terminal };
+    }
+  / Spacing ":|" { return { endings: [], terminal: ":|" }; }
+
+EndingParallelExpression
+  = first:EndingSequenceExpression
+    rest:(Spacing "," Spacing branch:EndingSequenceExpression { return branch; })* {
+      return parallel([first, ...rest]);
+    }
+
+EndingSequenceExpression
+  = first:SequenceItem rest:(EndingSequenceGap item:SequenceItem { return item; })* {
+      return sequence([first, ...rest]);
+    }
+
+EndingSequenceGap
+  = RequiredSpacing !("|" Spacing)
+  / &("|:" / "[" / "(" / "{")
+  / &Rest
+  / PreviousItemBoundary
+
+FirstEndingMarker
+  = "|" number:EndingNumber { return number; }
+
+NextEndingMarker
+  = ":|" number:EndingNumber { return number; }
+
+EndingNumber
+  = "@^" value:UnsignedInteger {
+      return node('IntegerLiteral', { raw: value, value });
+    }
+  / value:SuperscriptUnsignedInteger {
+      return node('IntegerLiteral', { raw: value.raw, value: value.value });
     }
 
 RepeatBody
@@ -350,11 +391,11 @@ RepeatBody
     }
 
 RepeatCount
-  = "(" Spacing "x"i Spacing value:UnsignedInteger Spacing ")" {
+  = "@x"i value:UnsignedInteger {
       return node('IntegerLiteral', { raw: value, value });
     }
-  / "ˣ" value:UnsignedInteger {
-      return node('IntegerLiteral', { raw: value, value });
+  / "ˣ" value:SuperscriptUnsignedInteger {
+      return node('IntegerLiteral', { raw: value.raw, value: value.value });
     }
 
 Directive
@@ -705,6 +746,12 @@ UnsignedDecimalOrInteger
 
 UnsignedInteger
   = $([0-9]+)
+
+SuperscriptUnsignedInteger
+  = raw:$([⁰¹²³⁴⁵⁶⁷⁸⁹]+) {
+      const digits = "⁰¹²³⁴⁵⁶⁷⁸⁹";
+      return { raw, value: [...raw].map(character => digits.indexOf(character)).join("") };
+    }
 
 Sign
   = $("+" / "-")

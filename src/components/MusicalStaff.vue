@@ -31,7 +31,7 @@ type StaffItemContent =
       notatedDuration?: Fraction
     }
   | { kind: 'rest'; duration: Fraction }
-  | { kind: 'barline'; style: BarlineStyle }
+  | { kind: 'barline'; style: BarlineStyle; endingNumber?: number }
   | { kind: 'annotation'; text: string }
   | { kind: 'dynamic'; mark: DynamicMark }
 
@@ -157,7 +157,14 @@ const items = computed(() => {
       state.barlineSinceActiveItems = false
       layout.push({ kind: 'rest', offset, duration: shape.duration, tuplets: [], voice })
     } else if (shape.kind === 'barline') {
-      layout.push({ kind: 'barline', offset, style: shape.style, tuplets: [], voice })
+      layout.push({
+        kind: 'barline',
+        offset,
+        style: shape.style,
+        endingNumber: shape.endingNumber,
+        tuplets: [],
+        voice,
+      })
       if (state.activeItems.length) state.barlineSinceActiveItems = true
     } else if (shape.kind === 'annotation') {
       layout.push({ kind: 'annotation', offset, text: shape.text, tuplets: [], voice })
@@ -359,6 +366,22 @@ const tupletCount = (item: StaffItem) =>
       2 ** (item.tuplets.length - 1)
     : undefined
 
+const endingSpans = computed(() =>
+  items.value.flatMap((item, index) => {
+    if (item.kind !== 'barline' || item.style !== 'ending-start') return []
+    const end = items.value
+      .slice(index + 1)
+      .find(
+        (candidate) =>
+          candidate.kind === 'barline' &&
+          (candidate.style === 'repeat-end' || candidate.style === 'ending-end'),
+      )
+    return end?.kind === 'barline'
+      ? [{ start: item, end, number: item.endingNumber }]
+      : []
+  }),
+)
+
 const repeatMarkerColumns = computed(
   () =>
     new Set(
@@ -524,6 +547,19 @@ const restDotY = (duration: Fraction, tupletCount?: number) =>
     </g>
     <text class="clef" x="25" y="98">𝄞</text>
     <text v-if="!items.length" class="empty-message" x="70" y="126">No notation loaded</text>
+    <g
+      v-for="(ending, index) in endingSpans"
+      :key="`ending-${index}`"
+      class="alternate-ending"
+    >
+      <path
+        class="alternate-ending-bracket"
+        :d="`M ${barlineX(ending.start)} 45 V 34 H ${barlineX(ending.end)}`"
+      />
+      <text class="alternate-ending-number" :x="barlineX(ending.start) + 6" y="31">
+        {{ ending.number }}.
+      </text>
+    </g>
     <g v-for="tuplet in tupletSpans" :key="`tuplet-${tuplet.id}`" class="tuplet">
       <text
         class="tuplet-number"
@@ -579,13 +615,13 @@ const restDotY = (duration: Fraction, tupletCount?: number) =>
       </text>
       <g v-else-if="item.kind === 'barline'" class="barline" :class="`barline--${item.style}`">
         <line
-          :x1="barlineX(item) - (item.style === 'single' ? 0 : 3)"
-          :x2="barlineX(item) - (item.style === 'single' ? 0 : 3)"
+          :x1="barlineX(item) - (item.style === 'single' || item.style.startsWith('ending-') ? 0 : 3)"
+          :x2="barlineX(item) - (item.style === 'single' || item.style.startsWith('ending-') ? 0 : 3)"
           y1="52"
           y2="100"
         />
         <line
-          v-if="item.style !== 'single'"
+          v-if="item.style !== 'single' && !item.style.startsWith('ending-')"
           :x1="barlineX(item) + 3"
           :x2="barlineX(item) + 3"
           y1="52"

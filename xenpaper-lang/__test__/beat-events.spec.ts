@@ -95,11 +95,21 @@ describe('beat event expansion', () => {
   })
 
   it('expands repeats and preserves simultaneous branch timing', () => {
-    const result = score('|:(x2) C, E G :|')
+    const result = score('|:@x2 C, E G :|')
     const notes = result.events.filter((event) => event.kind === 'note')
 
     expect(notes.map((note) => note.start.toFraction())).toEqual(['0', '0', '1', '2', '2', '3'])
     expect(result.duration.equals(new Fraction(4))).toBe(true)
+  })
+
+  it('carries directives from a common repeat body into alternate endings', () => {
+    const result = score('|: @p C |@^1 D :|@^2 E ||')
+
+    expect(
+      result.events
+        .filter((event) => event.kind === 'note')
+        .map((event) => event.dynamic.toFraction()),
+    ).toEqual(['3/10', '3/10', '3/10', '3/10'])
   })
 
   it('incorporates prevailing dynamics into a single effective dynamic field', () => {

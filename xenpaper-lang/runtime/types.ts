@@ -147,7 +147,12 @@ export type StaffNotationShape =
     }
   | { readonly kind: 'rest'; readonly duration: Fraction; readonly generated: boolean }
   | { readonly kind: 'continue'; readonly duration: Fraction }
-  | { readonly kind: 'barline'; readonly style: BarlineStyle; readonly duration: Fraction }
+  | {
+      readonly kind: 'barline'
+      readonly style: BarlineStyle
+      readonly duration: Fraction
+      readonly endingNumber?: number
+    }
   | { readonly kind: 'annotation'; readonly text: string; readonly duration: Fraction }
   | { readonly kind: 'dynamic'; readonly mark: DynamicMark; readonly duration: Fraction }
   | {
@@ -223,6 +228,7 @@ export interface ContinueShape extends ShapeBase {
 export interface BarlineShape extends ShapeBase {
   readonly kind: 'barline'
   readonly style: BarlineStyle
+  readonly endingNumber?: number
 }
 
 export interface AnnotationShape extends ShapeBase {
@@ -235,7 +241,13 @@ export interface DynamicShape extends ShapeBase {
   readonly mark: DynamicMark
 }
 
-export type BarlineStyle = 'single' | 'double' | 'repeat-start' | 'repeat-end'
+export type BarlineStyle =
+  | 'single'
+  | 'double'
+  | 'repeat-start'
+  | 'repeat-end'
+  | 'ending-start'
+  | 'ending-end'
 
 export interface SequenceShape extends ShapeBase {
   readonly kind: 'sequence'
