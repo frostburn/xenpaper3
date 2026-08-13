@@ -159,7 +159,7 @@ AdditiveOperator
 // integer. This mirrors binary minus so `0 +5` is a sequence item while
 // `0 + 5` remains addition.
 BinaryPlus
-  = "+" &([ \t\r\n#] / ![0-9]) { return "+"; }
+  = "+" ![0-9] { return "+"; }
 
 // A minus immediately followed by a digit or named interval belongs to the
 // following signed sequence item. This makes `-1 -2` a sequence of two
@@ -168,7 +168,7 @@ BinaryPlus
 // Write arithmetic subtraction of integer literals as `-1/1 - 2/1` or put
 // whitespace after the binary minus.
 BinaryMinus
-  = "-" &([ \t\r\n#] / !([0-9] / NamedIntervalStart)) { return "-"; }
+  = "-" !([0-9] / NamedIntervalStart) { return "-"; }
 
 NamedIntervalStart
   = PitchModifier* IntervalQuality [0-9]
@@ -250,7 +250,7 @@ PrimaryExpression
 // reversing each resulting ratio.  Double colon fills in every intervening
 // integer (in either direction).
 EnumeratedChord
-  = &("/"? [0-9]+ ":") inverted:"/"? first:ChordEnumerand tail:(
+  = inverted:"/"? first:IntegerLiteral tail:(
       "::" last:ChordEnumerand { return { rangeEnd: last, enumerands: null }; }
       / rest:(":" value:ChordEnumerand { return value; })+ {
         return { rangeEnd: null, enumerands: [first, ...rest] };
@@ -471,9 +471,10 @@ ContextPreset
   = raw:$(UnsignedInteger "ed"i (RatioText / UnsignedInteger)) !IdentifierContinue {
       return { kind: 'equalDivision', raw };
     }
-  / raw:$([a-zA-Z]* UnsignedInteger ("edo"i / [a-zA-Z]*))
-    &{ return !/^\d+$/.test(raw); }
-    !IdentifierContinue {
+  / raw:$(
+      [a-zA-Z]+ UnsignedInteger ("edo"i / [a-zA-Z]*)
+      / UnsignedInteger ("edo"i / [a-zA-Z]+)
+    ) !IdentifierContinue {
       return { kind: 'rank1', raw };
     }
 
@@ -720,10 +721,13 @@ SequenceGap
   // whitespace on either side (`C[D E]F`, `{13edo}C`, and `E|:F G:||`).
   / &("|:" / Barline / "[" / "(" / "{")
   / &Rest
-  // Character codes avoid putting a closing brace inside Peggy's semantic
-  // predicate while covering continues, bars, rests, and every structural
-  // closer: = ) ] }.
-  / &{ return offset() > 0 && [41, 46, 61, 93, 124, 125].includes(input.charCodeAt(offset() - 1)); }
+  / PreviousItemBoundary
+
+// Peggy has no lookbehind predicate. This zero-width rule recognizes
+// continues, bars, rests, and structural closers immediately before the gap.
+// The closing brace is escaped because it would end the semantic predicate.
+PreviousItemBoundary
+  = &{ return offset() > 0 && "=).]|\u007d".includes(input[offset() - 1]); }
 
 Spacing
   = (White / Comment)*
