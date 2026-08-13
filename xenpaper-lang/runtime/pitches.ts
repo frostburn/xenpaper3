@@ -286,8 +286,9 @@ export function applyPitchContextChange(
       }
       const degrees = values.map((value) => {
         const evaluated = evaluateExpression(value, context)
-        if (!('value' in evaluated) || evaluated.value.kind === 'absolutePitch')
+        if (!('value' in evaluated))
           throw new TypeError('Degree assignments require pitch intervals.')
+        if (evaluated.value.kind === 'absolutePitch') return evaluated.value.rootOffset
         return evaluated.value.kind === 'pitchOffset'
           ? evaluated.value.value
           : Value.pitch(evaluated.value.value)
@@ -335,8 +336,16 @@ export function applyPitchContextChange(
     }
     if (statement.target.type === 'ContextNameTarget' && statement.target.name === 'root') {
       const evaluated = evaluateExpression(statement.value, context)
+      if ('value' in evaluated && evaluated.value.kind === 'pitchOffset') {
+        context = {
+          ...context,
+          rootDisplacement: context.rootDisplacement.add(evaluated.value.value),
+          rootFrequency: context.rootFrequency.mul(Value.ratio(evaluated.value.value)),
+        }
+        continue
+      }
       if (!('value' in evaluated) || evaluated.value.kind !== 'scalar')
-        throw new TypeError('A root frequency assignment requires a frequency quantity.')
+        throw new TypeError('A root assignment requires a scale degree or frequency quantity.')
       const frequency = evaluated.value.value
       if (!frequency.dimensions.equals({ seconds: -1 }) || frequency.valueOf() <= 0)
         throw new TypeError('A root frequency assignment requires a positive frequency quantity.')

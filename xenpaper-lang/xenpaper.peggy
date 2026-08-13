@@ -427,6 +427,7 @@ SingleDegreeMappingLiteral
   / RatioLiteral
   / RealLiteral
   / DecimalLiteral
+  / PitchLiteral
   / ScaleDegreeLiteral
 
 DegreeMappingLiteral
@@ -435,6 +436,7 @@ DegreeMappingLiteral
   / RatioLiteral
   / RealLiteral
   / DecimalLiteral
+  / PitchLiteral
   / ScaleDegreeLiteral
 
 ContextStatementList
@@ -444,7 +446,14 @@ ContextStatementList
     }
 
 ContextStatement
-  = target:ContextAssignmentTarget Spacing "=" Spacing value:ContextValue {
+  = name:$('root'i) !IdentifierContinue Spacing "=" Spacing
+    value:(ShiftedValueExpression / ScaleDegreeLiteral) {
+      return node('ContextAssignment', {
+        target: node('ContextNameTarget', { name: name.toLowerCase() }),
+        value,
+      });
+    }
+  / target:ContextAssignmentTarget Spacing "=" Spacing value:ContextValue {
       return node('ContextAssignment', { target, value });
     }
   / preset:ContextPreset {
