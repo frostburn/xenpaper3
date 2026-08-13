@@ -427,7 +427,7 @@ SingleDegreeMappingLiteral
   / RatioLiteral
   / RealLiteral
   / DecimalLiteral
-  / IntegerLiteral
+  / ScaleDegreeLiteral
 
 DegreeMappingLiteral
   = EqualDivisionLiteral
@@ -435,7 +435,7 @@ DegreeMappingLiteral
   / RatioLiteral
   / RealLiteral
   / DecimalLiteral
-  / IntegerLiteral
+  / ScaleDegreeLiteral
 
 ContextStatementList
   = first:ContextStatement

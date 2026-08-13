@@ -57,6 +57,31 @@ describe('score-shape timing', () => {
     ])
   })
 
+  it('defines future scales with degrees from the current scale', () => {
+    const result = shape(`{19edo}{3 6 8 11 14 17 19}
+0 1 2 3 4 5 6 7=`) as SequenceShape
+    const collectPitches = (score: ScoreShape): number[] => {
+      if (score.kind === 'attack') return [score.pitch.value.valueOf()]
+      if (score.kind === 'sequence') return score.children.flatMap(collectPitches)
+      if (score.kind === 'parallel') return score.branches.flatMap(collectPitches)
+      return []
+    }
+    const pitches = collectPitches(result)
+    const expected = [
+      0,
+      (3 * 1200) / 19,
+      (6 * 1200) / 19,
+      (8 * 1200) / 19,
+      (11 * 1200) / 19,
+      (14 * 1200) / 19,
+      (17 * 1200) / 19,
+      1200,
+    ]
+
+    expect(pitches).toHaveLength(expected.length)
+    expected.forEach((pitch, index) => expect(pitches[index]).toBeCloseTo(pitch))
+  })
+
   it('accepts every numeric interval literal and respects explicit degree equaves', () => {
     const mixed = shape(String.raw`{123c 3/2 1201c} 0 1 2 3 4`) as SequenceShape
     const mixedPitches = mixed.children
@@ -76,7 +101,10 @@ describe('score-shape timing', () => {
   })
 
   it.each([
-    ['{12:14:16:18:21:24}\n0 1 2 3 4 5 6 7=', [1, 14 / 12, 16 / 12, 18 / 12, 21 / 12, 2, 28 / 12, 32 / 12]],
+    [
+      '{12:14:16:18:21:24}\n0 1 2 3 4 5 6 7=',
+      [1, 14 / 12, 16 / 12, 18 / 12, 21 / 12, 2, 28 / 12, 32 / 12],
+    ],
     ['{4::8}\n0 1 2 3 4==', [1, 5 / 4, 6 / 4, 7 / 4, 2]],
     ['{/6::3}\n0 1 2 3==', [1, 6 / 5, 6 / 4, 2]],
   ])('uses enumerated chords as scales without a redundant unison degree: %s', (source, ratios) => {
