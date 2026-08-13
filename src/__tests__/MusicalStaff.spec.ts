@@ -557,6 +557,17 @@ describe('MusicalStaff', () => {
     expect(wrapper.find('.tuplet-bracket').exists()).toBe(false)
   })
 
+  it('does not borrow a continuation from the next attack when resolving a tuplet', () => {
+    const evaluated = evaluateScoreShape(parse('[C E G] = = D =').body[0]!)
+    if (!('shape' in evaluated)) throw new Error('Expected a score shape.')
+    const wrapper = mount(MusicalStaff, {
+      props: { notation: constructStaffNotationShape(evaluated.shape) },
+    })
+
+    expect(wrapper.findAll('.tuplet-number')).toHaveLength(0)
+    expect(wrapper.findAll('.tuplet-bracket')).toHaveLength(0)
+  })
+
   it('splits continued notes at barlines and joins the repeated notehead with a tie', () => {
     const barred: StaffNotationShape = {
       kind: 'sequence',

@@ -30,9 +30,13 @@ const copy = (value: Fraction) => new Fraction(value.n, value.d)
 function flattenScoreSemantics(shape: ScoreShape): BeatEventFlatteningResult {
   const events: BeatTimedEvent[] = []
   const diagnostics: Diagnostic[] = []
-  type MutableNoteEvent = Omit<BeatTimedNoteEvent, 'start' | 'duration' | 'origins'> & {
+  type MutableNoteEvent = Omit<
+    BeatTimedNoteEvent,
+    'start' | 'duration' | 'automation' | 'origins'
+  > & {
     start: Fraction
     duration: Fraction
+    automation?: BeatTimedNoteEvent['automation']
     origins: readonly BeatTimedNoteEvent['origins'][number][]
   }
   type State = { active: MutableNoteEvent[]; activeStart?: Fraction; activeSpan?: Fraction }
@@ -69,6 +73,11 @@ function flattenScoreSemantics(shape: ScoreShape): BeatEventFlatteningResult {
         for (const event of state.active) {
           event.start = activeStart.add(event.start.sub(activeStart).mul(scale))
           event.duration = event.duration.mul(scale)
+          if (event.automation)
+            event.automation = {
+              ...event.automation,
+              duration: copy(event.duration),
+            }
           event.origins = [...event.origins, ...current.origins]
         }
         state.activeSpan = activeSpan.add(current.duration)
@@ -110,8 +119,10 @@ function flattenScoreSemantics(shape: ScoreShape): BeatEventFlatteningResult {
       const states = current.branches.map((): State => ({ active: [] }))
       current.branches.forEach((branch, index) => visit(branch, start, states[index]!))
       state.active = states.flatMap((branch) => branch.active)
-      state.activeStart = copy(start)
-      state.activeSpan = copy(current.duration)
+      // Unlike a normalized sequence, an uneven parallel has no single active
+      // span: only the final notes of its longest branches remain active.
+      state.activeStart = undefined
+      state.activeSpan = undefined
       return start.add(current.duration)
     }
     return start.add(current.duration)

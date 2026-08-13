@@ -169,7 +169,7 @@ const items = computed(() => {
       shape.children.forEach((child, index) => {
         state.hasFollowingContinuation =
           inheritedFollowingContinuation ||
-          shape.children.slice(index + 1).some((following) => following.kind === 'continue')
+          shape.children[index + 1]?.kind === 'continue'
         offset = visit(child, offset, state, voice)
       })
       state.hasFollowingContinuation = inheritedFollowingContinuation
