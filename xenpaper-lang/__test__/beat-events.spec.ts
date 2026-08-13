@@ -102,6 +102,21 @@ describe('beat event expansion', () => {
     expect(result.duration.equals(new Fraction(4))).toBe(true)
   })
 
+  it.each([
+    ['@2', '1/2'],
+    ['@.', '1/2'],
+  ])('expands repeated %s directives exactly like authored copies', (directive, duration) => {
+    const repeated = score(`|: C D E F ${directive} G :|`)
+    const expanded = score(`C D E F ${directive} G C D E F ${directive} G`)
+    const timing = (result: ReturnType<typeof score>) =>
+      result.events
+        .filter((event) => event.kind === 'note')
+        .map((event) => [event.start.toFraction(), event.duration.toFraction()])
+
+    expect(timing(repeated)).toEqual(timing(expanded))
+    expect(timing(repeated).at(-1)?.[1]).toBe(duration)
+  })
+
   it('carries directives from a common repeat body into alternate endings', () => {
     const result = score('|: @p C |@^1 D :|@^2 E ||')
 
