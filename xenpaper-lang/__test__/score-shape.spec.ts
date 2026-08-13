@@ -215,6 +215,100 @@ describe('score-shape timing', () => {
     expect(result.children.every((child) => child.duration.equals(new Fraction(1, 3)))).toBe(true)
   })
 
+  it.each([
+    ['2 * [3/2 4/3]', [3, 8 / 3]],
+    ['[3/2 4/3] * 2', [3, 8 / 3]],
+  ])('broadcasts scalar operations over slots from either side: %s', (source, ratios) => {
+    const result = shape(source) as SequenceShape
+    const attacks = result.children.filter((child) => child.kind === 'attack')
+
+    expect(result.duration.equals(1)).toBe(true)
+    attacks.forEach((attack, index) =>
+      expect(attack.pitch.notationValue?.valueOf()).toBeCloseTo(1200 * Math.log2(ratios[index]!)),
+    )
+  })
+
+  it.each([
+    ['3/1 / (2/1, 4/1)', [3 / 2, 3 / 4]],
+    ['(2/1, 4/1) / 3/1', [2 / 3, 4 / 3]],
+  ])(
+    'broadcasts scalar operations over parenthesized parallels from either side: %s',
+    (source, ratios) => {
+      const result = shape(source) as ParallelShape
+      const attacks = result.branches.filter((branch) => branch.kind === 'attack')
+
+      attacks.forEach((attack, index) =>
+        expect(attack.pitch.notationValue?.valueOf()).toBeCloseTo(1200 * Math.log2(ratios[index]!)),
+      )
+    },
+  )
+
+  it('preserves structural score items while broadcasting', () => {
+    const result = shape('[3/2 . @ff 4/3] * 2') as SequenceShape
+
+    expect(result.children.map((child) => child.kind)).toEqual([
+      'attack',
+      'rest',
+      'dynamic',
+      'attack',
+    ])
+    const attacks = result.children.filter((child) => child.kind === 'attack')
+    ;[3, 8 / 3].forEach((ratio, index) =>
+      expect(attacks[index]!.pitch.notationValue?.valueOf()).toBeCloseTo(1200 * Math.log2(ratio)),
+    )
+  })
+
+  it('combines matching score constructions elementwise', () => {
+    const result = shape('[3/2 4/3] * [5/4 6/5]') as SequenceShape
+    const attacks = result.children.filter((child) => child.kind === 'attack')
+
+    ;[15 / 8, 8 / 5].forEach((ratio, index) =>
+      expect(attacks[index]!.pitch.notationValue?.valueOf()).toBeCloseTo(1200 * Math.log2(ratio)),
+    )
+  })
+
+  it('rejects broadcasting between differently shaped score constructions', () => {
+    const result = evaluateScoreShape(parse('[3/2 4/3] * (5/4, 6/5)').body[0] as Expression)
+
+    expect(result.diagnostics).not.toHaveLength(0)
+    expect(result.diagnostics.every((diagnostic) => diagnostic.code === 'XP_TYPE_MISMATCH')).toBe(
+      true,
+    )
+  })
+
+  it('broadcasts nested scalar arithmetic before transposing a construction', () => {
+    const result = shape('G + [P1 M2, M3, P5] / 2') as ParallelShape
+
+    expect(result.branches).toHaveLength(3)
+    expect(result.branches.map((branch) => branch.kind)).toEqual([
+      'sequence',
+      'sequence',
+      'sequence',
+    ])
+    expect(
+      result.branches.map(
+        (branch) =>
+          (branch as SequenceShape).children.filter((child) => child.kind === 'attack').length,
+      ),
+    ).toEqual([2, 1, 1])
+  })
+
+  it.each([
+    ['G + ([P1, P5] + [P4, M2])', 'parallel'],
+    ['G + ([P1 P5] + [P4 M2])', 'sequence'],
+  ])('broadcasts construction arithmetic nested in an explicit group: %s', (source, kind) => {
+    const result = shape(source)
+
+    expect(result.kind).toBe(kind)
+    const branches =
+      result.kind === 'parallel'
+        ? result.branches
+        : result.kind === 'sequence'
+          ? result.children
+          : []
+    expect(branches.filter((branch) => branch.kind === 'attack')).toHaveLength(2)
+  })
+
   it('applies subdivision directives to following notes', () => {
     const result = shape('C @2 D E @1 F G') as SequenceShape
     const attacks = result.children.filter((child) => child.kind === 'attack')

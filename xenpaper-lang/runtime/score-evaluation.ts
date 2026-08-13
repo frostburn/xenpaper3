@@ -40,6 +40,151 @@ interface PlaybackAttackShape extends AttackShape {
 const MAX_REPEAT_EXPANSION_NODES = 100_000
 const MAX_ENUMERATED_CHORD_SIZE = 10_000n
 
+function mapScoreConstruction(
+  node: Expression,
+  mapLeaf: (leaf: Expression) => Expression,
+): Expression | undefined {
+  const mapItem = (item: Expression): Expression => {
+    const construction = mapScoreConstruction(item, mapLeaf)
+    if (construction) return construction
+    if (item.type === 'Group') return { ...item, expression: mapItem(item.expression) }
+    if (item.type === 'PostfixExpression') {
+      return { ...item, expression: mapItem(item.expression) }
+    }
+    if (
+      item.type === 'Rest' ||
+      item.type === 'DetachedContinue' ||
+      item.type === 'Barline' ||
+      item.type === 'HardBoundary' ||
+      item.type === 'Directive' ||
+      item.type === 'PitchContextChange'
+    ) {
+      return item
+    }
+    return mapLeaf(item)
+  }
+  if (node.type === 'Sequence') {
+    return {
+      ...node,
+      items: node.items.map(mapItem),
+    }
+  }
+  if (node.type === 'Parallel') {
+    return {
+      ...node,
+      branches: node.branches.map(mapItem),
+    }
+  }
+  if (node.type === 'NormalizeToSlot' && node.expression) {
+    return {
+      ...node,
+      expression: mapItem(node.expression),
+    }
+  }
+  if (node.type === 'Repeat') {
+    return { ...node, body: node.body.map(mapItem) }
+  }
+  if (node.type === 'Group') {
+    const expression = mapScoreConstruction(node.expression, mapLeaf)
+    if (expression) return { ...node, expression }
+  }
+  if (node.type === 'PostfixExpression') {
+    const expression = mapScoreConstruction(node.expression, mapLeaf)
+    if (expression) return { ...node, expression }
+  }
+  return undefined
+}
+
+function isScalarOperand(node: Expression): boolean {
+  if (mapScoreConstruction(node, (leaf) => leaf)) return false
+  if (node.type === 'Group') return isScalarOperand(node.expression)
+  return ![
+    'Rest',
+    'DetachedContinue',
+    'Barline',
+    'HardBoundary',
+    'Directive',
+    'PitchContextChange',
+    'PostfixExpression',
+    'EnumeratedChord',
+  ].includes(node.type)
+}
+
+function zipScoreConstructions(
+  left: Expression,
+  right: Expression,
+  combine: (left: Expression, right: Expression) => Expression,
+): Expression | undefined {
+  const zipItems = (leftItems: Expression[], rightItems: Expression[]) => {
+    if (leftItems.length !== rightItems.length) return undefined
+    const items = leftItems.map((leftItem, index) => {
+      const rightItem = rightItems[index]!
+      return (
+        zipScoreConstructions(leftItem, rightItem, combine) ??
+        (isScalarOperand(leftItem) && isScalarOperand(rightItem)
+          ? combine(leftItem, rightItem)
+          : undefined)
+      )
+    })
+    return items.every((item) => item !== undefined) ? items : undefined
+  }
+
+  if (left.type === 'NormalizeToSlot' && right.type === 'NormalizeToSlot') {
+    if (!left.expression || !right.expression) return undefined
+    const expression =
+      zipScoreConstructions(left.expression, right.expression, combine) ??
+      (isScalarOperand(left.expression) && isScalarOperand(right.expression)
+        ? combine(left.expression, right.expression)
+        : undefined)
+    return expression ? { ...left, expression } : undefined
+  }
+  if (left.type === 'Sequence' && right.type === 'Sequence') {
+    const items = zipItems(left.items, right.items)
+    return items ? { ...left, items } : undefined
+  }
+  if (left.type === 'Parallel' && right.type === 'Parallel') {
+    const branches = zipItems(left.branches, right.branches)
+    return branches ? { ...left, branches } : undefined
+  }
+  if (left.type === 'Group' && right.type === 'Group') {
+    const expression =
+      zipScoreConstructions(left.expression, right.expression, combine) ??
+      (isScalarOperand(left.expression) && isScalarOperand(right.expression)
+        ? combine(left.expression, right.expression)
+        : undefined)
+    return expression ? { ...left, expression } : undefined
+  }
+  return undefined
+}
+
+function broadcastScalarOperation(node: Expression): Expression | undefined {
+  if (node.type === 'Group') {
+    const expression = broadcastScalarOperation(node.expression)
+    return expression ? { ...node, expression } : undefined
+  }
+  if (node.type === 'PostfixExpression') {
+    const expression = broadcastScalarOperation(node.expression)
+    return expression ? { ...node, expression } : undefined
+  }
+  if (node.type !== 'BinaryExpression') return undefined
+  const left = broadcastScalarOperation(node.left)
+  if (left) return { ...node, left }
+  const right = broadcastScalarOperation(node.right)
+  if (right) return { ...node, right }
+  const zipped = zipScoreConstructions(node.left, node.right, (left, right) => ({
+    ...node,
+    left,
+    right,
+  }))
+  if (zipped) return zipped
+  const overLeft = isScalarOperand(node.right)
+    ? mapScoreConstruction(node.left, (left) => ({ ...node, left }))
+    : undefined
+  if (overLeft) return overLeft
+  if (!isScalarOperand(node.left)) return undefined
+  return mapScoreConstruction(node.right, (right) => ({ ...node, right }))
+}
+
 function expandEnumeratedChord(
   node: Expression,
   context: PitchContext,
@@ -566,6 +711,8 @@ export function evaluateScoreSemantics(
     currentPulse: Fraction = pulse,
     currentDynamic: DynamicMark = 'mf',
   ): ScoreShapeEvaluationResult => {
+    const broadcast = broadcastScalarOperation(current)
+    if (broadcast) return visit(broadcast, context, currentPulse, currentDynamic)
     const expandedChord = expandEnumeratedChord(current, context)
     if (expandedChord.diagnostics.length) return { diagnostics: expandedChord.diagnostics }
     if (expandedChord.expressions.length !== 1 || expandedChord.expressions[0] !== current) {
