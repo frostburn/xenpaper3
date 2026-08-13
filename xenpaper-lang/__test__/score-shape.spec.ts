@@ -75,6 +75,26 @@ describe('score-shape timing', () => {
     )
   })
 
+  it.each([
+    ['{12:14:16:18:21:24}\n0 1 2 3 4 5 6 7=', [1, 14 / 12, 16 / 12, 18 / 12, 21 / 12, 2, 28 / 12, 32 / 12]],
+    ['{4::8}\n0 1 2 3 4==', [1, 5 / 4, 6 / 4, 7 / 4, 2]],
+    ['{/6::3}\n0 1 2 3==', [1, 6 / 5, 6 / 4, 2]],
+  ])('uses enumerated chords as scales without a redundant unison degree: %s', (source, ratios) => {
+    const result = shape(source) as SequenceShape
+    const collectPitches = (score: ScoreShape): number[] => {
+      if (score.kind === 'attack') return [score.pitch.value.valueOf()]
+      if (score.kind === 'sequence') return score.children.flatMap(collectPitches)
+      if (score.kind === 'parallel') return score.branches.flatMap(collectPitches)
+      return []
+    }
+    const pitches = collectPitches(result)
+
+    expect(pitches).toHaveLength(ratios.length)
+    ratios.forEach((expected, index) =>
+      expect(pitches[index]).toBeCloseTo(1200 * Math.log2(expected)),
+    )
+  })
+
   it('supports patent vals, arbitrary warts, and non-octave equal divisions', () => {
     expect(parseVal('17c').mapping.mapPrime(5).valueOf()).not.toBe(
       parseVal('17cc').mapping.mapPrime(5).valueOf(),

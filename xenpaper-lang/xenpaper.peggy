@@ -411,7 +411,8 @@ PitchContextChange
     }
 
 DegreeMappingList
-  = first:DegreeMappingLiteral rest:(SequenceGap value:DegreeMappingLiteral { return value; })+ {
+  = chord:EnumeratedChord { return [chord]; }
+  / first:DegreeMappingLiteral rest:(SequenceGap value:DegreeMappingLiteral { return value; })+ {
       return [first, ...rest];
     }
   / value:SingleDegreeMappingLiteral { return [value]; }
