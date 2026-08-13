@@ -38,10 +38,14 @@ defineProps<{ inspection: PianoRollInspection }>()
         <template v-if="inspection.inspected.glissando">
           <dt>Glissando</dt>
           <dd>
-            {{ inspection.inspected.glissando.curve }},
-            {{ inspection.inspected.glissando.fromCents.toFixed(2) }}¢ →
-            {{ inspection.inspected.glissando.toCents.toFixed(2) }}¢ over
-            {{ inspection.inspected.glissando.duration }} beats
+            <span v-for="(segment, index) in inspection.inspected.glissando.segments" :key="index">
+              {{ index ? '; ' : '' }}{{ segment.curve }}, {{ segment.fromCents.toFixed(2) }}¢ →
+              {{ segment.toCents.toFixed(2) }}¢ from beat {{ segment.start }} over
+              {{ segment.duration }} beats
+            </span>
+            <span v-if="inspection.inspected.glissando.holdDuration">
+              ; hold for {{ inspection.inspected.glissando.holdDuration }} beats
+            </span>
           </dd>
         </template>
       </dl>
@@ -51,9 +55,15 @@ defineProps<{ inspection: PianoRollInspection }>()
           <span>{{ element.start }}–{{ element.end }} beats, {{ element.cents.toFixed(2) }}¢</span>
           <span>Dynamic: {{ element.dynamic }}</span>
           <span v-if="element.glissando">
-            Glissando: {{ element.glissando.curve }}, {{ element.glissando.fromCents.toFixed(2) }}¢
-            → {{ element.glissando.toCents.toFixed(2) }}¢ over
-            {{ element.glissando.duration }} beats
+            Glissando:
+            <span v-for="(segment, segmentIndex) in element.glissando.segments" :key="segmentIndex">
+              {{ segmentIndex ? '; ' : '' }}{{ segment.curve }}, {{ segment.fromCents.toFixed(2) }}¢
+              → {{ segment.toCents.toFixed(2) }}¢ from beat {{ segment.start }} over
+              {{ segment.duration }} beats
+            </span>
+            <template v-if="element.glissando.holdDuration">
+              ; hold for {{ element.glissando.holdDuration }} beats
+            </template>
           </span>
         </li>
       </ol>

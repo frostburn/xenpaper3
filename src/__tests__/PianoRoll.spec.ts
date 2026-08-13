@@ -260,10 +260,15 @@ describe('PianoRoll', () => {
               end: '1 1/2',
               dynamic: '4/5 (80.00%)',
               glissando: {
-                curve: 'linear',
-                fromCents: 701.955,
-                toCents: 1200,
-                duration: '1',
+                segments: [
+                  {
+                    curve: 'linear',
+                    fromCents: 701.955,
+                    toCents: 1200,
+                    start: '0',
+                    duration: '1',
+                  },
+                ],
               },
             },
           ],
@@ -277,8 +282,9 @@ describe('PianoRoll', () => {
     expect(wrapper.get('.selected-elements li').text()).toContain('1/2–1 1/2 beats, 701.96¢')
     expect(wrapper.get('.selected-elements li').text()).toContain('Dynamic: 4/5 (80.00%)')
     expect(wrapper.get('.selected-elements li').text()).toContain(
-      'Glissando: linear, 701.96¢ → 1200.00¢ over 1 beats',
+      'Glissando: linear, 701.96¢ → 1200.00¢ from beat 0 over 1 beats',
     )
+    expect(wrapper.get('.selected-elements li').text()).not.toContain('hold')
   })
 
   it('shows dynamics and glissando details for the inspected note', () => {
@@ -295,7 +301,13 @@ describe('PianoRoll', () => {
             duration: '2',
             end: '2',
             dynamic: '3/10 (30.00%)',
-            glissando: { curve: 'linear', fromCents: 0, toCents: 700, duration: '2' },
+            glissando: {
+              segments: [
+                { curve: 'linear', fromCents: 0, toCents: 400, start: '0', duration: '1' },
+                { curve: 'linear', fromCents: 400, toCents: 700, start: '1', duration: '1/2' },
+              ],
+              holdDuration: '1/2',
+            },
           },
           selected: [],
         },
@@ -304,7 +316,7 @@ describe('PianoRoll', () => {
 
     expect(wrapper.get('.element-details').text()).toContain('Dynamic3/10 (30.00%)')
     expect(wrapper.get('.element-details').text()).toContain(
-      'Glissandolinear, 0.00¢ → 700.00¢ over 2 beats',
+      'Glissandolinear, 0.00¢ → 400.00¢ from beat 0 over 1 beats ; linear, 400.00¢ → 700.00¢ from beat 1 over 1/2 beats  ; hold for 1/2 beats',
     )
   })
 

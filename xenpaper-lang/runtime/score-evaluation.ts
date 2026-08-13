@@ -1068,7 +1068,16 @@ export function evaluateScoreSemantics(
       let activeArticulationMarks = [...currentArticulationMarks]
       let velocity: Fraction | undefined
       let grace: { duration: Fraction; count: number; indices: number[] } | undefined
-      let gliss: number[] | undefined
+      let gliss:
+        | {
+            indices: number[]
+            /** A chained gliss reuses the previous target after it became a continuation. */
+            sourceShape?: ScoreShape
+            chainRequested?: boolean
+            ownerIndex?: number
+            segmentStart?: Fraction
+          }
+        | undefined
       const results: ScoreShapeEvaluationResult[] = []
       for (const item of current.items) {
         if (item.type === 'PitchContextChange') {
@@ -1097,8 +1106,12 @@ export function evaluateScoreSemantics(
           else if (directive?.kind === 'velocity') velocity = directive.velocity
           else if (directive?.kind === 'grace')
             grace = { duration: directive.duration, count: directive.count, indices: [] }
-          else if (directive?.kind === 'gliss') gliss = []
-          else if (directive?.kind === 'articulation') {
+          else if (directive?.kind === 'gliss') {
+            // A gliss directive between the source and target starts another segment at that
+            // target. Keep collecting the current pair; completion below will seed the next pair.
+            if (!gliss) gliss = { indices: [] }
+            else if (gliss.indices.length === 1) gliss.chainRequested = true
+          } else if (directive?.kind === 'articulation') {
             activeArticulation = directive.ratio
             activeArticulationMarks =
               directive.shorthand && directive.mark !== '-'
@@ -1156,7 +1169,7 @@ export function evaluateScoreSemantics(
             velocity = undefined
           }
           if (grace) grace.indices.push(index)
-          if (gliss) gliss.push(index)
+          if (gliss) gliss.indices.push(index)
         }
         results.push(result)
         if (grace && grace.indices.length === grace.count + 1) {
@@ -1196,14 +1209,15 @@ export function evaluateScoreSemantics(
             })
           grace = undefined
         }
-        if (gliss && gliss.length === 2) {
-          const sourceIndex = gliss[0]!,
-            targetIndex = gliss[1]!,
+        if (gliss && gliss.indices.length === 2) {
+          const sourceIndex = gliss.indices[0]!,
+            targetIndex = gliss.indices[1]!,
             source = results[sourceIndex]!,
             target = results[targetIndex]!
-          if ('shape' in source && 'shape' in target) {
+          const sourceShape = gliss.sourceShape ?? ('shape' in source ? source.shape : undefined)
+          if (sourceShape && 'shape' in target) {
             const to = attacks(target.shape)
-            const sourceTree = pitchTree(source.shape)
+            const sourceTree = pitchTree(sourceShape)
             const targetTree = pitchTree(target.shape)
             if (!sourceTree || !targetTree || !matchingPitchTrees(sourceTree, targetTree))
               results.push({
@@ -1217,18 +1231,29 @@ export function evaluateScoreSemantics(
                 ],
               })
             else {
-              const spans = attackSpans(source.shape)
+              const spans = attackSpans(sourceShape)
+              const sourceAttacks = attacks(sourceShape)
               let leaf = 0
               const automate = (shape: ScoreShape): ScoreShape => {
                 if (shape.kind === 'attack') {
                   const destination = to[leaf++]!
+                  const duration = spans.get(shape) ?? shape.duration
                   return {
                     ...shape,
                     automation: {
                       curve: 'linear',
                       from: shape.pitch,
                       to: destination.pitch,
-                      duration: spans.get(shape) ?? shape.duration,
+                      duration,
+                      segments: [
+                        {
+                          curve: 'linear',
+                          from: shape.pitch,
+                          to: destination.pitch,
+                          start: new Fraction(0),
+                          duration,
+                        },
+                      ],
                     },
                   }
                 }
@@ -1238,7 +1263,42 @@ export function evaluateScoreSemantics(
                   return { ...shape, branches: shape.branches.map(automate) }
                 return shape
               }
-              results[sourceIndex] = { ...source, shape: automate(source.shape) }
+              // Only the first segment owns an attack. Later segments begin at a target which
+              // has already been lowered to a continuation of that original attack.
+              if (!gliss.sourceShape && 'shape' in source)
+                results[sourceIndex] = { ...source, shape: automate(sourceShape) }
+              else if (gliss.ownerIndex !== undefined) {
+                const owner = results[gliss.ownerIndex]!
+                const segmentStart = gliss.segmentStart
+                let attackIndex = 0
+                if ('shape' in owner)
+                  results[gliss.ownerIndex] = {
+                    ...owner,
+                    shape: mapAttacks(owner.shape, (attack) => {
+                      const segmentSource = sourceAttacks[attackIndex]!
+                      const destination = to[attackIndex++]!
+                      const duration = spans.get(segmentSource) ?? segmentSource.duration
+                      const previous = attack.automation
+                      return {
+                        ...attack,
+                        automation: previous && {
+                          ...previous,
+                          segments: [
+                            ...(previous.segments ?? []),
+                            {
+                              curve: 'linear',
+                              from: segmentSource.pitch,
+                              to: destination.pitch,
+                              start: segmentStart ?? previous.duration,
+                              duration,
+                            },
+                          ],
+                        },
+                      }
+                    }),
+                  }
+              }
+              const chainedSource = target.shape
               results[targetIndex] = target.shape.duration.n
                 ? {
                     ...target,
@@ -1250,9 +1310,17 @@ export function evaluateScoreSemantics(
                     },
                   }
                 : { ...target, shape: sequence([], target.shape.origins) }
+              gliss = gliss.chainRequested
+                ? {
+                    indices: [targetIndex],
+                    sourceShape: chainedSource,
+                    ownerIndex: gliss.ownerIndex ?? sourceIndex,
+                    segmentStart: (gliss.segmentStart ?? new Fraction(0)).add(sourceShape.duration),
+                  }
+                : undefined
             }
           }
-          gliss = undefined
+          if (gliss?.indices.length === 2) gliss = undefined
         }
         activeContext = contextAfter(item, activeContext)
         activePulse = pulseAfter(item, activePulse, activeContext)

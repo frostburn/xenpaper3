@@ -15,10 +15,14 @@ export interface PianoRollElementInfo {
   end: string
   dynamic: string
   glissando?: {
-    curve: string
-    fromCents: number
-    toCents: number
-    duration: string
+    segments: {
+      curve: string
+      fromCents: number
+      toCents: number
+      start: string
+      duration: string
+    }[]
+    holdDuration?: string
   }
 }
 
@@ -78,6 +82,35 @@ const formatDynamic = (value: Fraction) => {
   return `${formatBeat(dynamic)} (${(dynamic.valueOf() * 100).toFixed(2)}%)`
 }
 const pitchCents = (pitch: (typeof notes.value)[number]['pitch']) => beat(pitch.value)
+const finalAutomationSegment = (note: (typeof notes.value)[number]) => {
+  const segments = note.automation?.segments
+  return segments?.[segments.length - 1]
+}
+const glissandoInfo = (note: (typeof notes.value)[number]) => {
+  const automation = note.automation!
+  const zero = raw(note.duration).sub(note.duration)
+  const finalSegment = finalAutomationSegment(note)
+  const holdDuration = raw(note.duration).sub(
+    (finalSegment?.start ?? zero).add(finalSegment?.duration ?? automation.duration),
+  )
+  return {
+    segments: (
+      automation.segments ?? [
+        {
+          ...automation,
+          start: zero,
+        },
+      ]
+    ).map((segment) => ({
+      curve: segment.curve,
+      fromCents: pitchCents(segment.from),
+      toCents: pitchCents(segment.to),
+      start: formatBeat(segment.start),
+      duration: formatBeat(segment.duration),
+    })),
+    ...(holdDuration.n ? { holdDuration: formatBeat(holdDuration) } : {}),
+  }
+}
 const elementInfo = (note: (typeof notes.value)[number], index: number): PianoRollElementInfo => ({
   index,
   label: tooltip(note),
@@ -90,12 +123,7 @@ const elementInfo = (note: (typeof notes.value)[number], index: number): PianoRo
   dynamic: formatDynamic(note.dynamic),
   ...(note.automation
     ? {
-        glissando: {
-          curve: note.automation.curve,
-          fromCents: pitchCents(note.automation.from),
-          toCents: pitchCents(note.automation.to),
-          duration: formatBeat(note.automation.duration),
-        },
+        glissando: glissandoInfo(note),
       }
     : {}),
 })
