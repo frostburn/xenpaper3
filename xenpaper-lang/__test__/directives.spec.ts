@@ -38,6 +38,26 @@ describe('directive runtime', () => {
     expect(notes(`${directive} C`)[0]!.duration.valueOf()).toBe(duration)
   })
 
+  it.each([
+    ['M2 + [@. P1 M2 P5]', ['1/3', '1/3', '1/3']],
+    ['(@. M2) + [P1 M2 P5]', ['1/3', '1/3', '1/3']],
+    ['(@art(50%) M2) + [P1 M2 P5]', ['1/3', '1/3', '1/3']],
+    ['(@_ M2) + [P1 M2 P5]', ['11/30', '11/30', '11/30']],
+  ])('max-coalesces articulation while broadcasting: %s', (source, durations) => {
+    expect(notes(source).map((note) => note.duration.toFraction())).toEqual(durations)
+  })
+
+  it('broadcasts a continued scalar using maximum note duration', () => {
+    const events = notes('(M2=) + [P1 M2 P5]')
+    expect(events.map((note) => note.start.valueOf())).toEqual([0, 1 / 3, 2 / 3])
+    expect(events.map((note) => note.duration.valueOf())).toEqual([1 / 3, 1 / 3, 1 / 3])
+  })
+
+  it('max-coalesces continuations on both sides of broadcasting', () => {
+    const events = notes('(M2=) + [P1= M2== P5]')
+    expect(events.map((note) => note.duration.toFraction())).toEqual(['2/7', '3/7', '2/7'])
+  })
+
   it('steals time for a grace cluster', () => {
     const events = notes('@4?? B c# c=')
     expect(events.map((event) => event.duration.valueOf())).toEqual([0.25, 0.25, 1.5])

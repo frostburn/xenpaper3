@@ -27,6 +27,17 @@ const notation: StaffNotationShape = {
 }
 
 describe('MusicalStaff', () => {
+  it('does not repeat articulation marks on tied continuation heads', () => {
+    const evaluated = evaluateScoreShape(parse('@. C | =').body[0]!)
+    if (!('shape' in evaluated)) throw new Error('Expected a score shape.')
+    const wrapper = mount(MusicalStaff, {
+      props: { notation: constructStaffNotationShape(evaluated.shape) },
+    })
+
+    expect(wrapper.findAll('.notehead')).toHaveLength(2)
+    expect(wrapper.findAll('.articulation-mark')).toHaveLength(1)
+  })
+
   it('renders hertz notes relative to the active root frequency', () => {
     const evaluated = evaluateScoreShape(parse('{root = 220Hz} 220Hz 440Hz').body[0]!)
     if (!('shape' in evaluated)) throw new Error('Expected shape.')

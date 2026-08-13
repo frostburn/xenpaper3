@@ -727,6 +727,7 @@ const restDotY = (duration: Fraction, tupletCount?: number) =>
           />
           <text
             v-for="(mark, markIndex) in item.articulationMarks"
+            v-if="item.tiedFromColumn === undefined"
             :key="`articulation-${markIndex}`"
             class="articulation-mark"
             :x="x(item.column)"

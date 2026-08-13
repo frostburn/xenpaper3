@@ -31,6 +31,20 @@ describe('staff notation construction', () => {
     ])
   })
 
+  it('carries shorthand articulation from a repeat body into alternate endings', () => {
+    const node = parse('|: @. C |@^1 D :|@^2 E ||').body[0] as Expression
+    const evaluated = evaluateScoreShape(node)
+    if (!('shape' in evaluated)) throw new Error('Expected a score shape.')
+    const staff = constructStaffNotationShape(evaluated.shape)
+    const collect = (shape: typeof staff): readonly (readonly string[] | undefined)[] => {
+      if (shape.kind === 'note') return [shape.articulationMarks]
+      if (shape.kind === 'sequence') return shape.children.flatMap(collect)
+      if (shape.kind === 'parallel') return shape.branches.flatMap(collect)
+      return []
+    }
+    expect(collect(staff)).toEqual([['.'], ['.'], ['.']])
+  })
+
   it('only infers FJS accidentals from rational frequency ratios', () => {
     const node = parse('300Hz').body[0] as Expression
     const evaluated = evaluateScoreShape(node)
