@@ -158,6 +158,14 @@ function zipScoreConstructions(
 }
 
 function broadcastScalarOperation(node: Expression): Expression | undefined {
+  if (node.type === 'Group') {
+    const expression = broadcastScalarOperation(node.expression)
+    return expression ? { ...node, expression } : undefined
+  }
+  if (node.type === 'PostfixExpression') {
+    const expression = broadcastScalarOperation(node.expression)
+    return expression ? { ...node, expression } : undefined
+  }
   if (node.type !== 'BinaryExpression') return undefined
   const left = broadcastScalarOperation(node.left)
   if (left) return { ...node, left }

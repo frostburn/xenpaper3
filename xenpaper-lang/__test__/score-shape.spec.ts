@@ -293,6 +293,22 @@ describe('score-shape timing', () => {
     ).toEqual([2, 1, 1])
   })
 
+  it.each([
+    ['G + ([P1, P5] + [P4, M2])', 'parallel'],
+    ['G + ([P1 P5] + [P4 M2])', 'sequence'],
+  ])('broadcasts construction arithmetic nested in an explicit group: %s', (source, kind) => {
+    const result = shape(source)
+
+    expect(result.kind).toBe(kind)
+    const branches =
+      result.kind === 'parallel'
+        ? result.branches
+        : result.kind === 'sequence'
+          ? result.children
+          : []
+    expect(branches.filter((branch) => branch.kind === 'attack')).toHaveLength(2)
+  })
+
   it('applies subdivision directives to following notes', () => {
     const result = shape('C @2 D E @1 F G') as SequenceShape
     const attacks = result.children.filter((child) => child.kind === 'attack')
