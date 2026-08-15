@@ -106,12 +106,14 @@ function addOrSubtract(
         origins,
       }
     }
-    if (left.kind !== 'absolutePitch')
+    if (subtract && left.kind !== 'absolutePitch')
       throw new TypeError('A pitch offset cannot subtract an absolute pitch.')
-    const offset = pitchCoercion(right)
-    const spelling = transposePitchSpelling(left.spelling, offset.spelling, subtract)
+    const pitch = left.kind === 'absolutePitch' ? left : right
+    if (pitch.kind !== 'absolutePitch') throw new TypeError('Expected an absolute pitch.')
+    const offset = pitchCoercion(left.kind === 'absolutePitch' ? right : left)
+    const spelling = transposePitchSpelling(pitch.spelling, offset.spelling, subtract)
     const formula = offset.formula
-      ? new Map([...left.formula].map(([prime, exponent]) => [prime, new Fraction(exponent)]))
+      ? new Map([...pitch.formula].map(([prime, exponent]) => [prime, new Fraction(exponent)]))
       : undefined
     if (formula && offset.formula) {
       for (const [prime, exponent] of offset.formula) {
@@ -123,8 +125,8 @@ function addOrSubtract(
       }
     }
     return {
-      ...left,
-      rootOffset: subtract ? left.rootOffset.sub(offset.value) : left.rootOffset.add(offset.value),
+      ...pitch,
+      rootOffset: subtract ? pitch.rootOffset.sub(offset.value) : pitch.rootOffset.add(offset.value),
       ...(formula ? { formula } : {}),
       ...(spelling ? { spelling } : {}),
       origins,
