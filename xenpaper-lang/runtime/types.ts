@@ -155,7 +155,12 @@ export type StaffNotationShape =
       readonly endingNumber?: number
     }
   | { readonly kind: 'annotation'; readonly text: string; readonly duration: Fraction }
-  | { readonly kind: 'swing'; readonly notes: number; readonly duration: Fraction }
+  | {
+      readonly kind: 'swing'
+      readonly straightDurations: readonly Fraction[]
+      readonly grooveDurations: readonly Fraction[]
+      readonly duration: Fraction
+    }
   | { readonly kind: 'dynamic'; readonly mark: DynamicMark; readonly duration: Fraction }
   | {
       readonly kind: 'sequence'

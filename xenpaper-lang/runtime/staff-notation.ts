@@ -11,6 +11,7 @@ import type {
   StaffNotationShape,
   StaffPitch,
 } from './types'
+import { flattenScoreSemantics } from './beat-events'
 
 const LETTERS = ['C', 'D', 'E', 'F', 'G', 'A', 'B'] as const
 const SEMITONES = [0, 2, 4, 5, 7, 9, 11] as const
@@ -330,9 +331,21 @@ export function constructStaffNotationShape(shape: ScoreShape): StaffNotationSha
     case 'dynamic':
       return { kind: 'dynamic', mark: shape.mark, duration: shape.duration }
     case 'groove':
-      return shape.controlCount
-        ? { kind: 'swing', notes: shape.controlCount, duration: shape.duration }
-        : { kind: 'sequence', children: [], duration: shape.duration }
+      if (!shape.template || !shape.controlCount)
+        return { kind: 'sequence', children: [], duration: shape.duration }
+      else {
+        const flattened = flattenScoreSemantics(shape.template).score
+        const notes = flattened.events.filter((event) => event.kind === 'note')
+        const grooveDurations = notes.map((note, index) =>
+          (notes[index + 1]?.start ?? flattened.duration).sub(note.start).div(flattened.duration),
+        )
+        return {
+          kind: 'swing',
+          straightDurations: notes.map(() => new Fraction(1, notes.length)),
+          grooveDurations,
+          duration: shape.duration,
+        }
+      }
     case 'sequence':
       return {
         kind: 'sequence',

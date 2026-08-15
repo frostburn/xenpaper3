@@ -765,6 +765,9 @@ describe('MusicalStaff', () => {
 
     expect(wrapper.find('.swing-annotation').exists()).toBe(true)
     expect(wrapper.findAll('.swing-annotation ellipse')).toHaveLength(4)
+    expect(wrapper.find('.swing-beam').exists()).toBe(true)
+    expect(wrapper.find('.swing-flag').exists()).toBe(true)
+    expect(wrapper.get('.swing-tuplet-number').text()).toBe('3')
     expect(wrapper.findAll('.annotation')).toHaveLength(0)
   })
 

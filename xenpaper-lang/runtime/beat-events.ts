@@ -28,7 +28,7 @@ interface BeatEventFlatteningResult {
 const copy = (value: Fraction) => new Fraction(value.n, value.d)
 
 /** Flatten evaluated playback semantics without converting exact beat positions to seconds. */
-function flattenScoreSemantics(shape: ScoreShape): BeatEventFlatteningResult {
+export function flattenScoreSemantics(shape: ScoreShape): BeatEventFlatteningResult {
   const events: BeatTimedEvent[] = []
   const diagnostics: Diagnostic[] = []
   type MutableNoteEvent = Omit<

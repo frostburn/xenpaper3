@@ -34,7 +34,11 @@ type StaffItemContent =
   | { kind: 'rest'; duration: Fraction }
   | { kind: 'barline'; style: BarlineStyle; endingNumber?: number }
   | { kind: 'annotation'; text: string }
-  | { kind: 'swing'; notes: number }
+  | {
+      kind: 'swing'
+      straightDurations: readonly Fraction[]
+      grooveDurations: readonly Fraction[]
+    }
   | { kind: 'dynamic'; mark: DynamicMark }
 
 type StaffItem = StaffItemContent & {
@@ -174,7 +178,14 @@ const items = computed(() => {
     } else if (shape.kind === 'annotation') {
       layout.push({ kind: 'annotation', offset, text: shape.text, tuplets: [], voice })
     } else if (shape.kind === 'swing') {
-      layout.push({ kind: 'swing', offset, notes: shape.notes, tuplets: [], voice })
+      layout.push({
+        kind: 'swing',
+        offset,
+        straightDurations: shape.straightDurations,
+        grooveDurations: shape.grooveDurations,
+        tuplets: [],
+        voice,
+      })
     } else if (shape.kind === 'dynamic') {
       layout.push({ kind: 'dynamic', offset, mark: shape.mark, tuplets: [], voice })
     } else if (shape.kind === 'sequence') {
@@ -605,29 +616,56 @@ const restDotY = (duration: Fraction, tupletCount?: number) =>
       </text>
       <g v-else-if="item.kind === 'swing'" class="swing-annotation">
         <text :x="x(item.column)" y="25">=</text>
-        <g v-for="index in item.notes" :key="`straight-${index}`">
-          <ellipse :cx="x(item.column) - 12 - (item.notes - index) * 11" cy="24" rx="4" ry="3" />
-          <line
-            :x1="x(item.column) - 8 - (item.notes - index) * 11"
-            :x2="x(item.column) - 8 - (item.notes - index) * 11"
-            y1="24"
-            y2="11"
-          />
-        </g>
-        <g v-for="index in item.notes" :key="`groove-${index}`">
+        <g v-for="(_, index) in item.straightDurations" :key="`straight-${index}`">
           <ellipse
-            :cx="x(item.column) + 12 + (index - 1) * 11 + (index % 2 === 0 ? 3 : 0)"
+            :cx="x(item.column) - 12 - (item.straightDurations.length - index - 1) * 11"
             cy="24"
             rx="4"
             ry="3"
           />
           <line
-            :x1="x(item.column) + 16 + (index - 1) * 11 + (index % 2 === 0 ? 3 : 0)"
-            :x2="x(item.column) + 16 + (index - 1) * 11 + (index % 2 === 0 ? 3 : 0)"
+            :x1="x(item.column) - 8 - (item.straightDurations.length - index - 1) * 11"
+            :x2="x(item.column) - 8 - (item.straightDurations.length - index - 1) * 11"
             y1="24"
             y2="11"
           />
         </g>
+        <line
+          class="swing-beam"
+          :x1="x(item.column) - 8 - (item.straightDurations.length - 1) * 11"
+          :x2="x(item.column) - 8"
+          y1="11"
+          y2="11"
+        />
+        <g v-for="(duration, index) in item.grooveDurations" :key="`groove-${index}`">
+          <ellipse :cx="x(item.column) + 12 + index * 14" cy="24" rx="4" ry="3" />
+          <line
+            :x1="x(item.column) + 16 + index * 14"
+            :x2="x(item.column) + 16 + index * 14"
+            y1="24"
+            y2="11"
+          />
+          <path
+            v-if="duration.compare(item.grooveDurations[0]!) < 0"
+            class="swing-flag"
+            :d="`M ${x(item.column) + 16 + index * 14} 11 Q ${x(item.column) + 24 + index * 14} 15 ${x(item.column) + 19 + index * 14} 20`"
+          />
+        </g>
+        <template
+          v-if="item.grooveDurations.some((duration) => !duration.equals(item.grooveDurations[0]!))"
+        >
+          <path
+            class="swing-tuplet-bracket"
+            :d="`M ${x(item.column) + 9} 7 L ${x(item.column) + 9} 3 L ${x(item.column) + 19 + item.grooveDurations.length * 14} 3 L ${x(item.column) + 19 + item.grooveDurations.length * 14} 7`"
+          />
+          <text
+            class="swing-tuplet-number"
+            :x="x(item.column) + 14 + (item.grooveDurations.length * 14) / 2"
+            y="5"
+          >
+            3
+          </text>
+        </template>
       </g>
       <text
         v-else-if="item.kind === 'dynamic'"
@@ -901,6 +939,23 @@ const restDotY = (duration: Fraction, tupletCount?: number) =>
   stroke: none;
   font-size: 12px;
   text-anchor: middle;
+}
+
+.swing-annotation path,
+.swing-beam {
+  fill: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.swing-beam {
+  stroke-width: 3;
+}
+
+.swing-tuplet-number {
+  paint-order: stroke;
+  stroke: white !important;
+  stroke-width: 4px;
 }
 
 .sounding-label,
