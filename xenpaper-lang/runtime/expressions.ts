@@ -304,24 +304,28 @@ export function evaluateExpression(
       }
       if (["'", '"', '`', '^', 'v', '/', '\\'].includes(node.operator)) {
         const context = 'rootPitch' in mapping ? mapping : createPitchContext(mapping)
-        const displacement =
-          node.operator === "'"
-            ? context.degreeEquave
-            : node.operator === '"'
-              ? context.degreeEquave.mul(new Value(2))
-              : node.operator === '`'
-                ? context.degreeEquave.neg()
-                : node.operator === '^'
-                  ? context.up
-                  : node.operator === 'v'
-                    ? context.up.neg()
-                    : node.operator === '/'
-                      ? context.lift
-                      : context.lift.neg()
+        const equaveShift =
+          node.operator === "'" ? 1 : node.operator === '"' ? 2 : node.operator === '`' ? -1 : 0
+        const inflection =
+          node.operator === '^'
+            ? context.up
+            : node.operator === 'v'
+              ? context.up.neg()
+              : node.operator === '/'
+                ? context.lift
+                : context.lift.neg()
+        // Equave shifts use the scale's degree equave for scalar arithmetic, but
+        // written pitches and intervals always move by notational octaves.
+        const scalarDisplacement = equaveShift
+          ? context.degreeEquave.mul(new Value(equaveShift))
+          : inflection
+        const pitchDisplacement = equaveShift
+          ? Value.pitch(new Value(2).pow(equaveShift))
+          : inflection
         const operatorOrigin: SourceOrigin = { location: node.location, role: 'operator' }
         const origins = [...operand.value.origins, operatorOrigin]
-        const equaveFormula = ["'", '"', '`'].includes(node.operator)
-          ? Value.ratio(displacement).primeExponents()
+        const equaveFormula = equaveShift
+          ? Value.ratio(pitchDisplacement).primeExponents()
           : undefined
         const shiftedFormula = (formula: ReadonlyMap<number, Fraction>) => {
           if (!equaveFormula) return formula
@@ -335,7 +339,7 @@ export function evaluateExpression(
           return {
             value: result(
               'scalar',
-              operand.value.value.mul(Value.ratio(displacement)),
+              operand.value.value.mul(Value.ratio(scalarDisplacement)),
               origins,
             ),
             diagnostics: operand.diagnostics,
@@ -360,7 +364,7 @@ export function evaluateExpression(
             value: {
               ...operand.value,
               origins,
-              rootOffset: operand.value.rootOffset.add(displacement),
+              rootOffset: operand.value.rootOffset.add(pitchDisplacement),
               formula: shiftedFormula(operand.value.formula),
               spelling: {
                 ...operand.value.spelling,
@@ -376,7 +380,7 @@ export function evaluateExpression(
           value: {
             ...offset,
             origins,
-            value: offset.value.add(displacement),
+            value: offset.value.add(pitchDisplacement),
             ...(offset.formula ? { formula: shiftedFormula(offset.formula) } : {}),
             ...(offset.spelling
               ? {

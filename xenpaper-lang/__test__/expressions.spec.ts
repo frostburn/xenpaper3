@@ -111,13 +111,23 @@ describe('arithmetic expression evaluation', () => {
       nominal: 'G',
       modifiers: ['equaveUp'],
     })
+    const lowerC = customEvaluate("'C")
+    const upperC = customEvaluate('c')
+    expect(
+      lowerC.kind === 'absolutePitch' && lowerC.rootOffset.equals(Value.cents(1200)),
+    ).toBe(true)
+    expect(
+      lowerC.kind === 'absolutePitch' &&
+        upperC.kind === 'absolutePitch' &&
+        lowerC.rootOffset.equals(upperC.rootOffset),
+    ).toBe(true)
     const interval = customEvaluate("'P5")
     expect(interval.kind === 'pitchOffset' && interval.spelling).toMatchObject({
       quality: 'P',
       number: 5n,
       modifiers: ['equaveUp'],
     })
-    expect(interval.value.equals(Value.pitch(new Value(9n, 4n)))).toBe(true)
+    expect(interval.value.equals(Value.pitch(new Value(3)))).toBe(true)
     const ratio = customEvaluate("'3/2")
     expect(ratio.kind).toBe('scalar')
     expect(ratio.value.equals(new Value(9n, 4n))).toBe(true)
