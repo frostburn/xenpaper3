@@ -812,6 +812,17 @@ describe('MusicalStaff', () => {
     expect(wrapper.find('.swing-notehead--open').exists()).toBe(false)
   })
 
+  it('engraves four straight controls as sixteenth notes', () => {
+    const evaluated = evaluateScoreShape(parse('@groove([0 0== 0= 0]) C').body[0]!)
+    if (!('shape' in evaluated)) throw new Error('Expected a score shape.')
+    const wrapper = mount(MusicalStaff, {
+      props: { notation: constructStaffNotationShape(evaluated.shape) },
+    })
+
+    expect(wrapper.findAll('.swing-beam--straight')).toHaveLength(2)
+    expect(wrapper.findAll('.swing-annotation ellipse')).toHaveLength(8)
+  })
+
   it('engraves an unnormalized groove using its full rhythmic span', () => {
     const evaluated = evaluateScoreShape(parse('@groove(0= 0) C').body[0]!)
     if (!('shape' in evaluated)) throw new Error('Expected a score shape.')

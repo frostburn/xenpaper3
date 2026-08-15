@@ -542,24 +542,18 @@ const restDotY = (duration: Fraction, tupletCount?: number) =>
       ? 72
       : 76
 
-const swingDuration = (duration: Fraction, tuplet?: number) => {
-  if (!tuplet) return fraction(duration)
-  return fraction(duration).mul(tuplet).div(2)
-}
-
 const swingOpen = (duration: Fraction, tuplet?: number) =>
-  swingDuration(duration, tuplet).compare(2) >= 0
+  isOpenNotehead(effectiveDuration(duration, tuplet))
 
-const swingDotted = (duration: Fraction, tuplet?: number) => {
-  const value = swingDuration(duration, tuplet)
-  return value.equals('3/4') || value.equals('3/2') || value.equals(3)
-}
+const swingDotted = (duration: Fraction, tuplet?: number) =>
+  isDotted(effectiveDuration(duration, tuplet))
 
-const swingFlagged = (duration: Fraction, tuplet?: number) =>
-  swingDuration(duration, tuplet).compare(1) < 0
+const swingFlagCount = (duration: Fraction, tuplet?: number) => flagCount(duration, tuplet)
 
-const swingBeamed = (durations: readonly Fraction[], tuplet?: number) =>
-  durations.length > 1 && durations.every((duration) => swingFlagged(duration, tuplet))
+const swingBeamCount = (durations: readonly Fraction[], tuplet?: number) =>
+  durations.length > 1
+    ? Math.min(...durations.map((duration) => swingFlagCount(duration, tuplet)))
+    : 0
 </script>
 
 <template>
@@ -660,12 +654,13 @@ const swingBeamed = (durations: readonly Fraction[], tuplet?: number) =>
           />
         </g>
         <line
-          v-if="swingBeamed(item.straightDurations)"
+          v-for="beam in swingBeamCount(item.straightDurations)"
+          :key="`straight-beam-${beam}`"
           class="swing-beam swing-beam--straight"
           :x1="x(item.column) - 8 - (item.straightDurations.length - 1) * 11"
           :x2="x(item.column) - 8"
-          y1="11"
-          y2="11"
+          :y1="11 + (beam - 1) * 4"
+          :y2="11 + (beam - 1) * 4"
         />
         <g v-for="(duration, index) in item.grooveDurations" :key="`groove-${index}`">
           <ellipse
@@ -689,20 +684,22 @@ const swingBeamed = (durations: readonly Fraction[], tuplet?: number) =>
             y2="11"
           />
           <path
-            v-if="
-              swingFlagged(duration, item.tuplet) && !swingBeamed(item.grooveDurations, item.tuplet)
-            "
+            v-for="flag in swingBeamCount(item.grooveDurations, item.tuplet)
+              ? 0
+              : swingFlagCount(duration, item.tuplet)"
+            :key="`groove-${index}-flag-${flag}`"
             class="swing-flag"
-            :d="`M ${x(item.column) + 16 + index * 14} 11 Q ${x(item.column) + 24 + index * 14} 15 ${x(item.column) + 19 + index * 14} 20`"
+            :d="`M ${x(item.column) + 16 + index * 14} ${11 + (flag - 1) * 4} Q ${x(item.column) + 24 + index * 14} ${15 + (flag - 1) * 4} ${x(item.column) + 19 + index * 14} ${20 + (flag - 1) * 4}`"
           />
         </g>
         <line
-          v-if="swingBeamed(item.grooveDurations, item.tuplet)"
+          v-for="beam in swingBeamCount(item.grooveDurations, item.tuplet)"
+          :key="`groove-beam-${beam}`"
           class="swing-beam swing-beam--groove"
           :x1="x(item.column) + 16"
           :x2="x(item.column) + 16 + (item.grooveDurations.length - 1) * 14"
-          y1="11"
-          y2="11"
+          :y1="11 + (beam - 1) * 4"
+          :y2="11 + (beam - 1) * 4"
         />
         <template v-if="item.tuplet">
           <path
