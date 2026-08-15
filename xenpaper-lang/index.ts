@@ -44,6 +44,7 @@ export type {
   BeatTimedScore,
   ContinueShape,
   DynamicShape,
+  GrooveShape,
   DynamicMark,
   PitchAutomation,
   EvaluatedLiteral,

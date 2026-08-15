@@ -86,6 +86,89 @@ describe('directive runtime', () => {
     expect(dynamic?.start.valueOf()).toBe(0)
   })
 
+  it('cycles groove timing from the directive origin', () => {
+    const events = notes('[1 2] [3 4] @groove([0= 0]) [5 6] [7 8]')
+    expect(events.map(({ start }) => start.toFraction())).toEqual([
+      '0',
+      '1/2',
+      '1',
+      '3/2',
+      '2',
+      '8/3',
+      '3',
+      '11/3',
+    ])
+    expect(events.slice(4).map(({ duration }) => duration.toFraction())).toEqual([
+      '2/3',
+      '1/3',
+      '2/3',
+      '1/3',
+    ])
+  })
+
+  it('accepts a plain sequence as the groove template', () => {
+    const plain = notes('@groove(C== C) C C C C')
+    const normalized = notes('@groove([C== C]===) C C C C')
+    expect(plain.map(({ start, duration }) => [start.toFraction(), duration.toFraction()])).toEqual(
+      normalized.map(({ start, duration }) => [start.toFraction(), duration.toFraction()]),
+    )
+  })
+
+  it('turns a groove off with an empty directive', () => {
+    expect(
+      notes('@groove([0= 0]) [1 2] @groove [3 4]').map(({ start }) => start.toFraction()),
+    ).toEqual(['0', '2/3', '1', '3/2'])
+  })
+
+  it('realigns beats immediately when a groove is turned off mid-cycle', () => {
+    const events = notes('@groove(C== C) C @groove C C')
+    // The first note remains stretched to the groove, so it overlaps the next note.
+    // Resetting immediately is intentional: subsequent attacks return to integer beats.
+    expect(
+      events.map(({ start, duration }) => [start.toFraction(), duration.toFraction()]),
+    ).toEqual([
+      ['0', '3/2'],
+      ['1', '1'],
+      ['2', '1'],
+    ])
+  })
+
+  it('isolates grooves in groups and parallel branches', () => {
+    expect(notes('(@groove([0= 0]) [1 2]) [3 4]').map(({ start }) => start.toFraction())).toEqual([
+      '0',
+      '2/3',
+      '1',
+      '3/2',
+    ])
+    expect(notes('[@groove([0= 0]) [1 2], [3 4]]').map(({ start }) => start.toFraction())).toEqual([
+      '0',
+      '0',
+      '1/2',
+      '2/3',
+    ])
+  })
+
+  it('warps normalized attacks after continuation rescaling', () => {
+    expect(notes('@groove([0= 0]) [1 2]=').map(({ start }) => start.toFraction())).toEqual([
+      '0',
+      '1',
+    ])
+  })
+
+  it('rejects playback-invalid groove templates', () => {
+    const result = compile('@groove([= 0 0]) 1')
+    expect(result.diagnostics).toContainEqual(
+      expect.objectContaining({ code: 'XP_CONTINUE_WITHOUT_ATTACK', severity: 'error' }),
+    )
+    expect('score' in result).toBe(false)
+  })
+
+  it('multiplies interpolated groove dynamics and articulation', () => {
+    const events = notes('@p @groove([@f @. 0 0]) [1 2 3]')
+    expect(events[0]!.dynamic.valueOf()).toBeCloseTo(0.39)
+    expect(events[0]!.duration.valueOf()).toBeCloseTo(1 / 6)
+  })
+
   it('isolates dynamic state in lexical groups', () => {
     expect(notes('@p C (@f D) E').map(({ dynamic }) => dynamic.toFraction())).toEqual([
       '3/10',

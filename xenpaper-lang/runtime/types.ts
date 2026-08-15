@@ -155,6 +155,13 @@ export type StaffNotationShape =
       readonly endingNumber?: number
     }
   | { readonly kind: 'annotation'; readonly text: string; readonly duration: Fraction }
+  | {
+      readonly kind: 'swing'
+      readonly straightDurations: readonly Fraction[]
+      readonly grooveDurations: readonly Fraction[]
+      readonly tuplet?: number
+      readonly duration: Fraction
+    }
   | { readonly kind: 'dynamic'; readonly mark: DynamicMark; readonly duration: Fraction }
   | {
       readonly kind: 'sequence'
@@ -184,6 +191,8 @@ export interface SourceOrigin {
 export interface ShapeBase {
   readonly duration: Fraction
   readonly origins: readonly SourceOrigin[]
+  /** Directive state within this shape does not escape to its parent scope. */
+  readonly isolatedDirectiveScope?: boolean
 }
 
 export interface AttackShape extends ShapeBase {
@@ -259,6 +268,14 @@ export interface DynamicShape extends ShapeBase {
   readonly mark: DynamicMark
 }
 
+/** A playback timing cycle. The authored template is retained so staff notation can
+ * show the swing equivalence without applying it to engraved note positions. */
+export interface GrooveShape extends ShapeBase {
+  readonly kind: 'groove'
+  readonly template?: ScoreShape
+  readonly controlCount?: number
+}
+
 export type BarlineStyle =
   | 'single'
   | 'double'
@@ -288,6 +305,7 @@ export type ScoreShape =
   | BarlineShape
   | AnnotationShape
   | DynamicShape
+  | GrooveShape
   | SequenceShape
   | ParallelShape
 

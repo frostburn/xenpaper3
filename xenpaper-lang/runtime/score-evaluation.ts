@@ -474,6 +474,7 @@ function scaleShape(shape: ScoreShape, factor: Fraction): ScoreShape {
     case 'barline':
     case 'annotation':
     case 'dynamic':
+    case 'groove':
       return { ...shape, duration }
     case 'sequence':
       return {
@@ -1118,6 +1119,28 @@ export function evaluateScoreSemantics(
                 ? [...activeArticulationMarks, directive.mark!]
                 : []
           }
+          let grooveTemplate: ScoreShape | undefined
+          if (directive?.kind === 'groove' && directive.argument) {
+            const template = visit(
+              directive.argument,
+              activeContext,
+              activePulse,
+              'mf',
+              new Fraction(1),
+              [],
+            )
+            resolved.diagnostics.push(...template.diagnostics)
+            if ('shape' in template) {
+              if (attacks(template.shape).length < 2 || template.shape.duration.compare(0) <= 0) {
+                resolved.diagnostics.push({
+                  code: 'XP_GROOVE',
+                  severity: 'error',
+                  message: 'A groove requires at least two notes over a positive duration.',
+                  locations: [directive.argument.location],
+                })
+              } else grooveTemplate = template.shape
+            }
+          }
           const shape: ScoreShape =
             directive?.kind === 'unknown'
               ? {
@@ -1133,7 +1156,15 @@ export function evaluateScoreSemantics(
                     duration: new Fraction(0),
                     origins: [origin(item, 'directive')],
                   }
-                : sequence([], [origin(item, 'directive')])
+                : directive?.kind === 'groove'
+                  ? {
+                      kind: 'groove',
+                      template: grooveTemplate,
+                      controlCount: grooveTemplate ? attacks(grooveTemplate).length : undefined,
+                      duration: new Fraction(0),
+                      origins: [origin(item, 'directive')],
+                    }
+                  : sequence([], [origin(item, 'directive')])
           results.push({ shape, diagnostics: resolved.diagnostics })
           continue
         }
@@ -1368,8 +1399,8 @@ export function evaluateScoreSemantics(
       }
       return { shape, diagnostics }
     }
-    if (current.type === 'Group')
-      return visit(
+    if (current.type === 'Group') {
+      const grouped = visit(
         current.expression,
         context,
         currentPulse,
@@ -1377,6 +1408,12 @@ export function evaluateScoreSemantics(
         currentArticulation,
         currentArticulationMarks,
       )
+      if (!('shape' in grouped)) return grouped
+      return {
+        ...grouped,
+        shape: { ...grouped.shape, isolatedDirectiveScope: true },
+      }
+    }
     if (current.type === 'NormalizeToSlot') {
       if (!current.expression) {
         return {
@@ -1421,12 +1458,15 @@ export function evaluateScoreSemantics(
         !Number.isInteger(Math.log2(tuplet))
       ) {
         return {
-          shape: { ...normalized, normalized: true, tuplet },
+          shape: { ...normalized, normalized: true, isolatedDirectiveScope: true, tuplet },
           diagnostics: evaluated.diagnostics,
         }
       }
       return {
-        shape: normalized.kind === 'sequence' ? { ...normalized, normalized: true } : normalized,
+        shape:
+          normalized.kind === 'sequence'
+            ? { ...normalized, normalized: true, isolatedDirectiveScope: true }
+            : { ...normalized, isolatedDirectiveScope: true },
         diagnostics: evaluated.diagnostics,
       }
     }

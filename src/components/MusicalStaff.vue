@@ -34,6 +34,12 @@ type StaffItemContent =
   | { kind: 'rest'; duration: Fraction }
   | { kind: 'barline'; style: BarlineStyle; endingNumber?: number }
   | { kind: 'annotation'; text: string }
+  | {
+      kind: 'swing'
+      straightDurations: readonly Fraction[]
+      grooveDurations: readonly Fraction[]
+      tuplet?: number
+    }
   | { kind: 'dynamic'; mark: DynamicMark }
 
 type StaffItem = StaffItemContent & {
@@ -172,6 +178,16 @@ const items = computed(() => {
       if (state.activeItems.length) state.barlineSinceActiveItems = true
     } else if (shape.kind === 'annotation') {
       layout.push({ kind: 'annotation', offset, text: shape.text, tuplets: [], voice })
+    } else if (shape.kind === 'swing') {
+      layout.push({
+        kind: 'swing',
+        offset,
+        straightDurations: shape.straightDurations,
+        grooveDurations: shape.grooveDurations,
+        tuplet: shape.tuplet,
+        tuplets: [],
+        voice,
+      })
     } else if (shape.kind === 'dynamic') {
       layout.push({ kind: 'dynamic', offset, mark: shape.mark, tuplets: [], voice })
     } else if (shape.kind === 'sequence') {
@@ -525,6 +541,19 @@ const restDotY = (duration: Fraction, tupletCount?: number) =>
     : restBox(duration, tupletCount) === 'half'
       ? 72
       : 76
+
+const swingOpen = (duration: Fraction, tuplet?: number) =>
+  isOpenNotehead(effectiveDuration(duration, tuplet))
+
+const swingDotted = (duration: Fraction, tuplet?: number) =>
+  isDotted(effectiveDuration(duration, tuplet))
+
+const swingFlagCount = (duration: Fraction, tuplet?: number) => flagCount(duration, tuplet)
+
+const swingBeamCount = (durations: readonly Fraction[], tuplet?: number) =>
+  durations.length > 1
+    ? Math.min(...durations.map((duration) => swingFlagCount(duration, tuplet)))
+    : 0
 </script>
 
 <template>
@@ -600,6 +629,92 @@ const restDotY = (duration: Fraction, tupletCount?: number) =>
       <text v-else-if="item.kind === 'annotation'" class="annotation" :x="x(item.column)" y="25">
         {{ item.text }}
       </text>
+      <g v-else-if="item.kind === 'swing'" class="swing-annotation">
+        <text :x="x(item.column)" y="25">=</text>
+        <g v-for="(_, index) in item.straightDurations" :key="`straight-${index}`">
+          <ellipse
+            :class="{ 'swing-notehead--open': swingOpen(_, undefined) }"
+            :cx="x(item.column) - 12 - (item.straightDurations.length - index - 1) * 11"
+            cy="24"
+            rx="4"
+            ry="3"
+          />
+          <circle
+            v-if="swingDotted(_, undefined)"
+            class="swing-dot"
+            :cx="x(item.column) - 5 - (item.straightDurations.length - index - 1) * 11"
+            cy="24"
+            r="1.25"
+          />
+          <line
+            :x1="x(item.column) - 8 - (item.straightDurations.length - index - 1) * 11"
+            :x2="x(item.column) - 8 - (item.straightDurations.length - index - 1) * 11"
+            y1="24"
+            y2="11"
+          />
+        </g>
+        <line
+          v-for="beam in swingBeamCount(item.straightDurations)"
+          :key="`straight-beam-${beam}`"
+          class="swing-beam swing-beam--straight"
+          :x1="x(item.column) - 8 - (item.straightDurations.length - 1) * 11"
+          :x2="x(item.column) - 8"
+          :y1="11 + (beam - 1) * 4"
+          :y2="11 + (beam - 1) * 4"
+        />
+        <g v-for="(duration, index) in item.grooveDurations" :key="`groove-${index}`">
+          <ellipse
+            :class="{ 'swing-notehead--open': swingOpen(duration, item.tuplet) }"
+            :cx="x(item.column) + 12 + index * 14"
+            cy="24"
+            rx="4"
+            ry="3"
+          />
+          <circle
+            v-if="swingDotted(duration, item.tuplet)"
+            class="swing-dot"
+            :cx="x(item.column) + 19 + index * 14"
+            cy="24"
+            r="1.25"
+          />
+          <line
+            :x1="x(item.column) + 16 + index * 14"
+            :x2="x(item.column) + 16 + index * 14"
+            y1="24"
+            y2="11"
+          />
+          <path
+            v-for="flag in swingBeamCount(item.grooveDurations, item.tuplet)
+              ? 0
+              : swingFlagCount(duration, item.tuplet)"
+            :key="`groove-${index}-flag-${flag}`"
+            class="swing-flag"
+            :d="`M ${x(item.column) + 16 + index * 14} ${11 + (flag - 1) * 4} Q ${x(item.column) + 24 + index * 14} ${15 + (flag - 1) * 4} ${x(item.column) + 19 + index * 14} ${20 + (flag - 1) * 4}`"
+          />
+        </g>
+        <line
+          v-for="beam in swingBeamCount(item.grooveDurations, item.tuplet)"
+          :key="`groove-beam-${beam}`"
+          class="swing-beam swing-beam--groove"
+          :x1="x(item.column) + 16"
+          :x2="x(item.column) + 16 + (item.grooveDurations.length - 1) * 14"
+          :y1="11 + (beam - 1) * 4"
+          :y2="11 + (beam - 1) * 4"
+        />
+        <template v-if="item.tuplet">
+          <path
+            class="swing-tuplet-bracket"
+            :d="`M ${x(item.column) + 9} 7 L ${x(item.column) + 9} 3 L ${x(item.column) + 19 + item.grooveDurations.length * 14} 3 L ${x(item.column) + 19 + item.grooveDurations.length * 14} 7`"
+          />
+          <text
+            class="swing-tuplet-number"
+            :x="x(item.column) + 14 + (item.grooveDurations.length * 14) / 2"
+            y="5"
+          >
+            {{ item.tuplet }}
+          </text>
+        </template>
+      </g>
       <text
         v-else-if="item.kind === 'dynamic'"
         class="performance-label dynamic-label"
@@ -725,16 +840,17 @@ const restDotY = (duration: Fraction, tupletCount?: number) =>
             rx="7"
             ry="5"
           />
-          <text
-            v-for="(mark, markIndex) in item.articulationMarks"
-            v-if="item.tiedFromColumn === undefined"
-            :key="`articulation-${markIndex}`"
-            class="articulation-mark"
-            :x="x(item.column)"
-            :y="y(item.pitch.staffPosition) + 18 + markIndex * 10"
-          >
-            {{ mark === "'" ? '▾' : mark === ':' ? '•̲' : mark === '_' ? '⌒' : mark }}
-          </text>
+          <template v-if="item.tiedFromColumn === undefined">
+            <text
+              v-for="(mark, markIndex) in item.articulationMarks"
+              :key="`articulation-${markIndex}`"
+              class="articulation-mark"
+              :x="x(item.column)"
+              :y="y(item.pitch.staffPosition) + 18 + markIndex * 10"
+            >
+              {{ mark === "'" ? '▾' : mark === ':' ? '•̲' : mark === '_' ? '⌒' : mark }}
+            </text>
+          </template>
           <circle
             v-if="isDotted(effectiveDuration(engravingDuration(item), tupletCount(item)))"
             class="augmentation-dot"
@@ -859,6 +975,39 @@ const restDotY = (duration: Fraction, tupletCount?: number) =>
 .annotation {
   font-size: 12px;
   text-anchor: middle;
+}
+
+.swing-annotation {
+  fill: currentColor;
+  stroke: currentColor;
+  stroke-width: 1.25;
+}
+
+.swing-notehead--open {
+  fill: white;
+}
+
+.swing-annotation text {
+  stroke: none;
+  font-size: 12px;
+  text-anchor: middle;
+}
+
+.swing-annotation path,
+.swing-beam {
+  fill: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.swing-beam {
+  stroke-width: 3;
+}
+
+.swing-tuplet-number {
+  paint-order: stroke;
+  stroke: white !important;
+  stroke-width: 4px;
 }
 
 .sounding-label,
