@@ -28,6 +28,12 @@ describe('score-shape timing', () => {
       .filter((child) => child.kind === 'attack')
       .map((attack) => Math.round(attack.pitch.value.valueOf()))
     expect(offsets).toEqual([0, 100, 200])
+
+    const perfect = shape('MOS{5L2s} P3ms P4ms') as SequenceShape
+    const perfectOffsets = perfect.children
+      .filter((child) => child.kind === 'attack')
+      .map((attack) => Math.round(attack.pitch.value.valueOf()))
+    expect(perfectOffsets).toEqual([500, 700])
   })
 
   it('supports explicit MOS modes, hardness, equaves, and step setters', () => {
@@ -42,6 +48,15 @@ describe('score-shape timing', () => {
     const set = shape('MOS{5L2s} MOS{^ = 1\\24} ^J') as SequenceShape
     const setAttack = set.children.find((child) => child.kind === 'attack')
     expect(setAttack?.pitch.value.equals(Value.equalDivision(1, 24, new Value(2)))).toBe(true)
+
+    const multiperiod = shape('MOS{4L2s} P3ms') as SequenceShape
+    const periodAttack = multiperiod.children.find((child) => child.kind === 'attack')
+    expect(Math.round(periodAttack!.pitch.value.valueOf())).toBe(600)
+
+    const inconsistent = evaluateScoreShape(
+      parse('MOS{5L2s L = 300c s = 100c} J').body[0] as Expression,
+    )
+    expect(inconsistent.diagnostics[0]?.message).toContain('accumulate to the MOS equave')
   })
 
   it('broadcasts unary pitch operators over score constructions', () => {

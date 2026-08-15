@@ -190,7 +190,7 @@ MultiplicativeOperator
 // A slash attached to a pitch-like token is a lift modifier belonging to the
 // following sequence item, not division (for example `Cv5 /'C`).
 BinaryDivide
-  = "/" !(PitchModifier / PitchNominal / [0-9]) { return "/"; }
+  = "/" !(PitchModifier / StandardPitchNominal / MosPitchNominal / [0-9]) { return "/"; }
 
 PowerExpression
   = left:UnaryExpression
@@ -239,6 +239,7 @@ PrimaryExpression
   / MonzoLiteral
   / MosIntervalLiteral
   / IntervalLiteral
+  / MosPitchLiteral
   / PitchLiteral
   / EqualDivisionLiteral
   / QuantityLiteral
@@ -594,7 +595,7 @@ IntervalNumber
   = $(UnsignedInteger (".5" / "½")?)
 
 PitchLiteral
-  = nominal:PitchNominal
+  = nominal:StandardPitchNominal
     accidentals:PythagoreanAccidental*
     inflections:FjsInflection* !IdentifierContinue {
       return node('PitchLiteral', {
@@ -605,6 +606,25 @@ PitchLiteral
         raw: text(),
       });
     }
+
+MosPitchLiteral
+  = nominal:MosPitchNominal accidentals:MosAccidental* inflections:FjsInflection*
+    !IdentifierContinue {
+      return node('PitchLiteral', {
+        modifiers: [], nominal, accidentals, inflections, raw: text(),
+      });
+    }
+
+MosPitchNominal
+  = value:$([Jj][J-Zj-z]) {
+      return node('PitchNominal', { system: 'mos', value });
+    }
+  / value:$([J-Zj-z]) {
+      return node('PitchNominal', { system: 'mos', value });
+    }
+
+MosAccidental
+  = value:$([&@ea]) { return node('Accidental', { value }); }
 
 // Bare integer tokens in score position are scale degrees, not scalar integer
 // expressions. They intentionally stop before binary operators so `2 - 3`
@@ -630,15 +650,12 @@ PitchModifier
       return node('PitchModifier', { kind: modifierKind(raw), raw });
     }
 
-PitchNominal
+StandardPitchNominal
   = value:$("alp"i / "bet"i / "gam"i / "del"i / "eps"i / "zet"i / "eta"i) {
       return node('PitchNominal', { system: 'greek', value });
     }
   / value:$([A-Ga-g]) {
       return node('PitchNominal', { system: 'latin', value });
-    }
-  / value:$([J-Zj-z]+) {
-      return node('PitchNominal', { system: 'mos', value });
     }
   / value:$([Α-Ηα-η]) {
       return node('PitchNominal', { system: 'greek', value });
@@ -647,7 +664,7 @@ PitchNominal
 // The underscore belongs exclusively to the Pythagorean natural accidental;
 // denominator FJS inflections use the postfix `v` marker.
 PythagoreanAccidental
-  = value:$("𝄪" / "𝄫" / "𝄲" / "𝄳" / "𝄬" / "𝄭" / "𝄮" / "𝄯" / "𝄰" / "𝄱" / [x♯#‡t♮d♭bpq&@ea]) {
+  = value:$("𝄪" / "𝄫" / "𝄲" / "𝄳" / "𝄬" / "𝄭" / "𝄮" / "𝄯" / "𝄰" / "𝄱" / [x♯#‡t♮d♭bpq]) {
       return node('Accidental', { value });
     }
   / "_" ![0-9] { return node('Accidental', { value: '_' }); }

@@ -127,6 +127,7 @@ export interface PitchContext {
 export interface MosDegree {
   readonly center: Value
   readonly imperfect: boolean
+  readonly mid?: Value
 }
 
 export interface MosContext {

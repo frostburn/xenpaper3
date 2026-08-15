@@ -1,4 +1,6 @@
-import { Fraction, mmod } from 'xen-dev-utils/fraction'
+import { Fraction, gcd, mmod } from 'xen-dev-utils/fraction'
+import { stepString } from 'moment-of-symmetry/core'
+import { generateNotation, type MosMonzo } from 'moment-of-symmetry/notation'
 import type {
   Expression,
   IntervalLiteral,
@@ -447,13 +449,6 @@ export function applyPitchContextChange(
   return context
 }
 
-function brightestPattern(large: number, small: number): string {
-  const length = large + small
-  return Array.from({ length }, (_, i) =>
-    Math.floor(((i + 1) * small) / length) === Math.floor((i * small) / length) ? 'L' : 's',
-  ).join('')
-}
-
 function mosValue(text: string, context: PitchContext): Value {
   const edo = /^(\d+)\\(\d+)$/.exec(text.trim())
   if (edo) return Value.equalDivision(Number(edo[1]), Number(edo[2]), new Value(2))
@@ -471,10 +466,15 @@ function applyMosDeclaration(body: string, context: PitchContext): PitchContext 
     : Value.pitch(new Value(2))
   let source = body.replace(/<[^>]+>/g, ' ').trim()
   const assignments = new Map<string, string>()
-  source = source.replace(/(?:^|\s)(\^|\/|L|s)\s*=\s*([^;]+?)(?=\s+(?:\^|\/|L|s)\s*=|;|$)/g, (_m, key, value) => {
-    assignments.set(key, value.trim())
-    return ' '
-  }).trim()
+  source = source
+    .replace(
+      /(?:^|\s)(\^|\/|L|s)\s*=\s*([^;]+?)(?=\s+(?:\^|\/|L|s)\s*=|;|$)/g,
+      (_m, key, value) => {
+        assignments.set(key, value.trim())
+        return ' '
+      },
+    )
+    .trim()
   if (!source) {
     if (!context.mos) throw new TypeError('A MOS step setter requires an active MOS declaration.')
     if (!assignments.has('L') && !assignments.has('s')) {
@@ -491,28 +491,39 @@ function applyMosDeclaration(body: string, context: PitchContext): PitchContext 
   let pattern: string
   let hardnessNumerator = 2
   let hardnessDenominator = 1
-  const countPattern = /^(\d+)L\s*(\d+)s(?:\s+(\d+)\s*\|\s*(\d+)(?:\s*\((\d+)\))?)?(?:\s+(\d+)\s*:\s*(\d+))?$/.exec(source)
+  const countPattern =
+    /^(\d+)L\s*(\d+)s(?:\s+(\d+)\s*\|\s*(\d+)(?:\s*\((\d+)\))?)?(?:\s+(\d+)\s*:\s*(\d+))?$/.exec(
+      source,
+    )
   if (countPattern) {
-    const largeCount = Number(countPattern[1]), smallCount = Number(countPattern[2])
-    pattern = brightestPattern(largeCount, smallCount)
+    const largeCount = Number(countPattern[1])
+    const smallCount = Number(countPattern[2])
+    const options: { up?: number; down?: number } = {}
     if (countPattern[3]) {
-      const period = gcdNumber(largeCount, smallCount)
+      const period = gcd(largeCount, smallCount)
       if (countPattern[5] && Number(countPattern[5]) !== period)
         throw new TypeError('MOS period must be consistent with the step counts.')
-      const rotation = mmod(Number(countPattern[4]), pattern.length)
-      pattern = pattern.slice(rotation) + pattern.slice(0, rotation)
+      options.up = Number(countPattern[3])
+      options.down = Number(countPattern[4])
     }
-    if (countPattern[6]) [hardnessNumerator, hardnessDenominator] = [Number(countPattern[6]), Number(countPattern[7])]
+    pattern = stepString(largeCount, smallCount, options)
+    if (countPattern[6])
+      [hardnessNumerator, hardnessDenominator] = [
+        Number(countPattern[6]),
+        Number(countPattern[7]),
+      ]
   } else if (/^[Ls]+$/.test(source)) pattern = source
   else {
     const parts = source.includes(',') ? source.split(',').map(Number) : [...source].map(Number)
     if (parts.length < 2 || parts.some((part) => !Number.isFinite(part)))
       throw new TypeError('Invalid MOS step pattern.')
-    const low = Math.min(...parts), high = Math.max(...parts)
+    const low = Math.min(...parts)
+    const high = Math.max(...parts)
     if (low === high) throw new TypeError('A MOS pattern requires two step sizes.')
-    pattern = parts.map((part) => part === high ? 'L' : part === low ? 's' : '?').join('')
+    pattern = parts.map((part) => (part === high ? 'L' : part === low ? 's' : '?')).join('')
     if (pattern.includes('?')) throw new TypeError('A MOS pattern requires exactly two step sizes.')
-    hardnessNumerator = high; hardnessDenominator = low
+    hardnessNumerator = high
+    hardnessDenominator = low
   }
   const countL = [...pattern].filter(x => x === 'L').length
   const countS = pattern.length - countL
@@ -522,31 +533,56 @@ function applyMosDeclaration(body: string, context: PitchContext): PitchContext 
     const host = countL * hardnessNumerator + countS * hardnessDenominator
     large = Value.equalDivision(hardnessNumerator, host, Value.ratio(equave))
     small = Value.equalDivision(hardnessDenominator, host, Value.ratio(equave))
-  } else if (large && !small) small = equave.sub(large.mul(new Value(countL))).div(new Value(countS))
-  else if (small && !large) large = equave.sub(small.mul(new Value(countS))).div(new Value(countL))
-  const offsets: Value[] = [Value.cents(0)]
-  for (const step of pattern) offsets.push(offsets.at(-1)!.add(step === 'L' ? large! : small!))
-  const nominals = new Map<string, Value>()
-  offsets.slice(0, -1).forEach((value, index) => nominals.set(mosNominal(index), value))
-  const chroma = large!.sub(small!)
-  const degrees = offsets.slice(0, -1).map((major, index) => ({
-    // The written scale supplies the bright (major) member.  Diamond-MOS
-    // degree centers lie halfway between their major and minor forms.
-    center: index ? major.sub(chroma.div(new Value(2))) : major,
-    imperfect: index !== 0,
-  }))
-  const mos: MosContext = { pattern, equave, period: equave, large: large!, small: small!, nominals, degrees }
-  return {
-    ...context, mos, degrees: offsets.slice(1), degreeEquave: equave,
-    up: assignments.has('^') ? mosValue(assignments.get('^')!, context) : Value.equalDivision(1, countL * hardnessNumerator + countS * hardnessDenominator, Value.ratio(equave)),
-    lift: assignments.has('/') ? mosValue(assignments.get('/')!, context) : Value.equalDivision(5, countL * hardnessNumerator + countS * hardnessDenominator, Value.ratio(equave)),
-  }
-}
+  } else if (large && !small)
+    small = equave.sub(large.mul(new Value(countL))).div(new Value(countS))
+  else if (small && !large)
+    large = equave.sub(small.mul(new Value(countS))).div(new Value(countL))
+  const accumulated = large!.mul(new Value(countL)).add(small!.mul(new Value(countS)))
+  if (Math.abs(accumulated.valueOf() - equave.valueOf()) > 1e-8)
+    throw new TypeError('The MOS large and small steps must accumulate to the MOS equave.')
 
-function gcdNumber(a: number, b: number): number { while (b) [a, b] = [b, a % b]; return Math.abs(a) }
-function mosNominal(index: number): string {
-  const alphabet = 'JKLMNOPQRSTUVWXYZ'
-  return alphabet[index % alphabet.length]!.repeat(Math.floor(index / alphabet.length) + 1)
+  const notation = generateNotation(pattern)
+  const realize = (monzo: MosMonzo): Value =>
+    large!.mul(new Value(monzo[0])).add(small!.mul(new Value(monzo[1])))
+  const nominals = new Map<string, Value>()
+  for (const [nominal, monzo] of notation.scale) nominals.set(nominal, realize(monzo))
+  const chroma = large!.sub(small!)
+  const degrees = notation.degrees.map((degree) => ({
+    center: realize(degree.center),
+    imperfect: !degree.perfect,
+    ...(degree.mid ? { mid: realize(degree.mid) } : {}),
+  }))
+  const offsets = [...nominals.values()]
+  const period = realize(notation.period)
+  const mos: MosContext = {
+    pattern,
+    equave,
+    period,
+    large: large!,
+    small: small!,
+    nominals,
+    degrees,
+  }
+  return {
+    ...context,
+    mos,
+    degrees: [...offsets.slice(1), equave],
+    degreeEquave: equave,
+    up: assignments.has('^')
+      ? mosValue(assignments.get('^')!, context)
+      : Value.equalDivision(
+          1,
+          countL * hardnessNumerator + countS * hardnessDenominator,
+          Value.ratio(equave),
+        ),
+    lift: assignments.has('/')
+      ? mosValue(assignments.get('/')!, context)
+      : Value.equalDivision(
+          5,
+          countL * hardnessNumerator + countS * hardnessDenominator,
+          Value.ratio(equave),
+        ),
+  }
 }
 
 const origin = (node: PitchLiteral | IntervalLiteral): readonly SourceOrigin[] => [
@@ -801,24 +837,45 @@ export function evaluatePitchLiteral(
   }
 }
 
-export function evaluateMosIntervalLiteral(node: MosIntervalLiteral, input: PrimeMapping | PitchContext): PitchOffsetValue {
+export function evaluateMosIntervalLiteral(
+  node: MosIntervalLiteral,
+  input: PrimeMapping | PitchContext,
+): PitchOffsetValue {
   const context = asContext(input)
   if (!context.mos) throw new TypeError('MOS-step intervals require a MOS declaration.')
   const degree = Number(node.degree)
   const size = context.mos.degrees.length
   const simple = mmod(degree, size)
-  let value = context.mos.degrees[simple]!.center.add(context.mos.period.mul(new Value(Math.floor(degree / size))))
+  let value = context.mos.degrees[simple]!.center.add(
+    context.mos.period.mul(new Value(Math.floor(degree / size))),
+  )
   const imperfect = context.mos.degrees[simple]!.imperfect
   const chroma = context.mos.large.sub(context.mos.small)
   let alteration = 0
-  if (node.quality === 'P') { if (imperfect) throw new TypeError(`P is invalid for MOS step ${degree}.`) }
-  else if (node.quality === 'M') { if (!imperfect) throw new TypeError(`M is invalid for MOS step ${degree}.`); alteration = 0.5 }
-  else if (node.quality === 'm') { if (!imperfect) throw new TypeError(`m is invalid for MOS step ${degree}.`); alteration = -0.5 }
-  else if (node.quality === 'n') { if (!imperfect) throw new TypeError(`n is invalid for MOS step ${degree}.`) }
-  else if (node.quality.startsWith('A')) alteration = node.quality.length
-  else alteration = -node.quality.length
+  if (node.quality === 'P') {
+    if (imperfect) throw new TypeError(`P is invalid for MOS step ${degree}.`)
+  } else if (node.quality === 'M') {
+    if (!imperfect) throw new TypeError(`M is invalid for MOS step ${degree}.`)
+    alteration = 0.5
+  } else if (node.quality === 'm') {
+    if (!imperfect) throw new TypeError(`m is invalid for MOS step ${degree}.`)
+    alteration = -0.5
+  } else if (node.quality === 'n') {
+    if (!imperfect) {
+      const mid = context.mos.degrees[simple]!.mid
+      if (!mid) throw new TypeError(`n is invalid for MOS step ${degree}.`)
+      value = mid.add(context.mos.period.mul(new Value(Math.floor(degree / size))))
+    }
+  } else if (node.quality.startsWith('A'))
+    alteration = node.quality.length + (imperfect ? 0.5 : 0)
+  else alteration = -(node.quality.length + (imperfect ? 0.5 : 0))
   value = value.add(chroma.mul(new Value(alteration)))
-  return { kind: 'pitchOffset', value, spelling: { quality: node.quality, number: BigInt(degree), raw: node.raw, modifiers: [] }, origins: [{ location: node.location, role: 'literal' }] }
+  return {
+    kind: 'pitchOffset',
+    value,
+    spelling: { quality: node.quality, number: BigInt(degree), raw: node.raw, modifiers: [] },
+    origins: [{ location: node.location, role: 'literal' }],
+  }
 }
 
 export function evaluateIntervalLiteral(

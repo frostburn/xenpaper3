@@ -125,6 +125,26 @@ describe('enumerated chords', () => {
   })
 })
 
+describe('Diamond-MOS tokens', () => {
+  it('does not consume ordinary identifiers as multi-letter MOS pitches', () => {
+    expect(parse('@test(sqrt(2))').body[0]).toMatchObject({
+      type: 'Directive',
+      arguments: [{ type: 'CallExpression', callee: 'sqrt' }],
+    })
+    expect(parse('{root = 220Hz}').body[0]).toMatchObject({
+      type: 'PitchContextChange',
+      statements: [{ target: { type: 'ContextNameTarget', name: 'root' } }],
+    })
+  })
+
+  it('limits extended nominals to the unambiguous J-prefixed two-letter form', () => {
+    expect(parse('JJ').body[0]).toMatchObject({
+      type: 'PitchLiteral',
+      nominal: { system: 'mos', value: 'JJ' },
+    })
+  })
+})
+
 const score = String.raw`# FJS and prefix modifiers
 E^5 Ebv5 P1v5 Cv5 E_
 /'C '/C vDb C#
