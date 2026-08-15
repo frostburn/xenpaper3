@@ -846,8 +846,9 @@ describe('MusicalStaff', () => {
     expect(wrapper.find('.swing-beam--straight').exists()).toBe(true)
     // The groove uses the same preceding-power-of-two scale as staff tuplets.
     expect(wrapper.findAll('.swing-dot')).toHaveLength(1)
-    expect(wrapper.find('.swing-beam--groove').exists()).toBe(false)
-    expect(wrapper.find('.swing-flag').exists()).toBe(true)
+    // A dotted eighth and an eighth share a single beam.
+    expect(wrapper.findAll('.swing-beam--groove')).toHaveLength(1)
+    expect(wrapper.findAll('.swing-flag')).toHaveLength(0)
     expect(wrapper.find('.swing-notehead--open').exists()).toBe(false)
   })
 

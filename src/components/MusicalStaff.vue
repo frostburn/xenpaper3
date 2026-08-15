@@ -496,10 +496,10 @@ const flagCount = (duration?: Fraction, scale = 1) => {
   if (!duration) return 0
   const value = durationValue(duration) * scale
   if (value >= 1 || value <= 0) return 0
-  const subdivision = Math.round(1 / value)
-  const binarySubdivision = subdivision % 3 === 0 ? subdivision / 3 : subdivision
-  const binaryFlags = Math.log2(binarySubdivision)
-  return Number.isInteger(binaryFlags) ? binaryFlags + (subdivision % 3 === 0 ? 1 : 0) : 0
+  const relativeToDottedHalf = value / 3
+  const dotted = Number.isInteger(Math.log2(relativeToDottedHalf))
+  const binaryFlags = Math.log2(1 / (dotted ? (value * 2) / 3 : value))
+  return Number.isInteger(binaryFlags) ? binaryFlags : 0
 }
 
 const effectiveDuration = (duration: Fraction, scale = 1) => fraction(duration).mul(scale)
