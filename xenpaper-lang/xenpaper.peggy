@@ -210,6 +210,7 @@ UnaryExpression
 UnaryOperator
   = "+" { return "+"; }
   / "-" { return "-"; }
+  / "~" { return "~"; }
 
 PostfixExpression
   = expression:PrimaryExpression marks:AttachedPostfixMark* {

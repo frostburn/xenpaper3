@@ -11,6 +11,7 @@ import {
   evaluateIntervalLiteral,
   evaluatePitchLiteral,
   scalePitchOffset,
+  mapFormula,
   spellIntervalFormula,
   spellPitchDifference,
   transposePitchSpelling,
@@ -278,6 +279,29 @@ export function evaluateExpression(
       const operand = evaluateExpression(node.operand, mapping)
       if (!('value' in operand)) return operand
       if (node.operator === '+') return operand
+      if (node.operator === '~') {
+        if (operand.value.kind === 'absolutePitch')
+          throw new TypeError('An absolute pitch cannot be tempered.')
+        if (operand.value.kind === 'pitchOffset') return operand
+        const ratio = operand.value.value
+        if (!ratio.isPositiveExactRatio())
+          throw new TypeError('Tempering requires a positive exact ratio.')
+        const formula = ratio.primeExponents()!
+        const context = 'rootPitch' in mapping ? mapping : createPitchContext(mapping)
+        return {
+          value: {
+            kind: 'pitchOffset',
+            value: mapFormula(formula, context.mapping),
+            formula,
+            spelling: spellIntervalFormula(formula),
+            origins: [
+              ...operand.value.origins,
+              { location: node.location, role: 'operator' as const },
+            ],
+          },
+          diagnostics: operand.diagnostics,
+        }
+      }
       if (["'", '"', '`'].includes(node.operator)) {
         if (operand.value.kind === 'absolutePitch')
           throw new TypeError('An equave shift requires a pitch offset.')
