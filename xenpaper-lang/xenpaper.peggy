@@ -554,7 +554,7 @@ CallArgumentList
     }
 
 IdentifierExpression
-  = !("v" &(PitchNominal / IntervalQuality)) name:Identifier {
+  = !("v" &(PitchLiteral / IntervalLiteral)) name:Identifier {
       return node('Identifier', { name });
     }
 

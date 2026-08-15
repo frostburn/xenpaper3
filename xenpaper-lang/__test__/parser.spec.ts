@@ -471,6 +471,20 @@ describe('Xenpaper surface grammar', () => {
     ])
   })
 
+  it('preserves identifiers beginning with v', () => {
+    expect(parse('@test(value, vfoo)').body[0]).toMatchObject({
+      arguments: [
+        { type: 'Identifier', name: 'value' },
+        { type: 'Identifier', name: 'vfoo' },
+      ],
+    })
+    expect(parse('vC').body[0]).toMatchObject({
+      type: 'UnaryExpression',
+      operator: 'v',
+      operand: { type: 'PitchLiteral', raw: 'C' },
+    })
+  })
+
   it('sequences a pitch with an attached up modifier instead of treating it as power', () => {
     const expression = parse('C ^D').body[0]
     const items = expression.items as SyntaxNode[]

@@ -318,14 +318,25 @@ export function evaluateExpression(
                     : node.operator === '/'
                       ? context.lift
                       : context.lift.neg()
-        const equaveExponent =
-          node.operator === "'" ? 1 : node.operator === '"' ? 2 : node.operator === '`' ? -1 : 0
+        const operatorOrigin: SourceOrigin = { location: node.location, role: 'operator' }
+        const origins = [...operand.value.origins, operatorOrigin]
+        const equaveFormula = ["'", '"', '`'].includes(node.operator)
+          ? Value.ratio(displacement).primeExponents()
+          : undefined
+        const shiftedFormula = (formula: ReadonlyMap<number, Fraction>) => {
+          if (!equaveFormula) return formula
+          const shifted = new Map(formula)
+          for (const [prime, exponent] of equaveFormula) {
+            shifted.set(prime, (shifted.get(prime) ?? new Fraction(0)).add(exponent))
+          }
+          return shifted
+        }
         if (operand.value.kind === 'scalar') {
           return {
             value: result(
               'scalar',
               operand.value.value.mul(Value.ratio(displacement)),
-              operand.value.origins,
+              origins,
             ),
             diagnostics: operand.diagnostics,
           }
@@ -348,13 +359,9 @@ export function evaluateExpression(
           return {
             value: {
               ...operand.value,
+              origins,
               rootOffset: operand.value.rootOffset.add(displacement),
-              formula: equaveExponent
-                ? new Map(operand.value.formula).set(
-                    2,
-                    (operand.value.formula.get(2) ?? new Fraction(0)).add(equaveExponent),
-                  )
-                : operand.value.formula,
+              formula: shiftedFormula(operand.value.formula),
               spelling: {
                 ...operand.value.spelling,
                 modifiers: [modifier, ...(operand.value.spelling.modifiers ?? [])],
@@ -368,15 +375,9 @@ export function evaluateExpression(
         return {
           value: {
             ...offset,
+            origins,
             value: offset.value.add(displacement),
-            ...(equaveExponent && offset.formula
-              ? {
-                  formula: new Map(offset.formula).set(
-                    2,
-                    (offset.formula.get(2) ?? new Fraction(0)).add(equaveExponent),
-                  ),
-                }
-              : {}),
+            ...(offset.formula ? { formula: shiftedFormula(offset.formula) } : {}),
             ...(offset.spelling
               ? {
                   spelling: {
