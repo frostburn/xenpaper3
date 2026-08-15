@@ -771,6 +771,30 @@ describe('MusicalStaff', () => {
     expect(wrapper.findAll('.annotation')).toHaveLength(0)
   })
 
+  it('engraves a trivial groove as equal pairs of beamed eighth notes', () => {
+    const evaluated = evaluateScoreShape(parse('@groove([0 0]) C').body[0]!)
+    if (!('shape' in evaluated)) throw new Error('Expected a score shape.')
+    const wrapper = mount(MusicalStaff, {
+      props: { notation: constructStaffNotationShape(evaluated.shape) },
+    })
+
+    expect(wrapper.findAll('.swing-beam')).toHaveLength(2)
+    expect(wrapper.find('.swing-beam--straight').exists()).toBe(true)
+    expect(wrapper.find('.swing-beam--groove').exists()).toBe(true)
+    expect(wrapper.find('.swing-flag').exists()).toBe(false)
+    expect(wrapper.find('.swing-tuplet-number').exists()).toBe(false)
+  })
+
+  it('annotates an empty groove directive as straight', () => {
+    const evaluated = evaluateScoreShape(parse('@groove C').body[0]!)
+    if (!('shape' in evaluated)) throw new Error('Expected a score shape.')
+    const wrapper = mount(MusicalStaff, {
+      props: { notation: constructStaffNotationShape(evaluated.shape) },
+    })
+
+    expect(wrapper.get('.annotation').text()).toBe('straight')
+  })
+
   it('renders ASCII-style operators and flavored numeric FJS inflections before accidentals', () => {
     const decorated: StaffNotationShape = {
       kind: 'note',

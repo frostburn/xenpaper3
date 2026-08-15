@@ -631,7 +631,7 @@ const restDotY = (duration: Fraction, tupletCount?: number) =>
           />
         </g>
         <line
-          class="swing-beam"
+          class="swing-beam swing-beam--straight"
           :x1="x(item.column) - 8 - (item.straightDurations.length - 1) * 11"
           :x2="x(item.column) - 8"
           y1="11"
@@ -651,6 +651,14 @@ const restDotY = (duration: Fraction, tupletCount?: number) =>
             :d="`M ${x(item.column) + 16 + index * 14} 11 Q ${x(item.column) + 24 + index * 14} 15 ${x(item.column) + 19 + index * 14} 20`"
           />
         </g>
+        <line
+          v-if="item.grooveDurations.every((duration) => duration.equals(item.grooveDurations[0]!))"
+          class="swing-beam swing-beam--groove"
+          :x1="x(item.column) + 16"
+          :x2="x(item.column) + 16 + (item.grooveDurations.length - 1) * 14"
+          y1="11"
+          y2="11"
+        />
         <template
           v-if="item.grooveDurations.some((duration) => !duration.equals(item.grooveDurations[0]!))"
         >

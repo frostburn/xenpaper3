@@ -332,7 +332,7 @@ export function constructStaffNotationShape(shape: ScoreShape): StaffNotationSha
       return { kind: 'dynamic', mark: shape.mark, duration: shape.duration }
     case 'groove':
       if (!shape.template || !shape.controlCount)
-        return { kind: 'sequence', children: [], duration: shape.duration }
+        return { kind: 'annotation', text: 'straight', duration: shape.duration }
       else {
         const flattened = flattenScoreSemantics(shape.template).score
         const notes = flattened.events.filter((event) => event.kind === 'note')
