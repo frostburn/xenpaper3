@@ -215,6 +215,19 @@ describe('arithmetic expression evaluation', () => {
     expect(interval.value.equals(evaluate('M3 - n3').value)).toBe(true)
   })
 
+  it('adds relative intervals to absolute pitches in either order', () => {
+    for (const source of ['C + P5', 'P5 + C']) {
+      const pitch = evaluate(source)
+
+      expect(pitch.kind).toBe('absolutePitch')
+      expect(
+        pitch.kind === 'absolutePitch' &&
+          pitch.rootOffset.equals(Value.pitch(new Value(3n, 2n))),
+      ).toBe(true)
+      expect(pitch.kind === 'absolutePitch' && pitch.spelling).toMatchObject({ nominal: 'G' })
+    }
+  })
+
   it('updates the exact pitch formula when transposing an absolute pitch', () => {
     const transposed = evaluate('A + M3')
     const difference = evaluate('(A + M3) - C')
