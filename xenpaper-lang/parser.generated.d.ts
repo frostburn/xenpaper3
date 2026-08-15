@@ -42,6 +42,8 @@ export type Expression =
   | IntervalLiteral
   | MappingLiteral
   | MonzoLiteral
+  | MosDeclaration
+  | MosIntervalLiteral
   | NamedArgument
   | NormalizeToSlot
   | Parallel
@@ -193,6 +195,20 @@ export interface IntervalLiteral extends Node {
   quality: string
   number: string
   inflections: FjsInflection[]
+  raw: string
+}
+
+export interface MosIntervalLiteral extends Node {
+  type: 'MosIntervalLiteral'
+  modifiers: PitchModifier[]
+  quality: string
+  degree: string
+  raw: string
+}
+
+export interface MosDeclaration extends Node {
+  type: 'MosDeclaration'
+  body: string
   raw: string
 }
 

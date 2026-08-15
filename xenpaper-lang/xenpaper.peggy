@@ -227,6 +227,7 @@ AttachedPostfixMark
 
 PrimaryExpression
   = RepeatExpression
+  / MosDeclaration
   / PitchContextChange
   / Directive
   / NormalizedGroup
@@ -236,6 +237,7 @@ PrimaryExpression
   / Barline
   / EnumeratedChord
   / MonzoLiteral
+  / MosIntervalLiteral
   / IntervalLiteral
   / PitchLiteral
   / EqualDivisionLiteral
@@ -570,6 +572,21 @@ IntervalLiteral
       });
     }
 
+MosIntervalLiteral
+  = quality:$("P" / "M" / "m" / "n" / "A"+ / "d"+) degree:UnsignedInteger "ms"
+    !IdentifierContinue {
+      return node('MosIntervalLiteral', { modifiers: [], quality, degree, raw: text() });
+    }
+
+// MOS has its own compact language.  Keeping its body raw here deliberately
+// isolates it from score-expression whitespace and comma rules.
+MosDeclaration
+  = "MOS" !IdentifierContinue Spacing "{" body:$([^}]*) "}" {
+      return node('PitchContextChange', {
+        statements: [node('MosDeclaration', { body, raw: text() })],
+      });
+    }
+
 IntervalQuality
   = $("S" "A"+ / "s" "d"+ / "A"+ / "d"+ / "P" / "M" / "m" / "n")
 
@@ -620,7 +637,7 @@ PitchNominal
   / value:$([A-Ga-g]) {
       return node('PitchNominal', { system: 'latin', value });
     }
-  / value:$([J-Zj-z]) {
+  / value:$([J-Zj-z]+) {
       return node('PitchNominal', { system: 'mos', value });
     }
   / value:$([Α-Ηα-η]) {
@@ -630,7 +647,7 @@ PitchNominal
 // The underscore belongs exclusively to the Pythagorean natural accidental;
 // denominator FJS inflections use the postfix `v` marker.
 PythagoreanAccidental
-  = value:$("𝄪" / "𝄫" / "𝄲" / "𝄳" / "𝄬" / "𝄭" / "𝄮" / "𝄯" / "𝄰" / "𝄱" / [x♯#‡t♮d♭bpq]) {
+  = value:$("𝄪" / "𝄫" / "𝄲" / "𝄳" / "𝄬" / "𝄭" / "𝄮" / "𝄯" / "𝄰" / "𝄱" / [x♯#‡t♮d♭bpq&@ea]) {
       return node('Accidental', { value });
     }
   / "_" ![0-9] { return node('Accidental', { value: '_' }); }

@@ -9,6 +9,7 @@ import {
   createPitchContext,
   DEFAULT_PITCH_CONTEXT,
   evaluateIntervalLiteral,
+  evaluateMosIntervalLiteral,
   evaluatePitchLiteral,
   scalePitchOffset,
   mapFormula,
@@ -276,6 +277,8 @@ export function evaluateExpression(
       return { value: evaluatePitchLiteral(node, mapping), diagnostics: [] }
     if (node.type === 'IntervalLiteral')
       return { value: evaluateIntervalLiteral(node, mapping), diagnostics: [] }
+    if (node.type === 'MosIntervalLiteral')
+      return { value: evaluateMosIntervalLiteral(node, mapping), diagnostics: [] }
     if (node.type === 'Group') return evaluateExpression(node.expression, mapping)
     if (node.type === 'UnaryExpression') {
       const operand = evaluateExpression(node.operand, mapping)

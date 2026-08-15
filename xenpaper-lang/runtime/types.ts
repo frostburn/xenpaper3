@@ -120,6 +120,23 @@ export interface PitchContext {
   readonly rootPitch: AbsolutePitchValue
   readonly up: Value
   readonly lift: Value
+  /** Active Diamond-MOS notation, installed by a MOS declaration. */
+  readonly mos?: MosContext
+}
+
+export interface MosDegree {
+  readonly center: Value
+  readonly imperfect: boolean
+}
+
+export interface MosContext {
+  readonly pattern: string
+  readonly equave: Value
+  readonly period: Value
+  readonly large: Value
+  readonly small: Value
+  readonly nominals: ReadonlyMap<string, Value>
+  readonly degrees: readonly MosDegree[]
 }
 
 export type EvaluatedLiteral = ScalarValue | PitchOffsetValue | AbsolutePitchValue
