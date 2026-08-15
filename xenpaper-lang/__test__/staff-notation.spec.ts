@@ -23,7 +23,8 @@ describe('staff notation construction', () => {
       return staff.children.filter((item) => item.kind === 'note')
     }
 
-    expect(collect('C D E ~9/8 9/8 5/4').map((note) => note.justIntonation)).toEqual([
+    expect(collect('C D E ~9/8 9/8 5/4 pitch(9/8)').map((note) => note.justIntonation)).toEqual([
+      undefined,
       undefined,
       undefined,
       undefined,
@@ -31,14 +32,9 @@ describe('staff notation construction', () => {
       undefined,
       undefined,
     ])
-    expect(collect('{12edo}C D E ~9/8 9/8 5/4').map((note) => note.justIntonation)).toEqual([
-      undefined,
-      undefined,
-      undefined,
-      undefined,
-      true,
-      true,
-    ])
+    expect(
+      collect('{12edo}C D E ~9/8 9/8 5/4 pitch(9/8)').map((note) => note.justIntonation),
+    ).toEqual([undefined, undefined, undefined, undefined, true, true, true])
   })
 
   it('retains shorthand articulation marks until a named articulation resets them', () => {

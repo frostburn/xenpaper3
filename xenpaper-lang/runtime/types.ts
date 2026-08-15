@@ -49,6 +49,8 @@ export interface ScalarValue {
 export interface PitchOffsetValue {
   readonly kind: 'pitchOffset'
   readonly value: Value
+  /** This offset was explicitly converted from a positive exact scalar ratio. */
+  readonly justIntonation?: boolean
   /** Root-relative value retained for notation when `value` includes a sounding root displacement. */
   readonly notationValue?: Value
   readonly formula?: PrimeMonzo

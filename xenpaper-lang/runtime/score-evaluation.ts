@@ -718,6 +718,9 @@ function playablePitch(
         value: evaluated.value.value.add(context.rootDisplacement),
         notationValue: evaluated.value.value,
       },
+      ...(context.mapping.id !== 'untempered' && evaluated.value.justIntonation
+        ? { justIntonation: true }
+        : {}),
       diagnostics: evaluated.diagnostics,
     }
   }
