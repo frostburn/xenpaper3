@@ -67,6 +67,13 @@ describe('score-shape timing', () => {
     ].forEach((expected, index) => expect(soundingCents[index]).toBeCloseTo(expected))
   })
 
+  it('applies equave shifts to frequency quantities', () => {
+    const result = shape("{root = 220Hz} '220Hz `220Hz") as SequenceShape
+    const attacks = result.children.filter((child) => child.kind === 'attack')
+
+    expect(attacks.map((attack) => attack.pitch.notationValue?.valueOf())).toEqual([1200, -1200])
+  })
+
   it('keeps playback dynamics and velocity out of abstract notation attacks', () => {
     const result = shape('@p C @velocity(4/5) D') as SequenceShape
     const attacks = result.children.filter((child) => child.kind === 'attack')
@@ -408,6 +415,13 @@ describe('score-shape timing', () => {
 
     expect(result.duration.equals(1)).toBe(true)
     expect(result.children.every((child) => child.duration.equals(new Fraction(1, 3)))).toBe(true)
+  })
+
+  it('broadcasts equave shifts over score constructions', () => {
+    const result = shape("'[0 1]") as SequenceShape
+    const attacks = result.children.filter((child) => child.kind === 'attack')
+
+    expect(attacks.map((attack) => attack.pitch.value.valueOf())).toEqual([1200, 1300])
   })
 
   it.each([
