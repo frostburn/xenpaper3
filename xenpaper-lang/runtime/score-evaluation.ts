@@ -397,6 +397,16 @@ function expandEnumeratedChord(
       diagnostics: expanded.diagnostics,
     }
   }
+  if (node.type === 'UnaryExpression') {
+    const expanded = expandEnumeratedChord(node.operand, context)
+    if (expanded.expressions.length === 1 && expanded.expressions[0] === node.operand) {
+      return { expressions: [node], diagnostics: expanded.diagnostics }
+    }
+    return {
+      expressions: expanded.expressions.map((operand) => ({ ...node, operand })),
+      diagnostics: expanded.diagnostics,
+    }
+  }
   return { expressions: [node], diagnostics: [] }
 }
 

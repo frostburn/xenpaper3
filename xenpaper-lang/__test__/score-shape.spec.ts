@@ -15,6 +15,33 @@ function shape(source: string, pulse: Fraction | number = 1): ScoreShape {
 }
 
 describe('score-shape timing', () => {
+  it('tempers enumerated major and minor chords through the active mapping', () => {
+    const pitches = (source: string) => {
+      const result = shape(source)
+      const collect = (score: ScoreShape): number[] => {
+        if (score.kind === 'attack') return [score.pitch.value.valueOf()]
+        if (score.kind === 'sequence') return score.children.flatMap(collect)
+        if (score.kind === 'parallel') return score.branches.flatMap(collect)
+        return []
+      }
+      return collect(result)
+    }
+
+    expect(pitches('{12edo}~4::6')).toEqual([0, 400, 700])
+    expect(pitches('{12edo}~/6:5:4')).toEqual([0, 300, 700])
+  })
+
+  it('converts untempered enumerated chords to pitches before arithmetic', () => {
+    const result = shape('3/2 + ~4::7') as ParallelShape
+    const pitches = result.branches.map((branch) => branch.pitch.value.valueOf())
+    ;[
+      1200 * Math.log2(3 / 2),
+      1200 * Math.log2(15 / 8),
+      1200 * Math.log2(9 / 4),
+      1200 * Math.log2(21 / 8),
+    ].forEach((expected, index) => expect(pitches[index]).toBeCloseTo(expected))
+  })
+
   it('uses middle C below A4 = 440 Hz as the default frequency root', () => {
     const result = shape('440Hz')
     if (result.kind !== 'attack') throw new Error('Expected an attack.')

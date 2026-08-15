@@ -34,6 +34,23 @@ describe('arithmetic expression evaluation', () => {
     expect(sum.value.equals(3)).toBe(true)
   })
 
+  it('tempers ratios and converts them to pitch offsets', () => {
+    const tempered = evaluateExpression(expression('~81/64'), edoMapping(12))
+    expect(tempered.diagnostics).toEqual([])
+    if (!('value' in tempered)) throw new Error('Expected a value.')
+    expect(tempered.value.kind).toBe('pitchOffset')
+    expect(tempered.value.value.equals(Value.cents(400))).toBe(true)
+
+    const radical = evaluateExpression(expression('~sqrt(2)'), edoMapping(12))
+    expect(radical.diagnostics).toEqual([])
+    if (!('value' in radical)) throw new Error('Expected a value.')
+    expect(radical.value.value.equals(Value.cents(600))).toBe(true)
+
+    const sum = evaluate('~3/2 + ~3/2')
+    expect(sum.kind).toBe('pitchOffset')
+    expect(sum.value.equals(Value.pitch(new Value(9n, 4n)))).toBe(true)
+  })
+
   it('supports exact scalar arithmetic and right-associative powers', () => {
     expect(evaluate('(5/2 - 1/2) * 3/4').value.equals(new Fraction(3, 2))).toBe(true)
     expect(evaluate('2 ^ 3 ^ 2').value.equals(512)).toBe(true)
