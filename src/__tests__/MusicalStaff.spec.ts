@@ -133,7 +133,7 @@ describe('MusicalStaff', () => {
     })
 
     expect(wrapper.findAll('.notehead')).toHaveLength(3)
-    expect(wrapper.findAll('.flag')).toHaveLength(3)
+    expect(wrapper.findAll('.flag')).toHaveLength(6)
     expect(wrapper.get('.tuplet-number').text()).toBe('3')
     expect(wrapper.findAll('.tuplet-bracket')).toHaveLength(1)
   })
@@ -150,8 +150,8 @@ describe('MusicalStaff', () => {
       '3',
       '3',
     ])
-    expect(wrapper.findAll('.flag')).toHaveLength(3)
-    expect(wrapper.findAll('.notehead--open')).toHaveLength(3)
+    expect(wrapper.findAll('.flag')).toHaveLength(9)
+    expect(wrapper.findAll('.notehead--open')).toHaveLength(0)
     expect(wrapper.findAll('.notation-error')).toHaveLength(0)
   })
 
@@ -180,7 +180,7 @@ describe('MusicalStaff', () => {
 
     expect(wrapper.get('.tuplet-number').text()).toBe('3')
     expect(wrapper.findAll('.tuplet-bracket')).toHaveLength(1)
-    expect(wrapper.findAll('.flag')).toHaveLength(3)
+    expect(wrapper.findAll('.flag')).toHaveLength(6)
     expect(wrapper.findAll('.notation-error')).toHaveLength(0)
   })
 
@@ -256,7 +256,7 @@ describe('MusicalStaff', () => {
     )
   })
 
-  it('engraves five notes normalized into a quarter-note slot as sixteenth notes', () => {
+  it('engraves five notes normalized into a quarter-note slot as thirty-second notes', () => {
     const evaluated = evaluateScoreShape(parse('0 2 7 [0 2 7] [0 2 3 5 7]').body[0]!)
     if (!('shape' in evaluated)) throw new Error('Expected a score shape.')
     const wrapper = mount(MusicalStaff, {
@@ -264,7 +264,7 @@ describe('MusicalStaff', () => {
     })
 
     const flags = wrapper.findAll('.flag')
-    expect(flags).toHaveLength(13)
+    expect(flags).toHaveLength(21)
     expect(wrapper.findAll('.tuplet-number').map((number) => number.text())).toEqual(['3', '5'])
     expect(wrapper.findAll('.notation-error')).toHaveLength(0)
   })
@@ -291,7 +291,7 @@ describe('MusicalStaff', () => {
 
     expect(wrapper.get('.tuplet-number').text()).toBe('3')
     expect(wrapper.findAll('.tuplet-bracket')).toHaveLength(1)
-    expect(wrapper.findAll('.flag')).toHaveLength(1)
+    expect(wrapper.findAll('.flag')).toHaveLength(3)
   })
 
   it('uses an eighth-rest glyph in a two-item normalized slot', () => {
@@ -587,7 +587,7 @@ describe('MusicalStaff', () => {
     })
 
     expect(wrapper.findAll('.notehead')).toHaveLength(3)
-    expect(wrapper.findAll('.flag')).toHaveLength(0)
+    expect(wrapper.findAll('.flag')).toHaveLength(3)
     expect(wrapper.get('.tuplet-number').text()).toBe('3')
     expect(wrapper.findAll('.tuplet-bracket')).toHaveLength(1)
   })
@@ -805,7 +805,7 @@ describe('MusicalStaff', () => {
     expect(wrapper.find('.swing-annotation').exists()).toBe(true)
     expect(wrapper.findAll('.swing-annotation ellipse')).toHaveLength(4)
     expect(wrapper.find('.swing-beam').exists()).toBe(true)
-    expect(wrapper.find('.swing-flag').exists()).toBe(true)
+    expect(wrapper.find('.swing-flag').exists()).toBe(false)
     expect(wrapper.get('.swing-tuplet-number').text()).toBe('3')
     expect(wrapper.findAll('.annotation')).toHaveLength(0)
   })
@@ -844,9 +844,9 @@ describe('MusicalStaff', () => {
     expect(wrapper.get('.swing-tuplet-number').text()).toBe('5')
     expect(wrapper.find('.swing-tuplet-bracket').exists()).toBe(true)
     expect(wrapper.find('.swing-beam--straight').exists()).toBe(true)
-    // Three quintuplet units engrave as a dotted quarter and two as a quarter.
+    // The groove uses the same following-power-of-two scale as staff tuplets.
     expect(wrapper.findAll('.swing-dot')).toHaveLength(1)
-    expect(wrapper.find('.swing-beam--groove').exists()).toBe(false)
+    expect(wrapper.find('.swing-beam--groove').exists()).toBe(true)
     expect(wrapper.find('.swing-flag').exists()).toBe(false)
     expect(wrapper.find('.swing-notehead--open').exists()).toBe(false)
   })

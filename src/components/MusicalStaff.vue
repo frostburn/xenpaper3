@@ -73,11 +73,9 @@ type RhythmicLayoutItem = Extract<LayoutItem, { kind: 'note' | 'rest' }>
 
 const durationValue = (duration: Fraction) => Number(duration.n) / Number(duration.d)
 const fraction = (duration: Fraction) => new Fraction(duration.n, duration.d)
-// Conventional small tuplets use the preceding binary subdivision. Above a
-// septuplet, use the following subdivision: without its bracket, a nine-note
-// group in one quarter would be a group of sixteen sixty-fourth notes.
-const tupletBinaryCount = (count: number) =>
-  count <= 7 ? 2 ** Math.floor(Math.log2(count)) : 2 ** Math.ceil(Math.log2(count))
+// Use the following binary subdivision so removing the bracket leaves the
+// rhythmic value unchanged (for example, nine notes become sixteen notes).
+const tupletBinaryCount = (count: number) => 2 ** Math.ceil(Math.log2(count))
 const tupletScale = (count: number) => count / tupletBinaryCount(count)
 
 const items = computed(() => {
@@ -569,13 +567,13 @@ const restDotY = (duration: Fraction, tupletCount?: number) =>
       : 76
 
 const swingOpen = (duration: Fraction, tuplet?: number) =>
-  isOpenNotehead(effectiveDuration(duration, tuplet ? tuplet / 2 : 1))
+  isOpenNotehead(effectiveDuration(duration, tuplet ? tupletScale(tuplet) : 1))
 
 const swingDotted = (duration: Fraction, tuplet?: number) =>
-  isDotted(effectiveDuration(duration, tuplet ? tuplet / 2 : 1))
+  isDotted(effectiveDuration(duration, tuplet ? tupletScale(tuplet) : 1))
 
 const swingFlagCount = (duration: Fraction, tuplet?: number) =>
-  flagCount(duration, tuplet ? tuplet / 2 : 1)
+  flagCount(duration, tuplet ? tupletScale(tuplet) : 1)
 
 const swingBeamCount = (durations: readonly Fraction[], tuplet?: number) =>
   durations.length > 1
