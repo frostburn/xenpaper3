@@ -73,9 +73,9 @@ type RhythmicLayoutItem = Extract<LayoutItem, { kind: 'note' | 'rest' }>
 
 const durationValue = (duration: Fraction) => Number(duration.n) / Number(duration.d)
 const fraction = (duration: Fraction) => new Fraction(duration.n, duration.d)
-// Use the following binary subdivision so removing the bracket leaves the
-// rhythmic value unchanged (for example, nine notes become sixteen notes).
-const tupletBinaryCount = (count: number) => 2 ** Math.ceil(Math.log2(count))
+// Use the preceding binary subdivision so removing the bracket leaves the
+// conventional written note value (for example, three eighth notes become two).
+const tupletBinaryCount = (count: number) => 2 ** Math.floor(Math.log2(count))
 const tupletScale = (count: number) => count / tupletBinaryCount(count)
 
 const items = computed(() => {
