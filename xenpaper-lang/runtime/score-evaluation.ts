@@ -1160,7 +1160,7 @@ export function evaluateScoreSemantics(
                   ? {
                       kind: 'groove',
                       template: grooveTemplate,
-                      annotation: grooveTemplate ? '[0 0] = [0= 0]' : undefined,
+                      controlCount: grooveTemplate ? attacks(grooveTemplate).length : undefined,
                       duration: new Fraction(0),
                       origins: [origin(item, 'directive')],
                     }

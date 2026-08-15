@@ -106,10 +106,31 @@ describe('directive runtime', () => {
     ])
   })
 
+  it('accepts a plain sequence as the groove template', () => {
+    const plain = notes('@groove(C== C) C C C C')
+    const normalized = notes('@groove([C== C]===) C C C C')
+    expect(plain.map(({ start, duration }) => [start.toFraction(), duration.toFraction()])).toEqual(
+      normalized.map(({ start, duration }) => [start.toFraction(), duration.toFraction()]),
+    )
+  })
+
   it('turns a groove off with an empty directive', () => {
     expect(
       notes('@groove([0= 0]) [1 2] @groove [3 4]').map(({ start }) => start.toFraction()),
     ).toEqual(['0', '2/3', '1', '3/2'])
+  })
+
+  it('realigns beats immediately when a groove is turned off mid-cycle', () => {
+    const events = notes('@groove(C== C) C @groove C C')
+    // The first note remains stretched to the groove, so it overlaps the next note.
+    // Resetting immediately is intentional: subsequent attacks return to integer beats.
+    expect(
+      events.map(({ start, duration }) => [start.toFraction(), duration.toFraction()]),
+    ).toEqual([
+      ['0', '3/2'],
+      ['1', '1'],
+      ['2', '1'],
+    ])
   })
 
   it('isolates grooves in groups and parallel branches', () => {

@@ -399,8 +399,18 @@ RepeatCount
     }
 
 Directive
-  = "@" body:(ArticulationShorthandBody / NumericDirectiveBody / NamedDirectiveBody) {
+  = "@" body:(GrooveDirectiveBody / ArticulationShorthandBody / NumericDirectiveBody / NamedDirectiveBody) {
       return node('Directive', body);
+    }
+
+GrooveDirectiveBody
+  = name:$('groove'i) !IdentifierContinue "(" Spacing argument:SequenceExpression? Spacing ")" {
+      return {
+        name: 'groove',
+        rawName: name,
+        arguments: argument ? [argument] : [],
+        graceCount: 0,
+      };
     }
 
 ArticulationShorthandBody

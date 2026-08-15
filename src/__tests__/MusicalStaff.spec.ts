@@ -756,6 +756,18 @@ describe('MusicalStaff', () => {
     expect(wrapper.get('.annotation').attributes('y')).toBe('25')
   })
 
+  it('engraves groove swing notes above the staff instead of text', () => {
+    const evaluated = evaluateScoreShape(parse('@groove(C== C) C').body[0]!)
+    if (!('shape' in evaluated)) throw new Error('Expected a score shape.')
+    const wrapper = mount(MusicalStaff, {
+      props: { notation: constructStaffNotationShape(evaluated.shape) },
+    })
+
+    expect(wrapper.find('.swing-annotation').exists()).toBe(true)
+    expect(wrapper.findAll('.swing-annotation ellipse')).toHaveLength(4)
+    expect(wrapper.findAll('.annotation')).toHaveLength(0)
+  })
+
   it('renders ASCII-style operators and flavored numeric FJS inflections before accidentals', () => {
     const decorated: StaffNotationShape = {
       kind: 'note',

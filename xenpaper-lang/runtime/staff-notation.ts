@@ -330,8 +330,8 @@ export function constructStaffNotationShape(shape: ScoreShape): StaffNotationSha
     case 'dynamic':
       return { kind: 'dynamic', mark: shape.mark, duration: shape.duration }
     case 'groove':
-      return shape.annotation
-        ? { kind: 'annotation', text: shape.annotation, duration: shape.duration }
+      return shape.controlCount
+        ? { kind: 'swing', notes: shape.controlCount, duration: shape.duration }
         : { kind: 'sequence', children: [], duration: shape.duration }
     case 'sequence':
       return {

@@ -155,6 +155,7 @@ export type StaffNotationShape =
       readonly endingNumber?: number
     }
   | { readonly kind: 'annotation'; readonly text: string; readonly duration: Fraction }
+  | { readonly kind: 'swing'; readonly notes: number; readonly duration: Fraction }
   | { readonly kind: 'dynamic'; readonly mark: DynamicMark; readonly duration: Fraction }
   | {
       readonly kind: 'sequence'
@@ -266,7 +267,7 @@ export interface DynamicShape extends ShapeBase {
 export interface GrooveShape extends ShapeBase {
   readonly kind: 'groove'
   readonly template?: ScoreShape
-  readonly annotation?: string
+  readonly controlCount?: number
 }
 
 export type BarlineStyle =

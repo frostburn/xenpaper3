@@ -34,6 +34,7 @@ type StaffItemContent =
   | { kind: 'rest'; duration: Fraction }
   | { kind: 'barline'; style: BarlineStyle; endingNumber?: number }
   | { kind: 'annotation'; text: string }
+  | { kind: 'swing'; notes: number }
   | { kind: 'dynamic'; mark: DynamicMark }
 
 type StaffItem = StaffItemContent & {
@@ -172,6 +173,8 @@ const items = computed(() => {
       if (state.activeItems.length) state.barlineSinceActiveItems = true
     } else if (shape.kind === 'annotation') {
       layout.push({ kind: 'annotation', offset, text: shape.text, tuplets: [], voice })
+    } else if (shape.kind === 'swing') {
+      layout.push({ kind: 'swing', offset, notes: shape.notes, tuplets: [], voice })
     } else if (shape.kind === 'dynamic') {
       layout.push({ kind: 'dynamic', offset, mark: shape.mark, tuplets: [], voice })
     } else if (shape.kind === 'sequence') {
@@ -600,6 +603,32 @@ const restDotY = (duration: Fraction, tupletCount?: number) =>
       <text v-else-if="item.kind === 'annotation'" class="annotation" :x="x(item.column)" y="25">
         {{ item.text }}
       </text>
+      <g v-else-if="item.kind === 'swing'" class="swing-annotation">
+        <text :x="x(item.column)" y="25">=</text>
+        <g v-for="index in item.notes" :key="`straight-${index}`">
+          <ellipse :cx="x(item.column) - 12 - (item.notes - index) * 11" cy="24" rx="4" ry="3" />
+          <line
+            :x1="x(item.column) - 8 - (item.notes - index) * 11"
+            :x2="x(item.column) - 8 - (item.notes - index) * 11"
+            y1="24"
+            y2="11"
+          />
+        </g>
+        <g v-for="index in item.notes" :key="`groove-${index}`">
+          <ellipse
+            :cx="x(item.column) + 12 + (index - 1) * 11 + (index % 2 === 0 ? 3 : 0)"
+            cy="24"
+            rx="4"
+            ry="3"
+          />
+          <line
+            :x1="x(item.column) + 16 + (index - 1) * 11 + (index % 2 === 0 ? 3 : 0)"
+            :x2="x(item.column) + 16 + (index - 1) * 11 + (index % 2 === 0 ? 3 : 0)"
+            y1="24"
+            y2="11"
+          />
+        </g>
+      </g>
       <text
         v-else-if="item.kind === 'dynamic'"
         class="performance-label dynamic-label"
@@ -725,16 +754,17 @@ const restDotY = (duration: Fraction, tupletCount?: number) =>
             rx="7"
             ry="5"
           />
-          <text
-            v-for="(mark, markIndex) in item.articulationMarks"
-            v-if="item.tiedFromColumn === undefined"
-            :key="`articulation-${markIndex}`"
-            class="articulation-mark"
-            :x="x(item.column)"
-            :y="y(item.pitch.staffPosition) + 18 + markIndex * 10"
-          >
-            {{ mark === "'" ? '▾' : mark === ':' ? '•̲' : mark === '_' ? '⌒' : mark }}
-          </text>
+          <template v-if="item.tiedFromColumn === undefined">
+            <text
+              v-for="(mark, markIndex) in item.articulationMarks"
+              :key="`articulation-${markIndex}`"
+              class="articulation-mark"
+              :x="x(item.column)"
+              :y="y(item.pitch.staffPosition) + 18 + markIndex * 10"
+            >
+              {{ mark === "'" ? '▾' : mark === ':' ? '•̲' : mark === '_' ? '⌒' : mark }}
+            </text>
+          </template>
           <circle
             v-if="isDotted(effectiveDuration(engravingDuration(item), tupletCount(item)))"
             class="augmentation-dot"
@@ -857,6 +887,18 @@ const restDotY = (duration: Fraction, tupletCount?: number) =>
 }
 
 .annotation {
+  font-size: 12px;
+  text-anchor: middle;
+}
+
+.swing-annotation {
+  fill: currentColor;
+  stroke: currentColor;
+  stroke-width: 1.25;
+}
+
+.swing-annotation text {
+  stroke: none;
   font-size: 12px;
   text-anchor: middle;
 }
