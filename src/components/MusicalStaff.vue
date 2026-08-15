@@ -73,10 +73,12 @@ type RhythmicLayoutItem = Extract<LayoutItem, { kind: 'note' | 'rest' }>
 
 const durationValue = (duration: Fraction) => Number(duration.n) / Number(duration.d)
 const fraction = (duration: Fraction) => new Fraction(duration.n, duration.d)
-// Five-, six-, and seven-note tuplets replace four notes of the next shorter
-// value. Smaller tuplets, and the extended tuplets supported by the language,
-// retain the established two-note unit.
-const tupletScale = (count: number) => count / (count >= 5 && count <= 7 ? 4 : 2)
+// Conventional small tuplets use the preceding binary subdivision. Above a
+// septuplet, use the following subdivision: without its bracket, a nine-note
+// group in one quarter would be a group of sixteen sixty-fourth notes.
+const tupletBinaryCount = (count: number) =>
+  count <= 7 ? 2 ** Math.floor(Math.log2(count)) : 2 ** Math.ceil(Math.log2(count))
+const tupletScale = (count: number) => count / tupletBinaryCount(count)
 
 const items = computed(() => {
   const layout: LayoutItem[] = []
@@ -539,7 +541,15 @@ const restSymbol = (duration: Fraction, tupletCount?: number) => {
         ? '𝄾'
         : base.equals('1/4')
           ? '𝄿'
-          : '?'
+          : base.equals('1/8')
+            ? '𝅀'
+            : base.equals('1/16')
+              ? '𝅁'
+              : base.equals('1/32')
+                ? '𝅂'
+                : base.equals('1/64')
+                  ? '𝅃'
+                  : '?'
 }
 
 const restBox = (duration: Fraction, tupletCount?: number) => {

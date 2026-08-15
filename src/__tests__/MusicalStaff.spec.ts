@@ -265,7 +265,19 @@ describe('MusicalStaff', () => {
 
     const flags = wrapper.findAll('.flag')
     expect(flags).toHaveLength(13)
-    expect(flags.slice(-10)).toHaveLength(10)
+    expect(wrapper.findAll('.tuplet-number').map((number) => number.text())).toEqual(['3', '5'])
+    expect(wrapper.findAll('.notation-error')).toHaveLength(0)
+  })
+
+  it('engraves nine notes normalized into a quarter-note slot as sixty-fourth notes', () => {
+    const evaluated = evaluateScoreShape(parse('[0 1 2 3 4 5 6 7 8]').body[0]!)
+    if (!('shape' in evaluated)) throw new Error('Expected a score shape.')
+    const wrapper = mount(MusicalStaff, {
+      props: { notation: constructStaffNotationShape(evaluated.shape) },
+    })
+
+    expect(wrapper.get('.tuplet-number').text()).toBe('9')
+    expect(wrapper.findAll('.flag')).toHaveLength(36)
     expect(wrapper.findAll('.notation-error')).toHaveLength(0)
   })
 
@@ -542,7 +554,7 @@ describe('MusicalStaff', () => {
     expect(wrapper.get('.rest').text()).toBe('?')
   })
 
-  it('preserves exact effective durations in large normalized tuplets', () => {
+  it('preserves exact effective note durations in large normalized tuplets', () => {
     const source = `[${Array.from({ length: 48 }, () => 'C').join(' ')} .]`
     const evaluated = evaluateScoreShape(parse(source).body[0]!)
     if (!('shape' in evaluated)) throw new Error('Expected a score shape.')
@@ -552,7 +564,7 @@ describe('MusicalStaff', () => {
 
     expect(wrapper.findAll('.notehead')).toHaveLength(48)
     expect(wrapper.find('.notation-error').exists()).toBe(false)
-    expect(wrapper.get('.rest').text()).toBe('𝄾')
+    expect(wrapper.get('.rest').text()).toBe('𝅃')
   })
 
   it('extends notes and chords through following continues', () => {
