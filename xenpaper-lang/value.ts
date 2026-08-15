@@ -548,6 +548,14 @@ export class Value {
   isExact(): boolean {
     return this.magnitude.kind !== 'real'
   }
+  /** Whether this value is an exact, positive, dimensionless ratio. */
+  isPositiveExactRatio(): boolean {
+    return (
+      this.dimensions.isDimensionless &&
+      this.magnitude.kind === 'exact' &&
+      this.magnitude.value.isPositive
+    )
+  }
   /** Exact prime exponents for a scalar monomial or logarithmic pitch. */
   primeExponents(): ReadonlyMap<number, Fraction> | undefined {
     if (this.magnitude.kind === 'real') return undefined

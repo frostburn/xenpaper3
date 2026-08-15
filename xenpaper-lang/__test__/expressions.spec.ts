@@ -46,6 +46,10 @@ describe('arithmetic expression evaluation', () => {
     if (!('value' in radical)) throw new Error('Expected a value.')
     expect(radical.value.value.equals(Value.cents(600))).toBe(true)
 
+    const underflow = evaluate('~(2 ^ -2000)')
+    expect(underflow.kind).toBe('pitchOffset')
+    expect(underflow.value.equals(Value.pitch(new Value(2).pow(-2000)))).toBe(true)
+
     const sum = evaluate('~3/2 + ~3/2')
     expect(sum.kind).toBe('pitchOffset')
     expect(sum.value.equals(Value.pitch(new Value(9n, 4n)))).toBe(true)

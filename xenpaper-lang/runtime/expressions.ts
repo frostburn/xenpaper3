@@ -284,9 +284,9 @@ export function evaluateExpression(
           throw new TypeError('An absolute pitch cannot be tempered.')
         if (operand.value.kind === 'pitchOffset') return operand
         const ratio = operand.value.value
-        const formula = ratio.dimensions.isDimensionless ? ratio.primeExponents() : undefined
-        if (!formula || ratio.valueOf() <= 0)
+        if (!ratio.isPositiveExactRatio())
           throw new TypeError('Tempering requires a positive exact ratio.')
+        const formula = ratio.primeExponents()!
         const context = 'rootPitch' in mapping ? mapping : createPitchContext(mapping)
         return {
           value: {
