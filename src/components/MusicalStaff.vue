@@ -544,9 +544,7 @@ const restDotY = (duration: Fraction, tupletCount?: number) =>
 
 const swingDuration = (duration: Fraction, tuplet?: number) => {
   if (!tuplet) return fraction(duration)
-  let binary = 1
-  while (binary * 2 < tuplet) binary *= 2
-  return fraction(duration).mul(tuplet).div(binary)
+  return fraction(duration).mul(tuplet).div(2)
 }
 
 const swingOpen = (duration: Fraction, tuplet?: number) =>

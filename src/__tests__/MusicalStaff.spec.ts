@@ -805,6 +805,11 @@ describe('MusicalStaff', () => {
     expect(wrapper.get('.swing-tuplet-number').text()).toBe('5')
     expect(wrapper.find('.swing-tuplet-bracket').exists()).toBe(true)
     expect(wrapper.find('.swing-beam--straight').exists()).toBe(true)
+    // Three quintuplet units engrave as a dotted quarter and two as a quarter.
+    expect(wrapper.findAll('.swing-dot')).toHaveLength(1)
+    expect(wrapper.find('.swing-beam--groove').exists()).toBe(false)
+    expect(wrapper.find('.swing-flag').exists()).toBe(false)
+    expect(wrapper.find('.swing-notehead--open').exists()).toBe(false)
   })
 
   it('engraves an unnormalized groove using its full rhythmic span', () => {
