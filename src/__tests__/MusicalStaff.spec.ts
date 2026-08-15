@@ -256,6 +256,31 @@ describe('MusicalStaff', () => {
     )
   })
 
+  it('engraves five notes normalized into a quarter-note slot as sixteenth notes', () => {
+    const evaluated = evaluateScoreShape(parse('0 2 7 [0 2 7] [0 2 3 5 7]').body[0]!)
+    if (!('shape' in evaluated)) throw new Error('Expected a score shape.')
+    const wrapper = mount(MusicalStaff, {
+      props: { notation: constructStaffNotationShape(evaluated.shape) },
+    })
+
+    const flags = wrapper.findAll('.flag')
+    expect(flags).toHaveLength(13)
+    expect(wrapper.findAll('.tuplet-number').map((number) => number.text())).toEqual(['3', '5'])
+    expect(wrapper.findAll('.notation-error')).toHaveLength(0)
+  })
+
+  it('engraves nine notes normalized into a quarter-note slot as thirty-second notes', () => {
+    const evaluated = evaluateScoreShape(parse('[0 1 2 3 4 5 6 7 8]').body[0]!)
+    if (!('shape' in evaluated)) throw new Error('Expected a score shape.')
+    const wrapper = mount(MusicalStaff, {
+      props: { notation: constructStaffNotationShape(evaluated.shape) },
+    })
+
+    expect(wrapper.get('.tuplet-number').text()).toBe('9')
+    expect(wrapper.findAll('.flag')).toHaveLength(27)
+    expect(wrapper.findAll('.notation-error')).toHaveLength(0)
+  })
+
   it('infers a triplet with an intact continued note', () => {
     const expression = parse('C [F G=] F').body[0]!
     const evaluated = evaluateScoreShape(expression)
@@ -529,7 +554,7 @@ describe('MusicalStaff', () => {
     expect(wrapper.get('.rest').text()).toBe('?')
   })
 
-  it('preserves exact effective durations in large normalized tuplets', () => {
+  it('preserves exact effective note durations in large normalized tuplets', () => {
     const source = `[${Array.from({ length: 48 }, () => 'C').join(' ')} .]`
     const evaluated = evaluateScoreShape(parse(source).body[0]!)
     if (!('shape' in evaluated)) throw new Error('Expected a score shape.')
@@ -539,7 +564,7 @@ describe('MusicalStaff', () => {
 
     expect(wrapper.findAll('.notehead')).toHaveLength(48)
     expect(wrapper.find('.notation-error').exists()).toBe(false)
-    expect(wrapper.get('.rest').text()).toBe('𝄾')
+    expect(wrapper.get('.rest').text()).toBe('𝅂')
   })
 
   it('extends notes and chords through following continues', () => {
@@ -819,10 +844,11 @@ describe('MusicalStaff', () => {
     expect(wrapper.get('.swing-tuplet-number').text()).toBe('5')
     expect(wrapper.find('.swing-tuplet-bracket').exists()).toBe(true)
     expect(wrapper.find('.swing-beam--straight').exists()).toBe(true)
-    // Three quintuplet units engrave as a dotted quarter and two as a quarter.
+    // The groove uses the same preceding-power-of-two scale as staff tuplets.
     expect(wrapper.findAll('.swing-dot')).toHaveLength(1)
-    expect(wrapper.find('.swing-beam--groove').exists()).toBe(false)
-    expect(wrapper.find('.swing-flag').exists()).toBe(false)
+    // A dotted eighth and an eighth share a single beam.
+    expect(wrapper.findAll('.swing-beam--groove')).toHaveLength(1)
+    expect(wrapper.findAll('.swing-flag')).toHaveLength(0)
     expect(wrapper.find('.swing-notehead--open').exists()).toBe(false)
   })
 

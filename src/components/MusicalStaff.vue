@@ -73,6 +73,10 @@ type RhythmicLayoutItem = Extract<LayoutItem, { kind: 'note' | 'rest' }>
 
 const durationValue = (duration: Fraction) => Number(duration.n) / Number(duration.d)
 const fraction = (duration: Fraction) => new Fraction(duration.n, duration.d)
+// Use the preceding binary subdivision so removing the bracket leaves the
+// conventional written note value (for example, three eighth notes become two).
+const tupletBinaryCount = (count: number) => 2 ** Math.floor(Math.log2(count))
+const tupletScale = (count: number) => count / tupletBinaryCount(count)
 
 const items = computed(() => {
   const layout: LayoutItem[] = []
@@ -300,7 +304,7 @@ const items = computed(() => {
         continue
       }
       const engravingDuration = first.tuplets.reduce(
-        (duration, tuplet) => duration.mul(tuplet.count).div(2),
+        (duration, tuplet) => duration.mul(tupletScale(tuplet.count)),
         fraction(first.duration),
       )
       let count = engravingDuration.d
@@ -316,7 +320,7 @@ const items = computed(() => {
         rhythmicItems[end]!.duration &&
         rhythmicItems[end]!.tuplets.map((tuplet) => tuplet.id).join(',') === containingTuplets &&
         rhythmicItems[end]!.tuplets.reduce(
-          (duration, tuplet) => duration.mul(tuplet.count).div(2),
+          (duration, tuplet) => duration.mul(tupletScale(tuplet.count)),
           fraction(rhythmicItems[end]!.duration),
         ).equals(engravingDuration)
       )
@@ -381,10 +385,9 @@ const tupletSpans = computed(() => {
   return [...spans.values()]
 })
 
-const tupletCount = (item: StaffItem) =>
+const itemTupletScale = (item: StaffItem) =>
   item.tuplets.length
-    ? item.tuplets.reduce((factor, tuplet) => factor * tuplet.count, 1) /
-      2 ** (item.tuplets.length - 1)
+    ? item.tuplets.reduce((scale, tuplet) => scale * tupletScale(tuplet.count), 1)
     : undefined
 
 const endingSpans = computed(() =>
@@ -489,20 +492,17 @@ const ledgerPositions = (position: number) => {
   return positions
 }
 
-const flagCount = (duration?: Fraction, tupletCount?: number) => {
+const flagCount = (duration?: Fraction, scale = 1) => {
   if (!duration) return 0
-  const value = durationValue(duration) * (tupletCount ? tupletCount / 2 : 1)
+  const value = durationValue(duration) * scale
   if (value >= 1 || value <= 0) return 0
-  const subdivision = Math.round(1 / value)
-  const binarySubdivision = subdivision % 3 === 0 ? subdivision / 3 : subdivision
-  const binaryFlags = Math.log2(binarySubdivision)
-  return Number.isInteger(binaryFlags) ? binaryFlags + (subdivision % 3 === 0 ? 1 : 0) : 0
+  const relativeToDottedHalf = value / 3
+  const dotted = Number.isInteger(Math.log2(relativeToDottedHalf))
+  const binaryFlags = Math.log2(1 / (dotted ? (value * 2) / 3 : value))
+  return Number.isInteger(binaryFlags) ? binaryFlags : 0
 }
 
-const effectiveDuration = (duration: Fraction, tupletCount?: number) =>
-  fraction(duration)
-    .mul(tupletCount ?? 2)
-    .div(2)
+const effectiveDuration = (duration: Fraction, scale = 1) => fraction(duration).mul(scale)
 
 const isPowerOfTwoFraction = (value: Fraction) => {
   let numerator = value.n
@@ -539,7 +539,15 @@ const restSymbol = (duration: Fraction, tupletCount?: number) => {
         ? '𝄾'
         : base.equals('1/4')
           ? '𝄿'
-          : '?'
+          : base.equals('1/8')
+            ? '𝅀'
+            : base.equals('1/16')
+              ? '𝅁'
+              : base.equals('1/32')
+                ? '𝅂'
+                : base.equals('1/64')
+                  ? '𝅃'
+                  : '?'
 }
 
 const restBox = (duration: Fraction, tupletCount?: number) => {
@@ -559,12 +567,13 @@ const restDotY = (duration: Fraction, tupletCount?: number) =>
       : 76
 
 const swingOpen = (duration: Fraction, tuplet?: number) =>
-  isOpenNotehead(effectiveDuration(duration, tuplet))
+  isOpenNotehead(effectiveDuration(duration, tuplet ? tupletScale(tuplet) : 1))
 
 const swingDotted = (duration: Fraction, tuplet?: number) =>
-  isDotted(effectiveDuration(duration, tuplet))
+  isDotted(effectiveDuration(duration, tuplet ? tupletScale(tuplet) : 1))
 
-const swingFlagCount = (duration: Fraction, tuplet?: number) => flagCount(duration, tuplet)
+const swingFlagCount = (duration: Fraction, tuplet?: number) =>
+  flagCount(duration, tuplet ? tupletScale(tuplet) : 1)
 
 const swingBeamCount = (durations: readonly Fraction[], tuplet?: number) =>
   durations.length > 1
@@ -620,25 +629,25 @@ const swingBeamCount = (durations: readonly Fraction[], tuplet?: number) =>
     >
       <template v-if="item.kind === 'rest'">
         <rect
-          v-if="restBox(item.duration, tupletCount(item))"
+          v-if="restBox(item.duration, itemTupletScale(item))"
           class="rest rest-box"
-          :class="`rest-box--${restBox(item.duration, tupletCount(item))}`"
+          :class="`rest-box--${restBox(item.duration, itemTupletScale(item))}`"
           :x="x(item.column) - 7"
-          :y="restBox(item.duration, tupletCount(item)) === 'whole' ? 64 : 70"
+          :y="restBox(item.duration, itemTupletScale(item)) === 'whole' ? 64 : 70"
           width="14"
           height="6"
         />
         <text v-else class="rest" :x="x(item.column)" y="79">
-          {{ restSymbol(item.duration, tupletCount(item)) }}
+          {{ restSymbol(item.duration, itemTupletScale(item)) }}
         </text>
         <circle
           v-if="
-            isSupportedRestDuration(item.duration, tupletCount(item)) &&
-            isDotted(effectiveDuration(item.duration, tupletCount(item)))
+            isSupportedRestDuration(item.duration, itemTupletScale(item)) &&
+            isDotted(effectiveDuration(item.duration, itemTupletScale(item)))
           "
           class="augmentation-dot rest-dot"
           :cx="x(item.column) + 17"
-          :cy="restDotY(item.duration, tupletCount(item))"
+          :cy="restDotY(item.duration, itemTupletScale(item))"
           r="2"
         />
       </template>
@@ -777,7 +786,7 @@ const swingBeamCount = (durations: readonly Fraction[], tuplet?: number) =>
           :d="`M ${x(item.column) + 5} ${y(item.pitch.staffPosition) + 5} Q ${(x(item.column) + x(item.tiedToColumn)) / 2} ${Math.max(y(item.pitch.staffPosition), y(item.tiedToPosition)) + 15} ${x(item.tiedToColumn) - 7} ${y(item.tiedToPosition) + 7}`"
         />
         <text
-          v-if="!isSupportedNoteDuration(engravingDuration(item), tupletCount(item))"
+          v-if="!isSupportedNoteDuration(engravingDuration(item), itemTupletScale(item))"
           class="notation-error"
           :x="x(item.column)"
           :y="y(item.pitch.staffPosition) + 5"
@@ -848,7 +857,7 @@ const swingBeamCount = (durations: readonly Fraction[], tuplet?: number) =>
             class="notehead"
             :class="{
               'notehead--open': isOpenNotehead(
-                effectiveDuration(engravingDuration(item), tupletCount(item)),
+                effectiveDuration(engravingDuration(item), itemTupletScale(item)),
               ),
             }"
             :cx="x(item.column)"
@@ -868,14 +877,14 @@ const swingBeamCount = (durations: readonly Fraction[], tuplet?: number) =>
             </text>
           </template>
           <circle
-            v-if="isDotted(effectiveDuration(engravingDuration(item), tupletCount(item)))"
+            v-if="isDotted(effectiveDuration(engravingDuration(item), itemTupletScale(item)))"
             class="augmentation-dot"
             :cx="x(item.column) + 13"
             :cy="y(item.pitch.staffPosition) - (item.pitch.staffPosition % 2 ? 0 : 3)"
             r="2"
           />
           <line
-            v-if="hasStem(effectiveDuration(engravingDuration(item), tupletCount(item)))"
+            v-if="hasStem(effectiveDuration(engravingDuration(item), itemTupletScale(item)))"
             class="stem"
             :x1="x(item.column) + 6"
             :x2="x(item.column) + 6"
@@ -883,7 +892,7 @@ const swingBeamCount = (durations: readonly Fraction[], tuplet?: number) =>
             :y2="y(item.pitch.staffPosition) - 30"
           />
           <path
-            v-for="flag in flagCount(engravingDuration(item), tupletCount(item))"
+            v-for="flag in flagCount(engravingDuration(item), itemTupletScale(item))"
             :key="`flag-${flag}`"
             class="flag"
             :d="`M ${x(item.column) + 6} ${y(item.pitch.staffPosition) - 30 + (flag - 1) * 7} Q ${x(item.column) + 20} ${y(item.pitch.staffPosition) - 23 + (flag - 1) * 7} ${x(item.column) + 12} ${y(item.pitch.staffPosition) - 13 + (flag - 1) * 7}`"
