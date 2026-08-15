@@ -27,6 +27,7 @@ type StaffItemContent =
       pitch: StaffPitch
       duration: Fraction
       displayLabel?: string
+      justIntonation?: boolean
       grace?: boolean
       notatedDuration?: Fraction
       articulationMarks?: readonly string[]
@@ -97,6 +98,7 @@ const items = computed(() => {
         pitch: shape.pitch,
         duration: shape.duration,
         displayLabel: shape.displayLabel,
+        justIntonation: shape.justIntonation,
         grace: shape.grace,
         notatedDuration: shape.notatedDuration,
         articulationMarks: shape.articulationMarks,
@@ -355,16 +357,18 @@ const items = computed(() => {
 
   const labeledNotesByColumn = new Map<number, Extract<StaffItem, { kind: 'note' }>[]>()
   staffItems.forEach((item) => {
-    if (item.kind !== 'note' || !item.displayLabel) return
+    if (item.kind !== 'note' || (!item.displayLabel && !item.justIntonation)) return
     const columnLabels = labeledNotesByColumn.get(item.column) ?? []
     columnLabels.push(item)
     labeledNotesByColumn.set(item.column, columnLabels)
   })
   labeledNotesByColumn.forEach((columnLabels) => {
+    let displayLabelRow = 0
     columnLabels
       .sort((a, b) => b.pitch.staffPosition - a.pitch.staffPosition)
-      .forEach((item, displayLabelRow) => {
+      .forEach((item) => {
         item.displayLabelRow = displayLabelRow
+        displayLabelRow += item.displayLabel && item.justIntonation ? 2 : 1
       })
   })
 
@@ -422,7 +426,19 @@ const width = computed(() =>
   ),
 )
 const height = computed(() =>
-  Math.max(170, 158 + Math.max(0, ...items.value.map((item) => item.displayLabelRow ?? 0)) * 13),
+  Math.max(
+    170,
+    158 +
+      Math.max(
+        0,
+        ...items.value.map(
+          (item) =>
+            (item.displayLabelRow ?? 0) +
+            (item.kind === 'note' && item.displayLabel && item.justIntonation ? 1 : 0),
+        ),
+      ) *
+        13,
+  ),
 )
 const x = (column: number) => 60 + column * 52 + repeatSpaceBefore(column)
 const barlineX = (item: Extract<StaffItem, { kind: 'barline' }>) =>
@@ -879,6 +895,14 @@ const swingBeamCount = (durations: readonly Fraction[], tuplet?: number) =>
             :y="130 + (item.displayLabelRow ?? 0) * 13"
           >
             {{ item.displayLabel }}
+          </text>
+          <text
+            v-if="item.justIntonation"
+            class="sounding-label just-intonation-label"
+            :x="x(item.column)"
+            :y="130 + ((item.displayLabelRow ?? 0) + (item.displayLabel ? 1 : 0)) * 13"
+          >
+            JI
           </text>
         </template>
       </template>
