@@ -18,6 +18,7 @@
     "compile:xenpaper-lang": "peggy --format es xenpaper-lang/xenpaper.peggy -o xenpaper-lang/parser.generated.js"
   },
   "dependencies": {
+    "moment-of-symmetry": "^0.10.0",
     "peggy": "^5.1.0",
     "pinia": "^4.0.2",
     "vue": "^3.5.40",
