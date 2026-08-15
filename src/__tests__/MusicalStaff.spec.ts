@@ -256,6 +256,19 @@ describe('MusicalStaff', () => {
     )
   })
 
+  it('engraves five notes normalized into a quarter-note slot as sixteenth notes', () => {
+    const evaluated = evaluateScoreShape(parse('0 2 7 [0 2 7] [0 2 3 5 7]').body[0]!)
+    if (!('shape' in evaluated)) throw new Error('Expected a score shape.')
+    const wrapper = mount(MusicalStaff, {
+      props: { notation: constructStaffNotationShape(evaluated.shape) },
+    })
+
+    const flags = wrapper.findAll('.flag')
+    expect(flags).toHaveLength(13)
+    expect(flags.slice(-10)).toHaveLength(10)
+    expect(wrapper.findAll('.notation-error')).toHaveLength(0)
+  })
+
   it('infers a triplet with an intact continued note', () => {
     const expression = parse('C [F G=] F').body[0]!
     const evaluated = evaluateScoreShape(expression)
