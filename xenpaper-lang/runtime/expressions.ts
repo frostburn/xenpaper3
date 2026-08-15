@@ -226,7 +226,7 @@ function binary(
       return multiplyOrDivide(left, right, true, node)
     case 'mod':
       return modulo(left, right, node)
-    case '^': {
+    case '**': {
       if (left.kind !== 'scalar' || right.kind !== 'scalar') {
         throw new TypeError('Exponentiation requires scalar operands.')
       }
@@ -302,25 +302,110 @@ export function evaluateExpression(
           diagnostics: operand.diagnostics,
         }
       }
-      if (["'", '"', '`'].includes(node.operator)) {
-        if (operand.value.kind === 'absolutePitch')
-          throw new TypeError('An equave shift requires a pitch offset.')
+      if (["'", '"', '`', '^', 'v', '/', '\\'].includes(node.operator)) {
         const context = 'rootPitch' in mapping ? mapping : createPitchContext(mapping)
-        const shift = node.operator === "'" ? 1 : node.operator === '"' ? 2 : -1
-        if (operand.value.kind === 'scalar' && !operand.value.value.dimensions.isDimensionless) {
+        const equaveShift =
+          node.operator === "'" ? 1 : node.operator === '"' ? 2 : node.operator === '`' ? -1 : 0
+        const inflection =
+          node.operator === '^'
+            ? context.up
+            : node.operator === 'v'
+              ? context.up.neg()
+              : node.operator === '/'
+                ? context.lift
+                : context.lift.neg()
+        // Equave shifts use the scale's degree equave for scalar arithmetic, but
+        // written pitches and intervals always move by notational octaves.
+        const scalarDisplacement = equaveShift
+          ? context.degreeEquave.mul(new Value(equaveShift))
+          : inflection
+        const pitchDisplacement = equaveShift
+          ? Value.pitch(new Value(2).pow(equaveShift))
+          : inflection
+        const operatorOrigin: SourceOrigin = { location: node.location, role: 'operator' }
+        const origins = [...operand.value.origins, operatorOrigin]
+        const equaveFormula = equaveShift
+          ? Value.ratio(pitchDisplacement).primeExponents()
+          : undefined
+        const shiftedFormula = (formula: ReadonlyMap<number, Fraction>) => {
+          if (!equaveFormula) return formula
+          const shifted = new Map(formula)
+          for (const [prime, exponent] of equaveFormula) {
+            shifted.set(prime, (shifted.get(prime) ?? new Fraction(0)).add(exponent))
+          }
+          return shifted
+        }
+        if (operand.value.kind === 'scalar') {
           return {
             value: result(
               'scalar',
-              operand.value.value.mul(Value.ratio(context.degreeEquave.mul(new Value(shift)))),
-              operand.value.origins,
+              operand.value.value.mul(Value.ratio(scalarDisplacement)),
+              origins,
             ),
+            diagnostics: operand.diagnostics,
+          }
+        }
+        if (operand.value.kind === 'absolutePitch') {
+          const modifier =
+            node.operator === "'"
+              ? 'equaveUp'
+              : node.operator === '"'
+                ? 'doubleEquaveUp'
+                : node.operator === '`'
+                  ? 'equaveDown'
+                  : node.operator === '^'
+                    ? 'up'
+                    : node.operator === 'v'
+                      ? 'down'
+                      : node.operator === '/'
+                        ? 'lift'
+                        : 'drop'
+          return {
+            value: {
+              ...operand.value,
+              origins,
+              rootOffset: operand.value.rootOffset.add(pitchDisplacement),
+              formula: shiftedFormula(operand.value.formula),
+              spelling: {
+                ...operand.value.spelling,
+                modifiers: [modifier, ...(operand.value.spelling.modifiers ?? [])],
+              },
+            },
             diagnostics: operand.diagnostics,
           }
         }
         const offset =
           operand.value.kind === 'pitchOffset' ? operand.value : pitchCoercion(operand.value)
         return {
-          value: { ...offset, value: offset.value.add(context.degreeEquave.mul(new Value(shift))) },
+          value: {
+            ...offset,
+            origins,
+            value: offset.value.add(pitchDisplacement),
+            ...(offset.formula ? { formula: shiftedFormula(offset.formula) } : {}),
+            ...(offset.spelling
+              ? {
+                  spelling: {
+                    ...offset.spelling,
+                    modifiers: [
+                      node.operator === "'"
+                        ? 'equaveUp'
+                        : node.operator === '"'
+                          ? 'doubleEquaveUp'
+                          : node.operator === '`'
+                            ? 'equaveDown'
+                            : node.operator === '^'
+                              ? 'up'
+                              : node.operator === 'v'
+                                ? 'down'
+                                : node.operator === '/'
+                                  ? 'lift'
+                                  : 'drop',
+                      ...(offset.spelling.modifiers ?? []),
+                    ],
+                  },
+                }
+              : {}),
+          },
           diagnostics: operand.diagnostics,
         }
       }

@@ -238,7 +238,7 @@ describe('Xenpaper surface grammar', () => {
     expect(items.map((item) => item.type)).toEqual(types)
   })
 
-  it('distinguishes attached FJS inflections and prefix pitch modifiers', () => {
+  it('distinguishes attached FJS inflections and unary pitch operators', () => {
     const program = parse("E^5 Ebv5 P1v5 Cv5 E_ /'C '/C vDb C#")
     const items = (program.body as SyntaxNode[])[0].items as SyntaxNode[]
 
@@ -248,21 +248,22 @@ describe('Xenpaper surface grammar', () => {
       'IntervalLiteral',
       'PitchLiteral',
       'PitchLiteral',
-      'PitchLiteral',
-      'PitchLiteral',
-      'PitchLiteral',
+      'UnaryExpression',
+      'UnaryExpression',
+      'UnaryExpression',
       'PitchLiteral',
     ])
-    expect(items.map((item) => item.raw)).toEqual([
+    expect(items.slice(0, 5).map((item) => item.raw)).toEqual([
       'E^5',
       'Ebv5',
       'P1v5',
       'Cv5',
       'E_',
-      "/'C",
-      "'/C",
-      'vDb',
-      'C#',
+    ])
+    expect(items.slice(5, 8).map((item) => item.type)).toEqual([
+      'UnaryExpression',
+      'UnaryExpression',
+      'UnaryExpression',
     ])
     expect((items[4].accidentals as SyntaxNode[]).map((accidental) => accidental.value)).toEqual([
       '_',
@@ -460,14 +461,28 @@ describe('Xenpaper surface grammar', () => {
     expect(((items[5].body as SyntaxNode[])[0] as SyntaxNode).type).toBe('Sequence')
   })
 
-  it('supports prefixes with relative pitch offset literals', () => {
+  it('represents pitch operators as unary expressions', () => {
     const program = parse("^M2 'P4")
     const items = (program.body[0] as SyntaxNode).items as SyntaxNode[]
 
-    expect(items.map((item) => item.type)).toEqual(['IntervalLiteral', 'IntervalLiteral'])
-    expect(items.map((item) => item.quality)).toEqual(['M', 'P'])
-    expect((items[0].modifiers as SyntaxNode[]).map((modifier) => modifier.raw)).toEqual(['^'])
-    expect((items[1].modifiers as SyntaxNode[]).map((modifier) => modifier.raw)).toEqual(["'"])
+    expect(items).toMatchObject([
+      { type: 'UnaryExpression', operator: '^', operand: { type: 'IntervalLiteral', quality: 'M' } },
+      { type: 'UnaryExpression', operator: "'", operand: { type: 'IntervalLiteral', quality: 'P' } },
+    ])
+  })
+
+  it('preserves identifiers beginning with v', () => {
+    expect(parse('@test(value, vfoo)').body[0]).toMatchObject({
+      arguments: [
+        { type: 'Identifier', name: 'value' },
+        { type: 'Identifier', name: 'vfoo' },
+      ],
+    })
+    expect(parse('vC').body[0]).toMatchObject({
+      type: 'UnaryExpression',
+      operator: 'v',
+      operand: { type: 'PitchLiteral', raw: 'C' },
+    })
   })
 
   it('sequences a pitch with an attached up modifier instead of treating it as power', () => {
@@ -475,8 +490,10 @@ describe('Xenpaper surface grammar', () => {
     const items = expression.items as SyntaxNode[]
 
     expect(expression.type).toBe('Sequence')
-    expect(items.map((item) => item.type)).toEqual(['PitchLiteral', 'PitchLiteral'])
-    expect((items[1].modifiers as SyntaxNode[]).map((modifier) => modifier.raw)).toEqual(['^'])
+    expect(items).toMatchObject([
+      { type: 'PitchLiteral' },
+      { type: 'UnaryExpression', operator: '^', operand: { type: 'PitchLiteral', raw: 'D' } },
+    ])
   })
 
   it('supports multiple augmentation and diminution of pitch offsets', () => {

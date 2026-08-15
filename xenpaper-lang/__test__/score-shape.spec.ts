@@ -15,6 +15,13 @@ function shape(source: string, pulse: Fraction | number = 1): ScoreShape {
 }
 
 describe('score-shape timing', () => {
+  it('broadcasts unary pitch operators over score constructions', () => {
+    const pitches = (source: string) =>
+      (shape(source) as SequenceShape).children
+        .filter((child) => child.kind === 'attack')
+        .map((attack) => attack.pitch.value.valueOf())
+    expect(pitches("'[C D E]")).toEqual(pitches("['C 'D 'E]"))
+  })
   it('tempers enumerated major and minor chords through the active mapping', () => {
     const pitches = (source: string) => {
       const result = shape(source)

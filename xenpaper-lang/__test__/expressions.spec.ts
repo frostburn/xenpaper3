@@ -46,7 +46,7 @@ describe('arithmetic expression evaluation', () => {
     if (!('value' in radical)) throw new Error('Expected a value.')
     expect(radical.value.value.equals(Value.cents(600))).toBe(true)
 
-    const underflow = evaluate('~(2 ^ -2000)')
+    const underflow = evaluate('~(2 ** -2000)')
     expect(underflow.kind).toBe('pitchOffset')
     expect(underflow.value.equals(Value.pitch(new Value(2).pow(-2000)))).toBe(true)
 
@@ -57,7 +57,7 @@ describe('arithmetic expression evaluation', () => {
 
   it('supports exact scalar arithmetic and right-associative powers', () => {
     expect(evaluate('(5/2 - 1/2) * 3/4').value.equals(new Fraction(3, 2))).toBe(true)
-    expect(evaluate('2 ^ 3 ^ 2').value.equals(512)).toBe(true)
+    expect(evaluate('2 ** 3 ** 2').value.equals(512)).toBe(true)
     expect(evaluate('-5 mod 3').value.equals(1)).toBe(true)
   })
 
@@ -83,8 +83,54 @@ describe('arithmetic expression evaluation', () => {
     expect(evaluate('sqrt(4)').value.equals(2)).toBe(true)
     expect(evaluate('sqrt(2) * sqrt(2)').value.equals(2)).toBe(true)
 
-    const duration = evaluate('sqrt(4 * 1s^2)')
+    const duration = evaluate('sqrt(4 * 1s**2)')
     expect(duration.value.equals(Value.seconds(2))).toBe(true)
+  })
+
+  it('applies pitch operators uniformly without coercing scalars to pitches', () => {
+    expect(evaluate("'sqrt(2)").value.equals(evaluate('sqrt(8)').value)).toBe(true)
+    const up = evaluate('^3/2')
+    expect(up.kind).toBe('scalar')
+    expect(up.value.equals(new Value(3n, 2n).mul(Value.ratio(DEFAULT_PITCH_CONTEXT.up)))).toBe(true)
+    expect(up.origins.map((origin) => origin.role)).toEqual(['literal', 'operator'])
+  })
+
+  it('keeps the written octave separate from a custom degree equave', () => {
+    const change = parse('{3/2}').body[0]
+    if (change.type !== 'PitchContextChange') throw new Error('Expected a pitch context change.')
+    const context = applyPitchContextChange(change, DEFAULT_PITCH_CONTEXT)
+    const customEvaluate = (source: string) => {
+      const result = evaluateExpression(expression(source), context)
+      expect(result.diagnostics).toEqual([])
+      if (!('value' in result)) throw new Error('Expected a value.')
+      return result.value
+    }
+
+    const pitch = customEvaluate("'G")
+    expect(pitch.kind === 'absolutePitch' && pitch.spelling).toMatchObject({
+      nominal: 'G',
+      modifiers: ['equaveUp'],
+    })
+    const lowerC = customEvaluate("'C")
+    const upperC = customEvaluate('c')
+    expect(
+      lowerC.kind === 'absolutePitch' && lowerC.rootOffset.equals(Value.cents(1200)),
+    ).toBe(true)
+    expect(
+      lowerC.kind === 'absolutePitch' &&
+        upperC.kind === 'absolutePitch' &&
+        lowerC.rootOffset.equals(upperC.rootOffset),
+    ).toBe(true)
+    const interval = customEvaluate("'P5")
+    expect(interval.kind === 'pitchOffset' && interval.spelling).toMatchObject({
+      quality: 'P',
+      number: 5n,
+      modifiers: ['equaveUp'],
+    })
+    expect(interval.value.equals(Value.pitch(new Value(3)))).toBe(true)
+    const ratio = customEvaluate("'3/2")
+    expect(ratio.kind).toBe('scalar')
+    expect(ratio.value.equals(new Value(9n, 4n))).toBe(true)
   })
 
   it('falls back to real arithmetic for sums of unrelated square roots', () => {
