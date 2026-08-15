@@ -49,6 +49,8 @@ export interface ScalarValue {
 export interface PitchOffsetValue {
   readonly kind: 'pitchOffset'
   readonly value: Value
+  /** This offset was explicitly converted from a positive exact scalar ratio. */
+  readonly justIntonation?: boolean
   /** Root-relative value retained for notation when `value` includes a sounding root displacement. */
   readonly notationValue?: Value
   readonly formula?: PrimeMonzo
@@ -142,6 +144,7 @@ export type StaffNotationShape =
       readonly pitch: StaffPitch
       readonly duration: Fraction
       readonly displayLabel?: string
+      readonly justIntonation?: boolean
       readonly grace?: boolean
       readonly notatedDuration?: Fraction
       readonly articulationMarks?: readonly string[]
@@ -208,6 +211,8 @@ export interface AttackShape extends ShapeBase {
   readonly displayLabel?: string
   /** Authored pitch expression retained for non-notation renderers such as piano rolls. */
   readonly authoredLabel?: string
+  /** An exact ratio sounding without the active prime mapping. */
+  readonly justIntonation?: boolean
   /** Sounding duration as a proportion of the occupied rhythmic duration. */
   readonly articulation?: Fraction
   /** Shorthand marks retained for staff engraving. */

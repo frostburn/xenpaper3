@@ -14,6 +14,29 @@ function notation(source: string) {
 }
 
 describe('staff notation construction', () => {
+  it('identifies pure ratios only when an active prime mapping distinguishes them', () => {
+    const collect = (source: string) => {
+      const evaluated = evaluateScoreShape(parse(source).body[0] as Expression)
+      if (!('shape' in evaluated)) throw new Error('Expected a score shape.')
+      const staff = constructStaffNotationShape(evaluated.shape)
+      if (staff.kind !== 'sequence') throw new Error('Expected a staff sequence.')
+      return staff.children.filter((item) => item.kind === 'note')
+    }
+
+    expect(collect('C D E ~9/8 9/8 5/4 pitch(9/8)').map((note) => note.justIntonation)).toEqual([
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+    ])
+    expect(
+      collect('{12edo}C D E ~9/8 9/8 5/4 pitch(9/8)').map((note) => note.justIntonation),
+    ).toEqual([undefined, undefined, undefined, undefined, true, true, true])
+  })
+
   it('retains shorthand articulation marks until a named articulation resets them', () => {
     const node = parse("@. C D @' E @staccato F @. G @- A").body[0] as Expression
     const evaluated = evaluateScoreShape(node)

@@ -467,7 +467,10 @@ export function evaluateExpression(
       if (node.callee === 'pitch') {
         if (argument.value.kind !== 'scalar') throw new TypeError('pitch() expects a scalar ratio.')
         return {
-          value: result('pitchOffset', Value.pitch(argument.value.value), argument.value.origins),
+          value: {
+            ...result('pitchOffset', Value.pitch(argument.value.value), argument.value.origins),
+            ...(argument.value.value.isPositiveExactRatio() ? { justIntonation: true } : {}),
+          },
           diagnostics: argument.diagnostics,
         }
       }

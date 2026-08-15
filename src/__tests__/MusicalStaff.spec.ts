@@ -27,6 +27,20 @@ const notation: StaffNotationShape = {
 }
 
 describe('MusicalStaff', () => {
+  it('labels pure ratios as JI when an active mapping distinguishes them from tempered notes', () => {
+    const evaluated = evaluateScoreShape(parse('{12edo}C D E ~9/8 9/8 5/4 pitch(9/8)').body[0]!)
+    if (!('shape' in evaluated)) throw new Error('Expected a score shape.')
+    const wrapper = mount(MusicalStaff, {
+      props: { notation: constructStaffNotationShape(evaluated.shape) },
+    })
+
+    expect(wrapper.findAll('.just-intonation-label').map((label) => label.text())).toEqual([
+      'JI',
+      'JI',
+      'JI',
+    ])
+  })
+
   it('does not repeat articulation marks on tied continuation heads', () => {
     const evaluated = evaluateScoreShape(parse('@. C | =').body[0]!)
     if (!('shape' in evaluated)) throw new Error('Expected a score shape.')

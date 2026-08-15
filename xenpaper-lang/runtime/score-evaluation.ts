@@ -705,6 +705,7 @@ function playablePitch(
 ):
   | {
       readonly pitch: PitchOffsetValue | (AbsolutePitchValue & { readonly value: Value })
+      readonly justIntonation?: boolean
       readonly diagnostics: readonly Diagnostic[]
     }
   | { readonly diagnostics: readonly Diagnostic[] } {
@@ -717,6 +718,9 @@ function playablePitch(
         value: evaluated.value.value.add(context.rootDisplacement),
         notationValue: evaluated.value.value,
       },
+      ...(context.mapping.id !== 'untempered' && evaluated.value.justIntonation
+        ? { justIntonation: true }
+        : {}),
       diagnostics: evaluated.diagnostics,
     }
   }
@@ -768,6 +772,9 @@ function playablePitch(
       notationValue: Value.pitch(ratio),
       origins: evaluated.value.origins,
     },
+    ...(context.mapping.id !== 'untempered' && ratio.isPositiveExactRatio()
+      ? { justIntonation: true }
+      : {}),
     diagnostics: evaluated.diagnostics,
   }
 }
@@ -1558,6 +1565,7 @@ export function evaluateScoreSemantics(
       articulation,
       ...(currentArticulationMarks.length ? { articulationMarks: currentArticulationMarks } : {}),
       ...('raw' in current ? { authoredLabel: String(current.raw) } : {}),
+      ...(evaluated.justIntonation ? { justIntonation: true } : {}),
       ...(current.type === 'DegreeLiteral' ||
       current.type === 'EqualDivisionLiteral' ||
       (current.type === 'QuantityLiteral' && current.unit === 'c')
