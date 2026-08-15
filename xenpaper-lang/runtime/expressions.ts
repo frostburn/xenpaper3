@@ -307,6 +307,16 @@ export function evaluateExpression(
           throw new TypeError('An equave shift requires a pitch offset.')
         const context = 'rootPitch' in mapping ? mapping : createPitchContext(mapping)
         const shift = node.operator === "'" ? 1 : node.operator === '"' ? 2 : -1
+        if (operand.value.kind === 'scalar' && !operand.value.value.dimensions.isDimensionless) {
+          return {
+            value: result(
+              'scalar',
+              operand.value.value.mul(Value.ratio(context.degreeEquave.mul(new Value(shift)))),
+              operand.value.origins,
+            ),
+            diagnostics: operand.diagnostics,
+          }
+        }
         const offset =
           operand.value.kind === 'pitchOffset' ? operand.value : pitchCoercion(operand.value)
         return {
