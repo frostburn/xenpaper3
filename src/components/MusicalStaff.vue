@@ -38,6 +38,7 @@ type StaffItemContent =
       kind: 'swing'
       straightDurations: readonly Fraction[]
       grooveDurations: readonly Fraction[]
+      tuplet?: number
     }
   | { kind: 'dynamic'; mark: DynamicMark }
 
@@ -183,6 +184,7 @@ const items = computed(() => {
         offset,
         straightDurations: shape.straightDurations,
         grooveDurations: shape.grooveDurations,
+        tuplet: shape.tuplet,
         tuplets: [],
         voice,
       })
@@ -539,6 +541,27 @@ const restDotY = (duration: Fraction, tupletCount?: number) =>
     : restBox(duration, tupletCount) === 'half'
       ? 72
       : 76
+
+const swingDuration = (duration: Fraction, tuplet?: number) => {
+  if (!tuplet) return fraction(duration)
+  let binary = 1
+  while (binary * 2 < tuplet) binary *= 2
+  return fraction(duration).mul(tuplet).div(binary)
+}
+
+const swingOpen = (duration: Fraction, tuplet?: number) =>
+  swingDuration(duration, tuplet).compare(2) >= 0
+
+const swingDotted = (duration: Fraction, tuplet?: number) => {
+  const value = swingDuration(duration, tuplet)
+  return value.equals('3/4') || value.equals('3/2') || value.equals(3)
+}
+
+const swingFlagged = (duration: Fraction, tuplet?: number) =>
+  swingDuration(duration, tuplet).compare(1) < 0
+
+const swingBeamed = (durations: readonly Fraction[], tuplet?: number) =>
+  durations.length > 1 && durations.every((duration) => swingFlagged(duration, tuplet))
 </script>
 
 <template>
@@ -618,10 +641,18 @@ const restDotY = (duration: Fraction, tupletCount?: number) =>
         <text :x="x(item.column)" y="25">=</text>
         <g v-for="(_, index) in item.straightDurations" :key="`straight-${index}`">
           <ellipse
+            :class="{ 'swing-notehead--open': swingOpen(_, undefined) }"
             :cx="x(item.column) - 12 - (item.straightDurations.length - index - 1) * 11"
             cy="24"
             rx="4"
             ry="3"
+          />
+          <circle
+            v-if="swingDotted(_, undefined)"
+            class="swing-dot"
+            :cx="x(item.column) - 5 - (item.straightDurations.length - index - 1) * 11"
+            cy="24"
+            r="1.25"
           />
           <line
             :x1="x(item.column) - 8 - (item.straightDurations.length - index - 1) * 11"
@@ -631,6 +662,7 @@ const restDotY = (duration: Fraction, tupletCount?: number) =>
           />
         </g>
         <line
+          v-if="swingBeamed(item.straightDurations)"
           class="swing-beam swing-beam--straight"
           :x1="x(item.column) - 8 - (item.straightDurations.length - 1) * 11"
           :x2="x(item.column) - 8"
@@ -638,7 +670,20 @@ const restDotY = (duration: Fraction, tupletCount?: number) =>
           y2="11"
         />
         <g v-for="(duration, index) in item.grooveDurations" :key="`groove-${index}`">
-          <ellipse :cx="x(item.column) + 12 + index * 14" cy="24" rx="4" ry="3" />
+          <ellipse
+            :class="{ 'swing-notehead--open': swingOpen(duration, item.tuplet) }"
+            :cx="x(item.column) + 12 + index * 14"
+            cy="24"
+            rx="4"
+            ry="3"
+          />
+          <circle
+            v-if="swingDotted(duration, item.tuplet)"
+            class="swing-dot"
+            :cx="x(item.column) + 19 + index * 14"
+            cy="24"
+            r="1.25"
+          />
           <line
             :x1="x(item.column) + 16 + index * 14"
             :x2="x(item.column) + 16 + index * 14"
@@ -646,22 +691,22 @@ const restDotY = (duration: Fraction, tupletCount?: number) =>
             y2="11"
           />
           <path
-            v-if="duration.compare(item.grooveDurations[0]!) < 0"
+            v-if="
+              swingFlagged(duration, item.tuplet) && !swingBeamed(item.grooveDurations, item.tuplet)
+            "
             class="swing-flag"
             :d="`M ${x(item.column) + 16 + index * 14} 11 Q ${x(item.column) + 24 + index * 14} 15 ${x(item.column) + 19 + index * 14} 20`"
           />
         </g>
         <line
-          v-if="item.grooveDurations.every((duration) => duration.equals(item.grooveDurations[0]!))"
+          v-if="swingBeamed(item.grooveDurations, item.tuplet)"
           class="swing-beam swing-beam--groove"
           :x1="x(item.column) + 16"
           :x2="x(item.column) + 16 + (item.grooveDurations.length - 1) * 14"
           y1="11"
           y2="11"
         />
-        <template
-          v-if="item.grooveDurations.some((duration) => !duration.equals(item.grooveDurations[0]!))"
-        >
+        <template v-if="item.tuplet">
           <path
             class="swing-tuplet-bracket"
             :d="`M ${x(item.column) + 9} 7 L ${x(item.column) + 9} 3 L ${x(item.column) + 19 + item.grooveDurations.length * 14} 3 L ${x(item.column) + 19 + item.grooveDurations.length * 14} 7`"
@@ -671,7 +716,7 @@ const restDotY = (duration: Fraction, tupletCount?: number) =>
             :x="x(item.column) + 14 + (item.grooveDurations.length * 14) / 2"
             y="5"
           >
-            3
+            {{ item.tuplet }}
           </text>
         </template>
       </g>
@@ -941,6 +986,10 @@ const restDotY = (duration: Fraction, tupletCount?: number) =>
   fill: currentColor;
   stroke: currentColor;
   stroke-width: 1.25;
+}
+
+.swing-notehead--open {
+  fill: white;
 }
 
 .swing-annotation text {

@@ -337,12 +337,18 @@ export function constructStaffNotationShape(shape: ScoreShape): StaffNotationSha
         const flattened = flattenScoreSemantics(shape.template).score
         const notes = flattened.events.filter((event) => event.kind === 'note')
         const grooveDurations = notes.map((note, index) =>
-          (notes[index + 1]?.start ?? flattened.duration).sub(note.start).div(flattened.duration),
+          (notes[index + 1]?.start ?? flattened.duration).sub(note.start),
         )
+        const oddDenominator = (value: number) => {
+          while (value % 2 === 0) value /= 2
+          return value
+        }
+        const tuplet = Math.max(...grooveDurations.map((duration) => oddDenominator(duration.d)))
         return {
           kind: 'swing',
-          straightDurations: notes.map(() => new Fraction(1, notes.length)),
+          straightDurations: notes.map(() => flattened.duration.div(notes.length)),
           grooveDurations,
+          ...(tuplet > 1 ? { tuplet } : {}),
           duration: shape.duration,
         }
       }

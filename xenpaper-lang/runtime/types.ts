@@ -159,6 +159,7 @@ export type StaffNotationShape =
       readonly kind: 'swing'
       readonly straightDurations: readonly Fraction[]
       readonly grooveDurations: readonly Fraction[]
+      readonly tuplet?: number
       readonly duration: Fraction
     }
   | { readonly kind: 'dynamic'; readonly mark: DynamicMark; readonly duration: Fraction }

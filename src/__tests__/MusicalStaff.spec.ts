@@ -757,7 +757,7 @@ describe('MusicalStaff', () => {
   })
 
   it('engraves groove swing notes above the staff instead of text', () => {
-    const evaluated = evaluateScoreShape(parse('@groove(C== C) C').body[0]!)
+    const evaluated = evaluateScoreShape(parse('@groove([C= C]) C').body[0]!)
     if (!('shape' in evaluated)) throw new Error('Expected a score shape.')
     const wrapper = mount(MusicalStaff, {
       props: { notation: constructStaffNotationShape(evaluated.shape) },
@@ -793,6 +793,32 @@ describe('MusicalStaff', () => {
     })
 
     expect(wrapper.get('.annotation').text()).toBe('straight')
+  })
+
+  it('engraves a five-part groove as a quintuplet', () => {
+    const evaluated = evaluateScoreShape(parse('@groove([0== 0=]) C').body[0]!)
+    if (!('shape' in evaluated)) throw new Error('Expected a score shape.')
+    const wrapper = mount(MusicalStaff, {
+      props: { notation: constructStaffNotationShape(evaluated.shape) },
+    })
+
+    expect(wrapper.get('.swing-tuplet-number').text()).toBe('5')
+    expect(wrapper.find('.swing-tuplet-bracket').exists()).toBe(true)
+    expect(wrapper.find('.swing-beam--straight').exists()).toBe(true)
+  })
+
+  it('engraves an unnormalized groove using its full rhythmic span', () => {
+    const evaluated = evaluateScoreShape(parse('@groove(0= 0) C').body[0]!)
+    if (!('shape' in evaluated)) throw new Error('Expected a score shape.')
+    const wrapper = mount(MusicalStaff, {
+      props: { notation: constructStaffNotationShape(evaluated.shape) },
+    })
+
+    // Two dotted quarters on the straight side equal a half followed by a quarter.
+    expect(wrapper.findAll('.swing-dot')).toHaveLength(2)
+    expect(wrapper.findAll('.swing-notehead--open')).toHaveLength(1)
+    expect(wrapper.find('.swing-tuplet-number').exists()).toBe(false)
+    expect(wrapper.findAll('.swing-beam')).toHaveLength(0)
   })
 
   it('renders ASCII-style operators and flavored numeric FJS inflections before accidentals', () => {
