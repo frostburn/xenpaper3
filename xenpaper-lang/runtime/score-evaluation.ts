@@ -44,6 +44,9 @@ function mapScoreConstruction(
   node: Expression,
   mapLeaf: (leaf: Expression) => Expression,
 ): Expression | undefined {
+  if (node.type === 'UnaryExpression') {
+    return mapScoreConstruction(node.operand, (leaf) => ({ ...node, operand: mapLeaf(leaf) }))
+  }
   const mapItem = (item: Expression): Expression => {
     const construction = mapScoreConstruction(item, mapLeaf)
     if (construction) return construction

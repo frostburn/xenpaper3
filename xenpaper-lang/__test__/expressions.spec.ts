@@ -46,7 +46,7 @@ describe('arithmetic expression evaluation', () => {
     if (!('value' in radical)) throw new Error('Expected a value.')
     expect(radical.value.value.equals(Value.cents(600))).toBe(true)
 
-    const underflow = evaluate('~(2 ^ -2000)')
+    const underflow = evaluate('~(2 ** -2000)')
     expect(underflow.kind).toBe('pitchOffset')
     expect(underflow.value.equals(Value.pitch(new Value(2).pow(-2000)))).toBe(true)
 
@@ -57,7 +57,7 @@ describe('arithmetic expression evaluation', () => {
 
   it('supports exact scalar arithmetic and right-associative powers', () => {
     expect(evaluate('(5/2 - 1/2) * 3/4').value.equals(new Fraction(3, 2))).toBe(true)
-    expect(evaluate('2 ^ 3 ^ 2').value.equals(512)).toBe(true)
+    expect(evaluate('2 ** 3 ** 2').value.equals(512)).toBe(true)
     expect(evaluate('-5 mod 3').value.equals(1)).toBe(true)
   })
 
@@ -83,8 +83,15 @@ describe('arithmetic expression evaluation', () => {
     expect(evaluate('sqrt(4)').value.equals(2)).toBe(true)
     expect(evaluate('sqrt(2) * sqrt(2)').value.equals(2)).toBe(true)
 
-    const duration = evaluate('sqrt(4 * 1s^2)')
+    const duration = evaluate('sqrt(4 * 1s**2)')
     expect(duration.value.equals(Value.seconds(2))).toBe(true)
+  })
+
+  it('applies pitch operators uniformly without coercing scalars to pitches', () => {
+    expect(evaluate("'sqrt(2)").value.equals(evaluate('sqrt(8)').value)).toBe(true)
+    const up = evaluate('^3/2')
+    expect(up.kind).toBe('scalar')
+    expect(up.value.equals(new Value(3n, 2n).mul(Value.ratio(DEFAULT_PITCH_CONTEXT.up)))).toBe(true)
   })
 
   it('falls back to real arithmetic for sums of unrelated square roots', () => {

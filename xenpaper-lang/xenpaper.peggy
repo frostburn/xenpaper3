@@ -195,10 +195,10 @@ BinaryDivide
 PowerExpression
   = left:UnaryExpression
     tail:(
-      "^" Spacing right:PowerExpression { return right; }
-      / RequiredSpacing "^" RequiredSpacing right:PowerExpression { return right; }
+      "**" Spacing right:PowerExpression { return right; }
+      / RequiredSpacing "**" RequiredSpacing right:PowerExpression { return right; }
     )? {
-      return tail ? binary("^", left, tail) : left;
+      return tail ? binary("**", left, tail) : left;
     }
 
 UnaryExpression
@@ -211,7 +211,7 @@ UnaryOperator
   = "+" { return "+"; }
   / "-" { return "-"; }
   / "~" { return "~"; }
-  / $("'" / '"' / "`")
+  / $("'" / '"' / "`" / "^" / "v" / "/" / "\\")
 
 PostfixExpression
   = expression:PrimaryExpression marks:AttachedPostfixMark* {
@@ -554,15 +554,15 @@ CallArgumentList
     }
 
 IdentifierExpression
-  = name:Identifier {
+  = !("v" &(PitchNominal / IntervalQuality)) name:Identifier {
       return node('Identifier', { name });
     }
 
 IntervalLiteral
-  = modifiers:PitchModifier* quality:IntervalQuality number:IntervalNumber
+  = quality:IntervalQuality number:IntervalNumber
     inflections:FjsInflection* !IdentifierContinue {
       return node('IntervalLiteral', {
-        modifiers,
+        modifiers: [],
         quality,
         number,
         inflections,
@@ -588,17 +588,6 @@ PitchLiteral
         raw: text(),
       });
     }
-  / modifiers:PitchModifier+ nominal:PitchNominal
-    accidentals:PythagoreanAccidental*
-    inflections:FjsInflection* !IdentifierContinue {
-      return node('PitchLiteral', {
-        modifiers,
-        nominal,
-        accidentals,
-        inflections,
-        raw: text(),
-      });
-    }
 
 // Bare integer tokens in score position are scale degrees, not scalar integer
 // expressions. They intentionally stop before binary operators so `2 - 3`
@@ -617,7 +606,7 @@ NumericLiteralSuffix
   = "/" / "\\" / "." [0-9]+ ("e" / "r" / UnitSuffix)
 
 BinaryOperatorAfterSpacing
-  = Spacing (AdditiveOperator / MultiplicativeOperator / "^")
+  = Spacing (AdditiveOperator / MultiplicativeOperator / "**")
 
 PitchModifier
   = raw:$("'" / '"' / "`" / "^" / "v" / "/" / "\\") {
