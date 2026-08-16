@@ -447,6 +447,87 @@ const x = (column: number) => 60 + column * 52 + repeatSpaceBefore(column)
 const barlineX = (item: Extract<StaffItem, { kind: 'barline' }>) =>
   x(item.column) - 26 - (repeatMarkerColumns.value.has(item.column) ? repeatMarkerSpace / 2 : 0)
 const y = (position: number) => 100 - (position - 2) * 6
+type DiamondMos = NonNullable<StaffPitch['diamondMos']>
+const diamondMosChanges = computed(() => {
+  const changes: { column: number; config: DiamondMos }[] = []
+  for (const item of items.value) {
+    if (item.kind !== 'note' || !item.pitch.diamondMos) continue
+    const previous = changes[changes.length - 1]
+    if (!previous || previous.config.pattern !== item.pitch.diamondMos.pattern)
+      changes.push({ column: item.column, config: item.pitch.diamondMos })
+  }
+  return changes
+})
+const diamondMos = computed(() => diamondMosChanges.value[0]?.config)
+const mosAtBarline = (barline: Extract<StaffItem, { kind: 'barline' }>) => {
+  let active = diamondMos.value
+  for (const item of items.value) {
+    if (item === barline) break
+    if (item.kind === 'note' && item.pitch.diamondMos) active = item.pitch.diamondMos
+  }
+  return active
+}
+const mosDegreeCount = computed(() =>
+  Math.max(0, ...diamondMosChanges.value.map(({ config }) => config.pattern.length)),
+)
+const linePositionsFor = (config?: DiamondMos) =>
+  Array.from(
+    { length: config ? Math.ceil(config.pattern.length / 2 + 1) : 5 },
+    (_, index) => index * 2 + 2,
+  )
+const staffLinePositions = computed(() =>
+  linePositionsFor(
+    diamondMos.value
+      ? { ...diamondMos.value, pattern: 'L'.repeat(mosDegreeCount.value) }
+      : undefined,
+  ),
+)
+const staffSegments = computed(() =>
+  diamondMosChanges.value.map((change, index) => ({
+    ...change,
+    x1: index ? x(change.column) - 26 : 20,
+    x2:
+      index + 1 < diamondMosChanges.value.length
+        ? x(diamondMosChanges.value[index + 1]!.column) - 26
+        : width.value - 20,
+  })),
+)
+const clefX = (column: number, index: number) => (index ? x(column) - 20 : 25)
+const diamondPositions = (config: DiamondMos | undefined) => {
+  if (!config) return []
+  const result: number[] = []
+  const positions = linePositionsFor(config)
+  const top = positions[positions.length - 1] ?? 0
+  for (let position = 0; position <= top; position += config.pattern.length) result.push(position)
+  return result
+}
+const markedMosStep = (config: DiamondMos | undefined) => {
+  if (!config) return undefined
+  const pattern = config.pattern
+  const large = [...pattern].filter((step) => step === 'L').length
+  const small = [...pattern].filter((step) => step === 's').length
+  return large <= small ? 'L' : 's'
+}
+const mosBoxPositions = (config: DiamondMos | undefined, extended = false) => {
+  const marked = markedMosStep(config)
+  if (!config || !marked) return []
+  const positionsForConfig = linePositionsFor(config)
+  const bottom = extended ? -1 : positionsForConfig[0]! - 1
+  const top = (positionsForConfig[positionsForConfig.length - 1] ?? 0) + (extended ? 1 : 0)
+  const positions: number[] = []
+  for (let position = bottom; position <= top; position++) {
+    const patternIndex =
+      ((position % config.pattern.length) + config.pattern.length) % config.pattern.length
+    if (config.pattern[patternIndex] === marked) positions.push(position + 0.5)
+  }
+  return positions
+}
+const barlineTopY = (barline: Extract<StaffItem, { kind: 'barline' }>) => {
+  const positions = linePositionsFor(mosAtBarline(barline))
+  return y(positions[positions.length - 1]!)
+}
+const barlineBottomY = (barline: Extract<StaffItem, { kind: 'barline' }>) =>
+  y(linePositionsFor(mosAtBarline(barline))[0]!)
 const accidental = (value: string) =>
   ({
     flat: '♭',
@@ -589,16 +670,68 @@ const swingBeamCount = (durations: readonly Fraction[], tuplet?: number) =>
     aria-label="Musical staff"
   >
     <g class="staff-lines">
+      <template v-if="diamondMos">
+        <g v-for="(segment, segmentIndex) in staffSegments" :key="segmentIndex">
+          <line
+            v-for="position in linePositionsFor(segment.config)"
+            :key="position"
+            :x1="segment.x1"
+            :x2="segment.x2"
+            :y1="y(position)"
+            :y2="y(position)"
+            :class="{
+              'staff-line--reference':
+                linePositionsFor(segment.config).length > 5 &&
+                position === linePositionsFor(segment.config)[0],
+            }"
+          />
+        </g>
+      </template>
       <line
-        v-for="line in 5"
-        :key="line"
+        v-for="position in diamondMos ? [] : staffLinePositions"
+        v-else
+        :key="position"
         x1="20"
         :x2="width - 20"
-        :y1="100 - (line - 1) * 12"
-        :y2="100 - (line - 1) * 12"
+        :y1="y(position)"
+        :y2="y(position)"
       />
     </g>
-    <text class="clef" x="25" y="98">𝄞</text>
+    <text v-if="!diamondMos" class="clef" x="25" y="98">𝄞</text>
+    <template v-else>
+      <g
+        v-for="(change, changeIndex) in diamondMosChanges"
+        :key="`diamond-clef-${changeIndex}`"
+        class="diamond-clef"
+      >
+        <line
+          v-for="position in diamondPositions(change.config)"
+          :key="`ledger-${position}`"
+          class="diamond-clef__ledger"
+          :x1="clefX(change.column, changeIndex) - 11"
+          :x2="clefX(change.column, changeIndex) + 18"
+          :y1="y(position)"
+          :y2="y(position)"
+        />
+        <polygon
+          v-for="position in diamondPositions(change.config)"
+          :key="position"
+          class="diamond-clef__mark"
+          :class="{ 'diamond-clef__mark--middle': position === 0 }"
+          :points="`${clefX(change.column, changeIndex)},${y(position) - (position === 0 ? 7 : 5)} ${clefX(change.column, changeIndex) + (position === 0 ? 7 : 5)},${y(position)} ${clefX(change.column, changeIndex)},${y(position) + (position === 0 ? 7 : 5)} ${clefX(change.column, changeIndex) - (position === 0 ? 7 : 5)},${y(position)}`"
+        />
+        <rect
+          v-for="position in mosBoxPositions(change.config, true)"
+          :key="`clef-box-${position}`"
+          class="mos-step-box"
+          :class="{ 'mos-step-box--hollow': markedMosStep(change.config) === 's' }"
+          :x="clefX(change.column, changeIndex) + 10"
+          :y="y(position) - 3"
+          width="6"
+          height="6"
+        />
+      </g>
+    </template>
     <text v-if="!items.length" class="empty-message" x="70" y="126">No notation loaded</text>
     <g v-for="(ending, index) in endingSpans" :key="`ending-${index}`" class="alternate-ending">
       <path
@@ -756,15 +889,15 @@ const swingBeamCount = (durations: readonly Fraction[], tuplet?: number) =>
           :x2="
             barlineX(item) - (item.style === 'single' || item.style.startsWith('ending-') ? 0 : 3)
           "
-          y1="52"
-          y2="100"
+          :y1="barlineTopY(item)"
+          :y2="barlineBottomY(item)"
         />
         <line
           v-if="item.style !== 'single' && !item.style.startsWith('ending-')"
           :x1="barlineX(item) + 3"
           :x2="barlineX(item) + 3"
-          y1="52"
-          y2="100"
+          :y1="barlineTopY(item)"
+          :y2="barlineBottomY(item)"
         />
         <template v-if="item.style === 'repeat-start' || item.style === 'repeat-end'">
           <circle
@@ -778,6 +911,18 @@ const swingBeamCount = (durations: readonly Fraction[], tuplet?: number) =>
             r="2.5"
           />
         </template>
+        <rect
+          v-for="position in mosBoxPositions(mosAtBarline(item))"
+          :key="`box-${position}`"
+          class="mos-step-box"
+          :class="{
+            'mos-step-box--hollow': markedMosStep(mosAtBarline(item)) === 's',
+          }"
+          :x="barlineX(item) + 5"
+          :y="y(position) - 3"
+          width="6"
+          height="6"
+        />
       </g>
       <template v-else>
         <path
@@ -935,6 +1080,30 @@ const swingBeamCount = (durations: readonly Fraction[], tuplet?: number) =>
 .tie {
   stroke: currentColor;
   stroke-width: 1.5;
+}
+
+.staff-lines .staff-line--reference {
+  stroke-width: 3;
+}
+
+.diamond-clef__mark,
+.mos-step-box {
+  fill: currentColor;
+  stroke: currentColor;
+  stroke-width: 1.25;
+}
+
+.diamond-clef__ledger {
+  stroke: currentColor;
+  stroke-width: 1.5;
+}
+
+.diamond-clef__mark--middle {
+  fill: white;
+}
+
+.mos-step-box--hollow {
+  fill: white;
 }
 
 .grace-tie {

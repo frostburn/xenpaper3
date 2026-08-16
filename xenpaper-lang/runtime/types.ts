@@ -159,6 +159,11 @@ export interface StaffPitch {
   readonly notehead: 'normal' | 'triangle-up' | 'triangle-down' | 'x'
   /** Sounding distance above middle C, retained for positioning refinements by a renderer. */
   readonly cents: number
+  /** Diamond-MOS information used to replace the conventional clef and staff guides. */
+  readonly diamondMos?: {
+    readonly rank: number
+    readonly pattern: string
+  }
 }
 
 export type StaffNotationShape =
