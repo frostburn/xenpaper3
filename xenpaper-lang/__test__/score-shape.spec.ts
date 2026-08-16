@@ -15,6 +15,62 @@ function shape(source: string, pulse: Fraction | number = 1): ScoreShape {
 }
 
 describe('score-shape timing', () => {
+  it('installs Diamond-MOS absolute pitches and relative mossteps', () => {
+    const score = shape('MOS{5L2s} J K L M N O P') as SequenceShape
+    const cents = score.children
+      .filter((child) => child.kind === 'attack')
+      .map((attack) => attack.pitch.value.valueOf())
+    expect(cents).toHaveLength(7)
+    expect(cents.map((value) => Math.round(value))).toEqual([0, 200, 400, 600, 700, 900, 1100])
+
+    const relative = shape('MOS{5L2s} P0ms m1ms M1ms') as SequenceShape
+    const offsets = relative.children
+      .filter((child) => child.kind === 'attack')
+      .map((attack) => Math.round(attack.pitch.value.valueOf()))
+    expect(offsets).toEqual([0, 100, 200])
+
+    const perfect = shape('MOS{5L2s} P3ms P4ms') as SequenceShape
+    const perfectOffsets = perfect.children
+      .filter((child) => child.kind === 'attack')
+      .map((attack) => Math.round(attack.pitch.value.valueOf()))
+    expect(perfectOffsets).toEqual([500, 700])
+  })
+
+  it('supports explicit MOS modes, hardness, equaves, and step setters', () => {
+    const ordered = shape('MOS{5L2s 3:2 2|4} J K') as SequenceShape
+    const reordered = shape('MOS{2|4 3:2 5L2s} J K') as SequenceShape
+    const attackCents = (score: SequenceShape) =>
+      score.children
+        .filter((child) => child.kind === 'attack')
+        .map((attack) => attack.pitch.value.valueOf())
+    expect(attackCents(reordered)).toEqual(attackCents(ordered))
+
+    const hard = shape('MOS{5L 2s 3:1} J K') as SequenceShape
+    const attacks = hard.children.filter((child) => child.kind === 'attack')
+    expect(Math.round(attacks[1]!.pitch.value.valueOf())).toBe(212)
+
+    const tritave = shape('MOS{4L5s<3>} J j') as SequenceShape
+    const tritaveAttacks = tritave.children.filter((child) => child.kind === 'attack')
+    expect(tritaveAttacks[1]!.pitch.value.equals(Value.pitch(new Value(3)))).toBe(true)
+
+    const set = shape('MOS{5L2s} MOS{^ = 1\\24} ^J') as SequenceShape
+    const setAttack = set.children.find((child) => child.kind === 'attack')
+    expect(setAttack?.pitch.value.equals(Value.equalDivision(1, 24, new Value(2)))).toBe(true)
+
+    const multiperiod = shape('MOS{4L2s} P3ms') as SequenceShape
+    const periodAttack = multiperiod.children.find((child) => child.kind === 'attack')
+    expect(Math.round(periodAttack!.pitch.value.valueOf())).toBe(600)
+
+    const inconsistent = evaluateScoreShape(
+      parse('MOS{5L2s L = 300c s = 100c} J').body[0] as Expression,
+    )
+    expect(inconsistent.diagnostics[0]?.message).toContain('accumulate to the MOS equave')
+
+    const centsEquave = shape('MOS{5L2s L = 300c s = 100c <1700c>} J j') as SequenceShape
+    const centsEquaveAttacks = centsEquave.children.filter((child) => child.kind === 'attack')
+    expect(Math.round(centsEquaveAttacks[1]!.pitch.value.valueOf())).toBe(1700)
+  })
+
   it('broadcasts unary pitch operators over score constructions', () => {
     const pitches = (source: string) =>
       (shape(source) as SequenceShape).children

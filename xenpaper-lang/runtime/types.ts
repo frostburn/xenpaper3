@@ -64,6 +64,11 @@ export interface AbsolutePitchValue {
   readonly formula: PrimeMonzo
   readonly spelling: PitchSpelling
   readonly origins: readonly SourceOrigin[]
+  /** Diamond-MOS ordinal and configuration retained for named pitch subtraction. */
+  readonly mos?: {
+    readonly rank: number
+    readonly context: MosContext
+  }
 }
 
 export type PrimeMonzo = ReadonlyMap<number, Fraction>
@@ -120,6 +125,24 @@ export interface PitchContext {
   readonly rootPitch: AbsolutePitchValue
   readonly up: Value
   readonly lift: Value
+  /** Active Diamond-MOS notation, installed by a MOS declaration. */
+  readonly mos?: MosContext
+}
+
+export interface MosDegree {
+  readonly center: Value
+  readonly imperfect: boolean
+  readonly mid?: Value
+}
+
+export interface MosContext {
+  readonly pattern: string
+  readonly equave: Value
+  readonly period: Value
+  readonly large: Value
+  readonly small: Value
+  readonly nominals: ReadonlyMap<string, Value>
+  readonly degrees: readonly MosDegree[]
 }
 
 export type EvaluatedLiteral = ScalarValue | PitchOffsetValue | AbsolutePitchValue

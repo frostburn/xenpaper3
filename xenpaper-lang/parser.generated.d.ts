@@ -42,6 +42,8 @@ export type Expression =
   | IntervalLiteral
   | MappingLiteral
   | MonzoLiteral
+  | MosDeclaration
+  | MosIntervalLiteral
   | NamedArgument
   | NormalizeToSlot
   | Parallel
@@ -194,6 +196,69 @@ export interface IntervalLiteral extends Node {
   number: string
   inflections: FjsInflection[]
   raw: string
+}
+
+export interface MosIntervalLiteral extends Node {
+  type: 'MosIntervalLiteral'
+  modifiers: PitchModifier[]
+  quality: string
+  degree: string
+  raw: string
+}
+
+export interface MosDeclaration extends Node {
+  type: 'MosDeclaration'
+  elements: MosElement[]
+  raw: string
+}
+
+export type MosElement =
+  | MosAbstractPattern
+  | MosEquave
+  | MosHardness
+  | MosIntegerPattern
+  | MosPatternCounts
+  | MosStepAssignment
+  | MosUdp
+
+export interface MosAbstractPattern extends Node {
+  type: 'MosAbstractPattern'
+  pattern: string
+}
+
+export interface MosEquave extends Node {
+  type: 'MosEquave'
+  value: Expression
+}
+
+export interface MosHardness extends Node {
+  type: 'MosHardness'
+  numerator: string
+  denominator: string
+}
+
+export interface MosIntegerPattern extends Node {
+  type: 'MosIntegerPattern'
+  values: string[]
+}
+
+export interface MosPatternCounts extends Node {
+  type: 'MosPatternCounts'
+  large: string
+  small: string
+}
+
+export interface MosStepAssignment extends Node {
+  type: 'MosStepAssignment'
+  target: '^' | '/' | 'L' | 's'
+  value: Expression
+}
+
+export interface MosUdp extends Node {
+  type: 'MosUdp'
+  up: string
+  down: string
+  period: string | null
 }
 
 export interface MappingLiteral extends Node {
