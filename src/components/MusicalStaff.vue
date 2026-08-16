@@ -6,6 +6,7 @@ import type {
   StaffInflection,
   StaffNotationShape,
   StaffPitch,
+  StaffClef,
 } from '../../xenpaper-lang'
 import { Fraction } from 'xen-dev-utils/fraction'
 
@@ -42,6 +43,7 @@ type StaffItemContent =
       tuplet?: number
     }
   | { kind: 'dynamic'; mark: DynamicMark }
+  | { kind: 'clef'; clef: StaffClef }
 
 type StaffItem = StaffItemContent & {
   column: number
@@ -196,6 +198,8 @@ const items = computed(() => {
       })
     } else if (shape.kind === 'dynamic') {
       layout.push({ kind: 'dynamic', offset, mark: shape.mark, tuplets: [], voice })
+    } else if (shape.kind === 'clef') {
+      layout.push({ kind: 'clef', offset, clef: shape.clef, tuplets: [], voice })
     } else if (shape.kind === 'sequence') {
       const startOffset = offset
       const startIndex = layout.length
@@ -451,13 +455,44 @@ type DiamondMos = NonNullable<StaffPitch['diamondMos']>
 const diamondMosChanges = computed(() => {
   const changes: { column: number; config: DiamondMos }[] = []
   for (const item of items.value) {
-    if (item.kind !== 'note' || !item.pitch.diamondMos) continue
+    const config =
+      item.kind === 'clef' && item.clef.kind === 'diamond-mos'
+        ? { rank: 0, pattern: item.clef.pattern }
+        : item.kind === 'note'
+          ? item.pitch.diamondMos
+          : undefined
+    if (!config) continue
     const previous = changes[changes.length - 1]
-    if (!previous || previous.config.pattern !== item.pitch.diamondMos.pattern)
-      changes.push({ column: item.column, config: item.pitch.diamondMos })
+    if (!previous || previous.config.pattern !== config.pattern)
+      changes.push({ column: item.column, config })
   }
   return changes
 })
+type ConventionalClefItem = Extract<StaffItem, { kind: 'clef' }> & {
+  clef: { kind: 'treble' | 'bass' }
+}
+const conventionalClefChanges = computed(() =>
+  items.value.filter(
+    (item): item is ConventionalClefItem =>
+      item.kind === 'clef' && item.clef.kind !== 'diamond-mos',
+  ),
+)
+const visibleConventionalClefChanges = computed(() => {
+  let active: StaffClef['kind'] = 'treble'
+  return conventionalClefChanges.value.filter((change) => {
+    if (change.column === 0) {
+      active = change.clef.kind
+      return false
+    }
+    if (change.clef.kind === active) return false
+    active = change.clef.kind
+    return true
+  })
+})
+const initialConventionalClef = computed(
+  () => conventionalClefChanges.value.find((change) => change.column === 0)?.clef.kind ?? 'treble',
+)
+const clefGlyph = (clef: StaffClef['kind']) => (clef === 'bass' ? '𝄢' : '𝄞')
 const diamondMos = computed(() => diamondMosChanges.value[0]?.config)
 const mosAtBarline = (barline: Extract<StaffItem, { kind: 'barline' }>) => {
   let active = diamondMos.value
@@ -697,8 +732,19 @@ const swingBeamCount = (durations: readonly Fraction[], tuplet?: number) =>
         :y2="y(position)"
       />
     </g>
-    <text v-if="!diamondMos" class="clef" x="25" y="98">𝄞</text>
-    <template v-else>
+    <text v-if="!diamondMos" class="clef" x="25" y="98">
+      {{ clefGlyph(initialConventionalClef) }}
+    </text>
+    <text
+      v-for="(change, index) in visibleConventionalClefChanges"
+      :key="`clef-${index}`"
+      class="clef clef--change"
+      :x="clefX(change.column, 1)"
+      y="98"
+    >
+      {{ clefGlyph(change.clef.kind) }}
+    </text>
+    <template v-if="diamondMos">
       <g
         v-for="(change, changeIndex) in diamondMosChanges"
         :key="`diamond-clef-${changeIndex}`"
@@ -923,6 +969,9 @@ const swingBeamCount = (durations: readonly Fraction[], tuplet?: number) =>
           width="6"
           height="6"
         />
+      </g>
+      <g v-else-if="item.kind === 'clef'" class="clef-event">
+        <title>Clef change</title>
       </g>
       <template v-else>
         <path

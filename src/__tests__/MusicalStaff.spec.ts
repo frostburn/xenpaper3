@@ -27,6 +27,18 @@ const notation: StaffNotationShape = {
 }
 
 describe('MusicalStaff', () => {
+  it('renders bass clef events', () => {
+    const bassNotation: StaffNotationShape = {
+      ...notation,
+      children: [
+        { kind: 'clef', clef: { kind: 'bass' }, duration: notation.duration },
+        ...notation.children,
+      ],
+    }
+    const wrapper = mount(MusicalStaff, { props: { notation: bassNotation } })
+    expect(wrapper.get('.clef').text()).toBe('𝄢')
+  })
+
   it('renders Diamond-MOS pitches with diamond octave marks and minority-step boxes', () => {
     const evaluated = evaluateScoreShape(parse('MOS{3L4s} J K L M | N O P j').body[0]!)
     if (!('shape' in evaluated)) throw new Error('Expected a score shape.')

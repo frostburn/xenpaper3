@@ -166,6 +166,12 @@ export interface StaffPitch {
   }
 }
 
+/** A change of the notation reference shown at an exact position in the score. */
+export type StaffClef =
+  | { readonly kind: 'treble' }
+  | { readonly kind: 'bass' }
+  | { readonly kind: 'diamond-mos'; readonly pattern: string }
+
 export type StaffNotationShape =
   | {
       readonly kind: 'note'
@@ -194,6 +200,7 @@ export type StaffNotationShape =
       readonly duration: Fraction
     }
   | { readonly kind: 'dynamic'; readonly mark: DynamicMark; readonly duration: Fraction }
+  | { readonly kind: 'clef'; readonly clef: StaffClef; readonly duration: Fraction }
   | {
       readonly kind: 'sequence'
       readonly duration: Fraction
@@ -301,6 +308,11 @@ export interface DynamicShape extends ShapeBase {
   readonly mark: DynamicMark
 }
 
+export interface ClefShape extends ShapeBase {
+  readonly kind: 'clef'
+  readonly clef: StaffClef
+}
+
 /** A playback timing cycle. The authored template is retained so staff notation can
  * show the swing equivalence without applying it to engraved note positions. */
 export interface GrooveShape extends ShapeBase {
@@ -338,6 +350,7 @@ export type ScoreShape =
   | BarlineShape
   | AnnotationShape
   | DynamicShape
+  | ClefShape
   | GrooveShape
   | SequenceShape
   | ParallelShape

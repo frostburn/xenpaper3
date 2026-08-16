@@ -345,6 +345,8 @@ export function constructStaffNotationShape(shape: ScoreShape): StaffNotationSha
       return { kind: 'annotation', text: shape.text, duration: shape.duration }
     case 'dynamic':
       return { kind: 'dynamic', mark: shape.mark, duration: shape.duration }
+    case 'clef':
+      return { kind: 'clef', clef: shape.clef, duration: shape.duration }
     case 'groove':
       if (!shape.template || !shape.controlCount)
         return { kind: 'annotation', text: 'straight', duration: shape.duration }

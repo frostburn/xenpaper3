@@ -492,6 +492,7 @@ function scaleShape(shape: ScoreShape, factor: Fraction): ScoreShape {
     case 'barline':
     case 'annotation':
     case 'dynamic':
+    case 'clef':
     case 'groove':
       return { ...shape, duration }
     case 'sequence':
@@ -697,6 +698,26 @@ function contextAnnotation(
     })
     .join('; ')
   return { kind: 'annotation', text, duration: new Fraction(0), origins: [origin(node, 'context')] }
+}
+
+function contextShape(
+  node: Extract<Expression, { type: 'PitchContextChange' }>,
+  context: PitchContext,
+): ScoreShape {
+  if (node.statements.some((statement) => statement.type === 'MosDeclaration') && context.mos) {
+    const large = [...context.mos.pattern].filter((step) => step === 'L').length
+    const small = [...context.mos.pattern].filter((step) => step === 's').length
+    return {
+      kind: 'clef',
+      clef:
+        large === 5 && small === 2
+          ? { kind: 'treble' }
+          : { kind: 'diamond-mos', pattern: context.mos.pattern },
+      duration: new Fraction(0),
+      origins: [origin(node, 'context')],
+    }
+  }
+  return contextAnnotation(node)
 }
 
 function playablePitch(
@@ -1109,7 +1130,7 @@ export function evaluateScoreSemantics(
         if (item.type === 'PitchContextChange') {
           try {
             activeContext = applyPitchContextChange(item, activeContext)
-            results.push({ shape: contextAnnotation(item), diagnostics: [] })
+            results.push({ shape: contextShape(item, activeContext), diagnostics: [] })
           } catch (error) {
             results.push({
               diagnostics: [
@@ -1542,7 +1563,12 @@ export function evaluateScoreSemantics(
     }
 
     if (current.type === 'PitchContextChange') {
-      return { shape: contextAnnotation(current), diagnostics: [] }
+      try {
+        const changed = applyPitchContextChange(current, context)
+        return { shape: contextShape(current, changed), diagnostics: [] }
+      } catch {
+        return { shape: contextAnnotation(current), diagnostics: [] }
+      }
     }
     const evaluated = playablePitch(current, context)
     if (!('pitch' in evaluated)) return evaluated

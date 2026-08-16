@@ -14,6 +14,23 @@ function notation(source: string) {
 }
 
 describe('staff notation construction', () => {
+  it('projects MOS declarations to explicit clef events', () => {
+    const evaluated = evaluateScoreShape(parse('MOS{3L4s} J').body[0] as Expression)
+    if (!('shape' in evaluated)) throw new Error('Expected a score shape.')
+    const staff = constructStaffNotationShape(evaluated.shape)
+    if (staff.kind !== 'sequence') throw new Error('Expected a staff sequence.')
+    expect(staff.children[0]).toMatchObject({
+      kind: 'clef',
+      clef: { kind: 'diamond-mos', pattern: 'LsLsLss' },
+    })
+
+    const diatonic = evaluateScoreShape(parse('MOS{5L2s} J').body[0] as Expression)
+    if (!('shape' in diatonic)) throw new Error('Expected a score shape.')
+    const diatonicStaff = constructStaffNotationShape(diatonic.shape)
+    if (diatonicStaff.kind !== 'sequence') throw new Error('Expected a staff sequence.')
+    expect(diatonicStaff.children[0]).toMatchObject({ kind: 'clef', clef: { kind: 'treble' } })
+  })
+
   it('identifies pure ratios only when an active prime mapping distinguishes them', () => {
     const collect = (source: string) => {
       const evaluated = evaluateScoreShape(parse(source).body[0] as Expression)
