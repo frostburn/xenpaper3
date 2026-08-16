@@ -606,10 +606,8 @@ MosElement
   / numerator:UnsignedInteger Spacing ":" Spacing denominator:UnsignedInteger {
       return node('MosHardness', { numerator, denominator });
     }
-  / "<" Spacing numerator:UnsignedInteger
-    denominator:(Spacing "/" Spacing value:UnsignedInteger { return value; })?
-    Spacing ">" {
-      return node('MosEquave', { numerator, denominator: denominator ?? '1' });
+  / "<" Spacing value:AdditiveExpression Spacing ">" {
+      return node('MosEquave', { value });
     }
   / pattern:$([Ls]+) {
       return node('MosAbstractPattern', { pattern });

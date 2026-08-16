@@ -20,6 +20,22 @@ function evaluate(source: string) {
 }
 
 describe('arithmetic expression evaluation', () => {
+  it('retains Diamond-MOS interval spelling when subtracting MOS pitches', () => {
+    const declaration = parse('MOS{5L2s}').body[0]
+    if (declaration.type !== 'PitchContextChange') throw new Error('Expected a MOS declaration.')
+    const context = applyPitchContextChange(declaration)
+    const difference = evaluateExpression(expression('K - J'), context)
+
+    expect(difference.diagnostics).toEqual([])
+    if (!('value' in difference) || difference.value.kind !== 'pitchOffset')
+      throw new Error('Expected a MOS pitch offset.')
+    expect(difference.value.spelling).toMatchObject({
+      quality: 'M',
+      number: 1n,
+      raw: 'M1ms',
+    })
+  })
+
   it('adds cents as pitch displacement', () => {
     const sum = evaluate('700c + 700c')
 

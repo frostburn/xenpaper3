@@ -228,8 +228,7 @@ export interface MosAbstractPattern extends Node {
 
 export interface MosEquave extends Node {
   type: 'MosEquave'
-  numerator: string
-  denominator: string
+  value: Expression
 }
 
 export interface MosHardness extends Node {

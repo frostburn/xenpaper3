@@ -503,9 +503,7 @@ function applyMosDeclaration(declaration: MosDeclaration, context: PitchContext)
     } else if (element.type === 'MosEquave') {
       if (equaveGiven) throw new TypeError('A MOS declaration may only contain one equave.')
       equaveGiven = true
-      equave = Value.pitch(
-        new Value(BigInt(element.numerator), BigInt(element.denominator)),
-      )
+      equave = mosSetterValue(element.value, context)
     } else if (element.type === 'MosStepAssignment') {
       if (assignments.has(element.target))
         throw new TypeError(`MOS step ${element.target} may only be assigned once.`)
@@ -628,6 +626,44 @@ function shifts(modifiers: readonly { kind: string }[]): number {
 
 /** Preserve the diatonic meaning of subtracting two naturally spelled pitches. */
 export function spellPitchDifference(left: AbsolutePitchValue, right: AbsolutePitchValue) {
+  if (left.mos && right.mos && left.mos.context === right.mos.context) {
+    const signedDistance = left.mos.rank - right.mos.rank
+    const distance = Math.abs(signedDistance)
+    const mos = left.mos.context
+    const simple = mmod(distance, mos.degrees.length)
+    const periods = Math.floor(distance / mos.degrees.length)
+    const degree = mos.degrees[simple]!
+    const center = degree.center.add(mos.period.mul(new Value(periods)))
+    let sounding = left.rootOffset.sub(right.rootOffset)
+    if (signedDistance < 0) sounding = sounding.neg()
+    const chroma = mos.large.sub(mos.small).valueOf()
+    const alteration = Math.round(((sounding.valueOf() - center.valueOf()) / chroma) * 2) / 2
+    let quality: string
+    if (degree.imperfect) {
+      if (alteration === 0.5) quality = 'M'
+      else if (alteration === -0.5) quality = 'm'
+      else if (alteration === 0) quality = 'n'
+      else if (alteration > 0.5) quality = 'A'.repeat(Math.round(alteration - 0.5))
+      else quality = 'd'.repeat(Math.round(-alteration - 0.5))
+    } else if (
+      degree.mid &&
+      Math.abs(
+        sounding.valueOf() -
+          degree.mid.add(mos.period.mul(new Value(periods))).valueOf(),
+      ) < 1e-8
+    ) {
+      quality = 'n'
+    } else if (alteration === 0) quality = 'P'
+    else if (alteration > 0) quality = 'A'.repeat(Math.round(alteration))
+    else quality = 'd'.repeat(Math.round(-alteration))
+    return {
+      quality,
+      number: BigInt(distance),
+      raw: `${quality}${distance}ms`,
+      ...(signedDistance < 0 ? { direction: 'descending' as const } : {}),
+    }
+  }
+
   const rank = (spelling: PitchSpelling) => {
     const upper = spelling.nominal.toUpperCase()
     const key = GREEK_SCRIPT[upper] ?? upper
@@ -753,7 +789,10 @@ export function evaluatePitchLiteral(
     const nominal = node.nominal.value.toUpperCase()
     let rootOffset = context.mos.nominals.get(nominal)
     if (!rootOffset) throw new TypeError(`Undefined MOS nominal ${node.nominal.value}.`)
-    const registers = (node.nominal.value === node.nominal.value.toLowerCase() ? 1 : 0) + shifts(node.modifiers)
+    const registers =
+      (node.nominal.value === node.nominal.value.toLowerCase() ? 1 : 0) +
+      shifts(node.modifiers)
+    const nominalRank = [...context.mos.nominals.keys()].indexOf(nominal)
     rootOffset = rootOffset.add(context.mos.equave.mul(new Value(registers)))
     const chroma = context.mos.large.sub(context.mos.small)
     for (const accidental of node.accidentals) {
@@ -772,6 +811,7 @@ export function evaluatePitchLiteral(
     return {
       kind: 'absolutePitch', rootOffset, formula: new Map(),
       spelling: { nominal: node.nominal.value, raw: node.raw, system: 'mos', accidentals: node.accidentals.map(a => a.value), modifiers: node.modifiers.map(m => m.kind) },
+      mos: { rank: nominalRank + registers * context.mos.nominals.size, context: context.mos },
       origins: origin(node),
     }
   }

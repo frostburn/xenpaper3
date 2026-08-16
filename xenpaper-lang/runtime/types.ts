@@ -64,6 +64,11 @@ export interface AbsolutePitchValue {
   readonly formula: PrimeMonzo
   readonly spelling: PitchSpelling
   readonly origins: readonly SourceOrigin[]
+  /** Diamond-MOS ordinal and configuration retained for named pitch subtraction. */
+  readonly mos?: {
+    readonly rank: number
+    readonly context: MosContext
+  }
 }
 
 export type PrimeMonzo = ReadonlyMap<number, Fraction>

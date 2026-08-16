@@ -65,6 +65,10 @@ describe('score-shape timing', () => {
       parse('MOS{5L2s L = 300c s = 100c} J').body[0] as Expression,
     )
     expect(inconsistent.diagnostics[0]?.message).toContain('accumulate to the MOS equave')
+
+    const centsEquave = shape('MOS{5L2s L = 300c s = 100c <1700c>} J j') as SequenceShape
+    const centsEquaveAttacks = centsEquave.children.filter((child) => child.kind === 'attack')
+    expect(Math.round(centsEquaveAttacks[1]!.pitch.value.valueOf())).toBe(1700)
   })
 
   it('broadcasts unary pitch operators over score constructions', () => {
