@@ -447,6 +447,46 @@ const x = (column: number) => 60 + column * 52 + repeatSpaceBefore(column)
 const barlineX = (item: Extract<StaffItem, { kind: 'barline' }>) =>
   x(item.column) - 26 - (repeatMarkerColumns.value.has(item.column) ? repeatMarkerSpace / 2 : 0)
 const y = (position: number) => 100 - (position - 2) * 6
+const diamondMos = computed(() => {
+  for (const item of items.value) {
+    if (item.kind === 'note' && item.pitch.diamondMos) return item.pitch.diamondMos
+  }
+  return undefined
+})
+const mosDegreeCount = computed(() => diamondMos.value?.pattern.length ?? 0)
+const staffLineCount = computed(() =>
+  diamondMos.value ? Math.ceil(mosDegreeCount.value / 2 + 1) : 5,
+)
+const staffLinePositions = computed(() =>
+  Array.from({ length: staffLineCount.value }, (_, index) => index * 2),
+)
+const diamondPositions = computed(() => {
+  if (!diamondMos.value) return []
+  const result: number[] = []
+  const top = staffLinePositions.value[staffLinePositions.value.length - 1] ?? 0
+  for (let position = 0; position <= top; position += mosDegreeCount.value) result.push(position)
+  return result
+})
+const markedMosStep = computed(() => {
+  if (!diamondMos.value) return undefined
+  const pattern = diamondMos.value.pattern
+  const large = [...pattern].filter((step) => step === 'L').length
+  const small = [...pattern].filter((step) => step === 's').length
+  return large <= small ? 'L' : 's'
+})
+const mosBoxPositions = computed(() => {
+  if (!diamondMos.value || !markedMosStep.value) return []
+  const bottom = -1
+  const top = (staffLinePositions.value[staffLinePositions.value.length - 1] ?? 0) + 1
+  const positions: number[] = []
+  for (let position = bottom; position <= top; position++) {
+    const patternIndex =
+      ((position % mosDegreeCount.value) + mosDegreeCount.value) % mosDegreeCount.value
+    if (diamondMos.value.pattern[patternIndex] === markedMosStep.value)
+      positions.push(position + 0.5)
+  }
+  return positions
+})
 const accidental = (value: string) =>
   ({
     flat: '♭',
@@ -590,15 +630,35 @@ const swingBeamCount = (durations: readonly Fraction[], tuplet?: number) =>
   >
     <g class="staff-lines">
       <line
-        v-for="line in 5"
-        :key="line"
+        v-for="position in staffLinePositions"
+        :key="position"
         x1="20"
         :x2="width - 20"
-        :y1="100 - (line - 1) * 12"
-        :y2="100 - (line - 1) * 12"
+        :y1="y(position)"
+        :y2="y(position)"
+        :class="{ 'staff-line--reference': diamondMos && staffLineCount > 5 && position === 0 }"
       />
     </g>
-    <text class="clef" x="25" y="98">𝄞</text>
+    <text v-if="!diamondMos" class="clef" x="25" y="98">𝄞</text>
+    <g v-else class="diamond-clef">
+      <polygon
+        v-for="position in diamondPositions"
+        :key="position"
+        class="diamond-clef__mark"
+        :class="{ 'diamond-clef__mark--middle': position === 0 }"
+        :points="`25,${y(position) - (position === 0 ? 7 : 5)} ${25 + (position === 0 ? 7 : 5)},${y(position)} 25,${y(position) + (position === 0 ? 7 : 5)} ${25 - (position === 0 ? 7 : 5)},${y(position)}`"
+      />
+      <rect
+        v-for="position in mosBoxPositions"
+        :key="`clef-box-${position}`"
+        class="mos-step-box"
+        :class="{ 'mos-step-box--hollow': markedMosStep === 's' }"
+        x="35"
+        :y="y(position) - 3"
+        width="6"
+        height="6"
+      />
+    </g>
     <text v-if="!items.length" class="empty-message" x="70" y="126">No notation loaded</text>
     <g v-for="(ending, index) in endingSpans" :key="`ending-${index}`" class="alternate-ending">
       <path
@@ -778,6 +838,16 @@ const swingBeamCount = (durations: readonly Fraction[], tuplet?: number) =>
             r="2.5"
           />
         </template>
+        <rect
+          v-for="position in mosBoxPositions"
+          :key="`box-${position}`"
+          class="mos-step-box"
+          :class="{ 'mos-step-box--hollow': markedMosStep === 's' }"
+          :x="barlineX(item) + 5"
+          :y="y(position) - 3"
+          width="6"
+          height="6"
+        />
       </g>
       <template v-else>
         <path
@@ -935,6 +1005,21 @@ const swingBeamCount = (durations: readonly Fraction[], tuplet?: number) =>
 .tie {
   stroke: currentColor;
   stroke-width: 1.5;
+}
+
+.staff-lines .staff-line--reference {
+  stroke-width: 3;
+}
+
+.diamond-clef__mark,
+.mos-step-box {
+  fill: currentColor;
+  stroke: currentColor;
+  stroke-width: 1.25;
+}
+
+.mos-step-box--hollow {
+  fill: white;
 }
 
 .grace-tie {

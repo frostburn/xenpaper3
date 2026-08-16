@@ -27,6 +27,31 @@ const notation: StaffNotationShape = {
 }
 
 describe('MusicalStaff', () => {
+  it('renders Diamond-MOS pitches with diamond octave marks and minority-step boxes', () => {
+    const evaluated = evaluateScoreShape(parse('MOS{3L4s} J K L M | N O P j').body[0]!)
+    if (!('shape' in evaluated)) throw new Error('Expected a score shape.')
+    const wrapper = mount(MusicalStaff, {
+      props: { notation: constructStaffNotationShape(evaluated.shape) },
+    })
+
+    expect(wrapper.find('.clef').exists()).toBe(false)
+    expect(wrapper.findAll('.diamond-clef__mark')).toHaveLength(2)
+    expect(wrapper.findAll('.staff-lines line')).toHaveLength(5)
+    expect(wrapper.findAll('.mos-step-box').length).toBeGreaterThan(0)
+    expect(wrapper.findAll('.notehead')).toHaveLength(8)
+  })
+
+  it('extends a large Diamond-MOS staff and bolds a reference line', () => {
+    const evaluated = evaluateScoreShape(parse('MOS{5L4s} J K').body[0]!)
+    if (!('shape' in evaluated)) throw new Error('Expected a score shape.')
+    const wrapper = mount(MusicalStaff, {
+      props: { notation: constructStaffNotationShape(evaluated.shape) },
+    })
+
+    expect(wrapper.findAll('.staff-lines line')).toHaveLength(6)
+    expect(wrapper.findAll('.staff-line--reference')).toHaveLength(1)
+  })
+
   it('labels pure ratios as JI when an active mapping distinguishes them from tempered notes', () => {
     const evaluated = evaluateScoreShape(parse('{12edo}C D E ~9/8 9/8 5/4 pitch(9/8)').body[0]!)
     if (!('shape' in evaluated)) throw new Error('Expected a score shape.')
