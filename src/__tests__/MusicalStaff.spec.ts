@@ -36,9 +36,47 @@ describe('MusicalStaff', () => {
 
     expect(wrapper.find('.clef').exists()).toBe(false)
     expect(wrapper.findAll('.diamond-clef__mark')).toHaveLength(2)
+    expect(wrapper.get('.diamond-clef__mark--middle').classes()).toContain(
+      'diamond-clef__mark--middle',
+    )
+    expect(wrapper.findAll('.diamond-clef__ledger')).toHaveLength(2)
     expect(wrapper.findAll('.staff-lines line')).toHaveLength(5)
     expect(wrapper.findAll('.mos-step-box').length).toBeGreaterThan(0)
     expect(wrapper.findAll('.notehead')).toHaveLength(8)
+  })
+
+  it('preserves conventional staff placement and clefs for diatonic notation', () => {
+    const evaluated = evaluateScoreShape(parse('C MOS{5L2s} J K').body[0]!)
+    if (!('shape' in evaluated)) throw new Error('Expected a score shape.')
+    const wrapper = mount(MusicalStaff, {
+      props: { notation: constructStaffNotationShape(evaluated.shape) },
+    })
+
+    expect(wrapper.findAll('.staff-lines line').map((line) => line.attributes('y1'))).toEqual([
+      '100',
+      '88',
+      '76',
+      '64',
+      '52',
+    ])
+    expect(wrapper.findAll('.clef')).toHaveLength(1)
+    expect(wrapper.findAll('.diamond-clef')).toHaveLength(0)
+  })
+
+  it('changes Diamond-MOS staff guides with the active pattern', () => {
+    const evaluated = evaluateScoreShape(parse('MOS{3L4s} J | MOS{5L4s} J |').body[0]!)
+    if (!('shape' in evaluated)) throw new Error('Expected a score shape.')
+    const wrapper = mount(MusicalStaff, {
+      props: { notation: constructStaffNotationShape(evaluated.shape) },
+    })
+
+    expect(wrapper.findAll('.diamond-clef')).toHaveLength(2)
+    expect(
+      wrapper.findAll('.staff-lines > g').map((segment) => segment.findAll('line').length),
+    ).toEqual([5, 6])
+    expect(
+      wrapper.findAll('.barline').map((barline) => barline.findAll('.mos-step-box--hollow').length),
+    ).toEqual([0, 6])
   })
 
   it('extends a large Diamond-MOS staff and bolds a reference line', () => {

@@ -185,12 +185,17 @@ export function constructStaffNotation(
 
   if (value.kind === 'absolutePitch') {
     if (value.mos) {
+      const isDiatonicMos =
+        [...value.mos.context.pattern].filter((step) => step === 'L').length === 5 &&
+        [...value.mos.context.pattern].filter((step) => step === 's').length === 2
       return {
         staffPosition: value.mos.rank,
         ...decorations(value),
         notehead: 'normal',
         cents,
-        diamondMos: { rank: value.mos.rank, pattern: value.mos.context.pattern },
+        ...(isDiatonicMos
+          ? {}
+          : { diamondMos: { rank: value.mos.rank, pattern: value.mos.context.pattern } }),
       }
     }
     const rawNominal = value.spelling.nominal
