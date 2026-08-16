@@ -51,6 +51,22 @@ describe('score-shape timing', () => {
       { nominal: 'K', system: 'mos', derived: true, accidentals: ['&'] },
       { nominal: 'K', system: 'mos', derived: true, accidentals: ['&'] },
     ])
+
+    const reassociated = shape('MOS{5L2s} {K = root} J + M1ms') as SequenceShape
+    const reassociatedAttack = reassociated.children.find((child) => child.kind === 'attack')
+    expect(reassociatedAttack?.pitch.spelling).toMatchObject({
+      nominal: 'K',
+      accidentals: [],
+    })
+  })
+
+  it('aligns MOS and conventional nominal groups through root associations', () => {
+    const score = shape(`MOS{5L2s 5|1 L=9/8} {K = root} J K L M
+{D = root} C D E F`) as SequenceShape
+    const cents = score.children
+      .filter((child) => child.kind === 'attack')
+      .map((attack) => attack.pitch.value.valueOf())
+    expect(cents.slice(0, 4)).toEqual(cents.slice(4))
   })
 
   it('supports explicit MOS modes, hardness, equaves, and step setters', () => {

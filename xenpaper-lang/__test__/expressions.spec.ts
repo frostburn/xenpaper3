@@ -369,6 +369,26 @@ describe('arithmetic expression evaluation', () => {
     expect(context.rootFrequency.equals(middleC)).toBe(true)
   })
 
+  it('reassociates a Diamond-MOS pitch with the root', () => {
+    const declaration = parse('MOS{5L2s 5|1 L=9/8}').body[0]
+    if (declaration.type !== 'PitchContextChange') throw new Error('Expected a MOS declaration.')
+    const mosContext = applyPitchContextChange(declaration, DEFAULT_PITCH_CONTEXT)
+    const change = parse('{K = root}').body[0]
+    if (change.type !== 'PitchContextChange') throw new Error('Expected a context change.')
+    const context = applyPitchContextChange(change, mosContext)
+    const j = evaluateExpression(expression('J'), context)
+    const k = evaluateExpression(expression('K'), context)
+    if (
+      !('value' in j) ||
+      j.value.kind !== 'absolutePitch' ||
+      !('value' in k) ||
+      k.value.kind !== 'absolutePitch'
+    )
+      throw new Error('Expected pitches.')
+    expect(k.value.rootOffset.equals(Value.cents(0))).toBe(true)
+    expect(j.value.rootOffset.equals(Value.pitch(new Value(8n, 9n)))).toBe(true)
+  })
+
   it('uses a pitch frequency assignment as a root frequency and spelling shorthand', () => {
     const shorthand = parse('{A = 440Hz}').body[0]
     const expanded = parse('{root = 440Hz; A = root}').body[0]

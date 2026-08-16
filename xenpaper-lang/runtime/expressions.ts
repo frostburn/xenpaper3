@@ -147,10 +147,22 @@ function addOrSubtract(
       const naturalOffset = mos.context.nominals
         .get(nominal)!
         .add(mos.context.equave.mul(new Value(registers)))
+      const sourceRegister = Math.floor(mos.rank / nominals.length)
+      const sourceNominal = nominals[mmod(mos.rank, nominals.length)]!
+      const sourceNaturalOffset = mos.context.nominals
+        .get(sourceNominal)!
+        .add(mos.context.equave.mul(new Value(sourceRegister)))
       const chroma = mos.context.large.sub(mos.context.small).valueOf()
-      const halfAlterations = chroma
-        ? Math.round((2 * (rootOffset.valueOf() - naturalOffset.valueOf())) / chroma)
-        : 0
+      const sourceHalfAlterations = (pitch.spelling.accidentals ?? []).reduce(
+        (sum, token) => sum + (token === '&' ? 2 : token === '@' ? -2 : token === 'e' ? 1 : -1),
+        0,
+      )
+      const intervalAlteration = rootOffset
+        .sub(pitch.rootOffset)
+        .sub(naturalOffset.sub(sourceNaturalOffset))
+      const halfAlterations =
+        sourceHalfAlterations +
+        (chroma ? Math.round((2 * intervalAlteration.valueOf()) / chroma) : 0)
       const accidental = halfAlterations > 0 ? '&' : '@'
       const halfAccidental = halfAlterations > 0 ? 'e' : 'a'
       const accidentals: string[] = Array.from(

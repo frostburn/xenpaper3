@@ -802,6 +802,9 @@ export function evaluatePitchLiteral(
       else if (accidental.value === 'a') rootOffset = rootOffset.sub(chroma.div(new Value(2)))
       else throw new TypeError(`Unsupported Diamond-MOS accidental ${accidental.value}.`)
     }
+    if (context.rootPitch.mos?.context === context.mos) {
+      rootOffset = rootOffset.sub(context.rootPitch.rootOffset)
+    }
     for (const modifier of node.modifiers) {
       if (modifier.kind === 'up') rootOffset = rootOffset.add(context.up)
       else if (modifier.kind === 'down') rootOffset = rootOffset.sub(context.up)
