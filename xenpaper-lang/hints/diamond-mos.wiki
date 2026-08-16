@@ -1,0 +1,137 @@
+[[File:Example for wiki intro.png|thumb|alt=|A score in diamond-mos notation.]]
+'''Diamond-mos notation''' is a [[EDO vs ET #Temperament-agnostic EDO paradigms|JI-agnostic]] microtonal notation system designed for writing non-diatonic [[mos]]ses, designed by members of the XA Discord.
+
+So far, all common microtonal notation schemes have been based on the [[5L 2s|diatonic scale]] (e.g. [[ups and downs notation]], [[Sagittal]], [[HEJI]], [[FJS]]). While these existing systems are useful in many contexts, they don't accommodate the logic of non-diatonic mos scales easily, requiring multiple accidentals to write these scales. Rather than restricting the staff to representing the diatonic scale, diamond-mos notation allows the natural notes of the staff to represent the tones of any mos the composer chooses.
+
+Reading sheet music based on non-diatonic mosses could be very confusing and could require a lot of practice and memorization. To mitigate this problem, diamond-mos includes visual aids and redundancies to make reading music in unfamiliar systems easier. Diamonds on the left edge of the staff mark octaves and boxes on the barlines mark the steps of the mos. These symbols enable readers and performers to understand what's going on without needing to spend as much time studying the specific mos.
+
+Diamond-mos notation is designed specifically to visually represent mos logic for compositions using mosses. It does not attempt to be an absolutely universal system that represents every microtonal theoretical school or system. It is designed to be backwards-compatible with standard notation and attempts to keep new symbols and memorization required to a minimum.
+
+== Credits ==
+[[User:SupahstarSaga]] (HEHEHE I AM A SUPAHSTAR SAGA#1163) contributed most of the key ideas and design. [[User:15tonefox]] (Fox Adventure N64#4164), [[User:Godtone]] (osmium#0444) and [[User:Inthar]] (Inthar#5959) contributed design ideas and feedback. SupahstarSaga drew and refined the rasterized accidental PNGs. SupahstarSaga and Inthar wrote this page, with SupahstarSaga contributing the images.
+
+== Concept and score ==
+[[File:Apartment in the Sky Score Opening.png|thumb|478x478px|The top of a score in diamond-mos notation.]]
+Diamond-mos notation is based in a specific tuning (such as an edo) at a given time, written at the top of the score. The naturals on the staff represent a specific mos. The mos pattern is written in large and small steps at the top of the score (if applicable, in edosteps), e.g. "LLsLLsLs" (or "33133131" in the [[hard]] tuning). The natural staff notes are the specific mode written, starting from middle J (which is always equivalent to middle C as discussed in [[#Staff]]).
+
+Diamond-mos notation treats the diatonic mos ([[5L&nbsp;2s]]) as special. If you are using 5L&nbsp;2s, diamond-mos looks like standard music notation. It uses standard clefs, ♯/♭ accidentals, and ABCDEFG note names. If you're using 5L&nbsp;2s, you don't need to write the mos pattern on the score, only the tuning. If you're using an edo that has 5L&nbsp;2s, its notes can be used as an unchanging reference other mosses can be compared against. For example, you might say {{nowrap|"P@ {{=}} B♭"}} to provide a reference for which note P@ is.
+
+When using a non-diatonic mos, the mode you write for notation should be the mode you are writing in. This soft rule allows you to figure out the tonic just by looking at the key signature, as explained later. We call this a soft rule because there are situations where it makes less sense, such as if the tonic is ambiguous or shifting. If you break this rule, we would suggest making a note on the score when you do.
+
+The score should include the text "This score uses the diamond-mos notation standard. Visit xen.wiki for more information." This ensures that someone reading the score can easily find information about how to read it.
+
+It is possible to change the tuning and/or the mos pattern mid-score. Just write the same information you would write at the top of the score at the bar where the change happens.
+
+=== Transposed notation ===
+Some keys in are difficult to read and write, even in relatively small edos. For example, a piece in [[19edo]]'s diatonic key of G♯ major would require a key signature with six sharps and one double sharp. To solve this problem, it is possible to transpose the pitch of the entire score (or a section of a score) to improve readability. The transpose amount and direction is written at the top of the score. For example, writing "1\19 higher than written" would enable you to rewrite a 19edo G♯ major piece as G major. A transposition affects diatonic and non-diatonic notation equally, and J still always equals C.
+
+== Staff ==
+[[File:Diamond-mos 4L3s staff boxes.png|thumb|The diamond-mos staff using the LsLLsLs mode of 4L&nbsp;3s.]]
+When using a mos different from 5L&nbsp;2s, diamond-mos notation does not have traditional clefs. Instead, octaves on the staff are marked with diamonds on the left edge of the staff. The notes marked with diamonds are named J. The large diamond marks "middle J", which is enharmonic to middle C. The point of the diamonds is to provide a visual reference for where the octaves are. It would be difficult to sightread otherwise, especially when using non-heptatonic mosses.
+
+The mos pattern is marked on the score too. On each barline (to the right of the diamonds if it's the leftmost line), little boxes mark the steps of the mos. Hollow boxes represent small mossteps (s) and filled boxes represent large mossteps (L). To avoid clutter, only the small mossteps or the large mossteps are marked. The ones which get marked are the ones the mos has fewer of. (In the case of ''n''L&nbsp;''n''s mosses, either is fine.) The boxes are another tool to make reading the score easier.
+[[File:Diamond-mos ledger lines.png|thumb|Notes with ledger lines on the diamond-mos staff using [[3L&nbsp;4s]].]]
+The boxes on a barline show all of the mos steps the staff covers, including the steps immediately above the top line and below the bottom line. Diamond clefs cover more staff lines than other barlines, so they have more boxes. When notes on the staff use ledger lines, extra boxes may be needed to aid sightreading. If a note has more ledger lines than any other note in the same bar, extra boxes should be attached to the left side of the ledger lines. (You may add boxes to other notes if you feel it's necessary.) However, if the bar has a diamond clef on the left which already has all of the necessary boxes, boxes on ledger lines aren't needed.
+
+The staff can be extended up and down to have more than five lines when using non-diatonic mosses. You should use at least as many staff lines as is required to fit an octave in the staff, which for an ''n''-tone mos is {{nowrap|ceil(''n''/2 + 1)}}. When more than five staff lines are used, at least one of the staff lines should be bolded. The bolded line doesn't represent anything in particular, but provides an extra visual reference for readability.
+
+== Accidentals ==
+[[File:Diamond-mos accidental names table.png|thumb|353x353px|A table of the accidentals in diamond-mos, their text representations, and their spoken names.]]
+There are three types of accidentals in diamond-mos. There are diatonic accidentals (♯, ♭, …), mos accidentals (&, @, …), and ups and downs (^, v, …).
+
+Diatonic accidentals are what you would expect. '''♯''' raises a note by a diatonic chroma, the difference between the diatonic whole tone and semitone. '''♭''' lowers a note by the same amount. '''𝄪''' and '''𝄫''' are the doublings of those. Half-sharp ('''{{demisharp2}}''') and half-flat ('''{{demiflat2}}''') represent changes of half a diatonic chroma, and are only allowed if ♯/♭ represent an even number of edosteps.
+
+Mos accidentals are similar to diatonic accidentals, but for non-diatonic mosses. Mos accidentals are based on the specific mos used. '''&''' (read "am") raises a note by a moschroma, the difference between the large mosstep (L) and the small mosstep (s). '''@''' (read "at") lowers a note by the same amount. '''e''' and '''a''' represent half of & and @ respectively, and are only allowed if &/@ represent an even number of edosteps.
+
+The third type of accidentals are ups and downs. '''^''' raises by one edostep and '''v''' lowers by one edostep. There are double and triple versions, '''^^'''/'''vv''' and '''^^^'''/'''vvv''', which represent movements of two and three edosteps respectively. Ups and downs can be combined with the other two types to create compound accidentals, such as '''^♯''' and '''vv@'''. Note: The ups and downs in diamond-mos do not necessarily follow the same rules as in Kite's original [[ups and downs notation|ups and downs standard]].
+
+The meaning of &/@ accidentals is dependent on the specific mos being used. &/@ have no meaning on the diatonic staff, so are not allowed in that case. Ups and downs can always be used. If the edo has 5L&nbsp;2s, the meaning of ♯/♭ accidentals is fixed, not dependent on any context. However, in a non-diatonic mos context, ♯/♭ have no theoretical significance and could potentially be confusing. We heavily discourage ♯/♭ in a non-diatonic mos context for that reason. However, using them could be useful in very large edos where you need all the accidental options you can get.
+
+When using 5L&nbsp;2s in an edo where t/d are one edostep, we encourage using {{demisharp2}}/{{demiflat2}} instead of ^/v. This is to increase consistency with existing microtonal notation, such as notation for 17edo, 24edo, and 31edo. The same rule does not apply to e/a semi-moschroma accidentals.
+
+A subtle but important feature of the standard is that accidentals are separate from each other and do not stack. '''If a note has an accidental in front, that accidental fully overrides any preceding accidentals.''' For example, if a D with a ♯ is followed by a D with only an ^, the second note is D^, not D^♯.
+
+== Note names ==
+When using a non-diatonic mos, the JKL… note names represent notes of the current mos. Only J has a fixed meaning ({{nowrap|middle J {{=}} middle C}}); the remaining note names depend on both the mos pattern and the current mode of the mos (under our soft rule about what note names mean). For example, when you are writing in the LsLLsLsL mode of 5L3s, the "natural" note names JKLMNOPQ represent the scale LsLLsLsL on J.
+
+== Key signatures ==
+[[File:5L3s LsLLsLsL key signature.png|thumb|298x298px|The 5L&nbsp;3s key signature mentioned in this section.]]
+Transposing the score's notation, as mentioned in the Staff section, can do much of the job of key signatures. For non-diatonic scores which do not change key, we recommend to transpose the score so that the tonic is written as J. This is an especially useful option if the key signature would be very complicated otherwise. For scores which do modulate, however, key signatures are important for showing the relationship between the keys, especially since modulations often mix tones from the two keys as the change happens. Note that transposing the whole score is still an option for scores which modulate. For example, when modulating from the key of J^ to L^, transposing so that the keys are written as J natural and L natural improves readability.
+
+With that out of the way, this is how to make non-diatonic key signatures. To change the tonic, we use the key signature of mos accidentals to indicate how many chroma-positive mos generators the tonic is above {{nowrap|middle J {{=}} middle C}}. (A generator of a mos is called chroma-positive if the ''larger'' intervals in each generic interval class of the mos result from stacking the generator ''upwards''. For example, the chroma-positive generator of [[5L&nbsp;2s]] is the fifth, because the major third is 4 fifths up and the minor third is 3 fifths down.)
+
+For example, if you want to notate the key of D in the 42442424 mode of [[5L&nbsp;3s]] in [[26edo]]:
+* The chroma-positive generator of [[5L&nbsp;3s]] is the subfourth, 461.5¢.
+* D is reached by going 3 subfourth generators up from C.
+* This means that the key signature should have three &'s, notated on the appropriate notes to represent the 42442424 scale on D. 
+
+The new tonic (D) is spelled K in this mode, and the notes will be K L& M N O& P Q& J K. So the key signature will have an & on L, O, and Q.
+
+Similarly if your key is reached by stacking chroma-positive generators down, the number of generators taken to do so is the number of @'s in the key signature.
+
+What notes you put the accidentals on in the key signature will depend on the mode, but the number of accidentals only depends on the number of generators up from {{nowrap|J {{=}} C}}. This rule allows you to figure out the tonic just by counting the accidentals in the key signature.
+
+If your key is not reachable from C by stacking a given generator in the edo (i.e. if the mos generator is contained in an edo subset), the key signature will indicate the number of generators (indicated by &'s or @'s) + the number of edo steps (indicated by shifting every accidental on the key signature by that fixed number of ^/v) the tonic is above C. For example, writing the key of F in 42442424 in 26edo will require one & on Q (to change the tonic from C to F♭), plus an ^ on every note in J…Q (to shift the tonic from F♭ to F). Thus the key signature will be: ^& on Q, ^ on every other note.
+
+The order of the accidentals of the key signature from left to right should follow the generator chain, just like how 12edo key signatures follow the circle of fifths.
+
+=== Altered mosses ===
+[[File:D Ionian v3 v6 v7 (v2).png|alt=|thumb|A key signature representing the altered mos D Ionian v3 v6 v7, e.g. in [[34edo]]. The unmodified D major key signature (two sharps) is readable on the left side of the dotted line, making the tonic apparent.]]
+The mos mode written on the score, and represented by the boxes, must be a pure mos with no alterations. However, there is a way to make altered mos key signatures to avoid cluttering the score with accidentals. First, we write the key signature corresponding to the tonic as if the mos is not altered. This is so that you can still find the tonic just by counting the accidentals. Next, we add the alterations as extra accidentals to the right of the existing ones. There is a dotted line between the pure mos accidentals and the alteration accidentals to improve clarity. The dotted line has the word "ALT" attached below to reinforce its meaning. (If the pure key signature is blank, the dotted line is to the left of the alteration accidentals, with nothing to the left of the dotted line.) As discussed before, all accidentals in diamond-mos completely override any preceding accidentals. This includes alteration accidentals in the key signature.
+
+== Edo superset notation ==
+It is often a good idea to notate small edos as subsets of larger edos. For example, notating 13edo as a subset of 26edo allows you to use ABC notation. To do this for a diamond-mos score, write "13edo, superset 26edo" at the top of the score. For the purposes of notation, the superset edo is the edo the score is in. However, you cannot stray outside the subset edo, because that would not make sense.
+
+Recommended supersets for nondiatonic edos (that are also not multiples of 5 or 7):
+* [[8edo]]: [[24edo]]
+* [[9edo]] and [[18edo]]: [[36edo]]
+* [[11edo]]: [[22edo]]
+* [[13edo]]: [[26edo]]
+* [[16edo]]: [[48edo]]
+* [[23edo]]: [[46edo]]
+
+== Using edo notation to represent non-edo tunings ==
+Diamond-mos notation is based on an edo, but that does not mean it can only represent music in edos. The tones of an edo in diamond-mos can be retuned to any scale of the same size. After the edo, write "Retune [scale]" at the top of the score, with the scale's tones written out explicitly.
+
+If you do not use a tone of the edo at all in the score, you can write "X" in your scale, e.g. "7edo, retune 24:26:X:32:36:39:43:48".
+
+== Sightreading ==
+[[File:Diamond-mos sightreading.png|thumb|An example of sightreading in diamond-mos. This 3-mosstep interval contains two hollow boxes (s). Other 3-mosstep intervals contain only one hollow box, so this interval would be minor if the notes were natural. However, since the upper note is natural and the lower note has @, the interval is one moschroma wider than that. Thus, this interval is a major 3-mosstep.]]
+By looking at the boxes on the staff, you can quickly figure out what the interval between two notes is. What interval class ([[TAMNAMS|2-mosstep]], 3-mosstep, etc) the interval is is easy to see; just count the distance between the notes. From there, look at the boxes on the left of the score contained by the interval. This will tell you what the interval would be if the notes were natural. If the interval contains one more filled box than it could in another position, or one fewer hollow box, it is major. If the interval contains one more hollow box than it could in another position, or one fewer filled box, it is minor. (Generators are called perfect/augmented/diminished, not major and minor, but it is the same idea. Every interval class has at most two sizes.) Finally, look at the accidentals on the notes, including ones implied by the key signature. If the bottom note is natural and the top note has &, for example, the interval is one moschroma wider than the boxes suggest. Remember that a moschroma is the difference between any major interval and its corresponding minor interval.
+
+This method allows you to figure out the size of the interval just from the visual aids on the score. You still have to remember how many edosteps each mos interval is, but that is much less work than memorizing all the interval sizes on every scale degree.
+
+== How to choose between enharmonics ==
+Especially when working in small edos, there will be cases where there is more than one way to write a note. For example, J& and K@ may be enharmonic to each other. The way to choose which to write is similar to how you would make the choice in a 12edo score. The spelling you choose should reflect the mos structure of the piece. More practically speaking, you should choose spellings which lead to arrangements of notes which do not span too many generators. For example, in 12edo diatonic, "B♭ D♭ F" spans four fifths (D♭ A♭ E♭ B♭ F), while "B♭ C♯ F" spans nine fifths.
+
+== Exceptions ==
+* There is an exception to the rule that diamond-mos notation is always based on an edo. There is also the option of specifying a mos tuning which does not come from an edo. At the top of the score, write "Non-edo mos tuning" and specify the exact size of the generator. Instead of writing the mos mode in edosteps, use generic mos pattern notation, e.g. "LLsLsLs". When using non-edo notation, ^/v have no meaning and are disallowed. The only available accidentals are the mos-based &/@/e/a accidentals (or ♯/♭/{{demisharp2}}/{{demiflat2}} if using 5L&nbsp;2s). Since non-edo notation does not use a fixed, finite set of pitches, retuning to an arbitrary scale is disallowed.
+* It is acceptable to treat equal scales (sub-edos of the edo used for notation) as mosses for notation in diamond-mos, for example 9edo in 18edo. In that case, &/@ have no meaning and are disallowed. There are also no boxes on the staff. The only non-altered key signatures allowed are all-up (^) key signatures or similar.
+* It is acceptable to use 5L&nbsp;2s-based notation even for edos where the best fifth is 4\7 or 3\5. This is for consistency with existing microtonal notation that allows this. In the case of 4\7, ♯/♭ technically alter notes by zero edosteps, so they are disallowed. [[TAMNAMS #Step ratio spectrum|Equalized]] and [[TAMNAMS #Step ratio spectrum|collapsed]] tunings are only allowed for 5L&nbsp;2s, not other mosses.
+* It is possible to use non-octave equal tunings and non-octave mosses with diamond-mos. In this case, the diamonds mark the structural [[equave]] (the period or occasionally a multiple of the period). JKL note names repeat at this same equave. Explicitly write out what this equave is along with the tuning and mos pattern.
+* So far, we have assumed that the choice of perfect fifth for the diatonic mos is unambiguous. However, larger edos can have more than one size of interval capable of generating 5L&nbsp;2s. If you're using such an edo, the default fifth used for diatonic notation is the fifth closest to 3/2. If you want to use a different fifth for diatonic notation, write it at the top of the score, e.g. "54edo, diatonic fifth = 31\54".
+
+== Use in software ==
+The raster images of diamond-mos accidentals have been designed and created. A large, transparent png sheet with the accidentals and clefs is available [[:File:Accidentals and clefs PNG for wiki.png|here]]. You can make diamond-mos scores (without playback) entirely in notation software by using these images. There is also the possibility of exporting sheet music without diamond-mos symbols from notation software and then using image editing software to edit the symbols in.
+
+=== MuseScore ===
+Creating a plugin to make diamond-mos scores play back correctly in MuseScore could be very difficult, and there are currently no plans to make one. MuseScore also doesn't support custom accidentals or even importing new musical fonts.
+
+However, you can paste raster images into MuseScore to use it for visual-only diamond-mos scores. [[User:SupahstarSaga|SupahstarSaga]] has made a MuseScore score file from which you can copy diamond-mos symbols and paste them onto your own scores. The file can be downloaded [[:File:Diamond-mos palette.zip|here]]. Making scores this way is tedious but viable.
+
+If you use key signatures in your score, fiddling with the individual accidental images every time you use the key signature would be very tedious. A solution is to combine the diamond clef and the key signature accidentals into a single image and pasting that onto the score. You can make these images by editing from the PNG sheet linked above.
+
+=== Dorico ===
+Dorico supports microtonality, custom tuning systems, and custom accidentals. Diamond-mos notation with playback may be possible in Dorico, at least for heptatonic mosses. Even in Dorico, however, including the diamond clefs and boxes would potentially be difficult. [TODO: Investigate this further.]
+
+== Scores ==
+* [https://www.youtube.com/watch?v=uOsrbFEC6bQ HEHEHE I AM A SUPAHSTAR SAGA - Apartment in the Sky (10edo 3L&nbsp;4s)] ([[:File:Apartment in the Sky diamond-mos.pdf|PDF]])
+* [https://www.youtube.com/watch?v=5r7UctUfAJ8&t=579s HEHEHE I AM A SUPAHSTAR SAGA - Moon (13edo 5L&nbsp;3s)] ([https://drive.google.com/file/d/1TI8-Df_tYx2OI6bahqZtJCe8DFa44P8f PDF])<!--
+* [[:File:WT13C Prelude XII chip.mp3|Inthar - Well-Tempered 13edo Clavier: Prelude XII in F# (13edo 5L&nbsp;3s)]] ([[:File:WT13C Prelude XII.pdf|PDF]])
+* [[:File:WT13C Fugue XII chip.mp3|Inthar - Well-Tempered 13edo Clavier: Fugue XII in F# (13edo 5L&nbsp;3s)]] ([[:File:WT13C Fugue XII.pdf|PDF]])-->
+* [https://www.youtube.com/watch?v=mkSlVrpC7HI&t=221s HEHEHE I AM A SUPAHSTAR SAGA - Aquatic Ambience 18edo cover (18edo 5L&nbsp;3s)] ([https://drive.google.com/file/d/12GwaxfIyxxCOyvYRqN4b3Ra894xL8MmC PDF])
+
+{{Navbox notation}}
+
+[[Category:Notation]]
+[[Category:MOS scale]]
