@@ -516,6 +516,13 @@ const diamondPositions = (config: DiamondMos | undefined) => {
   for (let position = 0; position <= top; position += config.pattern.length) result.push(position)
   return result
 }
+const diamondLedgerPositions = (config: DiamondMos | undefined) => {
+  if (!config) return []
+  const staffPositions = linePositionsFor(config)
+  const bottom = staffPositions[0]!
+  const top = staffPositions[staffPositions.length - 1]!
+  return diamondPositions(config).filter((position) => position < bottom || position > top)
+}
 const markedMosStep = (config: DiamondMos | undefined) => {
   if (!config) return undefined
   const pattern = config.pattern
@@ -697,12 +704,6 @@ const swingBeamCount = (durations: readonly Fraction[], tuplet?: number) =>
           :x2="segment.x2"
           :y1="y(position)"
           :y2="y(position)"
-          :class="{
-            'staff-line--reference':
-              segment.clef.kind === 'diamond-mos' &&
-              linePositionsFor({ rank: 0, pattern: segment.clef.pattern }).length > 5 &&
-              position === 2,
-          }"
         />
       </g>
     </g>
@@ -718,7 +719,7 @@ const swingBeamCount = (durations: readonly Fraction[], tuplet?: number) =>
       </text>
       <g v-else class="diamond-clef">
         <line
-          v-for="position in diamondPositions({ rank: 0, pattern: change.clef.pattern })"
+          v-for="position in diamondLedgerPositions({ rank: 0, pattern: change.clef.pattern })"
           :key="`ledger-${position}`"
           class="diamond-clef__ledger"
           :x1="clefX(change.column, change.implicit) - 11"
@@ -1099,10 +1100,6 @@ const swingBeamCount = (durations: readonly Fraction[], tuplet?: number) =>
 .tie {
   stroke: currentColor;
   stroke-width: 1.5;
-}
-
-.staff-lines .staff-line--reference {
-  stroke-width: 3;
 }
 
 .diamond-clef__mark,

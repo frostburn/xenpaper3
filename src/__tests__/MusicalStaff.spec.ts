@@ -89,7 +89,7 @@ describe('MusicalStaff', () => {
     expect(wrapper.get('.diamond-clef__mark--middle').classes()).toContain(
       'diamond-clef__mark--middle',
     )
-    expect(wrapper.findAll('.diamond-clef__ledger')).toHaveLength(2)
+    expect(wrapper.findAll('.diamond-clef__ledger')).toHaveLength(1)
     expect(wrapper.findAll('.staff-lines line')).toHaveLength(5)
     expect(wrapper.findAll('.mos-step-box').length).toBeGreaterThan(0)
     expect(wrapper.findAll('.notehead')).toHaveLength(8)
@@ -131,15 +131,34 @@ describe('MusicalStaff', () => {
     ).toEqual([0, 5])
   })
 
-  it('extends a large Diamond-MOS staff and bolds a reference line', () => {
-    const evaluated = evaluateScoreShape(parse('MOS{5L4s} J K').body[0]!)
+  it('extends a large Diamond-MOS staff without thickening its bottom line', () => {
+    const evaluated = evaluateScoreShape(parse('MOS{8L2s} J K').body[0]!)
     if (!('shape' in evaluated)) throw new Error('Expected a score shape.')
     const wrapper = mount(MusicalStaff, {
       props: { notation: constructStaffNotationShape(evaluated.shape) },
     })
 
     expect(wrapper.findAll('.staff-lines line')).toHaveLength(6)
-    expect(wrapper.findAll('.staff-line--reference')).toHaveLength(1)
+    expect(wrapper.findAll('.staff-lines line').map((line) => line.attributes('class'))).toEqual([
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+    ])
+  })
+
+  it('only draws Diamond-MOS clef ledgers outside the staff', () => {
+    const evaluated = evaluateScoreShape(parse('MOS{4L3s} J K').body[0]!)
+    if (!('shape' in evaluated)) throw new Error('Expected a score shape.')
+    const wrapper = mount(MusicalStaff, {
+      props: { notation: constructStaffNotationShape(evaluated.shape) },
+    })
+
+    expect(wrapper.findAll('.diamond-clef__mark')).toHaveLength(2)
+    expect(wrapper.findAll('.diamond-clef__ledger')).toHaveLength(1)
+    expect(wrapper.get('.diamond-clef__ledger').attributes('y1')).toBe('112')
   })
 
   it('labels pure ratios as JI when an active mapping distinguishes them from tempered notes', () => {
