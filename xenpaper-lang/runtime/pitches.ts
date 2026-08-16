@@ -7,6 +7,7 @@ import type {
   PitchContextChange,
   PitchLiteral,
   MosIntervalLiteral,
+  MosDeclaration,
 } from '../parser.generated.js'
 import type { Diagnostic } from '../diagnostics'
 import { Value } from '../value'
@@ -231,7 +232,7 @@ export function applyPitchContextChange(
   let context = input
   for (const statement of node.statements) {
     if (statement.type === 'MosDeclaration') {
-      context = applyMosDeclaration(statement.body, context)
+      context = applyMosDeclaration(statement, context)
       continue
     }
     if (statement.type === 'ContextPreset') {
@@ -449,86 +450,104 @@ export function applyPitchContextChange(
   return context
 }
 
-function mosValue(text: string, context: PitchContext): Value {
-  const edo = /^(\d+)\\(\d+)$/.exec(text.trim())
-  if (edo) return Value.equalDivision(Number(edo[1]), Number(edo[2]), new Value(2))
-  const ratio = /^(\d+)\s*\/\s*(\d+)$/.exec(text.trim())
-  if (ratio) return Value.pitch(new Value(BigInt(ratio[1]!), BigInt(ratio[2]!)))
-  const cents = /^(\d+(?:\.\d+)?)c$/.exec(text.trim())
-  if (cents) return Value.cents(Number(cents[1]))
-  throw new TypeError(`Unsupported MOS interval ${text.trim()}.`)
+function mosSetterValue(expression: Expression, context: PitchContext): Value {
+  const evaluated = evaluateExpression(expression, context)
+  if (!('value' in evaluated) || evaluated.value.kind === 'absolutePitch')
+    throw new TypeError('A MOS step assignment requires a pitch interval.')
+  return evaluated.value.kind === 'pitchOffset'
+    ? evaluated.value.value
+    : Value.pitch(evaluated.value.value)
 }
 
-function applyMosDeclaration(body: string, context: PitchContext): PitchContext {
-  const equaveMatch = /<\s*(\d+)(?:\s*\/\s*(\d+))?\s*>/.exec(body)
-  let equave = equaveMatch
-    ? Value.pitch(new Value(BigInt(equaveMatch[1]!), BigInt(equaveMatch[2] ?? '1')))
-    : Value.pitch(new Value(2))
-  let source = body.replace(/<[^>]+>/g, ' ').trim()
-  const assignments = new Map<string, string>()
-  source = source
-    .replace(
-      /(?:^|\s)(\^|\/|L|s)\s*=\s*([^;]+?)(?=\s+(?:\^|\/|L|s)\s*=|;|$)/g,
-      (_m, key, value) => {
-        assignments.set(key, value.trim())
-        return ' '
-      },
-    )
-    .trim()
-  if (!source) {
-    if (!context.mos) throw new TypeError('A MOS step setter requires an active MOS declaration.')
-    if (!assignments.has('L') && !assignments.has('s')) {
-      return {
-        ...context,
-        up: assignments.has('^') ? mosValue(assignments.get('^')!, context) : context.up,
-        lift: assignments.has('/') ? mosValue(assignments.get('/')!, context) : context.lift,
-      }
-    }
-    source = context.mos.pattern
-    equave = context.mos.equave
-  }
-
-  let pattern: string
+function applyMosDeclaration(declaration: MosDeclaration, context: PitchContext): PitchContext {
+  let equave = Value.pitch(new Value(2))
+  let equaveGiven = false
+  let pattern: string | undefined
+  let counts: { large: number; small: number } | undefined
+  let udp: { up: number; down: number; period?: number } | undefined
   let hardnessNumerator = 2
   let hardnessDenominator = 1
-  const countPattern =
-    /^(\d+)L\s*(\d+)s(?:\s+(\d+)\s*\|\s*(\d+)(?:\s*\((\d+)\))?)?(?:\s+(\d+)\s*:\s*(\d+))?$/.exec(
-      source,
-    )
-  if (countPattern) {
-    const largeCount = Number(countPattern[1])
-    const smallCount = Number(countPattern[2])
-    const options: { up?: number; down?: number } = {}
-    if (countPattern[3]) {
-      const period = gcd(largeCount, smallCount)
-      if (countPattern[5] && Number(countPattern[5]) !== period)
-        throw new TypeError('MOS period must be consistent with the step counts.')
-      options.up = Number(countPattern[3])
-      options.down = Number(countPattern[4])
+  let hardnessGiven = false
+  const assignments = new Map<string, Value>()
+
+  for (const element of declaration.elements) {
+    if (element.type === 'MosPatternCounts') {
+      if (pattern || counts) throw new TypeError('A MOS declaration may only contain one mode.')
+      counts = { large: Number(element.large), small: Number(element.small) }
+    } else if (element.type === 'MosAbstractPattern') {
+      if (pattern || counts) throw new TypeError('A MOS declaration may only contain one mode.')
+      pattern = element.pattern
+    } else if (element.type === 'MosIntegerPattern') {
+      if (pattern || counts) throw new TypeError('A MOS declaration may only contain one mode.')
+      const parts = element.values.map(Number)
+      const low = Math.min(...parts)
+      const high = Math.max(...parts)
+      if (low === high) throw new TypeError('A MOS pattern requires two step sizes.')
+      pattern = parts.map((part) => (part === high ? 'L' : part === low ? 's' : '?')).join('')
+      if (pattern.includes('?')) throw new TypeError('A MOS pattern requires exactly two step sizes.')
+      hardnessNumerator = high
+      hardnessDenominator = low
+      hardnessGiven = true
+    } else if (element.type === 'MosHardness') {
+      if (hardnessGiven) throw new TypeError('A MOS declaration may only contain one hardness.')
+      hardnessNumerator = Number(element.numerator)
+      hardnessDenominator = Number(element.denominator)
+      hardnessGiven = true
+    } else if (element.type === 'MosUdp') {
+      if (udp) throw new TypeError('A MOS declaration may only contain one UD(P) selection.')
+      udp = {
+        up: Number(element.up),
+        down: Number(element.down),
+        ...(element.period ? { period: Number(element.period) } : {}),
+      }
+    } else if (element.type === 'MosEquave') {
+      if (equaveGiven) throw new TypeError('A MOS declaration may only contain one equave.')
+      equaveGiven = true
+      equave = Value.pitch(
+        new Value(BigInt(element.numerator), BigInt(element.denominator)),
+      )
+    } else if (element.type === 'MosStepAssignment') {
+      if (assignments.has(element.target))
+        throw new TypeError(`MOS step ${element.target} may only be assigned once.`)
+      assignments.set(element.target, mosSetterValue(element.value, context))
     }
-    pattern = stepString(largeCount, smallCount, options)
-    if (countPattern[6])
-      [hardnessNumerator, hardnessDenominator] = [
-        Number(countPattern[6]),
-        Number(countPattern[7]),
-      ]
-  } else if (/^[Ls]+$/.test(source)) pattern = source
-  else {
-    const parts = source.includes(',') ? source.split(',').map(Number) : [...source].map(Number)
-    if (parts.length < 2 || parts.some((part) => !Number.isFinite(part)))
-      throw new TypeError('Invalid MOS step pattern.')
-    const low = Math.min(...parts)
-    const high = Math.max(...parts)
-    if (low === high) throw new TypeError('A MOS pattern requires two step sizes.')
-    pattern = parts.map((part) => (part === high ? 'L' : part === low ? 's' : '?')).join('')
-    if (pattern.includes('?')) throw new TypeError('A MOS pattern requires exactly two step sizes.')
-    hardnessNumerator = high
-    hardnessDenominator = low
+  }
+
+  const preserveOperators = !counts && !pattern && !hardnessGiven && !equaveGiven && !udp
+
+  if (
+    !counts &&
+    !pattern &&
+    !hardnessGiven &&
+    !equaveGiven &&
+    !udp &&
+    !assignments.has('L') &&
+    !assignments.has('s')
+  ) {
+    if (!context.mos) throw new TypeError('A MOS step setter requires an active MOS declaration.')
+    return {
+      ...context,
+      up: assignments.get('^') ?? context.up,
+      lift: assignments.get('/') ?? context.lift,
+    }
+  }
+
+  if (counts) {
+    if (udp?.period !== undefined && udp.period !== gcd(counts.large, counts.small))
+      throw new TypeError('MOS period must be consistent with the step counts.')
+    pattern = stepString(counts.large, counts.small, udp)
+  } else if (udp) {
+    throw new TypeError('UD(P) selection requires a large/small count pattern.')
+  }
+  if (!pattern) {
+    if (!context.mos) throw new TypeError('A MOS declaration requires a mode.')
+    pattern = context.mos.pattern
+    if (!equaveGiven) equave = context.mos.equave
   }
   const countL = [...pattern].filter(x => x === 'L').length
   const countS = pattern.length - countL
-  let large = assignments.has('L') ? mosValue(assignments.get('L')!, context) : undefined
-  let small = assignments.has('s') ? mosValue(assignments.get('s')!, context) : undefined
+  let large = assignments.get('L')
+  let small = assignments.get('s')
   if (!large && !small) {
     const host = countL * hardnessNumerator + countS * hardnessDenominator
     large = Value.equalDivision(hardnessNumerator, host, Value.ratio(equave))
@@ -546,7 +565,6 @@ function applyMosDeclaration(body: string, context: PitchContext): PitchContext 
     large!.mul(new Value(monzo[0])).add(small!.mul(new Value(monzo[1])))
   const nominals = new Map<string, Value>()
   for (const [nominal, monzo] of notation.scale) nominals.set(nominal, realize(monzo))
-  const chroma = large!.sub(small!)
   const degrees = notation.degrees.map((degree) => ({
     center: realize(degree.center),
     imperfect: !degree.perfect,
@@ -569,14 +587,18 @@ function applyMosDeclaration(body: string, context: PitchContext): PitchContext 
     degrees: [...offsets.slice(1), equave],
     degreeEquave: equave,
     up: assignments.has('^')
-      ? mosValue(assignments.get('^')!, context)
+      ? assignments.get('^')!
+      : preserveOperators
+        ? context.up
       : Value.equalDivision(
           1,
           countL * hardnessNumerator + countS * hardnessDenominator,
           Value.ratio(equave),
         ),
     lift: assignments.has('/')
-      ? mosValue(assignments.get('/')!, context)
+      ? assignments.get('/')!
+      : preserveOperators
+        ? context.lift
       : Value.equalDivision(
           5,
           countL * hardnessNumerator + countS * hardnessDenominator,

@@ -126,6 +126,27 @@ describe('enumerated chords', () => {
 })
 
 describe('Diamond-MOS tokens', () => {
+  it('parses the MOS sub-language structurally in any element order', () => {
+    const elements = (source: string) =>
+      (parse(source).body[0] as { statements: { elements: { type: string }[] }[] }).statements[0]!
+        .elements
+
+    expect(elements('MOS{5L2s 3:2 2|4}').map((element) => element.type)).toEqual([
+      'MosPatternCounts',
+      'MosHardness',
+      'MosUdp',
+    ])
+    expect(elements('MOS{2|4 5L2s 3:2}').map((element) => element.type)).toEqual([
+      'MosUdp',
+      'MosPatternCounts',
+      'MosHardness',
+    ])
+    expect(elements('MOS{4L5s<3>}').map((element) => element.type)).toEqual([
+      'MosPatternCounts',
+      'MosEquave',
+    ])
+  })
+
   it('does not consume ordinary identifiers as multi-letter MOS pitches', () => {
     expect(parse('@test(sqrt(2))').body[0]).toMatchObject({
       type: 'Directive',

@@ -37,6 +37,14 @@ describe('score-shape timing', () => {
   })
 
   it('supports explicit MOS modes, hardness, equaves, and step setters', () => {
+    const ordered = shape('MOS{5L2s 3:2 2|4} J K') as SequenceShape
+    const reordered = shape('MOS{2|4 3:2 5L2s} J K') as SequenceShape
+    const attackCents = (score: SequenceShape) =>
+      score.children
+        .filter((child) => child.kind === 'attack')
+        .map((attack) => attack.pitch.value.valueOf())
+    expect(attackCents(reordered)).toEqual(attackCents(ordered))
+
     const hard = shape('MOS{5L 2s 3:1} J K') as SequenceShape
     const attacks = hard.children.filter((child) => child.kind === 'attack')
     expect(Math.round(attacks[1]!.pitch.value.valueOf())).toBe(212)

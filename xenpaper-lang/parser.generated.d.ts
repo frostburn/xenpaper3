@@ -208,8 +208,58 @@ export interface MosIntervalLiteral extends Node {
 
 export interface MosDeclaration extends Node {
   type: 'MosDeclaration'
-  body: string
+  elements: MosElement[]
   raw: string
+}
+
+export type MosElement =
+  | MosAbstractPattern
+  | MosEquave
+  | MosHardness
+  | MosIntegerPattern
+  | MosPatternCounts
+  | MosStepAssignment
+  | MosUdp
+
+export interface MosAbstractPattern extends Node {
+  type: 'MosAbstractPattern'
+  pattern: string
+}
+
+export interface MosEquave extends Node {
+  type: 'MosEquave'
+  numerator: string
+  denominator: string
+}
+
+export interface MosHardness extends Node {
+  type: 'MosHardness'
+  numerator: string
+  denominator: string
+}
+
+export interface MosIntegerPattern extends Node {
+  type: 'MosIntegerPattern'
+  values: string[]
+}
+
+export interface MosPatternCounts extends Node {
+  type: 'MosPatternCounts'
+  large: string
+  small: string
+}
+
+export interface MosStepAssignment extends Node {
+  type: 'MosStepAssignment'
+  target: '^' | '/' | 'L' | 's'
+  value: Expression
+}
+
+export interface MosUdp extends Node {
+  type: 'MosUdp'
+  up: string
+  down: string
+  period: string | null
 }
 
 export interface MappingLiteral extends Node {

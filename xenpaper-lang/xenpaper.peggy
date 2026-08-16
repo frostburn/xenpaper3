@@ -579,14 +579,52 @@ MosIntervalLiteral
       return node('MosIntervalLiteral', { modifiers: [], quality, degree, raw: text() });
     }
 
-// MOS has its own compact language.  Keeping its body raw here deliberately
-// isolates it from score-expression whitespace and comma rules.
 MosDeclaration
-  = "MOS" !IdentifierContinue Spacing "{" body:$([^}]*) "}" {
+  = "MOS" !IdentifierContinue Spacing "{" Spacing
+    elements:MosElementList? Spacing "}" {
       return node('PitchContextChange', {
-        statements: [node('MosDeclaration', { body, raw: text() })],
+        statements: [node('MosDeclaration', { elements: elements ?? [], raw: text() })],
       });
     }
+
+MosElementList
+  = first:MosElement rest:(Spacing element:MosElement { return element; })* {
+      return [first, ...rest];
+    }
+
+MosElement
+  = target:$("^" / "/" / "L" / "s") Spacing "=" Spacing value:MosSetterValue {
+      return node('MosStepAssignment', { target, value });
+    }
+  / large:UnsignedInteger "L" Spacing small:UnsignedInteger "s" {
+      return node('MosPatternCounts', { large, small });
+    }
+  / up:UnsignedInteger Spacing "|" Spacing down:UnsignedInteger
+    period:(Spacing "(" Spacing value:UnsignedInteger Spacing ")" { return value; })? {
+      return node('MosUdp', { up, down, period: period ?? null });
+    }
+  / numerator:UnsignedInteger Spacing ":" Spacing denominator:UnsignedInteger {
+      return node('MosHardness', { numerator, denominator });
+    }
+  / "<" Spacing numerator:UnsignedInteger
+    denominator:(Spacing "/" Spacing value:UnsignedInteger { return value; })?
+    Spacing ">" {
+      return node('MosEquave', { numerator, denominator: denominator ?? '1' });
+    }
+  / pattern:$([Ls]+) {
+      return node('MosAbstractPattern', { pattern });
+    }
+  / first:UnsignedInteger rest:(Spacing "," Spacing value:UnsignedInteger { return value; })+ {
+      return node('MosIntegerPattern', { values: [first, ...rest] });
+    }
+  / pattern:$([0-9]+) {
+      return node('MosIntegerPattern', { values: [...pattern] });
+    }
+
+MosSetterValue
+  = EqualDivisionLiteral
+  / RatioLiteral
+  / QuantityLiteral
 
 IntervalQuality
   = $("S" "A"+ / "s" "d"+ / "A"+ / "d"+ / "P" / "M" / "m" / "n")
