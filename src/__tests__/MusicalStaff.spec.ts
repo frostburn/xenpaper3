@@ -43,6 +43,8 @@ describe('MusicalStaff', () => {
     expect(wrapper.findAll('.staff-lines line')).toHaveLength(5)
     expect(wrapper.findAll('.mos-step-box').length).toBeGreaterThan(0)
     expect(wrapper.findAll('.notehead')).toHaveLength(8)
+    expect(wrapper.findAll('.notehead')[0]!.attributes('cy')).toBe('112')
+    expect(wrapper.findAll('.staff-lines line')[0]!.attributes('y1')).toBe('100')
   })
 
   it('preserves conventional staff placement and clefs for diatonic notation', () => {
@@ -76,7 +78,7 @@ describe('MusicalStaff', () => {
     ).toEqual([5, 6])
     expect(
       wrapper.findAll('.barline').map((barline) => barline.findAll('.mos-step-box--hollow').length),
-    ).toEqual([0, 6])
+    ).toEqual([0, 5])
   })
 
   it('extends a large Diamond-MOS staff and bolds a reference line', () => {

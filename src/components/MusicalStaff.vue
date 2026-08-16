@@ -471,8 +471,9 @@ const mosDegreeCount = computed(() =>
   Math.max(0, ...diamondMosChanges.value.map(({ config }) => config.pattern.length)),
 )
 const linePositionsFor = (config?: DiamondMos) =>
-  Array.from({ length: config ? Math.ceil(config.pattern.length / 2 + 1) : 5 }, (_, index) =>
-    config ? index * 2 : index * 2 + 2,
+  Array.from(
+    { length: config ? Math.ceil(config.pattern.length / 2 + 1) : 5 },
+    (_, index) => index * 2 + 2,
   )
 const staffLinePositions = computed(() =>
   linePositionsFor(
@@ -507,12 +508,12 @@ const markedMosStep = (config: DiamondMos | undefined) => {
   const small = [...pattern].filter((step) => step === 's').length
   return large <= small ? 'L' : 's'
 }
-const mosBoxPositions = (config: DiamondMos | undefined) => {
+const mosBoxPositions = (config: DiamondMos | undefined, extended = false) => {
   const marked = markedMosStep(config)
   if (!config || !marked) return []
-  const bottom = -1
   const positionsForConfig = linePositionsFor(config)
-  const top = (positionsForConfig[positionsForConfig.length - 1] ?? 0) + 1
+  const bottom = extended ? -1 : positionsForConfig[0]! - 1
+  const top = (positionsForConfig[positionsForConfig.length - 1] ?? 0) + (extended ? 1 : 0)
   const positions: number[] = []
   for (let position = bottom; position <= top; position++) {
     const patternIndex =
@@ -680,7 +681,8 @@ const swingBeamCount = (durations: readonly Fraction[], tuplet?: number) =>
             :y2="y(position)"
             :class="{
               'staff-line--reference':
-                linePositionsFor(segment.config).length > 5 && position === 0,
+                linePositionsFor(segment.config).length > 5 &&
+                position === linePositionsFor(segment.config)[0],
             }"
           />
         </g>
@@ -719,7 +721,7 @@ const swingBeamCount = (durations: readonly Fraction[], tuplet?: number) =>
           :points="`${clefX(change.column, changeIndex)},${y(position) - (position === 0 ? 7 : 5)} ${clefX(change.column, changeIndex) + (position === 0 ? 7 : 5)},${y(position)} ${clefX(change.column, changeIndex)},${y(position) + (position === 0 ? 7 : 5)} ${clefX(change.column, changeIndex) - (position === 0 ? 7 : 5)},${y(position)}`"
         />
         <rect
-          v-for="position in mosBoxPositions(change.config)"
+          v-for="position in mosBoxPositions(change.config, true)"
           :key="`clef-box-${position}`"
           class="mos-step-box"
           :class="{ 'mos-step-box--hollow': markedMosStep(change.config) === 's' }"
