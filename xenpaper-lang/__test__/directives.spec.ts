@@ -12,6 +12,16 @@ const notes = (source: string) => {
 }
 
 describe('directive runtime', () => {
+  it.each(['@clef()', '@clef(alto)', '@clef(bass, treble)'])(
+    'diagnoses invalid clef directive %s',
+    (source) => {
+      const result = compile(`${source} C`)
+      expect(result.diagnostics).toContainEqual(
+        expect.objectContaining({ code: 'XP_DIRECTIVE', severity: 'error' }),
+      )
+    },
+  )
+
   it('shortens sounding notes without changing their rhythmic spacing', () => {
     const result = compile('@art(50%) 0 1 2 3')
     if (!('score' in result)) throw new Error('Expected score.')

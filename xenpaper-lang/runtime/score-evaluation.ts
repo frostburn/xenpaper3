@@ -1210,7 +1210,14 @@ export function evaluateScoreSemantics(
                       duration: new Fraction(0),
                       origins: [origin(item, 'directive')],
                     }
-                  : sequence([], [origin(item, 'directive')])
+                  : directive?.kind === 'clef'
+                    ? {
+                        kind: 'clef',
+                        clef: directive.clef,
+                        duration: new Fraction(0),
+                        origins: [origin(item, 'directive')],
+                      }
+                    : sequence([], [origin(item, 'directive')])
           results.push({ shape, diagnostics: resolved.diagnostics })
           continue
         }
