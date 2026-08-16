@@ -113,10 +113,26 @@ function addOrSubtract(
     if (pitch.kind !== 'absolutePitch') throw new TypeError('Expected an absolute pitch.')
     const offset = pitchCoercion(left.kind === 'absolutePitch' ? right : left)
     const spelling = transposePitchSpelling(pitch.spelling, offset.spelling, subtract)
+    const rootOffset = subtract
+      ? pitch.rootOffset.sub(offset.value)
+      : pitch.rootOffset.add(offset.value)
     let mos = pitch.mos
     let mosSpelling
     if (mos && offset.spelling?.raw.endsWith('ms')) {
-      let steps = Number(offset.spelling.number.valueOf())
+      const mosContext = mos.context
+      const registerSteps = (offset.spelling.modifiers ?? []).reduce(
+        (sum, modifier) =>
+          sum +
+          (modifier === 'equaveUp'
+            ? mosContext.nominals.size
+            : modifier === 'doubleEquaveUp'
+              ? 2 * mosContext.nominals.size
+              : modifier === 'equaveDown'
+                ? -mosContext.nominals.size
+                : 0),
+        0,
+      )
+      let steps = Number(offset.spelling.number.valueOf()) + registerSteps
       if (offset.spelling.direction === 'descending') steps = -steps
       if (subtract) steps = -steps
       const rank = mos.rank + steps
@@ -128,12 +144,27 @@ function addOrSubtract(
             registers > 0 ? 'equaveUp' : 'equaveDown',
           )
         : undefined
+      const naturalOffset = mos.context.nominals
+        .get(nominal)!
+        .add(mos.context.equave.mul(new Value(registers)))
+      const chroma = mos.context.large.sub(mos.context.small).valueOf()
+      const halfAlterations = chroma
+        ? Math.round((2 * (rootOffset.valueOf() - naturalOffset.valueOf())) / chroma)
+        : 0
+      const accidental = halfAlterations > 0 ? '&' : '@'
+      const halfAccidental = halfAlterations > 0 ? 'e' : 'a'
+      const accidentals: string[] = Array.from(
+        { length: Math.floor(Math.abs(halfAlterations) / 2) },
+        () => accidental,
+      )
+      if (Math.abs(halfAlterations) % 2) accidentals.push(halfAccidental)
       mos = { ...mos, rank }
       mosSpelling = {
         nominal,
         raw: nominal,
         system: 'mos' as const,
         derived: true,
+        accidentals,
         ...(modifiers ? { modifiers } : {}),
       }
     }
@@ -151,9 +182,7 @@ function addOrSubtract(
     }
     return {
       ...pitch,
-      rootOffset: subtract
-        ? pitch.rootOffset.sub(offset.value)
-        : pitch.rootOffset.add(offset.value),
+      rootOffset,
       ...(formula ? { formula } : {}),
       ...(mosSpelling ? { spelling: mosSpelling } : spelling ? { spelling } : {}),
       ...(mos ? { mos } : {}),

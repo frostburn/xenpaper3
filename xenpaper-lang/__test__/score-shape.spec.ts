@@ -42,10 +42,15 @@ describe('score-shape timing', () => {
       pitch: { value: expect.any(Value) },
     })
 
-    const transposed = shape('MOS{5L2s} J + M1ms') as SequenceShape
-    const attack = transposed.children.find((child) => child.kind === 'attack')
-    expect(attack?.pitch.mos).toMatchObject({ rank: 1 })
-    expect(attack?.pitch.spelling).toMatchObject({ nominal: 'K', system: 'mos', derived: true })
+    const transposed = shape("MOS{5L2s} J + M1ms J + 'M1ms J + A1ms J& + M1ms") as SequenceShape
+    const attacks = transposed.children.filter((child) => child.kind === 'attack')
+    expect(attacks.map((attack) => attack.pitch.mos?.rank)).toEqual([1, 8, 1, 1])
+    expect(attacks.map((attack) => attack.pitch.spelling)).toMatchObject([
+      { nominal: 'K', system: 'mos', derived: true, accidentals: [] },
+      { nominal: 'K', system: 'mos', derived: true, modifiers: ['equaveUp'], accidentals: [] },
+      { nominal: 'K', system: 'mos', derived: true, accidentals: ['&'] },
+      { nominal: 'K', system: 'mos', derived: true, accidentals: ['&'] },
+    ])
   })
 
   it('supports explicit MOS modes, hardness, equaves, and step setters', () => {
