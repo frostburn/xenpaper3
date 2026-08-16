@@ -36,6 +36,18 @@ describe('score-shape timing', () => {
     expect(perfectOffsets).toEqual([500, 700])
   })
 
+  it('associates and transposes Diamond-MOS pitches by their written rank', () => {
+    const associated = shape('MOS{5L2s} {K = root} K') as SequenceShape
+    expect(associated.children.find((child) => child.kind === 'attack')).toMatchObject({
+      pitch: { value: expect.any(Value) },
+    })
+
+    const transposed = shape('MOS{5L2s} J + M1ms') as SequenceShape
+    const attack = transposed.children.find((child) => child.kind === 'attack')
+    expect(attack?.pitch.mos).toMatchObject({ rank: 1 })
+    expect(attack?.pitch.spelling).toMatchObject({ nominal: 'K', system: 'mos', derived: true })
+  })
+
   it('supports explicit MOS modes, hardness, equaves, and step setters', () => {
     const ordered = shape('MOS{5L2s 3:2 2|4} J K') as SequenceShape
     const reordered = shape('MOS{2|4 3:2 5L2s} J K') as SequenceShape
@@ -181,9 +193,7 @@ describe('score-shape timing', () => {
       .filter((child) => child.kind === 'attack')
       .map((attack) => attack.pitch.value.valueOf())
 
-    ;[0, 2, 4].forEach((degree, index) =>
-      expect(pitches[index]).toBeCloseTo((degree * 1200) / 19),
-    )
+    ;[0, 2, 4].forEach((degree, index) => expect(pitches[index]).toBeCloseTo((degree * 1200) / 19))
   })
 
   it('defines future scales with degrees from the current scale', () => {

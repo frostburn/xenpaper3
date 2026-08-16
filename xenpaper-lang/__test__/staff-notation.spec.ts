@@ -31,6 +31,16 @@ describe('staff notation construction', () => {
     expect(diatonicStaff.children[0]).toMatchObject({ kind: 'clef', clef: { kind: 'treble' } })
   })
 
+  it('restores a treble clef when a preset leaves Diamond-MOS context', () => {
+    const evaluated = evaluateScoreShape(parse('MOS{3L4s} J {12edo} C').body[0] as Expression)
+    if (!('shape' in evaluated)) throw new Error('Expected a score shape.')
+    const staff = constructStaffNotationShape(evaluated.shape)
+    if (staff.kind !== 'sequence') throw new Error('Expected a staff sequence.')
+    expect(
+      staff.children.filter((child) => child.kind === 'clef').map((child) => child.clef),
+    ).toEqual([{ kind: 'diamond-mos', pattern: 'LsLsLss' }, { kind: 'treble' }])
+  })
+
   it('projects @clef directives to conventional clef events', () => {
     const evaluated = evaluateScoreShape(
       parse('@clef(bass) C D E @clef(treble) F G').body[0] as Expression,

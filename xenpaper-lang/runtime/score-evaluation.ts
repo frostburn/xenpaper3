@@ -703,6 +703,7 @@ function contextAnnotation(
 function contextShape(
   node: Extract<Expression, { type: 'PitchContextChange' }>,
   context: PitchContext,
+  previousContext?: PitchContext,
 ): ScoreShape {
   if (node.statements.some((statement) => statement.type === 'MosDeclaration') && context.mos) {
     const large = [...context.mos.pattern].filter((step) => step === 'L').length
@@ -713,6 +714,14 @@ function contextShape(
         large === 5 && small === 2
           ? { kind: 'treble' }
           : { kind: 'diamond-mos', pattern: context.mos.pattern },
+      duration: new Fraction(0),
+      origins: [origin(node, 'context')],
+    }
+  }
+  if (previousContext?.mos && !context.mos) {
+    return {
+      kind: 'clef',
+      clef: { kind: 'treble' },
       duration: new Fraction(0),
       origins: [origin(node, 'context')],
     }
@@ -1129,8 +1138,12 @@ export function evaluateScoreSemantics(
       for (const item of current.items) {
         if (item.type === 'PitchContextChange') {
           try {
+            const previousContext = activeContext
             activeContext = applyPitchContextChange(item, activeContext)
-            results.push({ shape: contextShape(item, activeContext), diagnostics: [] })
+            results.push({
+              shape: contextShape(item, activeContext, previousContext),
+              diagnostics: [],
+            })
           } catch (error) {
             results.push({
               diagnostics: [
@@ -1572,7 +1585,7 @@ export function evaluateScoreSemantics(
     if (current.type === 'PitchContextChange') {
       try {
         const changed = applyPitchContextChange(current, context)
-        return { shape: contextShape(current, changed), diagnostics: [] }
+        return { shape: contextShape(current, changed, context), diagnostics: [] }
       } catch {
         return { shape: contextAnnotation(current), diagnostics: [] }
       }

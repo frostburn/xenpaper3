@@ -113,6 +113,30 @@ function addOrSubtract(
     if (pitch.kind !== 'absolutePitch') throw new TypeError('Expected an absolute pitch.')
     const offset = pitchCoercion(left.kind === 'absolutePitch' ? right : left)
     const spelling = transposePitchSpelling(pitch.spelling, offset.spelling, subtract)
+    let mos = pitch.mos
+    let mosSpelling
+    if (mos && offset.spelling?.raw.endsWith('ms')) {
+      let steps = Number(offset.spelling.number.valueOf())
+      if (offset.spelling.direction === 'descending') steps = -steps
+      if (subtract) steps = -steps
+      const rank = mos.rank + steps
+      const nominals = [...mos.context.nominals.keys()]
+      const nominal = nominals[((rank % nominals.length) + nominals.length) % nominals.length]!
+      const registers = Math.floor(rank / nominals.length)
+      const modifiers = registers
+        ? Array.from({ length: Math.abs(registers) }, () =>
+            registers > 0 ? 'equaveUp' : 'equaveDown',
+          )
+        : undefined
+      mos = { ...mos, rank }
+      mosSpelling = {
+        nominal,
+        raw: nominal,
+        system: 'mos' as const,
+        derived: true,
+        ...(modifiers ? { modifiers } : {}),
+      }
+    }
     const formula = offset.formula
       ? new Map([...pitch.formula].map(([prime, exponent]) => [prime, new Fraction(exponent)]))
       : undefined
@@ -127,9 +151,12 @@ function addOrSubtract(
     }
     return {
       ...pitch,
-      rootOffset: subtract ? pitch.rootOffset.sub(offset.value) : pitch.rootOffset.add(offset.value),
+      rootOffset: subtract
+        ? pitch.rootOffset.sub(offset.value)
+        : pitch.rootOffset.add(offset.value),
       ...(formula ? { formula } : {}),
-      ...(spelling ? { spelling } : {}),
+      ...(mosSpelling ? { spelling: mosSpelling } : spelling ? { spelling } : {}),
+      ...(mos ? { mos } : {}),
       origins,
     }
   }
