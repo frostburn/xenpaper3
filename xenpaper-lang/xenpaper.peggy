@@ -651,7 +651,7 @@ MosPitchLiteral
     }
 
 MosPitchNominal
-  = value:$([Jj][J-Zj-z]) {
+  = value:$([J-Zj-z][J-Zj-z]) {
       return node('PitchNominal', { system: 'mos', value });
     }
   / value:$([J-Zj-z]) {

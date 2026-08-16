@@ -158,11 +158,17 @@ describe('Diamond-MOS tokens', () => {
     })
   })
 
-  it('limits extended nominals to the unambiguous J-prefixed two-letter form', () => {
-    expect(parse('JJ').body[0]).toMatchObject({
-      type: 'PitchLiteral',
-      nominal: { system: 'mos', value: 'JJ' },
-    })
+  it('parses extended MOS nominals through ZZ', () => {
+    expect(parse('JJ KZ ZZ').body).toMatchObject([
+      {
+        type: 'Sequence',
+        items: [
+          { type: 'PitchLiteral', nominal: { system: 'mos', value: 'JJ' } },
+          { type: 'PitchLiteral', nominal: { system: 'mos', value: 'KZ' } },
+          { type: 'PitchLiteral', nominal: { system: 'mos', value: 'ZZ' } },
+        ],
+      },
+    ])
   })
 
   it('parses MOS pitches as context-assignment targets and rejects FJS suffixes', () => {
