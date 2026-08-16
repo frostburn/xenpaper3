@@ -31,12 +31,33 @@ describe('MusicalStaff', () => {
     const bassNotation: StaffNotationShape = {
       ...notation,
       children: [
-        { kind: 'clef', clef: { kind: 'bass' }, duration: notation.duration },
+        {
+          kind: 'clef',
+          clef: { kind: 'bass' },
+          duration: { n: 0, d: 1 } as StaffNotationShape['duration'],
+        },
         ...notation.children,
       ],
     }
     const wrapper = mount(MusicalStaff, { props: { notation: bassNotation } })
     expect(wrapper.get('.clef').text()).toBe('𝄢')
+    expect(wrapper.get('.notehead').attributes('cy')).toBe('40')
+    expect(wrapper.findAll('.ledger-line')).toHaveLength(1)
+  })
+
+  it('changes between conventional and Diamond-MOS staff segments at clef events', () => {
+    const evaluated = evaluateScoreShape(parse('C D E F G MOS{4L3s} J K MOS{5L2s} J').body[0]!)
+    if (!('shape' in evaluated)) throw new Error('Expected a score shape.')
+    const wrapper = mount(MusicalStaff, {
+      props: { notation: constructStaffNotationShape(evaluated.shape) },
+    })
+
+    expect(
+      wrapper.findAll('.staff-lines > g').map((segment) => segment.findAll('line').length),
+    ).toEqual([5, 5, 5])
+    expect(wrapper.findAll('.clef').map((clef) => clef.text())).toEqual(['𝄞', '𝄞'])
+    expect(wrapper.findAll('.diamond-clef')).toHaveLength(1)
+    expect(wrapper.findAll('.staff-lines > g')[0]!.find('line').attributes('x2')).toBe('294')
   })
 
   it('renders Diamond-MOS pitches with diamond octave marks and minority-step boxes', () => {
