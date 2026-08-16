@@ -510,7 +510,7 @@ ContextAssignmentTarget
   = operator:ContextOperatorTarget {
       return node('ContextOperatorTarget', { operator });
     }
-  / pitch:PitchLiteral {
+  / pitch:(MosPitchLiteral / PitchLiteral) {
       return node('ContextPitchTarget', { pitch });
     }
   / name:Identifier {
@@ -644,10 +644,9 @@ PitchLiteral
     }
 
 MosPitchLiteral
-  = nominal:MosPitchNominal accidentals:MosAccidental* inflections:FjsInflection*
-    !IdentifierContinue {
+  = nominal:MosPitchNominal accidentals:MosAccidental* !FjsInflection !IdentifierContinue {
       return node('PitchLiteral', {
-        modifiers: [], nominal, accidentals, inflections, raw: text(),
+        modifiers: [], nominal, accidentals, inflections: [], raw: text(),
       });
     }
 

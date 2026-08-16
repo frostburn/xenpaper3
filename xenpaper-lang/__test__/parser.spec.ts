@@ -164,6 +164,22 @@ describe('Diamond-MOS tokens', () => {
       nominal: { system: 'mos', value: 'JJ' },
     })
   })
+
+  it('parses MOS pitches as context-assignment targets and rejects FJS suffixes', () => {
+    expect(parse('MOS{5L2s} {K = root}').body[0]).toMatchObject({
+      type: 'Sequence',
+      items: [
+        { type: 'PitchContextChange', statements: [{ type: 'MosDeclaration' }] },
+        {
+          type: 'PitchContextChange',
+          statements: [
+            { target: { type: 'ContextPitchTarget', pitch: { nominal: { value: 'K' } } } },
+          ],
+        },
+      ],
+    })
+    expect(() => parse('MOS{5L2s} J^5')).toThrow()
+  })
 })
 
 const score = String.raw`# FJS and prefix modifiers
@@ -294,13 +310,7 @@ describe('Xenpaper surface grammar', () => {
       'UnaryExpression',
       'PitchLiteral',
     ])
-    expect(items.slice(0, 5).map((item) => item.raw)).toEqual([
-      'E^5',
-      'Ebv5',
-      'P1v5',
-      'Cv5',
-      'E_',
-    ])
+    expect(items.slice(0, 5).map((item) => item.raw)).toEqual(['E^5', 'Ebv5', 'P1v5', 'Cv5', 'E_'])
     expect(items.slice(5, 8).map((item) => item.type)).toEqual([
       'UnaryExpression',
       'UnaryExpression',
@@ -507,8 +517,16 @@ describe('Xenpaper surface grammar', () => {
     const items = (program.body[0] as SyntaxNode).items as SyntaxNode[]
 
     expect(items).toMatchObject([
-      { type: 'UnaryExpression', operator: '^', operand: { type: 'IntervalLiteral', quality: 'M' } },
-      { type: 'UnaryExpression', operator: "'", operand: { type: 'IntervalLiteral', quality: 'P' } },
+      {
+        type: 'UnaryExpression',
+        operator: '^',
+        operand: { type: 'IntervalLiteral', quality: 'M' },
+      },
+      {
+        type: 'UnaryExpression',
+        operator: "'",
+        operand: { type: 'IntervalLiteral', quality: 'P' },
+      },
     ])
   })
 
