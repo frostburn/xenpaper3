@@ -14,6 +14,21 @@ function notation(source: string) {
 }
 
 describe('staff notation construction', () => {
+  it('emits key-signature events and suppresses repeated note accidentals', () => {
+    const evaluated = evaluateScoreShape(parse('{key = G} F F_').body[0] as Expression)
+    if (!('shape' in evaluated)) throw new Error('Expected a score shape.')
+    const staff = constructStaffNotationShape(evaluated.shape)
+    if (staff.kind !== 'sequence') throw new Error('Expected a staff sequence.')
+    expect(staff.children[0]).toMatchObject({
+      kind: 'key-signature',
+      pitches: [{ staffPosition: 3, accidentals: ['sharp'] }],
+    })
+    expect(staff.children.filter((child) => child.kind === 'note')).toMatchObject([
+      { pitch: { accidentals: [] } },
+      { pitch: { accidentals: ['natural'] } },
+    ])
+  })
+
   it('projects MOS declarations to explicit clef events', () => {
     const evaluated = evaluateScoreShape(parse('MOS{3L4s} J').body[0] as Expression)
     if (!('shape' in evaluated)) throw new Error('Expected a score shape.')

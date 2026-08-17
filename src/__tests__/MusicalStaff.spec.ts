@@ -27,6 +27,16 @@ const notation: StaffNotationShape = {
 }
 
 describe('MusicalStaff', () => {
+  it('renders key signatures as staff accidentals', () => {
+    const evaluated = evaluateScoreShape(parse('{key = G} F').body[0]!)
+    if (!('shape' in evaluated)) throw new Error('Expected score shape.')
+    const wrapper = mount(MusicalStaff, {
+      props: { notation: constructStaffNotationShape(evaluated.shape) },
+    })
+    expect(wrapper.find('.key-signature').text()).toContain('♯')
+    expect(wrapper.find('.pitch-decorations').exists()).toBe(false)
+  })
+
   it('renders bass clef events', () => {
     const bassNotation: StaffNotationShape = {
       ...notation,

@@ -81,6 +81,7 @@ function spellingChromatic(quality: string, number: number): number | undefined 
 }
 
 function decorations(value: EvaluatedLiteral, chromatic?: number) {
+  if (value.kind === 'absolutePitch' && value.spelling.signature) return { accidentals: [] }
   const written = value.kind === 'absolutePitch' ? value.spelling.accidentals : undefined
   const fjs =
     value.kind === 'absolutePitch'
@@ -346,6 +347,17 @@ export function constructStaffNotationShape(shape: ScoreShape): StaffNotationSha
       return { kind: 'dynamic', mark: shape.mark, duration: shape.duration }
     case 'clef':
       return { kind: 'clef', clef: shape.clef, duration: shape.duration }
+    case 'key-signature':
+      return {
+        kind: 'key-signature',
+        pitches: shape.pitches.map((pitch) => {
+          const spelling = pitch.spelling.signature
+            ? { ...pitch.spelling, signature: false }
+            : pitch.spelling
+          return constructStaffNotation({ ...pitch, spelling })
+        }),
+        duration: shape.duration,
+      }
     case 'groove':
       if (!shape.template || !shape.controlCount)
         return { kind: 'annotation', text: 'straight', duration: shape.duration }

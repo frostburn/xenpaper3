@@ -470,7 +470,7 @@ PitchContextChange
   / "{" Spacing statements:ContextStatementList Spacing "}" {
       return node('PitchContextChange', { statements });
     }
-  / "{" Spacing expression:ParallelExpression Spacing "}" {
+  / "{" Spacing !ContextAssignmentStart expression:ParallelExpression Spacing "}" {
       return node('PitchContextChange', {
         statements: [node('ContextDegreeMapping', { values: [expression] })],
       });
@@ -484,6 +484,10 @@ ContextStatementList
     rest:(Spacing ";" Spacing statement:ContextStatement { return statement; })* {
       return [first, ...rest];
     }
+
+ContextAssignmentStart
+  = ("sig"i / "key"i / "root"i) !IdentifierContinue Spacing "="
+  / ContextAssignmentTarget Spacing "="
 
 ContextStatement
   = kind:$("sig"i / "key"i) !IdentifierContinue Spacing "=" Spacing
@@ -586,14 +590,28 @@ MosDeclaration
     }
 
 MosElementList
-  = first:MosElement rest:(Spacing element:MosElement { return element; })* {
-      return [first, ...rest];
+  = first:MosElement rest:(separator:(Spacing ";" Spacing { return ";"; } / Spacing { return " "; }) element:MosElement {
+      return { separator, element };
+    })* {
+      const elements = [first, ...rest.map(part => part.element)];
+      for (let index = 0; index < rest.length; index += 1) {
+        const left = elements[index];
+        const right = elements[index + 1];
+        const assignment = element => element.type === 'MosStepAssignment' || element.type === 'SignatureDeclaration';
+        if (rest[index].separator !== ";" && (assignment(left) || assignment(right))) {
+          expected('a semicolon between MOS assignments');
+        }
+      }
+      return elements;
     }
 
 MosElement
-  = kind:$("sig"i / "key"i) !IdentifierContinue Spacing "=" Spacing
-    pitches:MosSignaturePitchList {
-      return node('SignatureDeclaration', { kind: kind.toLowerCase(), pitches });
+  = kind:$("sig"i) !IdentifierContinue Spacing "=" Spacing pitches:MosSignaturePitchList {
+      return node('SignatureDeclaration', { kind: kind.toLowerCase(), pitches, udp: null });
+    }
+  / kind:$("key"i) !IdentifierContinue Spacing "=" Spacing pitch:MosSignaturePitchLiteral
+    udp:(RequiredSpacing value:MosUdpValue { return value; })? {
+      return node('SignatureDeclaration', { kind: kind.toLowerCase(), pitches: [pitch], udp: udp ?? null });
     }
   / target:$("^" / "/" / "L" / "s") Spacing "=" Spacing value:MosSetterValue {
       return node('MosStepAssignment', { target, value });
@@ -601,9 +619,8 @@ MosElement
   / large:UnsignedInteger "L" Spacing small:UnsignedInteger "s" {
       return node('MosPatternCounts', { large, small });
     }
-  / up:UnsignedInteger Spacing "|" Spacing down:UnsignedInteger
-    period:(Spacing "(" Spacing value:UnsignedInteger Spacing ")" { return value; })? {
-      return node('MosUdp', { up, down, period: period ?? null });
+  / udp:MosUdpValue {
+      return node('MosUdp', udp);
     }
   / numerator:UnsignedInteger Spacing ":" Spacing denominator:UnsignedInteger {
       return node('MosHardness', { numerator, denominator });
@@ -626,6 +643,12 @@ MosSetterValue
   / RatioLiteral
   / QuantityLiteral
   / IntegerLiteral
+
+MosUdpValue
+  = up:UnsignedInteger Spacing "|" Spacing down:UnsignedInteger
+    period:(Spacing "(" Spacing value:UnsignedInteger Spacing ")" { return value; })? {
+      return { up, down, period: period ?? null };
+    }
 
 SignaturePitchList
   = first:SignaturePitchLiteral
