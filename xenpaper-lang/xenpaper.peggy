@@ -492,7 +492,11 @@ ContextStatementList
     }
 
 ContextStatement
-  = name:$('root'i) !IdentifierContinue Spacing "=" Spacing
+  = kind:$("sig"i / "key"i) !IdentifierContinue Spacing "=" Spacing
+    pitches:SignaturePitchList {
+      return node('SignatureDeclaration', { kind: kind.toLowerCase(), pitches });
+    }
+  / name:$('root'i) !IdentifierContinue Spacing "=" Spacing
     value:(ShiftedValueExpression / ScaleDegreeLiteral) {
       return node('ContextAssignment', {
         target: node('ContextNameTarget', { name: name.toLowerCase() }),
@@ -593,7 +597,11 @@ MosElementList
     }
 
 MosElement
-  = target:$("^" / "/" / "L" / "s") Spacing "=" Spacing value:MosSetterValue {
+  = kind:$("sig"i / "key"i) !IdentifierContinue Spacing "=" Spacing
+    pitches:MosSignaturePitchList {
+      return node('SignatureDeclaration', { kind: kind.toLowerCase(), pitches });
+    }
+  / target:$("^" / "/" / "L" / "s") Spacing "=" Spacing value:MosSetterValue {
       return node('MosStepAssignment', { target, value });
     }
   / large:UnsignedInteger "L" Spacing small:UnsignedInteger "s" {
@@ -624,6 +632,28 @@ MosSetterValue
   / RatioLiteral
   / QuantityLiteral
   / IntegerLiteral
+
+SignaturePitchList
+  = first:SignaturePitchLiteral
+    rest:(RequiredSpacing pitch:SignaturePitchLiteral { return pitch; })* {
+      return [first, ...rest];
+    }
+
+MosSignaturePitchList
+  = first:MosSignaturePitchLiteral
+    rest:(RequiredSpacing pitch:MosSignaturePitchLiteral { return pitch; })* {
+      return [first, ...rest];
+    }
+
+SignaturePitchLiteral
+  = modifiers:PitchModifier* pitch:PitchLiteral {
+      return { ...pitch, modifiers: [...modifiers, ...pitch.modifiers], raw: text() };
+    }
+
+MosSignaturePitchLiteral
+  = modifiers:PitchModifier* pitch:MosPitchLiteral {
+      return { ...pitch, modifiers: [...modifiers, ...pitch.modifiers], raw: text() };
+    }
 
 IntervalQuality
   = $("S" "A"+ / "s" "d"+ / "A"+ / "d"+ / "P" / "M" / "m" / "n")
