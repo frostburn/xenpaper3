@@ -6,6 +6,7 @@ import type {
   StaffInflection,
   StaffNotationShape,
   StaffPitch,
+  StaffClef,
 } from '../../xenpaper-lang'
 import { Fraction } from 'xen-dev-utils/fraction'
 
@@ -42,6 +43,7 @@ type StaffItemContent =
       tuplet?: number
     }
   | { kind: 'dynamic'; mark: DynamicMark }
+  | { kind: 'clef'; clef: StaffClef }
 
 type StaffItem = StaffItemContent & {
   column: number
@@ -196,6 +198,8 @@ const items = computed(() => {
       })
     } else if (shape.kind === 'dynamic') {
       layout.push({ kind: 'dynamic', offset, mark: shape.mark, tuplets: [], voice })
+    } else if (shape.kind === 'clef') {
+      layout.push({ kind: 'clef', offset, clef: shape.clef, tuplets: [], voice })
     } else if (shape.kind === 'sequence') {
       const startOffset = offset
       const startIndex = layout.length
@@ -447,6 +451,105 @@ const x = (column: number) => 60 + column * 52 + repeatSpaceBefore(column)
 const barlineX = (item: Extract<StaffItem, { kind: 'barline' }>) =>
   x(item.column) - 26 - (repeatMarkerColumns.value.has(item.column) ? repeatMarkerSpace / 2 : 0)
 const y = (position: number) => 100 - (position - 2) * 6
+type DiamondMos = NonNullable<StaffPitch['diamondMos']>
+type ClefChange = { column: number; clef: StaffClef; implicit?: boolean }
+const sameClef = (left: StaffClef, right: StaffClef) =>
+  left.kind === right.kind &&
+  (left.kind !== 'diamond-mos' || (right.kind === 'diamond-mos' && left.pattern === right.pattern))
+const clefChanges = computed(() => {
+  const changes: ClefChange[] = [{ column: 0, clef: { kind: 'treble' }, implicit: true }]
+  for (const item of items.value) {
+    if (item.kind !== 'clef') continue
+    const previous = changes[changes.length - 1]
+    if (previous && sameClef(previous.clef, item.clef)) continue
+    if (previous?.implicit && previous.column === item.column) {
+      changes[changes.length - 1] = { column: item.column, clef: item.clef, implicit: true }
+      continue
+    }
+    changes.push({ column: item.column, clef: item.clef })
+  }
+  return changes
+})
+const clefGlyph = (clef: StaffClef['kind']) => (clef === 'bass' ? '𝄢' : '𝄞')
+const clefAtColumn = (column: number) => {
+  let active = clefChanges.value[0]!.clef
+  for (const change of clefChanges.value) {
+    if (change.column > column) break
+    active = change.clef
+  }
+  return active
+}
+const displayStaffPosition = (item: Extract<StaffItem, { kind: 'note' }>) =>
+  item.pitch.staffPosition + (clefAtColumn(item.column).kind === 'bass' ? 12 : 0)
+const noteY = (item: Extract<StaffItem, { kind: 'note' }>) => y(displayStaffPosition(item))
+const tiedY = (position: number, column: number) =>
+  y(position + (clefAtColumn(column).kind === 'bass' ? 12 : 0))
+const mosAtBarline = (barline: Extract<StaffItem, { kind: 'barline' }>) => {
+  let active: StaffClef = { kind: 'treble' }
+  for (const item of items.value) {
+    if (item === barline) break
+    if (item.kind === 'clef') active = item.clef
+  }
+  return active.kind === 'diamond-mos' ? { rank: 0, pattern: active.pattern } : undefined
+}
+const linePositionsFor = (config?: DiamondMos) =>
+  Array.from(
+    { length: config ? Math.ceil(config.pattern.length / 2 + 1) : 5 },
+    (_, index) => index * 2 + 2,
+  )
+const staffSegments = computed(() =>
+  clefChanges.value.map((change, index) => ({
+    ...change,
+    x1: index ? x(change.column) - 26 : 20,
+    x2:
+      index + 1 < clefChanges.value.length
+        ? x(clefChanges.value[index + 1]!.column) - 26
+        : width.value - 20,
+  })),
+)
+const clefX = (column: number, implicit?: boolean) => (implicit ? 25 : x(column) - 20)
+const diamondPositions = (config: DiamondMos | undefined) => {
+  if (!config) return []
+  const result: number[] = []
+  const positions = linePositionsFor(config)
+  const top = positions[positions.length - 1] ?? 0
+  for (let position = 0; position <= top; position += config.pattern.length) result.push(position)
+  return result
+}
+const diamondLedgerPositions = (config: DiamondMos | undefined) => {
+  if (!config) return []
+  const staffPositions = linePositionsFor(config)
+  const bottom = staffPositions[0]!
+  const top = staffPositions[staffPositions.length - 1]!
+  return diamondPositions(config).filter((position) => position < bottom || position > top)
+}
+const markedMosStep = (config: DiamondMos | undefined) => {
+  if (!config) return undefined
+  const pattern = config.pattern
+  const large = [...pattern].filter((step) => step === 'L').length
+  const small = [...pattern].filter((step) => step === 's').length
+  return large <= small ? 'L' : 's'
+}
+const mosBoxPositions = (config: DiamondMos | undefined, extended = false) => {
+  const marked = markedMosStep(config)
+  if (!config || !marked) return []
+  const positionsForConfig = linePositionsFor(config)
+  const bottom = extended ? -1 : positionsForConfig[0]! - 1
+  const top = (positionsForConfig[positionsForConfig.length - 1] ?? 0) + (extended ? 1 : 0)
+  const positions: number[] = []
+  for (let position = bottom; position <= top; position++) {
+    const patternIndex =
+      ((position % config.pattern.length) + config.pattern.length) % config.pattern.length
+    if (config.pattern[patternIndex] === marked) positions.push(position + 0.5)
+  }
+  return positions
+}
+const barlineTopY = (barline: Extract<StaffItem, { kind: 'barline' }>) => {
+  const positions = linePositionsFor(mosAtBarline(barline))
+  return y(positions[positions.length - 1]!)
+}
+const barlineBottomY = (barline: Extract<StaffItem, { kind: 'barline' }>) =>
+  y(linePositionsFor(mosAtBarline(barline))[0]!)
 const accidental = (value: string) =>
   ({
     flat: '♭',
@@ -589,16 +692,63 @@ const swingBeamCount = (durations: readonly Fraction[], tuplet?: number) =>
     aria-label="Musical staff"
   >
     <g class="staff-lines">
-      <line
-        v-for="line in 5"
-        :key="line"
-        x1="20"
-        :x2="width - 20"
-        :y1="100 - (line - 1) * 12"
-        :y2="100 - (line - 1) * 12"
-      />
+      <g v-for="(segment, segmentIndex) in staffSegments" :key="segmentIndex">
+        <line
+          v-for="position in linePositionsFor(
+            segment.clef.kind === 'diamond-mos'
+              ? { rank: 0, pattern: segment.clef.pattern }
+              : undefined,
+          )"
+          :key="position"
+          :x1="segment.x1"
+          :x2="segment.x2"
+          :y1="y(position)"
+          :y2="y(position)"
+        />
+      </g>
     </g>
-    <text class="clef" x="25" y="98">𝄞</text>
+    <template v-for="(change, changeIndex) in clefChanges" :key="`clef-${changeIndex}`">
+      <text
+        v-if="change.clef.kind !== 'diamond-mos'"
+        class="clef"
+        :class="{ 'clef--change': !change.implicit }"
+        :x="clefX(change.column, change.implicit)"
+        y="98"
+      >
+        {{ clefGlyph(change.clef.kind) }}
+      </text>
+      <g v-else class="diamond-clef">
+        <line
+          v-for="position in diamondLedgerPositions({ rank: 0, pattern: change.clef.pattern })"
+          :key="`ledger-${position}`"
+          class="diamond-clef__ledger"
+          :x1="clefX(change.column, change.implicit) - 11"
+          :x2="clefX(change.column, change.implicit) + 18"
+          :y1="y(position)"
+          :y2="y(position)"
+        />
+        <polygon
+          v-for="position in diamondPositions({ rank: 0, pattern: change.clef.pattern })"
+          :key="position"
+          class="diamond-clef__mark"
+          :class="{ 'diamond-clef__mark--middle': position === 0 }"
+          :points="`${clefX(change.column, change.implicit)},${y(position) - (position === 0 ? 7 : 5)} ${clefX(change.column, change.implicit) + (position === 0 ? 7 : 5)},${y(position)} ${clefX(change.column, change.implicit)},${y(position) + (position === 0 ? 7 : 5)} ${clefX(change.column, change.implicit) - (position === 0 ? 7 : 5)},${y(position)}`"
+        />
+        <rect
+          v-for="position in mosBoxPositions({ rank: 0, pattern: change.clef.pattern }, true)"
+          :key="`clef-box-${position}`"
+          class="mos-step-box"
+          :class="{
+            'mos-step-box--hollow':
+              markedMosStep({ rank: 0, pattern: change.clef.pattern }) === 's',
+          }"
+          :x="clefX(change.column, change.implicit) + 10"
+          :y="y(position) - 3"
+          width="6"
+          height="6"
+        />
+      </g>
+    </template>
     <text v-if="!items.length" class="empty-message" x="70" y="126">No notation loaded</text>
     <g v-for="(ending, index) in endingSpans" :key="`ending-${index}`" class="alternate-ending">
       <path
@@ -756,15 +906,15 @@ const swingBeamCount = (durations: readonly Fraction[], tuplet?: number) =>
           :x2="
             barlineX(item) - (item.style === 'single' || item.style.startsWith('ending-') ? 0 : 3)
           "
-          y1="52"
-          y2="100"
+          :y1="barlineTopY(item)"
+          :y2="barlineBottomY(item)"
         />
         <line
           v-if="item.style !== 'single' && !item.style.startsWith('ending-')"
           :x1="barlineX(item) + 3"
           :x2="barlineX(item) + 3"
-          y1="52"
-          y2="100"
+          :y1="barlineTopY(item)"
+          :y2="barlineBottomY(item)"
         />
         <template v-if="item.style === 'repeat-start' || item.style === 'repeat-end'">
           <circle
@@ -778,18 +928,33 @@ const swingBeamCount = (durations: readonly Fraction[], tuplet?: number) =>
             r="2.5"
           />
         </template>
+        <rect
+          v-for="position in mosBoxPositions(mosAtBarline(item))"
+          :key="`box-${position}`"
+          class="mos-step-box"
+          :class="{
+            'mos-step-box--hollow': markedMosStep(mosAtBarline(item)) === 's',
+          }"
+          :x="barlineX(item) + 5"
+          :y="y(position) - 3"
+          width="6"
+          height="6"
+        />
+      </g>
+      <g v-else-if="item.kind === 'clef'" class="clef-event">
+        <title>Clef change</title>
       </g>
       <template v-else>
         <path
           v-if="item.grace && item.tiedToColumn !== undefined && item.tiedToPosition !== undefined"
           class="grace-tie"
-          :d="`M ${x(item.column) + 5} ${y(item.pitch.staffPosition) + 5} Q ${(x(item.column) + x(item.tiedToColumn)) / 2} ${Math.max(y(item.pitch.staffPosition), y(item.tiedToPosition)) + 15} ${x(item.tiedToColumn) - 7} ${y(item.tiedToPosition) + 7}`"
+          :d="`M ${x(item.column) + 5} ${noteY(item) + 5} Q ${(x(item.column) + x(item.tiedToColumn)) / 2} ${Math.max(noteY(item), tiedY(item.tiedToPosition, item.tiedToColumn)) + 15} ${x(item.tiedToColumn) - 7} ${tiedY(item.tiedToPosition, item.tiedToColumn) + 7}`"
         />
         <text
           v-if="!isSupportedNoteDuration(engravingDuration(item), itemTupletScale(item))"
           class="notation-error"
           :x="x(item.column)"
-          :y="y(item.pitch.staffPosition) + 5"
+          :y="noteY(item) + 5"
         >
           ?
         </text>
@@ -797,10 +962,10 @@ const swingBeamCount = (durations: readonly Fraction[], tuplet?: number) =>
           <path
             v-if="item.tiedFromColumn !== undefined"
             class="tie"
-            :d="`M ${x(item.tiedFromColumn) + 6} ${y(item.pitch.staffPosition) + 7} Q ${(x(item.tiedFromColumn) + x(item.column)) / 2} ${y(item.pitch.staffPosition) + 17} ${x(item.column) - 6} ${y(item.pitch.staffPosition) + 7}`"
+            :d="`M ${x(item.tiedFromColumn) + 6} ${noteY(item) + 7} Q ${(x(item.tiedFromColumn) + x(item.column)) / 2} ${noteY(item) + 17} ${x(item.column) - 6} ${noteY(item) + 7}`"
           />
           <line
-            v-for="position in ledgerPositions(item.pitch.staffPosition)"
+            v-for="position in ledgerPositions(displayStaffPosition(item))"
             :key="position"
             class="ledger-line"
             :x1="x(item.column) - 12"
@@ -815,7 +980,7 @@ const swingBeamCount = (durations: readonly Fraction[], tuplet?: number) =>
             "
             class="pitch-decorations"
             :x="x(item.column) - 11"
-            :y="y(item.pitch.staffPosition) + 5"
+            :y="noteY(item) + 5"
           >
             <tspan
               v-for="(value, inflectionIndex) in formattedInflections(item.pitch.inflections ?? [])"
@@ -831,25 +996,25 @@ const swingBeamCount = (durations: readonly Fraction[], tuplet?: number) =>
           <polygon
             v-if="item.pitch.notehead === 'triangle-down'"
             class="notehead"
-            :points="`${x(item.column) - 7},${y(item.pitch.staffPosition) - 5} ${x(item.column) + 7},${y(item.pitch.staffPosition) - 5} ${x(item.column)},${y(item.pitch.staffPosition) + 6}`"
+            :points="`${x(item.column) - 7},${noteY(item) - 5} ${x(item.column) + 7},${noteY(item) - 5} ${x(item.column)},${noteY(item) + 6}`"
           />
           <polygon
             v-else-if="item.pitch.notehead === 'triangle-up'"
             class="notehead"
-            :points="`${x(item.column)},${y(item.pitch.staffPosition) - 6} ${x(item.column) + 7},${y(item.pitch.staffPosition) + 5} ${x(item.column) - 7},${y(item.pitch.staffPosition) + 5}`"
+            :points="`${x(item.column)},${noteY(item) - 6} ${x(item.column) + 7},${noteY(item) + 5} ${x(item.column) - 7},${noteY(item) + 5}`"
           />
           <g v-else-if="item.pitch.notehead === 'x'" class="notehead x-notehead">
             <line
               :x1="x(item.column) - 6"
               :x2="x(item.column) + 6"
-              :y1="y(item.pitch.staffPosition) - 6"
-              :y2="y(item.pitch.staffPosition) + 6"
+              :y1="noteY(item) - 6"
+              :y2="noteY(item) + 6"
             />
             <line
               :x1="x(item.column) - 6"
               :x2="x(item.column) + 6"
-              :y1="y(item.pitch.staffPosition) + 6"
-              :y2="y(item.pitch.staffPosition) - 6"
+              :y1="noteY(item) + 6"
+              :y2="noteY(item) - 6"
             />
           </g>
           <ellipse
@@ -861,7 +1026,7 @@ const swingBeamCount = (durations: readonly Fraction[], tuplet?: number) =>
               ),
             }"
             :cx="x(item.column)"
-            :cy="y(item.pitch.staffPosition)"
+            :cy="noteY(item)"
             rx="7"
             ry="5"
           />
@@ -871,7 +1036,7 @@ const swingBeamCount = (durations: readonly Fraction[], tuplet?: number) =>
               :key="`articulation-${markIndex}`"
               class="articulation-mark"
               :x="x(item.column)"
-              :y="y(item.pitch.staffPosition) + 18 + markIndex * 10"
+              :y="noteY(item) + 18 + markIndex * 10"
             >
               {{ mark === "'" ? '▾' : mark === ':' ? '•̲' : mark === '_' ? '⌒' : mark }}
             </text>
@@ -880,7 +1045,7 @@ const swingBeamCount = (durations: readonly Fraction[], tuplet?: number) =>
             v-if="isDotted(effectiveDuration(engravingDuration(item), itemTupletScale(item)))"
             class="augmentation-dot"
             :cx="x(item.column) + 13"
-            :cy="y(item.pitch.staffPosition) - (item.pitch.staffPosition % 2 ? 0 : 3)"
+            :cy="noteY(item) - (item.pitch.staffPosition % 2 ? 0 : 3)"
             r="2"
           />
           <line
@@ -888,14 +1053,14 @@ const swingBeamCount = (durations: readonly Fraction[], tuplet?: number) =>
             class="stem"
             :x1="x(item.column) + 6"
             :x2="x(item.column) + 6"
-            :y1="y(item.pitch.staffPosition)"
-            :y2="y(item.pitch.staffPosition) - 30"
+            :y1="noteY(item)"
+            :y2="noteY(item) - 30"
           />
           <path
             v-for="flag in flagCount(engravingDuration(item), itemTupletScale(item))"
             :key="`flag-${flag}`"
             class="flag"
-            :d="`M ${x(item.column) + 6} ${y(item.pitch.staffPosition) - 30 + (flag - 1) * 7} Q ${x(item.column) + 20} ${y(item.pitch.staffPosition) - 23 + (flag - 1) * 7} ${x(item.column) + 12} ${y(item.pitch.staffPosition) - 13 + (flag - 1) * 7}`"
+            :d="`M ${x(item.column) + 6} ${noteY(item) - 30 + (flag - 1) * 7} Q ${x(item.column) + 20} ${noteY(item) - 23 + (flag - 1) * 7} ${x(item.column) + 12} ${noteY(item) - 13 + (flag - 1) * 7}`"
           />
           <text
             v-if="item.displayLabel"
@@ -935,6 +1100,26 @@ const swingBeamCount = (durations: readonly Fraction[], tuplet?: number) =>
 .tie {
   stroke: currentColor;
   stroke-width: 1.5;
+}
+
+.diamond-clef__mark,
+.mos-step-box {
+  fill: currentColor;
+  stroke: currentColor;
+  stroke-width: 1.25;
+}
+
+.diamond-clef__ledger {
+  stroke: currentColor;
+  stroke-width: 1.5;
+}
+
+.diamond-clef__mark--middle {
+  fill: white;
+}
+
+.mos-step-box--hollow {
+  fill: white;
 }
 
 .grace-tie {

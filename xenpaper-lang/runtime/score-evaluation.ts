@@ -492,6 +492,7 @@ function scaleShape(shape: ScoreShape, factor: Fraction): ScoreShape {
     case 'barline':
     case 'annotation':
     case 'dynamic':
+    case 'clef':
     case 'groove':
       return { ...shape, duration }
     case 'sequence':
@@ -697,6 +698,35 @@ function contextAnnotation(
     })
     .join('; ')
   return { kind: 'annotation', text, duration: new Fraction(0), origins: [origin(node, 'context')] }
+}
+
+function contextShape(
+  node: Extract<Expression, { type: 'PitchContextChange' }>,
+  context: PitchContext,
+  previousContext?: PitchContext,
+): ScoreShape {
+  if (node.statements.some((statement) => statement.type === 'MosDeclaration') && context.mos) {
+    const large = [...context.mos.pattern].filter((step) => step === 'L').length
+    const small = [...context.mos.pattern].filter((step) => step === 's').length
+    return {
+      kind: 'clef',
+      clef:
+        large === 5 && small === 2
+          ? { kind: 'treble' }
+          : { kind: 'diamond-mos', pattern: context.mos.pattern },
+      duration: new Fraction(0),
+      origins: [origin(node, 'context')],
+    }
+  }
+  if (previousContext?.mos && !context.mos) {
+    return {
+      kind: 'clef',
+      clef: { kind: 'treble' },
+      duration: new Fraction(0),
+      origins: [origin(node, 'context')],
+    }
+  }
+  return contextAnnotation(node)
 }
 
 function playablePitch(
@@ -1108,8 +1138,12 @@ export function evaluateScoreSemantics(
       for (const item of current.items) {
         if (item.type === 'PitchContextChange') {
           try {
+            const previousContext = activeContext
             activeContext = applyPitchContextChange(item, activeContext)
-            results.push({ shape: contextAnnotation(item), diagnostics: [] })
+            results.push({
+              shape: contextShape(item, activeContext, previousContext),
+              diagnostics: [],
+            })
           } catch (error) {
             results.push({
               diagnostics: [
@@ -1189,7 +1223,14 @@ export function evaluateScoreSemantics(
                       duration: new Fraction(0),
                       origins: [origin(item, 'directive')],
                     }
-                  : sequence([], [origin(item, 'directive')])
+                  : directive?.kind === 'clef'
+                    ? {
+                        kind: 'clef',
+                        clef: directive.clef,
+                        duration: new Fraction(0),
+                        origins: [origin(item, 'directive')],
+                      }
+                    : sequence([], [origin(item, 'directive')])
           results.push({ shape, diagnostics: resolved.diagnostics })
           continue
         }
@@ -1542,7 +1583,12 @@ export function evaluateScoreSemantics(
     }
 
     if (current.type === 'PitchContextChange') {
-      return { shape: contextAnnotation(current), diagnostics: [] }
+      try {
+        const changed = applyPitchContextChange(current, context)
+        return { shape: contextShape(current, changed, context), diagnostics: [] }
+      } catch {
+        return { shape: contextAnnotation(current), diagnostics: [] }
+      }
     }
     const evaluated = playablePitch(current, context)
     if (!('pitch' in evaluated)) return evaluated

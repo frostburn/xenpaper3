@@ -186,6 +186,8 @@ export function flattenScoreSemantics(shape: ScoreShape): BeatEventFlatteningRes
               : current.text,
         origins: current.origins,
       })
+    } else if (current.kind === 'clef') {
+      // Clefs are engraving-only context and deliberately do not enter playback events.
     } else if (current.kind === 'sequence') {
       const firstEvent = events.length
       let cursor = start

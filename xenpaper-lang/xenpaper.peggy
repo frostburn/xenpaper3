@@ -190,7 +190,7 @@ MultiplicativeOperator
 // A slash attached to a pitch-like token is a lift modifier belonging to the
 // following sequence item, not division (for example `Cv5 /'C`).
 BinaryDivide
-  = "/" !(PitchModifier / PitchNominal / [0-9]) { return "/"; }
+  = "/" !(PitchModifier / StandardPitchNominal / MosPitchNominal / [0-9]) { return "/"; }
 
 PowerExpression
   = left:UnaryExpression
@@ -227,6 +227,7 @@ AttachedPostfixMark
 
 PrimaryExpression
   = RepeatExpression
+  / MosDeclaration
   / PitchContextChange
   / Directive
   / NormalizedGroup
@@ -236,7 +237,9 @@ PrimaryExpression
   / Barline
   / EnumeratedChord
   / MonzoLiteral
+  / MosIntervalLiteral
   / IntervalLiteral
+  / MosPitchLiteral
   / PitchLiteral
   / EqualDivisionLiteral
   / QuantityLiteral
@@ -507,7 +510,7 @@ ContextAssignmentTarget
   = operator:ContextOperatorTarget {
       return node('ContextOperatorTarget', { operator });
     }
-  / pitch:PitchLiteral {
+  / pitch:(MosPitchLiteral / PitchLiteral) {
       return node('ContextPitchTarget', { pitch });
     }
   / name:Identifier {
@@ -554,7 +557,7 @@ CallArgumentList
     }
 
 IdentifierExpression
-  = !("v" &(PitchLiteral / IntervalLiteral)) name:Identifier {
+  = !("v" &(MosPitchLiteral / PitchLiteral / IntervalLiteral)) name:Identifier {
       return node('Identifier', { name });
     }
 
@@ -570,6 +573,58 @@ IntervalLiteral
       });
     }
 
+MosIntervalLiteral
+  = quality:$("P" / "M" / "m" / "n" / "A"+ / "d"+) degree:UnsignedInteger "ms"
+    !IdentifierContinue {
+      return node('MosIntervalLiteral', { modifiers: [], quality, degree, raw: text() });
+    }
+
+MosDeclaration
+  = "MOS" !IdentifierContinue Spacing "{" Spacing
+    elements:MosElementList? Spacing "}" {
+      return node('PitchContextChange', {
+        statements: [node('MosDeclaration', { elements: elements ?? [], raw: text() })],
+      });
+    }
+
+MosElementList
+  = first:MosElement rest:(Spacing element:MosElement { return element; })* {
+      return [first, ...rest];
+    }
+
+MosElement
+  = target:$("^" / "/" / "L" / "s") Spacing "=" Spacing value:MosSetterValue {
+      return node('MosStepAssignment', { target, value });
+    }
+  / large:UnsignedInteger "L" Spacing small:UnsignedInteger "s" {
+      return node('MosPatternCounts', { large, small });
+    }
+  / up:UnsignedInteger Spacing "|" Spacing down:UnsignedInteger
+    period:(Spacing "(" Spacing value:UnsignedInteger Spacing ")" { return value; })? {
+      return node('MosUdp', { up, down, period: period ?? null });
+    }
+  / numerator:UnsignedInteger Spacing ":" Spacing denominator:UnsignedInteger {
+      return node('MosHardness', { numerator, denominator });
+    }
+  / "<" Spacing value:AdditiveExpression Spacing ">" {
+      return node('MosEquave', { value });
+    }
+  / pattern:$([Ls]+) {
+      return node('MosAbstractPattern', { pattern });
+    }
+  / first:UnsignedInteger rest:(Spacing "," Spacing value:UnsignedInteger { return value; })+ {
+      return node('MosIntegerPattern', { values: [first, ...rest] });
+    }
+  / pattern:$([0-9]+) {
+      return node('MosIntegerPattern', { values: [...pattern] });
+    }
+
+MosSetterValue
+  = EqualDivisionLiteral
+  / RatioLiteral
+  / QuantityLiteral
+  / IntegerLiteral
+
 IntervalQuality
   = $("S" "A"+ / "s" "d"+ / "A"+ / "d"+ / "P" / "M" / "m" / "n")
 
@@ -577,7 +632,7 @@ IntervalNumber
   = $(UnsignedInteger (".5" / "½")?)
 
 PitchLiteral
-  = nominal:PitchNominal
+  = nominal:StandardPitchNominal
     accidentals:PythagoreanAccidental*
     inflections:FjsInflection* !IdentifierContinue {
       return node('PitchLiteral', {
@@ -588,6 +643,25 @@ PitchLiteral
         raw: text(),
       });
     }
+
+MosPitchLiteral
+  = !("v" &([J-Zj-z] !IdentifierContinue))
+    nominal:MosPitchNominal accidentals:MosAccidental* !FjsInflection !IdentifierContinue {
+      return node('PitchLiteral', {
+        modifiers: [], nominal, accidentals, inflections: [], raw: text(),
+      });
+    }
+
+MosPitchNominal
+  = value:$([J-Zj-z][J-Zj-z]) {
+      return node('PitchNominal', { system: 'mos', value });
+    }
+  / value:$([J-Zj-z]) {
+      return node('PitchNominal', { system: 'mos', value });
+    }
+
+MosAccidental
+  = value:$([&@ea]) { return node('Accidental', { value }); }
 
 // Bare integer tokens in score position are scale degrees, not scalar integer
 // expressions. They intentionally stop before binary operators so `2 - 3`
@@ -613,15 +687,12 @@ PitchModifier
       return node('PitchModifier', { kind: modifierKind(raw), raw });
     }
 
-PitchNominal
+StandardPitchNominal
   = value:$("alp"i / "bet"i / "gam"i / "del"i / "eps"i / "zet"i / "eta"i) {
       return node('PitchNominal', { system: 'greek', value });
     }
   / value:$([A-Ga-g]) {
       return node('PitchNominal', { system: 'latin', value });
-    }
-  / value:$([J-Zj-z]) {
-      return node('PitchNominal', { system: 'mos', value });
     }
   / value:$([Α-Ηα-η]) {
       return node('PitchNominal', { system: 'greek', value });

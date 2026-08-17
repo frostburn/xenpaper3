@@ -125,6 +125,87 @@ describe('enumerated chords', () => {
   })
 })
 
+describe('Diamond-MOS tokens', () => {
+  it('parses the MOS sub-language structurally in any element order', () => {
+    const elements = (source: string) =>
+      (parse(source).body[0] as { statements: { elements: { type: string }[] }[] }).statements[0]!
+        .elements
+
+    expect(elements('MOS{5L2s 3:2 2|4}').map((element) => element.type)).toEqual([
+      'MosPatternCounts',
+      'MosHardness',
+      'MosUdp',
+    ])
+    expect(elements('MOS{2|4 5L2s 3:2}').map((element) => element.type)).toEqual([
+      'MosUdp',
+      'MosPatternCounts',
+      'MosHardness',
+    ])
+    expect(elements('MOS{4L5s<3>}').map((element) => element.type)).toEqual([
+      'MosPatternCounts',
+      'MosEquave',
+    ])
+  })
+
+  it('does not consume ordinary identifiers as multi-letter MOS pitches', () => {
+    expect(parse('@test(sqrt(2))').body[0]).toMatchObject({
+      type: 'Directive',
+      arguments: [{ type: 'CallExpression', callee: 'sqrt' }],
+    })
+    expect(parse('{root = 220Hz}').body[0]).toMatchObject({
+      type: 'PitchContextChange',
+      statements: [{ target: { type: 'ContextNameTarget', name: 'root' } }],
+    })
+  })
+
+  it('parses extended MOS nominals through ZZ', () => {
+    expect(parse('JJ KZ ZZ').body).toMatchObject([
+      {
+        type: 'Sequence',
+        items: [
+          { type: 'PitchLiteral', nominal: { system: 'mos', value: 'JJ' } },
+          { type: 'PitchLiteral', nominal: { system: 'mos', value: 'KZ' } },
+          { type: 'PitchLiteral', nominal: { system: 'mos', value: 'ZZ' } },
+        ],
+      },
+    ])
+  })
+
+  it('parses down-shifted MOS pitches as unary expressions', () => {
+    expect(parse('vK vZZ').body[0]).toMatchObject({
+      type: 'Sequence',
+      items: [
+        {
+          type: 'UnaryExpression',
+          operator: 'v',
+          operand: { type: 'PitchLiteral', nominal: { system: 'mos', value: 'K' } },
+        },
+        {
+          type: 'UnaryExpression',
+          operator: 'v',
+          operand: { type: 'PitchLiteral', nominal: { system: 'mos', value: 'ZZ' } },
+        },
+      ],
+    })
+  })
+
+  it('parses MOS pitches as context-assignment targets and rejects FJS suffixes', () => {
+    expect(parse('MOS{5L2s} {K = root}').body[0]).toMatchObject({
+      type: 'Sequence',
+      items: [
+        { type: 'PitchContextChange', statements: [{ type: 'MosDeclaration' }] },
+        {
+          type: 'PitchContextChange',
+          statements: [
+            { target: { type: 'ContextPitchTarget', pitch: { nominal: { value: 'K' } } } },
+          ],
+        },
+      ],
+    })
+    expect(() => parse('MOS{5L2s} J^5')).toThrow()
+  })
+})
+
 const score = String.raw`# FJS and prefix modifiers
 E^5 Ebv5 P1v5 Cv5 E_
 /'C '/C vDb C#
@@ -253,13 +334,7 @@ describe('Xenpaper surface grammar', () => {
       'UnaryExpression',
       'PitchLiteral',
     ])
-    expect(items.slice(0, 5).map((item) => item.raw)).toEqual([
-      'E^5',
-      'Ebv5',
-      'P1v5',
-      'Cv5',
-      'E_',
-    ])
+    expect(items.slice(0, 5).map((item) => item.raw)).toEqual(['E^5', 'Ebv5', 'P1v5', 'Cv5', 'E_'])
     expect(items.slice(5, 8).map((item) => item.type)).toEqual([
       'UnaryExpression',
       'UnaryExpression',
@@ -466,8 +541,16 @@ describe('Xenpaper surface grammar', () => {
     const items = (program.body[0] as SyntaxNode).items as SyntaxNode[]
 
     expect(items).toMatchObject([
-      { type: 'UnaryExpression', operator: '^', operand: { type: 'IntervalLiteral', quality: 'M' } },
-      { type: 'UnaryExpression', operator: "'", operand: { type: 'IntervalLiteral', quality: 'P' } },
+      {
+        type: 'UnaryExpression',
+        operator: '^',
+        operand: { type: 'IntervalLiteral', quality: 'M' },
+      },
+      {
+        type: 'UnaryExpression',
+        operator: "'",
+        operand: { type: 'IntervalLiteral', quality: 'P' },
+      },
     ])
   })
 

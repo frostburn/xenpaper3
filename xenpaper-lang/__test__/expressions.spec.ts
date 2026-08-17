@@ -20,6 +20,22 @@ function evaluate(source: string) {
 }
 
 describe('arithmetic expression evaluation', () => {
+  it('retains Diamond-MOS interval spelling when subtracting MOS pitches', () => {
+    const declaration = parse('MOS{5L2s}').body[0]
+    if (declaration.type !== 'PitchContextChange') throw new Error('Expected a MOS declaration.')
+    const context = applyPitchContextChange(declaration)
+    const difference = evaluateExpression(expression('K - J'), context)
+
+    expect(difference.diagnostics).toEqual([])
+    if (!('value' in difference) || difference.value.kind !== 'pitchOffset')
+      throw new Error('Expected a MOS pitch offset.')
+    expect(difference.value.spelling).toMatchObject({
+      quality: 'M',
+      number: 1n,
+      raw: 'M1ms',
+    })
+  })
+
   it('adds cents as pitch displacement', () => {
     const sum = evaluate('700c + 700c')
 
@@ -351,6 +367,30 @@ describe('arithmetic expression evaluation', () => {
     expect(b.value.rootOffset.equals(Value.pitch(new Value(9n, 8n)))).toBe(true)
     const middleC = Value.hertz(new Value(440).div(new Value(2).pow(new Fraction(3, 4))))
     expect(context.rootFrequency.equals(middleC)).toBe(true)
+  })
+
+  it('reassociates a Diamond-MOS pitch with the root', () => {
+    const declaration = parse('MOS{5L2s 5|1 L=9/8}').body[0]
+    if (declaration.type !== 'PitchContextChange') throw new Error('Expected a MOS declaration.')
+    const mosContext = applyPitchContextChange(declaration, DEFAULT_PITCH_CONTEXT)
+    expect(mosContext.up).toBe(DEFAULT_PITCH_CONTEXT.up)
+    expect(mosContext.lift).toBe(DEFAULT_PITCH_CONTEXT.lift)
+    expect(mosContext.mos?.up).toBeUndefined()
+    expect(mosContext.mos?.lift).toBeUndefined()
+    const change = parse('{K = root}').body[0]
+    if (change.type !== 'PitchContextChange') throw new Error('Expected a context change.')
+    const context = applyPitchContextChange(change, mosContext)
+    const j = evaluateExpression(expression('J'), context)
+    const k = evaluateExpression(expression('K'), context)
+    if (
+      !('value' in j) ||
+      j.value.kind !== 'absolutePitch' ||
+      !('value' in k) ||
+      k.value.kind !== 'absolutePitch'
+    )
+      throw new Error('Expected pitches.')
+    expect(k.value.rootOffset.equals(Value.cents(0))).toBe(true)
+    expect(j.value.rootOffset.equals(Value.pitch(new Value(8n, 9n)))).toBe(true)
   })
 
   it('uses a pitch frequency assignment as a root frequency and spelling shorthand', () => {

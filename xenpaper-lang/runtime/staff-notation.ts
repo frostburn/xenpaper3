@@ -184,6 +184,20 @@ export function constructStaffNotation(
   }
 
   if (value.kind === 'absolutePitch') {
+    if (value.mos) {
+      const isDiatonicMos =
+        [...value.mos.context.pattern].filter((step) => step === 'L').length === 5 &&
+        [...value.mos.context.pattern].filter((step) => step === 's').length === 2
+      return {
+        staffPosition: value.mos.rank,
+        ...decorations(value),
+        notehead: 'normal',
+        cents,
+        ...(isDiatonicMos
+          ? {}
+          : { diamondMos: { rank: value.mos.rank, pattern: value.mos.context.pattern } }),
+      }
+    }
     const rawNominal = value.spelling.nominal
     const key = rawNominal.toUpperCase()
     const greekRank = GREEK_RANK[key]
@@ -331,6 +345,8 @@ export function constructStaffNotationShape(shape: ScoreShape): StaffNotationSha
       return { kind: 'annotation', text: shape.text, duration: shape.duration }
     case 'dynamic':
       return { kind: 'dynamic', mark: shape.mark, duration: shape.duration }
+    case 'clef':
+      return { kind: 'clef', clef: shape.clef, duration: shape.duration }
     case 'groove':
       if (!shape.template || !shape.controlCount)
         return { kind: 'annotation', text: 'straight', duration: shape.duration }

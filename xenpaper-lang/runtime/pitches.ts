@@ -1,9 +1,13 @@
-import { Fraction, mmod } from 'xen-dev-utils/fraction'
+import { Fraction, gcd, mmod } from 'xen-dev-utils/fraction'
+import { stepString } from 'moment-of-symmetry/core'
+import { generateNotation, type MosMonzo } from 'moment-of-symmetry/notation'
 import type {
   Expression,
   IntervalLiteral,
   PitchContextChange,
   PitchLiteral,
+  MosIntervalLiteral,
+  MosDeclaration,
 } from '../parser.generated.js'
 import type { Diagnostic } from '../diagnostics'
 import { Value } from '../value'
@@ -17,6 +21,7 @@ import type {
   PrimeMapping,
   PrimeMonzo,
   PitchContext,
+  MosContext,
   SourceOrigin,
 } from './types'
 import { parseVal, valMapping } from './val'
@@ -226,6 +231,10 @@ export function applyPitchContextChange(
 ): PitchContext {
   let context = input
   for (const statement of node.statements) {
+    if (statement.type === 'MosDeclaration') {
+      context = applyMosDeclaration(statement, context)
+      continue
+    }
     if (statement.type === 'ContextPreset') {
       const edo = /^(\d+)edo$/i.exec(statement.raw)
       const parsed = edo
@@ -441,6 +450,202 @@ export function applyPitchContextChange(
   return context
 }
 
+function mosSetterValue(expression: Expression, context: PitchContext): Value {
+  const evaluated = evaluateExpression(expression, context)
+  if (!('value' in evaluated) || evaluated.value.kind === 'absolutePitch')
+    throw new TypeError('A MOS step assignment requires a pitch interval.')
+  return evaluated.value.kind === 'pitchOffset'
+    ? evaluated.value.value
+    : Value.pitch(evaluated.value.value)
+}
+
+function mosOperatorInteger(expression: Expression, context: PitchContext): number | undefined {
+  if (expression.type !== 'IntegerLiteral') return undefined
+  const evaluated = evaluateExpression(expression, context)
+  if (!('value' in evaluated) || evaluated.value.kind !== 'scalar') return undefined
+  const exact = evaluated.value.value.exactRational()
+  if (!exact || exact.d !== 1) return undefined
+  return exact.s * exact.n
+}
+
+function applyMosDeclaration(declaration: MosDeclaration, context: PitchContext): PitchContext {
+  let equave = Value.pitch(new Value(2))
+  let equaveGiven = false
+  let pattern: string | undefined
+  let counts: { large: number; small: number } | undefined
+  let udp: { up: number; down: number; period?: number } | undefined
+  let hardnessNumerator = 2
+  let hardnessDenominator = 1
+  let hardnessGiven = false
+  const assignments = new Map<string, Value>()
+  const integerOperatorAssignments = new Map<string, number>()
+
+  for (const element of declaration.elements) {
+    if (element.type === 'MosPatternCounts') {
+      if (pattern || counts) throw new TypeError('A MOS declaration may only contain one mode.')
+      counts = { large: Number(element.large), small: Number(element.small) }
+    } else if (element.type === 'MosAbstractPattern') {
+      if (pattern || counts) throw new TypeError('A MOS declaration may only contain one mode.')
+      pattern = element.pattern
+    } else if (element.type === 'MosIntegerPattern') {
+      if (pattern || counts) throw new TypeError('A MOS declaration may only contain one mode.')
+      const parts = element.values.map(Number)
+      const low = Math.min(...parts)
+      const high = Math.max(...parts)
+      if (low === high) throw new TypeError('A MOS pattern requires two step sizes.')
+      pattern = parts.map((part) => (part === high ? 'L' : part === low ? 's' : '?')).join('')
+      if (pattern.includes('?'))
+        throw new TypeError('A MOS pattern requires exactly two step sizes.')
+      hardnessNumerator = high
+      hardnessDenominator = low
+      hardnessGiven = true
+    } else if (element.type === 'MosHardness') {
+      if (hardnessGiven) throw new TypeError('A MOS declaration may only contain one hardness.')
+      hardnessNumerator = Number(element.numerator)
+      hardnessDenominator = Number(element.denominator)
+      hardnessGiven = true
+    } else if (element.type === 'MosUdp') {
+      if (udp) throw new TypeError('A MOS declaration may only contain one UD(P) selection.')
+      udp = {
+        up: Number(element.up),
+        down: Number(element.down),
+        ...(element.period ? { period: Number(element.period) } : {}),
+      }
+    } else if (element.type === 'MosEquave') {
+      if (equaveGiven) throw new TypeError('A MOS declaration may only contain one equave.')
+      equaveGiven = true
+      equave = mosSetterValue(element.value, context)
+    } else if (element.type === 'MosStepAssignment') {
+      if (assignments.has(element.target) || integerOperatorAssignments.has(element.target))
+        throw new TypeError(`MOS step ${element.target} may only be assigned once.`)
+      const integer =
+        element.target === '^' || element.target === '/'
+          ? mosOperatorInteger(element.value, context)
+          : undefined
+      if (integer === undefined)
+        assignments.set(element.target, mosSetterValue(element.value, context))
+      else integerOperatorAssignments.set(element.target, integer)
+    }
+  }
+
+  const preserveOperators = !counts && !pattern && !hardnessGiven && !equaveGiven && !udp
+
+  if (
+    !counts &&
+    !pattern &&
+    !hardnessGiven &&
+    !equaveGiven &&
+    !udp &&
+    !assignments.has('L') &&
+    !assignments.has('s')
+  ) {
+    if (!context.mos) throw new TypeError('A MOS step setter requires an active MOS declaration.')
+    return {
+      ...context,
+      mos: {
+        ...context.mos,
+        up:
+          assignments.get('^') ??
+          (integerOperatorAssignments.has('^') && context.mos.hostStep
+            ? context.mos.hostStep.mul(new Value(integerOperatorAssignments.get('^')!))
+            : integerOperatorAssignments.has('^')
+              ? undefined
+              : context.mos.up),
+        lift:
+          assignments.get('/') ??
+          (integerOperatorAssignments.has('/') && context.mos.hostStep
+            ? context.mos.hostStep.mul(new Value(integerOperatorAssignments.get('/')!))
+            : integerOperatorAssignments.has('/')
+              ? undefined
+              : context.mos.lift),
+      },
+    }
+  }
+
+  if (counts) {
+    if (udp?.period !== undefined && udp.period !== gcd(counts.large, counts.small))
+      throw new TypeError('MOS period must be consistent with the step counts.')
+    pattern = stepString(counts.large, counts.small, udp)
+  } else if (udp) {
+    throw new TypeError('UD(P) selection requires a large/small count pattern.')
+  }
+  if (!pattern) {
+    if (!context.mos) throw new TypeError('A MOS declaration requires a mode.')
+    pattern = context.mos.pattern
+    if (!equaveGiven) equave = context.mos.equave
+  }
+  const countL = [...pattern].filter((x) => x === 'L').length
+  const countS = pattern.length - countL
+  let large = assignments.get('L')
+  let small = assignments.get('s')
+  if (!large && !small) {
+    const host = countL * hardnessNumerator + countS * hardnessDenominator
+    large = Value.equalDivision(hardnessNumerator, host, Value.ratio(equave))
+    small = Value.equalDivision(hardnessDenominator, host, Value.ratio(equave))
+  } else if (large && !small)
+    small = equave.sub(large.mul(new Value(countL))).div(new Value(countS))
+  else if (small && !large) large = equave.sub(small.mul(new Value(countS))).div(new Value(countL))
+  const accumulated = large!.mul(new Value(countL)).add(small!.mul(new Value(countS)))
+  if (Math.abs(accumulated.valueOf() - equave.valueOf()) > 1e-8)
+    throw new TypeError('The MOS large and small steps must accumulate to the MOS equave.')
+  const largeUnit = large!.div(new Value(hardnessNumerator))
+  const smallUnit = small!.div(new Value(hardnessDenominator))
+  const hostStep =
+    Math.abs(largeUnit.valueOf() - smallUnit.valueOf()) <= 1e-8 ? largeUnit : undefined
+
+  const notation = generateNotation(pattern)
+  const realize = (monzo: MosMonzo): Value =>
+    large!.mul(new Value(monzo[0])).add(small!.mul(new Value(monzo[1])))
+  const nominals = new Map<string, Value>()
+  for (const [nominal, monzo] of notation.scale) nominals.set(nominal, realize(monzo))
+  const degrees = notation.degrees.map((degree) => ({
+    center: realize(degree.center),
+    imperfect: !degree.perfect,
+    ...(degree.mid ? { mid: realize(degree.mid) } : {}),
+  }))
+  const offsets = [...nominals.values()]
+  const period = realize(notation.period)
+  const mos: MosContext = {
+    pattern,
+    equave,
+    period,
+    large: large!,
+    small: small!,
+    ...(hostStep ? { hostStep } : {}),
+    up: assignments.has('^')
+      ? assignments.get('^')!
+      : integerOperatorAssignments.has('^') && hostStep
+        ? hostStep.mul(new Value(integerOperatorAssignments.get('^')!))
+        : preserveOperators
+          ? context.mos?.up
+          : hostStep,
+    lift: assignments.has('/')
+      ? assignments.get('/')!
+      : integerOperatorAssignments.has('/') && hostStep
+        ? hostStep.mul(new Value(integerOperatorAssignments.get('/')!))
+        : preserveOperators
+          ? context.mos?.lift
+          : hostStep?.mul(new Value(5)),
+    nominals,
+    degrees,
+  }
+  return {
+    ...context,
+    mos,
+    degrees: [...offsets.slice(1), equave],
+    degreeEquave: equave,
+  }
+}
+
+export function requirePitchOperator(context: PitchContext, operator: 'up' | 'lift'): Value {
+  const value = context.mos ? context.mos[operator] : context[operator]
+  if (!value)
+    throw new TypeError(
+      `Cannot derive the MOS ${operator} interval because the scale has no equal-temperament host.`,
+    )
+  return value
+}
+
 const origin = (node: PitchLiteral | IntervalLiteral): readonly SourceOrigin[] => [
   { location: node.location, role: 'literal' },
 ]
@@ -462,6 +667,42 @@ function shifts(modifiers: readonly { kind: string }[]): number {
 
 /** Preserve the diatonic meaning of subtracting two naturally spelled pitches. */
 export function spellPitchDifference(left: AbsolutePitchValue, right: AbsolutePitchValue) {
+  if (left.mos && right.mos && left.mos.context === right.mos.context) {
+    const signedDistance = left.mos.rank - right.mos.rank
+    const distance = Math.abs(signedDistance)
+    const mos = left.mos.context
+    const simple = mmod(distance, mos.degrees.length)
+    const periods = Math.floor(distance / mos.degrees.length)
+    const degree = mos.degrees[simple]!
+    const center = degree.center.add(mos.period.mul(new Value(periods)))
+    let sounding = left.rootOffset.sub(right.rootOffset)
+    if (signedDistance < 0) sounding = sounding.neg()
+    const chroma = mos.large.sub(mos.small).valueOf()
+    const alteration = Math.round(((sounding.valueOf() - center.valueOf()) / chroma) * 2) / 2
+    let quality: string
+    if (degree.imperfect) {
+      if (alteration === 0.5) quality = 'M'
+      else if (alteration === -0.5) quality = 'm'
+      else if (alteration === 0) quality = 'n'
+      else if (alteration > 0.5) quality = 'A'.repeat(Math.round(alteration - 0.5))
+      else quality = 'd'.repeat(Math.round(-alteration - 0.5))
+    } else if (
+      degree.mid &&
+      Math.abs(sounding.valueOf() - degree.mid.add(mos.period.mul(new Value(periods))).valueOf()) <
+        1e-8
+    ) {
+      quality = 'n'
+    } else if (alteration === 0) quality = 'P'
+    else if (alteration > 0) quality = 'A'.repeat(Math.round(alteration))
+    else quality = 'd'.repeat(Math.round(-alteration))
+    return {
+      quality,
+      number: BigInt(distance),
+      raw: `${quality}${distance}ms`,
+      ...(signedDistance < 0 ? { direction: 'descending' as const } : {}),
+    }
+  }
+
   const rank = (spelling: PitchSpelling) => {
     const upper = spelling.nominal.toUpperCase()
     const key = GREEK_SCRIPT[upper] ?? upper
@@ -582,6 +823,50 @@ export function evaluatePitchLiteral(
   input: PrimeMapping | PitchContext,
 ): AbsolutePitchValue {
   const context = asContext(input)
+  if (node.nominal.system === 'mos') {
+    if (!context.mos) throw new TypeError('Diamond-MOS pitches require a MOS declaration.')
+    const nominal = node.nominal.value.toUpperCase()
+    let rootOffset = context.mos.nominals.get(nominal)
+    if (!rootOffset) throw new TypeError(`Undefined MOS nominal ${node.nominal.value}.`)
+    const registers =
+      (node.nominal.value === node.nominal.value.toLowerCase() ? 1 : 0) + shifts(node.modifiers)
+    const nominalRank = [...context.mos.nominals.keys()].indexOf(nominal)
+    rootOffset = rootOffset.add(context.mos.equave.mul(new Value(registers)))
+    const chroma = context.mos.large.sub(context.mos.small)
+    for (const accidental of node.accidentals) {
+      if (accidental.value === '&') rootOffset = rootOffset.add(chroma)
+      else if (accidental.value === '@') rootOffset = rootOffset.sub(chroma)
+      else if (accidental.value === 'e') rootOffset = rootOffset.add(chroma.div(new Value(2)))
+      else if (accidental.value === 'a') rootOffset = rootOffset.sub(chroma.div(new Value(2)))
+      else throw new TypeError(`Unsupported Diamond-MOS accidental ${accidental.value}.`)
+    }
+    if (context.rootPitch.mos?.context === context.mos) {
+      rootOffset = rootOffset.sub(context.rootPitch.rootOffset)
+    }
+    for (const modifier of node.modifiers) {
+      if (modifier.kind === 'up') rootOffset = rootOffset.add(requirePitchOperator(context, 'up'))
+      else if (modifier.kind === 'down')
+        rootOffset = rootOffset.sub(requirePitchOperator(context, 'up'))
+      else if (modifier.kind === 'lift')
+        rootOffset = rootOffset.add(requirePitchOperator(context, 'lift'))
+      else if (modifier.kind === 'drop')
+        rootOffset = rootOffset.sub(requirePitchOperator(context, 'lift'))
+    }
+    return {
+      kind: 'absolutePitch',
+      rootOffset,
+      formula: new Map(),
+      spelling: {
+        nominal: node.nominal.value,
+        raw: node.raw,
+        system: 'mos',
+        accidentals: node.accidentals.map((a) => a.value),
+        modifiers: node.modifiers.map((m) => m.kind),
+      },
+      mos: { rank: nominalRank + registers * context.mos.nominals.size, context: context.mos },
+      origins: origin(node),
+    }
+  }
   const upper = node.nominal.value.toUpperCase()
   const greekKey = GREEK_SCRIPT[upper] ?? upper
   const entries = node.nominal.system === 'latin' ? NOMINALS[upper] : GREEK_NOMINALS[greekKey]
@@ -641,10 +926,13 @@ export function evaluatePitchLiteral(
   if (context.rootPitch.formula.size)
     rootOffset = rootOffset.sub(mapFormula(context.rootPitch.formula, context.mapping))
   for (const modifier of node.modifiers) {
-    if (modifier.kind === 'up') rootOffset = rootOffset.add(context.up)
-    else if (modifier.kind === 'down') rootOffset = rootOffset.sub(context.up)
-    else if (modifier.kind === 'lift') rootOffset = rootOffset.add(context.lift)
-    else if (modifier.kind === 'drop') rootOffset = rootOffset.sub(context.lift)
+    if (modifier.kind === 'up') rootOffset = rootOffset.add(requirePitchOperator(context, 'up'))
+    else if (modifier.kind === 'down')
+      rootOffset = rootOffset.sub(requirePitchOperator(context, 'up'))
+    else if (modifier.kind === 'lift')
+      rootOffset = rootOffset.add(requirePitchOperator(context, 'lift'))
+    else if (modifier.kind === 'drop')
+      rootOffset = rootOffset.sub(requirePitchOperator(context, 'lift'))
   }
   return {
     kind: 'absolutePitch',
@@ -663,6 +951,46 @@ export function evaluatePitchLiteral(
       modifiers: node.modifiers.map((modifier) => modifier.kind),
     },
     origins: origin(node),
+  }
+}
+
+export function evaluateMosIntervalLiteral(
+  node: MosIntervalLiteral,
+  input: PrimeMapping | PitchContext,
+): PitchOffsetValue {
+  const context = asContext(input)
+  if (!context.mos) throw new TypeError('MOS-step intervals require a MOS declaration.')
+  const degree = Number(node.degree)
+  const size = context.mos.degrees.length
+  const simple = mmod(degree, size)
+  let value = context.mos.degrees[simple]!.center.add(
+    context.mos.period.mul(new Value(Math.floor(degree / size))),
+  )
+  const imperfect = context.mos.degrees[simple]!.imperfect
+  const chroma = context.mos.large.sub(context.mos.small)
+  let alteration = 0
+  if (node.quality === 'P') {
+    if (imperfect) throw new TypeError(`P is invalid for MOS step ${degree}.`)
+  } else if (node.quality === 'M') {
+    if (!imperfect) throw new TypeError(`M is invalid for MOS step ${degree}.`)
+    alteration = 0.5
+  } else if (node.quality === 'm') {
+    if (!imperfect) throw new TypeError(`m is invalid for MOS step ${degree}.`)
+    alteration = -0.5
+  } else if (node.quality === 'n') {
+    if (!imperfect) {
+      const mid = context.mos.degrees[simple]!.mid
+      if (!mid) throw new TypeError(`n is invalid for MOS step ${degree}.`)
+      value = mid.add(context.mos.period.mul(new Value(Math.floor(degree / size))))
+    }
+  } else if (node.quality.startsWith('A')) alteration = node.quality.length + (imperfect ? 0.5 : 0)
+  else alteration = -(node.quality.length + (imperfect ? 0.5 : 0))
+  value = value.add(chroma.mul(new Value(alteration)))
+  return {
+    kind: 'pitchOffset',
+    value,
+    spelling: { quality: node.quality, number: BigInt(degree), raw: node.raw, modifiers: [] },
+    origins: [{ location: node.location, role: 'literal' }],
   }
 }
 
@@ -706,10 +1034,10 @@ export function evaluateIntervalLiteral(
   const spellingNumber = number.d === 1 ? BigInt(number.n) : number
   let value = mapFormula(result, context.mapping)
   for (const modifier of node.modifiers) {
-    if (modifier.kind === 'up') value = value.add(context.up)
-    else if (modifier.kind === 'down') value = value.sub(context.up)
-    else if (modifier.kind === 'lift') value = value.add(context.lift)
-    else if (modifier.kind === 'drop') value = value.sub(context.lift)
+    if (modifier.kind === 'up') value = value.add(requirePitchOperator(context, 'up'))
+    else if (modifier.kind === 'down') value = value.sub(requirePitchOperator(context, 'up'))
+    else if (modifier.kind === 'lift') value = value.add(requirePitchOperator(context, 'lift'))
+    else if (modifier.kind === 'drop') value = value.sub(requirePitchOperator(context, 'lift'))
   }
   return {
     kind: 'pitchOffset',

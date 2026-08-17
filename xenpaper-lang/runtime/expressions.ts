@@ -9,12 +9,14 @@ import {
   createPitchContext,
   DEFAULT_PITCH_CONTEXT,
   evaluateIntervalLiteral,
+  evaluateMosIntervalLiteral,
   evaluatePitchLiteral,
   scalePitchOffset,
   mapFormula,
   spellIntervalFormula,
   spellPitchDifference,
   transposePitchSpelling,
+  requirePitchOperator,
 } from './pitches'
 
 function equaveShifts(modifiers: readonly { readonly kind: string }[]): number {
@@ -112,6 +114,73 @@ function addOrSubtract(
     if (pitch.kind !== 'absolutePitch') throw new TypeError('Expected an absolute pitch.')
     const offset = pitchCoercion(left.kind === 'absolutePitch' ? right : left)
     const spelling = transposePitchSpelling(pitch.spelling, offset.spelling, subtract)
+    const rootOffset = subtract
+      ? pitch.rootOffset.sub(offset.value)
+      : pitch.rootOffset.add(offset.value)
+    let mos = pitch.mos
+    let mosSpelling
+    if (mos && offset.spelling?.raw.endsWith('ms')) {
+      const mosContext = mos.context
+      const registerSteps = (offset.spelling.modifiers ?? []).reduce(
+        (sum, modifier) =>
+          sum +
+          (modifier === 'equaveUp'
+            ? mosContext.nominals.size
+            : modifier === 'doubleEquaveUp'
+              ? 2 * mosContext.nominals.size
+              : modifier === 'equaveDown'
+                ? -mosContext.nominals.size
+                : 0),
+        0,
+      )
+      let steps = Number(offset.spelling.number.valueOf()) + registerSteps
+      if (offset.spelling.direction === 'descending') steps = -steps
+      if (subtract) steps = -steps
+      const rank = mos.rank + steps
+      const nominals = [...mos.context.nominals.keys()]
+      const nominal = nominals[((rank % nominals.length) + nominals.length) % nominals.length]!
+      const registers = Math.floor(rank / nominals.length)
+      const modifiers = registers
+        ? Array.from({ length: Math.abs(registers) }, () =>
+            registers > 0 ? 'equaveUp' : 'equaveDown',
+          )
+        : undefined
+      const naturalOffset = mos.context.nominals
+        .get(nominal)!
+        .add(mos.context.equave.mul(new Value(registers)))
+      const sourceRegister = Math.floor(mos.rank / nominals.length)
+      const sourceNominal = nominals[mmod(mos.rank, nominals.length)]!
+      const sourceNaturalOffset = mos.context.nominals
+        .get(sourceNominal)!
+        .add(mos.context.equave.mul(new Value(sourceRegister)))
+      const chroma = mos.context.large.sub(mos.context.small).valueOf()
+      const sourceHalfAlterations = (pitch.spelling.accidentals ?? []).reduce(
+        (sum, token) => sum + (token === '&' ? 2 : token === '@' ? -2 : token === 'e' ? 1 : -1),
+        0,
+      )
+      const intervalAlteration = rootOffset
+        .sub(pitch.rootOffset)
+        .sub(naturalOffset.sub(sourceNaturalOffset))
+      const halfAlterations =
+        sourceHalfAlterations +
+        (chroma ? Math.round((2 * intervalAlteration.valueOf()) / chroma) : 0)
+      const accidental = halfAlterations > 0 ? '&' : '@'
+      const halfAccidental = halfAlterations > 0 ? 'e' : 'a'
+      const accidentals: string[] = Array.from(
+        { length: Math.floor(Math.abs(halfAlterations) / 2) },
+        () => accidental,
+      )
+      if (Math.abs(halfAlterations) % 2) accidentals.push(halfAccidental)
+      mos = { ...mos, rank }
+      mosSpelling = {
+        nominal,
+        raw: nominal,
+        system: 'mos' as const,
+        derived: true,
+        accidentals,
+        ...(modifiers ? { modifiers } : {}),
+      }
+    }
     const formula = offset.formula
       ? new Map([...pitch.formula].map(([prime, exponent]) => [prime, new Fraction(exponent)]))
       : undefined
@@ -126,9 +195,10 @@ function addOrSubtract(
     }
     return {
       ...pitch,
-      rootOffset: subtract ? pitch.rootOffset.sub(offset.value) : pitch.rootOffset.add(offset.value),
+      rootOffset,
       ...(formula ? { formula } : {}),
-      ...(spelling ? { spelling } : {}),
+      ...(mosSpelling ? { spelling: mosSpelling } : spelling ? { spelling } : {}),
+      ...(mos ? { mos } : {}),
       origins,
     }
   }
@@ -276,6 +346,8 @@ export function evaluateExpression(
       return { value: evaluatePitchLiteral(node, mapping), diagnostics: [] }
     if (node.type === 'IntervalLiteral')
       return { value: evaluateIntervalLiteral(node, mapping), diagnostics: [] }
+    if (node.type === 'MosIntervalLiteral')
+      return { value: evaluateMosIntervalLiteral(node, mapping), diagnostics: [] }
     if (node.type === 'Group') return evaluateExpression(node.expression, mapping)
     if (node.type === 'UnaryExpression') {
       const operand = evaluateExpression(node.operand, mapping)
@@ -310,12 +382,12 @@ export function evaluateExpression(
           node.operator === "'" ? 1 : node.operator === '"' ? 2 : node.operator === '`' ? -1 : 0
         const inflection =
           node.operator === '^'
-            ? context.up
+            ? requirePitchOperator(context, 'up')
             : node.operator === 'v'
-              ? context.up.neg()
+              ? requirePitchOperator(context, 'up').neg()
               : node.operator === '/'
-                ? context.lift
-                : context.lift.neg()
+                ? requirePitchOperator(context, 'lift')
+                : requirePitchOperator(context, 'lift').neg()
         // Equave shifts use the scale's degree equave for scalar arithmetic, but
         // written pitches and intervals always move by notational octaves.
         const scalarDisplacement = equaveShift

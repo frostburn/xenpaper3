@@ -64,6 +64,11 @@ export interface AbsolutePitchValue {
   readonly formula: PrimeMonzo
   readonly spelling: PitchSpelling
   readonly origins: readonly SourceOrigin[]
+  /** Diamond-MOS ordinal and configuration retained for named pitch subtraction. */
+  readonly mos?: {
+    readonly rank: number
+    readonly context: MosContext
+  }
 }
 
 export type PrimeMonzo = ReadonlyMap<number, Fraction>
@@ -120,6 +125,28 @@ export interface PitchContext {
   readonly rootPitch: AbsolutePitchValue
   readonly up: Value
   readonly lift: Value
+  /** Active Diamond-MOS notation, installed by a MOS declaration. */
+  readonly mos?: MosContext
+}
+
+export interface MosDegree {
+  readonly center: Value
+  readonly imperfect: boolean
+  readonly mid?: Value
+}
+
+export interface MosContext {
+  readonly pattern: string
+  readonly equave: Value
+  readonly period: Value
+  readonly large: Value
+  readonly small: Value
+  /** A single step of the equal temperament hosting this MOS, when one exists. */
+  readonly hostStep?: Value
+  readonly up?: Value
+  readonly lift?: Value
+  readonly nominals: ReadonlyMap<string, Value>
+  readonly degrees: readonly MosDegree[]
 }
 
 export type EvaluatedLiteral = ScalarValue | PitchOffsetValue | AbsolutePitchValue
@@ -136,7 +163,18 @@ export interface StaffPitch {
   readonly notehead: 'normal' | 'triangle-up' | 'triangle-down' | 'x'
   /** Sounding distance above middle C, retained for positioning refinements by a renderer. */
   readonly cents: number
+  /** Diamond-MOS information used to replace the conventional clef and staff guides. */
+  readonly diamondMos?: {
+    readonly rank: number
+    readonly pattern: string
+  }
 }
+
+/** A change of the notation reference shown at an exact position in the score. */
+export type StaffClef =
+  | { readonly kind: 'treble' }
+  | { readonly kind: 'bass' }
+  | { readonly kind: 'diamond-mos'; readonly pattern: string }
 
 export type StaffNotationShape =
   | {
@@ -166,6 +204,7 @@ export type StaffNotationShape =
       readonly duration: Fraction
     }
   | { readonly kind: 'dynamic'; readonly mark: DynamicMark; readonly duration: Fraction }
+  | { readonly kind: 'clef'; readonly clef: StaffClef; readonly duration: Fraction }
   | {
       readonly kind: 'sequence'
       readonly duration: Fraction
@@ -273,6 +312,11 @@ export interface DynamicShape extends ShapeBase {
   readonly mark: DynamicMark
 }
 
+export interface ClefShape extends ShapeBase {
+  readonly kind: 'clef'
+  readonly clef: StaffClef
+}
+
 /** A playback timing cycle. The authored template is retained so staff notation can
  * show the swing equivalence without applying it to engraved note positions. */
 export interface GrooveShape extends ShapeBase {
@@ -310,6 +354,7 @@ export type ScoreShape =
   | BarlineShape
   | AnnotationShape
   | DynamicShape
+  | ClefShape
   | GrooveShape
   | SequenceShape
   | ParallelShape

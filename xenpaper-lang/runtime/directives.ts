@@ -2,7 +2,7 @@ import { Fraction } from 'xen-dev-utils/fraction'
 import type { Directive, Expression } from '../parser.generated.js'
 import type { Diagnostic } from '../diagnostics'
 import { evaluateExpression } from './expressions'
-import type { DynamicMark, PitchContext } from './types'
+import type { DynamicMark, PitchContext, StaffClef } from './types'
 
 export const DYNAMIC_VELOCITIES: Readonly<Record<DynamicMark, Fraction>> = {
   ppp: new Fraction(1, 10),
@@ -20,6 +20,7 @@ export const DIRECTIVE_REGISTRY = Object.freeze({
   velocity: 'velocity',
   gliss: 'gliss',
   groove: 'groove',
+  clef: 'clef',
   art: 'articulation',
   'articulation-shorthand': 'articulation',
   staccatissimo: 'articulation',
@@ -45,6 +46,7 @@ export type ResolvedDirective =
   | { kind: 'gliss'; curve: 'linear' }
   | { kind: 'groove'; argument?: Expression }
   | { kind: 'articulation'; ratio: Fraction; mark?: string; shorthand: boolean }
+  | { kind: 'clef'; clef: Extract<StaffClef, { kind: 'treble' | 'bass' }> }
   | { kind: 'unknown' }
 
 export function resolveDirective(
@@ -76,6 +78,15 @@ export function resolveDirective(
       directive: { kind: 'dynamic', mark, velocity: DYNAMIC_VELOCITIES[mark] },
       diagnostics: [],
     }
+  }
+  if (registered === 'clef') {
+    const argument = node.arguments[0]
+    if (node.arguments.length !== 1 || argument?.type !== 'Identifier')
+      return fail('@clef requires exactly one clef name: treble or bass.')
+    const kind = argument.name.toLowerCase()
+    if (kind !== 'treble' && kind !== 'bass')
+      return fail(`Unsupported clef ${argument.name}. Expected treble or bass.`)
+    return { directive: { kind: 'clef', clef: { kind } }, diagnostics: [] }
   }
   if (registered === 'groove') {
     if (node.arguments.length > 1 || node.arguments[0]?.type === 'NamedArgument')
