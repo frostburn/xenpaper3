@@ -53,6 +53,12 @@ describe('score-shape timing', () => {
       [],
       ['b'],
     ])
+
+    const halfFlatC = shape('{key = Cd} C D E F G A B') as SequenceShape
+    const halfFlatAttacks = halfFlatC.children.filter((child) => child.kind === 'attack')
+    expect(halfFlatAttacks.map((attack) => attack.pitch.spelling.accidentals)).toEqual(
+      Array.from({ length: 7 }, () => ['d']),
+    )
   })
 
   it('ties Greek signature defaults to their corresponding Latin nominals', () => {

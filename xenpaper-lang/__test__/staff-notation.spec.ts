@@ -319,6 +319,8 @@ describe('staff notation construction', () => {
     expect(notation('b')).toMatchObject({ accidentals: [] })
     expect(notation('Ct')).toMatchObject({ accidentals: ['half-sharp'] })
     expect(notation('Cx')).toMatchObject({ accidentals: ['double-sharp'] })
+    expect(notation('C###')).toMatchObject({ accidentals: ['double-sharp', 'sharp'] })
+    expect(notation('Cbbb')).toMatchObject({ accidentals: ['double-flat', 'flat'] })
   })
 
   it('classifies ups, downs, lifts, and drops as staff inflections', () => {

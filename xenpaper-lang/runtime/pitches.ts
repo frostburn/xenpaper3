@@ -485,6 +485,9 @@ function accidentalSteps(pitch: PitchLiteral, mos: boolean): number {
     else if (accidental.value === 'b' || accidental.value === '♭') steps -= 1
     else if (accidental.value === 'x' || accidental.value === '𝄪') steps += 2
     else if (accidental.value === '𝄫') steps -= 2
+    else if (accidental.value === 't' || accidental.value === '𝄲' || accidental.value === '‡')
+      steps += 0.5
+    else if (accidental.value === 'd' || accidental.value === '𝄳') steps -= 0.5
   }
   return steps
 }
@@ -555,16 +558,14 @@ function applySignatureDeclaration(
     throw new TypeError('Key signatures require a Latin or MOS tonic.')
   const fifths: Record<string, number> = { C: 0, G: 1, D: 2, A: 3, E: 4, B: 5, F: -1 }
   const tonicName = tiedNominals(tonic.nominal.value)[0]!
-  const count = fifths[tonicName]! + 7 * accidentalSteps(tonic, false)
-  const order =
-    count >= 0 ? ['F', 'C', 'G', 'D', 'A', 'E', 'B'] : ['B', 'E', 'A', 'D', 'G', 'C', 'F']
   const signature = new Map<string, PitchLiteral>()
   for (const name of ['C', 'D', 'E', 'F', 'G', 'A', 'B']) {
-    const position = order.indexOf(name)
-    const steps =
-      position < Math.abs(count) % 7
-        ? Math.sign(count) * (Math.floor(Math.abs(count) / 7) + 1)
-        : Math.sign(count) * Math.floor(Math.abs(count) / 7)
+    const baseCount = fifths[tonicName]!
+    const position = (
+      baseCount >= 0 ? ['F', 'C', 'G', 'D', 'A', 'E', 'B'] : ['B', 'E', 'A', 'D', 'G', 'C', 'F']
+    ).indexOf(name)
+    const baseSteps = position < Math.abs(baseCount) ? Math.sign(baseCount) : 0
+    const steps = baseSteps + accidentalSteps(tonic, false)
     const entry = signaturePitch(name, tonic, steps, false)
     for (const nominal of tiedNominals(name)) signature.set(nominal, entry)
   }

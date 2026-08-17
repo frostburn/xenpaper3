@@ -101,7 +101,13 @@ function decorations(value: EvaluatedLiteral, chromatic?: number) {
     )
     .map((kind) => ({ kind }))
   const accidentals = written?.length
-    ? written.map(normalizeStaffAccidental)
+    ? written.map(normalizeStaffAccidental).reduce<string[]>((result, accidental) => {
+        const previous = result[result.length - 1]
+        if (accidental === 'sharp' && previous === 'sharp') result.splice(-1, 1, 'double-sharp')
+        else if (accidental === 'flat' && previous === 'flat') result.splice(-1, 1, 'double-flat')
+        else result.push(accidental)
+        return result
+      }, [])
     : inferredAccidentals(chromatic)
   const inflections: StaffInflection[] = [...operatorInflections, ...(fjs ?? [])]
   return {
