@@ -546,20 +546,16 @@ function applyMosDeclaration(declaration: MosDeclaration, context: PitchContext)
         assignments.get('^') ??
         (integerOperatorAssignments.has('^') && context.mos.hostStep
           ? context.mos.hostStep.mul(new Value(integerOperatorAssignments.get('^')!))
-          : context.up),
+          : integerOperatorAssignments.has('^')
+            ? undefined
+            : context.up),
       lift:
         assignments.get('/') ??
         (integerOperatorAssignments.has('/') && context.mos.hostStep
           ? context.mos.hostStep.mul(new Value(integerOperatorAssignments.get('/')!))
-          : context.lift),
-      unavailableMosOperators: new Set(
-        (['up', 'lift'] as const).filter((operator) => {
-          const target = operator === 'up' ? '^' : '/'
-          if (assignments.has(target)) return false
-          if (integerOperatorAssignments.has(target)) return !context.mos!.hostStep
-          return context.unavailableMosOperators?.has(operator)
-        }),
-      ),
+          : integerOperatorAssignments.has('/')
+            ? undefined
+            : context.lift),
     }
   }
 
@@ -627,27 +623,24 @@ function applyMosDeclaration(declaration: MosDeclaration, context: PitchContext)
         ? hostStep.mul(new Value(integerOperatorAssignments.get('^')!))
         : preserveOperators
           ? context.up
-          : (hostStep ?? context.up),
+          : hostStep,
     lift: assignments.has('/')
       ? assignments.get('/')!
       : integerOperatorAssignments.has('/') && hostStep
         ? hostStep.mul(new Value(integerOperatorAssignments.get('/')!))
         : preserveOperators
           ? context.lift
-          : (hostStep?.mul(new Value(5)) ?? context.lift),
-    unavailableMosOperators: new Set([
-      ...(!assignments.has('^') && !hostStep ? (['up'] as const) : []),
-      ...(!assignments.has('/') && !hostStep ? (['lift'] as const) : []),
-    ]),
+          : hostStep?.mul(new Value(5)),
   }
 }
 
-function requireMosOperator(context: PitchContext, operator: 'up' | 'lift'): Value {
-  if (context.unavailableMosOperators?.has(operator))
+export function requirePitchOperator(context: PitchContext, operator: 'up' | 'lift'): Value {
+  const value = context[operator]
+  if (!value)
     throw new TypeError(
       `Cannot derive the MOS ${operator} interval because the scale has no equal-temperament host.`,
     )
-  return context[operator]
+  return value
 }
 
 const origin = (node: PitchLiteral | IntervalLiteral): readonly SourceOrigin[] => [
@@ -848,13 +841,13 @@ export function evaluatePitchLiteral(
       rootOffset = rootOffset.sub(context.rootPitch.rootOffset)
     }
     for (const modifier of node.modifiers) {
-      if (modifier.kind === 'up') rootOffset = rootOffset.add(requireMosOperator(context, 'up'))
+      if (modifier.kind === 'up') rootOffset = rootOffset.add(requirePitchOperator(context, 'up'))
       else if (modifier.kind === 'down')
-        rootOffset = rootOffset.sub(requireMosOperator(context, 'up'))
+        rootOffset = rootOffset.sub(requirePitchOperator(context, 'up'))
       else if (modifier.kind === 'lift')
-        rootOffset = rootOffset.add(requireMosOperator(context, 'lift'))
+        rootOffset = rootOffset.add(requirePitchOperator(context, 'lift'))
       else if (modifier.kind === 'drop')
-        rootOffset = rootOffset.sub(requireMosOperator(context, 'lift'))
+        rootOffset = rootOffset.sub(requirePitchOperator(context, 'lift'))
     }
     return {
       kind: 'absolutePitch',
@@ -930,10 +923,13 @@ export function evaluatePitchLiteral(
   if (context.rootPitch.formula.size)
     rootOffset = rootOffset.sub(mapFormula(context.rootPitch.formula, context.mapping))
   for (const modifier of node.modifiers) {
-    if (modifier.kind === 'up') rootOffset = rootOffset.add(context.up)
-    else if (modifier.kind === 'down') rootOffset = rootOffset.sub(context.up)
-    else if (modifier.kind === 'lift') rootOffset = rootOffset.add(context.lift)
-    else if (modifier.kind === 'drop') rootOffset = rootOffset.sub(context.lift)
+    if (modifier.kind === 'up') rootOffset = rootOffset.add(requirePitchOperator(context, 'up'))
+    else if (modifier.kind === 'down')
+      rootOffset = rootOffset.sub(requirePitchOperator(context, 'up'))
+    else if (modifier.kind === 'lift')
+      rootOffset = rootOffset.add(requirePitchOperator(context, 'lift'))
+    else if (modifier.kind === 'drop')
+      rootOffset = rootOffset.sub(requirePitchOperator(context, 'lift'))
   }
   return {
     kind: 'absolutePitch',
@@ -1035,10 +1031,10 @@ export function evaluateIntervalLiteral(
   const spellingNumber = number.d === 1 ? BigInt(number.n) : number
   let value = mapFormula(result, context.mapping)
   for (const modifier of node.modifiers) {
-    if (modifier.kind === 'up') value = value.add(context.up)
-    else if (modifier.kind === 'down') value = value.sub(context.up)
-    else if (modifier.kind === 'lift') value = value.add(context.lift)
-    else if (modifier.kind === 'drop') value = value.sub(context.lift)
+    if (modifier.kind === 'up') value = value.add(requirePitchOperator(context, 'up'))
+    else if (modifier.kind === 'down') value = value.sub(requirePitchOperator(context, 'up'))
+    else if (modifier.kind === 'lift') value = value.add(requirePitchOperator(context, 'lift'))
+    else if (modifier.kind === 'drop') value = value.sub(requirePitchOperator(context, 'lift'))
   }
   return {
     kind: 'pitchOffset',

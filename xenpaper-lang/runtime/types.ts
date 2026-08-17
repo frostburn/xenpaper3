@@ -123,10 +123,8 @@ export interface PitchContext {
   readonly rootFrequency: Value
   /** Absolute pitch used as the notation root. */
   readonly rootPitch: AbsolutePitchValue
-  readonly up: Value
-  readonly lift: Value
-  /** MOS operators whose intervals cannot be derived from an equal-temperament host. */
-  readonly unavailableMosOperators?: ReadonlySet<'up' | 'lift'>
+  readonly up?: Value
+  readonly lift?: Value
   /** Active Diamond-MOS notation, installed by a MOS declaration. */
   readonly mos?: MosContext
 }
