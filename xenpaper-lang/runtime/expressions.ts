@@ -16,6 +16,7 @@ import {
   spellIntervalFormula,
   spellPitchDifference,
   transposePitchSpelling,
+  requirePitchOperator,
 } from './pitches'
 
 function equaveShifts(modifiers: readonly { readonly kind: string }[]): number {
@@ -381,12 +382,12 @@ export function evaluateExpression(
           node.operator === "'" ? 1 : node.operator === '"' ? 2 : node.operator === '`' ? -1 : 0
         const inflection =
           node.operator === '^'
-            ? context.up
+            ? requirePitchOperator(context, 'up')
             : node.operator === 'v'
-              ? context.up.neg()
+              ? requirePitchOperator(context, 'up').neg()
               : node.operator === '/'
-                ? context.lift
-                : context.lift.neg()
+                ? requirePitchOperator(context, 'lift')
+                : requirePitchOperator(context, 'lift').neg()
         // Equave shifts use the scale's degree equave for scalar arithmetic, but
         // written pitches and intervals always move by notational octaves.
         const scalarDisplacement = equaveShift

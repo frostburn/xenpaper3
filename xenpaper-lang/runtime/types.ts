@@ -141,6 +141,10 @@ export interface MosContext {
   readonly period: Value
   readonly large: Value
   readonly small: Value
+  /** A single step of the equal temperament hosting this MOS, when one exists. */
+  readonly hostStep?: Value
+  readonly up?: Value
+  readonly lift?: Value
   readonly nominals: ReadonlyMap<string, Value>
   readonly degrees: readonly MosDegree[]
 }

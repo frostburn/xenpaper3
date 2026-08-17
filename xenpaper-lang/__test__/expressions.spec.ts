@@ -373,6 +373,10 @@ describe('arithmetic expression evaluation', () => {
     const declaration = parse('MOS{5L2s 5|1 L=9/8}').body[0]
     if (declaration.type !== 'PitchContextChange') throw new Error('Expected a MOS declaration.')
     const mosContext = applyPitchContextChange(declaration, DEFAULT_PITCH_CONTEXT)
+    expect(mosContext.up).toBe(DEFAULT_PITCH_CONTEXT.up)
+    expect(mosContext.lift).toBe(DEFAULT_PITCH_CONTEXT.lift)
+    expect(mosContext.mos?.up).toBeUndefined()
+    expect(mosContext.mos?.lift).toBeUndefined()
     const change = parse('{K = root}').body[0]
     if (change.type !== 'PitchContextChange') throw new Error('Expected a context change.')
     const context = applyPitchContextChange(change, mosContext)

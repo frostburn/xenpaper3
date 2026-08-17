@@ -90,6 +90,15 @@ describe('score-shape timing', () => {
     const setAttack = set.children.find((child) => child.kind === 'attack')
     expect(setAttack?.pitch.value.equals(Value.equalDivision(1, 24, new Value(2)))).toBe(true)
 
+    const integerSet = shape('MOS{5L2s ^ = 2} ^J') as SequenceShape
+    const integerSetAttack = integerSet.children.find((child) => child.kind === 'attack')
+    expect(integerSetAttack?.pitch.value.equals(Value.equalDivision(2, 12, new Value(2)))).toBe(
+      true,
+    )
+
+    const unhosted = evaluateScoreShape(parse('MOS{5L 2s L=9/8} ^J').body[0] as Expression)
+    expect(unhosted.diagnostics[0]?.message).toContain('no equal-temperament host')
+
     const multiperiod = shape('MOS{4L2s} P3ms') as SequenceShape
     const periodAttack = multiperiod.children.find((child) => child.kind === 'attack')
     expect(Math.round(periodAttack!.pitch.value.valueOf())).toBe(600)
