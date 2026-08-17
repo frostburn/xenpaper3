@@ -123,8 +123,8 @@ export interface PitchContext {
   readonly rootFrequency: Value
   /** Absolute pitch used as the notation root. */
   readonly rootPitch: AbsolutePitchValue
-  readonly up?: Value
-  readonly lift?: Value
+  readonly up: Value
+  readonly lift: Value
   /** Active Diamond-MOS notation, installed by a MOS declaration. */
   readonly mos?: MosContext
 }
@@ -143,6 +143,8 @@ export interface MosContext {
   readonly small: Value
   /** A single step of the equal temperament hosting this MOS, when one exists. */
   readonly hostStep?: Value
+  readonly up?: Value
+  readonly lift?: Value
   readonly nominals: ReadonlyMap<string, Value>
   readonly degrees: readonly MosDegree[]
 }

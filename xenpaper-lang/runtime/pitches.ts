@@ -542,20 +542,23 @@ function applyMosDeclaration(declaration: MosDeclaration, context: PitchContext)
     if (!context.mos) throw new TypeError('A MOS step setter requires an active MOS declaration.')
     return {
       ...context,
-      up:
-        assignments.get('^') ??
-        (integerOperatorAssignments.has('^') && context.mos.hostStep
-          ? context.mos.hostStep.mul(new Value(integerOperatorAssignments.get('^')!))
-          : integerOperatorAssignments.has('^')
-            ? undefined
-            : context.up),
-      lift:
-        assignments.get('/') ??
-        (integerOperatorAssignments.has('/') && context.mos.hostStep
-          ? context.mos.hostStep.mul(new Value(integerOperatorAssignments.get('/')!))
-          : integerOperatorAssignments.has('/')
-            ? undefined
-            : context.lift),
+      mos: {
+        ...context.mos,
+        up:
+          assignments.get('^') ??
+          (integerOperatorAssignments.has('^') && context.mos.hostStep
+            ? context.mos.hostStep.mul(new Value(integerOperatorAssignments.get('^')!))
+            : integerOperatorAssignments.has('^')
+              ? undefined
+              : context.mos.up),
+        lift:
+          assignments.get('/') ??
+          (integerOperatorAssignments.has('/') && context.mos.hostStep
+            ? context.mos.hostStep.mul(new Value(integerOperatorAssignments.get('/')!))
+            : integerOperatorAssignments.has('/')
+              ? undefined
+              : context.mos.lift),
+      },
     }
   }
 
@@ -609,6 +612,20 @@ function applyMosDeclaration(declaration: MosDeclaration, context: PitchContext)
     large: large!,
     small: small!,
     ...(hostStep ? { hostStep } : {}),
+    up: assignments.has('^')
+      ? assignments.get('^')!
+      : integerOperatorAssignments.has('^') && hostStep
+        ? hostStep.mul(new Value(integerOperatorAssignments.get('^')!))
+        : preserveOperators
+          ? context.mos?.up
+          : hostStep,
+    lift: assignments.has('/')
+      ? assignments.get('/')!
+      : integerOperatorAssignments.has('/') && hostStep
+        ? hostStep.mul(new Value(integerOperatorAssignments.get('/')!))
+        : preserveOperators
+          ? context.mos?.lift
+          : hostStep?.mul(new Value(5)),
     nominals,
     degrees,
   }
@@ -617,25 +634,11 @@ function applyMosDeclaration(declaration: MosDeclaration, context: PitchContext)
     mos,
     degrees: [...offsets.slice(1), equave],
     degreeEquave: equave,
-    up: assignments.has('^')
-      ? assignments.get('^')!
-      : integerOperatorAssignments.has('^') && hostStep
-        ? hostStep.mul(new Value(integerOperatorAssignments.get('^')!))
-        : preserveOperators
-          ? context.up
-          : hostStep,
-    lift: assignments.has('/')
-      ? assignments.get('/')!
-      : integerOperatorAssignments.has('/') && hostStep
-        ? hostStep.mul(new Value(integerOperatorAssignments.get('/')!))
-        : preserveOperators
-          ? context.lift
-          : hostStep?.mul(new Value(5)),
   }
 }
 
 export function requirePitchOperator(context: PitchContext, operator: 'up' | 'lift'): Value {
-  const value = context[operator]
+  const value = context.mos ? context.mos[operator] : context[operator]
   if (!value)
     throw new TypeError(
       `Cannot derive the MOS ${operator} interval because the scale has no equal-temperament host.`,

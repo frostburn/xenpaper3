@@ -107,7 +107,7 @@ describe('arithmetic expression evaluation', () => {
     expect(evaluate("'sqrt(2)").value.equals(evaluate('sqrt(8)').value)).toBe(true)
     const up = evaluate('^3/2')
     expect(up.kind).toBe('scalar')
-    expect(up.value.equals(new Value(3n, 2n).mul(Value.ratio(DEFAULT_PITCH_CONTEXT.up!)))).toBe(true)
+    expect(up.value.equals(new Value(3n, 2n).mul(Value.ratio(DEFAULT_PITCH_CONTEXT.up)))).toBe(true)
     expect(up.origins.map((origin) => origin.role)).toEqual(['literal', 'operator'])
   })
 
@@ -373,8 +373,10 @@ describe('arithmetic expression evaluation', () => {
     const declaration = parse('MOS{5L2s 5|1 L=9/8}').body[0]
     if (declaration.type !== 'PitchContextChange') throw new Error('Expected a MOS declaration.')
     const mosContext = applyPitchContextChange(declaration, DEFAULT_PITCH_CONTEXT)
-    expect(mosContext.up).toBeUndefined()
-    expect(mosContext.lift).toBeUndefined()
+    expect(mosContext.up).toBe(DEFAULT_PITCH_CONTEXT.up)
+    expect(mosContext.lift).toBe(DEFAULT_PITCH_CONTEXT.lift)
+    expect(mosContext.mos?.up).toBeUndefined()
+    expect(mosContext.mos?.lift).toBeUndefined()
     const change = parse('{K = root}').body[0]
     if (change.type !== 'PitchContextChange') throw new Error('Expected a context change.')
     const context = applyPitchContextChange(change, mosContext)
