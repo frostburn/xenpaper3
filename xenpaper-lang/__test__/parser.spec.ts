@@ -515,6 +515,18 @@ describe('Xenpaper surface grammar', () => {
     expect(((items[0].marks as SyntaxNode[])[0] as SyntaxNode).type).toBe('DetachedContinue')
   })
 
+  it('parses a hold within a pitch modifier expression', () => {
+    expect(parse("'a=").body[0]).toMatchObject({
+      type: 'UnaryExpression',
+      operator: "'",
+      operand: {
+        type: 'PostfixExpression',
+        expression: { type: 'PitchLiteral', nominal: { value: 'a' } },
+        marks: [{ type: 'DetachedContinue', raw: '=' }],
+      },
+    })
+  })
+
   it('parses double barlines as hard boundaries', () => {
     const items = parse('C || D').body as SyntaxNode[]
 

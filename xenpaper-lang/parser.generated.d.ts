@@ -155,7 +155,6 @@ export interface Directive extends Node {
 export interface DetachedContinue extends Node {
   type: 'DetachedContinue'
   raw: '='
-  attached?: boolean
 }
 
 export interface EqualDivisionLiteral extends Node {

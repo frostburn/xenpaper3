@@ -100,19 +100,10 @@ SequenceExpression
     }
 
 SequenceItem
-  = expression:(EnumeratedChordArithmetic / ShiftedValueExpression / ScaleDegreeLiteral / AdditiveExpression)
+  = expression:(EnumeratedChordArithmetic / ScaleDegreeLiteral / AdditiveExpression)
     marks:AttachedPostfixMark* {
       if (!marks.length) return expression;
       return node('PostfixExpression', { expression, marks });
-    }
-
-ShiftedValueExpression
-  = modifiers:PitchModifier+ operand:(RatioLiteral / EqualDivisionLiteral / ScaleDegreeLiteral) {
-      let result = operand;
-      for (let index = modifiers.length - 1; index >= 0; index -= 1) {
-        result = unary(modifiers[index].raw, result);
-      }
-      return result;
     }
 
 EnumeratedChordArithmetic
@@ -203,6 +194,9 @@ PowerExpression
 
 UnaryExpression
   = PostfixExpression
+  / modifier:PitchModifier Spacing operand:(ScaleDegreeLiteral / UnaryExpression) {
+      return unary(modifier.raw, operand);
+    }
   / operator:UnaryOperator Spacing operand:UnaryExpression {
       return unary(operator, operand);
     }
@@ -220,7 +214,7 @@ PostfixExpression
     }
 
 AttachedPostfixMark
-  = "=" { return node('DetachedContinue', { raw: "=", attached: true }); }
+  = "=" { return node('DetachedContinue', { raw: "=" }); }
   / marks:$("?"+) {
       return node('TailElimination', { count: marks.length, raw: marks });
     }
@@ -493,7 +487,7 @@ ContextStatementList
 
 ContextStatement
   = name:$('root'i) !IdentifierContinue Spacing "=" Spacing
-    value:(ShiftedValueExpression / ScaleDegreeLiteral) {
+    value:(ScaleDegreeLiteral / UnaryExpression) {
       return node('ContextAssignment', {
         target: node('ContextNameTarget', { name: name.toLowerCase() }),
         value,

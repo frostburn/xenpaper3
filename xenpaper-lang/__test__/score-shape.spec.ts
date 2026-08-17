@@ -663,6 +663,20 @@ describe('score-shape timing', () => {
     expect(result.tuplet).toBe(3)
   })
 
+  it('shifts a grouped continued pitch like an ungrouped continued pitch', () => {
+    const ungrouped = shape("'a=")
+    const grouped = shape("'(a=)")
+    const collectPitches = (score: ScoreShape): number[] => {
+      if (score.kind === 'attack') return [score.pitch.value.valueOf()]
+      if (score.kind === 'sequence') return score.children.flatMap(collectPitches)
+      if (score.kind === 'parallel') return score.branches.flatMap(collectPitches)
+      return []
+    }
+
+    expect(grouped.duration.equals(ungrouped.duration)).toBe(true)
+    expect(collectPitches(grouped)).toEqual(collectPitches(ungrouped))
+  })
+
   it('adds a complete pulse for every continuation on a normalized slot', () => {
     const result = shape('[0 2 7] [0 2 7]= [0 2 7]===') as SequenceShape
     const groups = result.children as SequenceShape[]
