@@ -29,6 +29,17 @@ describe('staff notation construction', () => {
     ])
   })
 
+  it('emits naturals for alterations removed by a replacement key signature', () => {
+    const evaluated = evaluateScoreShape(parse('{key = G} F {key = C} F').body[0] as Expression)
+    if (!('shape' in evaluated)) throw new Error('Expected a score shape.')
+    const staff = constructStaffNotationShape(evaluated.shape)
+    if (staff.kind !== 'sequence') throw new Error('Expected a staff sequence.')
+    expect(staff.children.filter((child) => child.kind === 'key-signature')).toMatchObject([
+      { pitches: [{ staffPosition: 3, accidentals: ['sharp'] }] },
+      { pitches: [{ staffPosition: 3, accidentals: ['natural'] }] },
+    ])
+  })
+
   it('projects MOS declarations to explicit clef events', () => {
     const evaluated = evaluateScoreShape(parse('MOS{3L4s} J').body[0] as Expression)
     if (!('shape' in evaluated)) throw new Error('Expected a score shape.')
@@ -54,6 +65,31 @@ describe('staff notation construction', () => {
     expect(
       staff.children.filter((child) => child.kind === 'clef').map((child) => child.clef),
     ).toEqual([{ kind: 'diamond-mos', pattern: 'LsLsLss' }, { kind: 'treble' }])
+  })
+
+  it('preserves a declared key signature when leaving Diamond-MOS context', () => {
+    const evaluated = evaluateScoreShape(
+      parse('MOS{5L2s; key=K} J {12edo; key=G} F').body[0] as Expression,
+    )
+    if (!('shape' in evaluated)) throw new Error('Expected a score shape.')
+    const staff = constructStaffNotationShape(evaluated.shape)
+    if (staff.kind !== 'sequence') throw new Error('Expected a staff sequence.')
+    expect(staff.children.map((child) => child.kind)).toEqual([
+      'sequence',
+      'note',
+      'sequence',
+      'note',
+    ])
+    expect(staff.children[2]).toMatchObject({
+      kind: 'sequence',
+      children: [
+        { kind: 'clef', clef: { kind: 'treble' } },
+        {
+          kind: 'key-signature',
+          pitches: [{ staffPosition: 3, accidentals: ['sharp'] }],
+        },
+      ],
+    })
   })
 
   it('engraves alterations produced by Diamond-MOS transposition', () => {

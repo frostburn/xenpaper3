@@ -725,7 +725,21 @@ function contextShape(
       else if (flats && !sharps) names = ['B', 'E', 'A', 'D', 'G', 'C', 'F']
     }
     const pitches = names.flatMap((name) => {
-      const pitch = context.signature?.get(name)
+      let pitch = context.signature?.get(name)
+      const decorated = (candidate: typeof pitch) =>
+        candidate &&
+        (candidate.accidentals.length || candidate.inflections.length || candidate.modifiers.length)
+      if (!decorated(pitch)) {
+        const previousPitch = previousContext?.signature?.get(name)
+        if (!previousPitch || !decorated(previousPitch)) return []
+        pitch = {
+          ...previousPitch,
+          modifiers: [],
+          accidentals: [{ type: 'Accidental', value: '_', location: node.location }],
+          inflections: [],
+          raw: name,
+        }
+      }
       if (!pitch) return []
       const system: 'mos' | 'latin' = context.mos ? 'mos' : 'latin'
       const literal = {
@@ -768,12 +782,14 @@ function contextShape(
     }
   }
   if (previousContext?.mos && !context.mos) {
-    return {
+    const clef: ScoreShape = {
       kind: 'clef',
       clef: { kind: 'treble' },
       duration: new Fraction(0),
       origins: [origin(node, 'context')],
     }
+    if (!signatureDeclared) return clef
+    return sequence([clef, signatureShape()], [origin(node, 'context')])
   }
   if (signatureDeclared) return signatureShape()
   return contextAnnotation(node)
