@@ -171,6 +171,24 @@ describe('Diamond-MOS tokens', () => {
     ])
   })
 
+  it('parses down-shifted MOS pitches as unary expressions', () => {
+    expect(parse('vK vZZ').body[0]).toMatchObject({
+      type: 'Sequence',
+      items: [
+        {
+          type: 'UnaryExpression',
+          operator: 'v',
+          operand: { type: 'PitchLiteral', nominal: { system: 'mos', value: 'K' } },
+        },
+        {
+          type: 'UnaryExpression',
+          operator: 'v',
+          operand: { type: 'PitchLiteral', nominal: { system: 'mos', value: 'ZZ' } },
+        },
+      ],
+    })
+  })
+
   it('parses MOS pitches as context-assignment targets and rejects FJS suffixes', () => {
     expect(parse('MOS{5L2s} {K = root}').body[0]).toMatchObject({
       type: 'Sequence',
