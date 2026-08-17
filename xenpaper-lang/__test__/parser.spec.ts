@@ -523,7 +523,7 @@ describe('Xenpaper surface grammar', () => {
         operator: "'",
         operand: { type: 'PitchLiteral', nominal: { value: 'a' } },
       },
-      marks: [{ type: 'DetachedContinue', attached: true }],
+      marks: [{ type: 'DetachedContinue', raw: '=' }],
     })
   })
 

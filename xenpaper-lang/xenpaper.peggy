@@ -100,18 +100,19 @@ SequenceExpression
     }
 
 SequenceItem
-  = expression:(EnumeratedChordArithmetic / ShiftedPitchExpression / ShiftedValueExpression / ScaleDegreeLiteral / AdditiveExpression)
+  = expression:(EnumeratedChordArithmetic / ShiftedPitchBeforeContinue / ShiftedValueExpression / ScaleDegreeLiteral / AdditiveExpression)
     marks:AttachedPostfixMark* {
       if (!marks.length) return expression;
       return node('PostfixExpression', { expression, marks });
     }
 
-// Parse pitch modifiers at the score-item level so an attached duration mark
-// applies to the shifted pitch, rather than becoming part of the modifier's
-// operand. For example, `'a=` is (`'a`)=, not '(a=).
-ShiftedPitchExpression
+// Look ahead for a continuation so it remains available to SequenceItem and
+// applies to the complete shifted pitch. For example, `'a=` is (`'a`)=, not
+// '(a=). Shifted pitches without a continuation use the ordinary expression
+// grammar below.
+ShiftedPitchBeforeContinue
   = modifiers:PitchModifier+
-    operand:(MosIntervalLiteral / IntervalLiteral / MosPitchLiteral / PitchLiteral) {
+    operand:(MosIntervalLiteral / IntervalLiteral / MosPitchLiteral / PitchLiteral) &"=" {
       let result = operand;
       for (let index = modifiers.length - 1; index >= 0; index -= 1) {
         result = unary(modifiers[index].raw, result);
@@ -233,7 +234,7 @@ PostfixExpression
     }
 
 AttachedPostfixMark
-  = "=" { return node('DetachedContinue', { raw: "=", attached: true }); }
+  = "=" { return node('DetachedContinue', { raw: "=" }); }
   / marks:$("?"+) {
       return node('TailElimination', { count: marks.length, raw: marks });
     }
