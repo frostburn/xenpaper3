@@ -227,6 +227,7 @@ export interface SignatureDeclaration extends Node {
   type: 'SignatureDeclaration'
   kind: 'sig' | 'key'
   pitches: PitchLiteral[]
+  udp?: { up: string; down: string; period: string | null } | null
 }
 
 export interface MosAbstractPattern extends Node {

@@ -516,7 +516,8 @@ function applySignatureDeclaration(
 ): PitchContext {
   if (declaration.kind === 'sig') {
     const signature = new Map<string, PitchLiteral>()
-    for (const pitch of declaration.pitches) signature.set(pitch.nominal.value.toUpperCase(), pitch)
+    for (const pitch of declaration.pitches)
+      for (const nominal of tiedNominals(pitch.nominal.value)) signature.set(nominal, pitch)
     return { ...context, signature }
   }
   if (declaration.pitches.length !== 1)
@@ -550,10 +551,10 @@ function applySignatureDeclaration(
     }
     return { ...context, signature }
   }
-  if (tonic.nominal.system !== 'latin')
+  if (tonic.nominal.system !== 'latin' && tonic.nominal.system !== 'greek')
     throw new TypeError('Key signatures require a Latin or MOS tonic.')
   const fifths: Record<string, number> = { C: 0, G: 1, D: 2, A: 3, E: 4, B: 5, F: -1 }
-  const tonicName = tonic.nominal.value.toUpperCase()
+  const tonicName = tiedNominals(tonic.nominal.value)[0]!
   const count = fifths[tonicName]! + 7 * accidentalSteps(tonic, false)
   const order =
     count >= 0 ? ['F', 'C', 'G', 'D', 'A', 'E', 'B'] : ['B', 'E', 'A', 'D', 'G', 'C', 'F']
@@ -565,9 +566,24 @@ function applySignatureDeclaration(
         ? Math.sign(count) * (Math.floor(Math.abs(count) / 7) + 1)
         : Math.sign(count) * Math.floor(Math.abs(count) / 7)
     const entry = signaturePitch(name, tonic, steps, false)
-    signature.set(name, entry)
+    for (const nominal of tiedNominals(name)) signature.set(nominal, entry)
   }
   return { ...context, signature }
+}
+
+const TIED_NOMINALS = [
+  ['C', 'GAM', 'Γ'],
+  ['D', 'DEL', 'Δ'],
+  ['E', 'EPS', 'Ε'],
+  ['F', 'ZET', 'Ζ'],
+  ['G', 'ETA', 'Η'],
+  ['A', 'ALP', 'Α'],
+  ['B', 'BET', 'Β'],
+] as const
+
+function tiedNominals(nominal: string): readonly string[] {
+  const upper = nominal.toUpperCase()
+  return TIED_NOMINALS.find((group) => group.includes(upper as never)) ?? [upper]
 }
 
 function applyMosDeclaration(declaration: MosDeclaration, context: PitchContext): PitchContext {
@@ -588,6 +604,14 @@ function applyMosDeclaration(declaration: MosDeclaration, context: PitchContext)
       if (signatureDeclaration)
         throw new TypeError('A MOS declaration may only contain one signature.')
       signatureDeclaration = element
+      if (element.udp) {
+        if (udp) throw new TypeError('A MOS declaration may only contain one UD(P) selection.')
+        udp = {
+          up: Number(element.udp.up),
+          down: Number(element.udp.down),
+          ...(element.udp.period ? { period: Number(element.udp.period) } : {}),
+        }
+      }
     } else if (element.type === 'MosPatternCounts') {
       if (pattern || counts) throw new TypeError('A MOS declaration may only contain one mode.')
       counts = { large: Number(element.large), small: Number(element.small) }
@@ -932,6 +956,7 @@ export function evaluatePitchLiteral(
   input: PrimeMapping | PitchContext,
 ): AbsolutePitchValue {
   const context = asContext(input)
+  let fromSignature = false
   const explicitlyNatural = node.accidentals.some(
     (accidental) => accidental.value === '_' || accidental.value === '♮',
   )
@@ -943,6 +968,7 @@ export function evaluatePitchLiteral(
     !node.modifiers.length &&
     !node.inflections.length
   ) {
+    fromSignature = true
     node = {
       ...node,
       modifiers: defaultSpelling.modifiers,
@@ -989,6 +1015,7 @@ export function evaluatePitchLiteral(
         system: 'mos',
         accidentals: node.accidentals.map((a) => a.value),
         modifiers: node.modifiers.map((m) => m.kind),
+        ...(fromSignature ? { signature: true } : {}),
       },
       mos: { rank: nominalRank + registers * context.mos.nominals.size, context: context.mos },
       origins: origin(node),
@@ -1076,6 +1103,7 @@ export function evaluatePitchLiteral(
         flavor: inflection.flavor,
       })),
       modifiers: node.modifiers.map((modifier) => modifier.kind),
+      ...(fromSignature ? { signature: true } : {}),
     },
     origins: origin(node),
   }
