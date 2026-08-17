@@ -1,4 +1,4 @@
-import type { Program } from '../parser.generated.js'
+import type { PitchLiteral, Program } from '../parser.generated.js'
 import type { Diagnostic } from '../diagnostics'
 import type { Value } from '../value'
 import type { LocationRange } from 'peggy'
@@ -125,6 +125,8 @@ export interface PitchContext {
   readonly rootPitch: AbsolutePitchValue
   readonly up: Value
   readonly lift: Value
+  /** Defaults applied to otherwise unaltered written pitch nominals. */
+  readonly signature?: ReadonlyMap<string, PitchLiteral>
   /** Active Diamond-MOS notation, installed by a MOS declaration. */
   readonly mos?: MosContext
 }

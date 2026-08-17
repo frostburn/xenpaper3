@@ -15,6 +15,56 @@ function shape(source: string, pulse: Fraction | number = 1): ScoreShape {
 }
 
 describe('score-shape timing', () => {
+  it('applies custom and key signatures while explicit naturals cancel them', () => {
+    const custom = shape('{sig = C# ^D E^5 /Ad} C C_ D E A') as SequenceShape
+    const attacks = custom.children.filter((child) => child.kind === 'attack')
+    expect(attacks.map((attack) => attack.pitch.spelling)).toMatchObject([
+      { nominal: 'C', accidentals: ['#'] },
+      { nominal: 'C', accidentals: ['_'] },
+      { nominal: 'D', modifiers: ['up'] },
+      { nominal: 'E', inflections: [{ prime: 5n }] },
+      { nominal: 'A', accidentals: ['d'], modifiers: ['lift'] },
+    ])
+    expect(attacks[0]!.pitch.value.valueOf()).not.toBeCloseTo(attacks[1]!.pitch.value.valueOf())
+
+    const gMajor = shape('{key = G} C D E F G A B') as SequenceShape
+    const gAttacks = gMajor.children.filter((child) => child.kind === 'attack')
+    expect(gAttacks.map((attack) => attack.pitch.spelling.accidentals)).toEqual([
+      [],
+      [],
+      [],
+      ['#'],
+      [],
+      [],
+      [],
+    ])
+
+    const upF = shape('{key = ^F} C D E F G A B') as SequenceShape
+    const upFAttacks = upF.children.filter((child) => child.kind === 'attack')
+    expect(upFAttacks.map((attack) => attack.pitch.spelling.modifiers)).toEqual(
+      Array.from({ length: 7 }, () => ['up']),
+    )
+    expect(upFAttacks.map((attack) => attack.pitch.spelling.accidentals)).toEqual([
+      [],
+      [],
+      [],
+      [],
+      [],
+      [],
+      ['b'],
+    ])
+  })
+
+  it('applies signatures declared inside Diamond-MOS blocks', () => {
+    const custom = shape('MOS{5L2s sig = J& L@} J K L') as SequenceShape
+    const attacks = custom.children.filter((child) => child.kind === 'attack')
+    expect(attacks.map((attack) => attack.pitch.spelling.accidentals)).toEqual([['&'], [], ['@']])
+
+    const keyed = shape('MOS{5L2s key = K} J K L M N O P') as SequenceShape
+    const keyedAttacks = keyed.children.filter((child) => child.kind === 'attack')
+    expect(keyedAttacks.some((attack) => attack.pitch.spelling.accidentals.length)).toBe(true)
+  })
+
   it('installs Diamond-MOS absolute pitches and relative mossteps', () => {
     const score = shape('MOS{5L2s} J K L M N O P') as SequenceShape
     const cents = score.children
