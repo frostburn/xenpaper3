@@ -97,7 +97,7 @@ function mapScoreConstruction(
   }
   if (node.type === 'PostfixExpression') {
     const expression = mapScoreConstruction(node.expression, mapLeaf)
-    if (expression) return { ...node, expression }
+    return { ...node, expression: expression ?? mapLeaf(node.expression) }
   }
   return undefined
 }
