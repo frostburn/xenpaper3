@@ -557,7 +557,7 @@ CallArgumentList
     }
 
 IdentifierExpression
-  = !("v" &(PitchLiteral / IntervalLiteral)) name:Identifier {
+  = !("v" &(MosPitchLiteral / PitchLiteral / IntervalLiteral)) name:Identifier {
       return node('Identifier', { name });
     }
 
@@ -644,7 +644,8 @@ PitchLiteral
     }
 
 MosPitchLiteral
-  = nominal:MosPitchNominal accidentals:MosAccidental* !FjsInflection !IdentifierContinue {
+  = !("v" &([J-Zj-z] !IdentifierContinue))
+    nominal:MosPitchNominal accidentals:MosAccidental* !FjsInflection !IdentifierContinue {
       return node('PitchLiteral', {
         modifiers: [], nominal, accidentals, inflections: [], raw: text(),
       });
