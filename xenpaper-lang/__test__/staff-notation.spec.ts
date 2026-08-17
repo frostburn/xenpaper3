@@ -156,6 +156,7 @@ describe('staff notation construction', () => {
 
   it('places just ratios relative to middle C and retains FJS inflections', () => {
     expect(notation('1/1')).toMatchObject({ staffPosition: 0 })
+    expect(notation('256/243')).toMatchObject({ staffPosition: 1, accidentals: ['flat'] })
     expect(notation('3/2')).toMatchObject({ staffPosition: 4 })
     expect(notation('5/3')).toMatchObject({
       staffPosition: 5,

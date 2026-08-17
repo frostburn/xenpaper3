@@ -250,16 +250,15 @@ export function constructStaffNotation(
   }
 
   const formula = formulaOf(value)
-  const hasFjsPrime = formula && [...formula].some(([prime, exponent]) => prime >= 5 && exponent.n)
-  const fjsSpelling = hasFjsPrime ? spellIntervalFormula(formula) : undefined
-  if (fjsSpelling) {
-    const numericNumber = Number(fjsSpelling.number.valueOf())
+  const formulaSpelling = formula ? spellIntervalFormula(formula) : undefined
+  if (formulaSpelling) {
+    const numericNumber = Number(formulaSpelling.number.valueOf())
     const position = rootPosition + Math.ceil(numericNumber - 1)
-    const chromatic = spellingChromatic(fjsSpelling.quality, numericNumber)
+    const chromatic = spellingChromatic(formulaSpelling.quality, numericNumber)
     return {
       staffPosition: position,
       accidentals: inferredAccidentals(chromatic),
-      ...(fjsSpelling.inflections?.length ? { inflections: fjsSpelling.inflections } : {}),
+      ...(formulaSpelling.inflections?.length ? { inflections: formulaSpelling.inflections } : {}),
       notehead: 'normal',
       cents,
     }
