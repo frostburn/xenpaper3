@@ -100,33 +100,10 @@ SequenceExpression
     }
 
 SequenceItem
-  = expression:(EnumeratedChordArithmetic / ShiftedPitchBeforeContinue / ShiftedValueExpression / ScaleDegreeLiteral / AdditiveExpression)
+  = expression:(EnumeratedChordArithmetic / ScaleDegreeLiteral / AdditiveExpression)
     marks:AttachedPostfixMark* {
       if (!marks.length) return expression;
       return node('PostfixExpression', { expression, marks });
-    }
-
-// Look ahead for a continuation so it remains available to SequenceItem and
-// applies to the complete shifted pitch. For example, `'a=` is (`'a`)=, not
-// '(a=). Shifted pitches without a continuation use the ordinary expression
-// grammar below.
-ShiftedPitchBeforeContinue
-  = modifiers:PitchModifier+
-    operand:(MosIntervalLiteral / IntervalLiteral / MosPitchLiteral / PitchLiteral) &"=" {
-      let result = operand;
-      for (let index = modifiers.length - 1; index >= 0; index -= 1) {
-        result = unary(modifiers[index].raw, result);
-      }
-      return result;
-    }
-
-ShiftedValueExpression
-  = modifiers:PitchModifier+ operand:(RatioLiteral / EqualDivisionLiteral / ScaleDegreeLiteral) {
-      let result = operand;
-      for (let index = modifiers.length - 1; index >= 0; index -= 1) {
-        result = unary(modifiers[index].raw, result);
-      }
-      return result;
     }
 
 EnumeratedChordArithmetic
@@ -217,6 +194,9 @@ PowerExpression
 
 UnaryExpression
   = PostfixExpression
+  / modifier:PitchModifier Spacing operand:(ScaleDegreeLiteral / UnaryExpression) {
+      return unary(modifier.raw, operand);
+    }
   / operator:UnaryOperator Spacing operand:UnaryExpression {
       return unary(operator, operand);
     }
@@ -507,7 +487,7 @@ ContextStatementList
 
 ContextStatement
   = name:$('root'i) !IdentifierContinue Spacing "=" Spacing
-    value:(ShiftedValueExpression / ScaleDegreeLiteral) {
+    value:(ScaleDegreeLiteral / UnaryExpression) {
       return node('ContextAssignment', {
         target: node('ContextNameTarget', { name: name.toLowerCase() }),
         value,
