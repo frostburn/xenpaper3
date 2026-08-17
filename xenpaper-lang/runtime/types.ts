@@ -125,6 +125,8 @@ export interface PitchContext {
   readonly rootPitch: AbsolutePitchValue
   readonly up: Value
   readonly lift: Value
+  /** MOS operators whose intervals cannot be derived from an equal-temperament host. */
+  readonly unavailableMosOperators?: ReadonlySet<'up' | 'lift'>
   /** Active Diamond-MOS notation, installed by a MOS declaration. */
   readonly mos?: MosContext
 }
@@ -141,6 +143,8 @@ export interface MosContext {
   readonly period: Value
   readonly large: Value
   readonly small: Value
+  /** A single step of the equal temperament hosting this MOS, when one exists. */
+  readonly hostStep?: Value
   readonly nominals: ReadonlyMap<string, Value>
   readonly degrees: readonly MosDegree[]
 }

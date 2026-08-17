@@ -623,6 +623,7 @@ MosSetterValue
   = EqualDivisionLiteral
   / RatioLiteral
   / QuantityLiteral
+  / IntegerLiteral
 
 IntervalQuality
   = $("S" "A"+ / "s" "d"+ / "A"+ / "d"+ / "P" / "M" / "m" / "n")

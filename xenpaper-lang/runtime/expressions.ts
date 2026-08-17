@@ -377,6 +377,16 @@ export function evaluateExpression(
       }
       if (["'", '"', '`', '^', 'v', '/', '\\'].includes(node.operator)) {
         const context = 'rootPitch' in mapping ? mapping : createPitchContext(mapping)
+        const mosOperator =
+          node.operator === '^' || node.operator === 'v'
+            ? 'up'
+            : node.operator === '/' || node.operator === '\\'
+              ? 'lift'
+              : undefined
+        if (mosOperator && context.unavailableMosOperators?.has(mosOperator))
+          throw new TypeError(
+            `Cannot derive the MOS ${mosOperator} interval because the scale has no equal-temperament host.`,
+          )
         const equaveShift =
           node.operator === "'" ? 1 : node.operator === '"' ? 2 : node.operator === '`' ? -1 : 0
         const inflection =
