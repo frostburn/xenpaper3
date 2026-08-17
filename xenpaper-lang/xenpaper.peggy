@@ -100,10 +100,23 @@ SequenceExpression
     }
 
 SequenceItem
-  = expression:(EnumeratedChordArithmetic / ShiftedValueExpression / ScaleDegreeLiteral / AdditiveExpression)
+  = expression:(EnumeratedChordArithmetic / ShiftedPitchExpression / ShiftedValueExpression / ScaleDegreeLiteral / AdditiveExpression)
     marks:AttachedPostfixMark* {
       if (!marks.length) return expression;
       return node('PostfixExpression', { expression, marks });
+    }
+
+// Parse pitch modifiers at the score-item level so an attached duration mark
+// applies to the shifted pitch, rather than becoming part of the modifier's
+// operand. For example, `'a=` is (`'a`)=, not '(a=).
+ShiftedPitchExpression
+  = modifiers:PitchModifier+
+    operand:(MosIntervalLiteral / IntervalLiteral / MosPitchLiteral / PitchLiteral) {
+      let result = operand;
+      for (let index = modifiers.length - 1; index >= 0; index -= 1) {
+        result = unary(modifiers[index].raw, result);
+      }
+      return result;
     }
 
 ShiftedValueExpression
