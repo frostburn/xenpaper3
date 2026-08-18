@@ -579,8 +579,11 @@ const accidental = (value: string) =>
     'half-flat': '𝄳',
     'half-sharp': '𝄲',
   })[value] ?? value
-const keySignaturePosition = (pitch: StaffPitch) => {
-  let position = pitch.staffPosition
+const keySignaturePosition = (
+  item: Extract<StaffItem, { kind: 'key-signature' }>,
+  pitch: StaffPitch,
+) => {
+  let position = pitch.staffPosition + (clefAtColumn(item.column).kind === 'bass' ? 12 : 0)
   while (position < 2) position += 7
   while (position > 10) position -= 7
   return position
@@ -784,7 +787,7 @@ const swingBeamCount = (durations: readonly Fraction[], tuplet?: number) =>
         :key="pitchIndex"
         class="key-signature__accidental"
         :x="keySignatureX(item) + pitchIndex * 10"
-        :y="y(keySignaturePosition(pitch)) + 5"
+        :y="y(keySignaturePosition(item, pitch)) + 5"
       >
         <tspan
           v-for="(value, inflectionIndex) in formattedInflections(pitch.inflections ?? [])"
