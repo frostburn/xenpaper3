@@ -17,14 +17,14 @@ function valuation(target: number, wartCount: number): number {
   if (!wartCount) return patent
   // Walk the two monotonic candidate streams instead of allocating and
   // sorting an array proportional to the number of repeated wart letters.
-  let lower = patent - 1
-  let upper = patent + 1
+  let lowerOffset = 1
+  let upperOffset = 1
   let candidate = patent
   for (let index = 0; index < wartCount; index++) {
-    const lowerDistance = Math.abs(lower - target)
-    const upperDistance = Math.abs(upper - target)
-    if (lowerDistance <= upperDistance) candidate = lower--
-    else candidate = upper++
+    const lowerDistance = Math.abs(patent - target - lowerOffset)
+    const upperDistance = Math.abs(patent - target + upperOffset)
+    if (lowerDistance <= upperDistance) candidate = patent - lowerOffset++
+    else candidate = patent + upperOffset++
   }
   return candidate
 }

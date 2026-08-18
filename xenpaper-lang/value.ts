@@ -351,7 +351,12 @@ export class Value {
   ): Value {
     const count = new Fraction(divisions)
     if (!count.n) throw new RangeError('Equal division count cannot be zero.')
-    return Value.pitch(equave).mul(new Fraction(steps).div(count))
+    const pitch = Value.pitch(equave)
+    if (pitch.magnitude.kind !== 'pitch') throw new TypeError('Expected a pitch displacement.')
+    return Value.fromMagnitude(
+      { kind: 'pitch', value: pitch.magnitude.value.scale(new Fraction(steps).div(count)) },
+      pitch.dimensions,
+    )
   }
 
   add(input: ValueInput): Value {
