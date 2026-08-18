@@ -1198,6 +1198,8 @@ export function evaluateScoreSemantics(
             chainRequested?: boolean
             ownerIndex?: number
             segmentStart?: Fraction
+            curve: string
+            nextCurve?: string
           }
         | undefined
       const results: ScoreShapeEvaluationResult[] = []
@@ -1235,8 +1237,11 @@ export function evaluateScoreSemantics(
           else if (directive?.kind === 'gliss') {
             // A gliss directive between the source and target starts another segment at that
             // target. Keep collecting the current pair; completion below will seed the next pair.
-            if (!gliss) gliss = { indices: [] }
-            else if (gliss.indices.length === 1) gliss.chainRequested = true
+            if (!gliss) gliss = { indices: [], curve: directive.curve }
+            else if (gliss.indices.length === 1) {
+              gliss.chainRequested = true
+              gliss.nextCurve = directive.curve
+            }
           } else if (directive?.kind === 'articulation') {
             activeArticulation = directive.ratio
             activeArticulationMarks =
@@ -1394,6 +1399,7 @@ export function evaluateScoreSemantics(
                 ],
               })
             else {
+              const curve = gliss.curve
               const spans = attackSpans(sourceShape)
               const sourceAttacks = attacks(sourceShape)
               let leaf = 0
@@ -1404,13 +1410,13 @@ export function evaluateScoreSemantics(
                   return {
                     ...shape,
                     automation: {
-                      curve: 'linear',
+                      curve,
                       from: shape.pitch,
                       to: destination.pitch,
                       duration,
                       segments: [
                         {
-                          curve: 'linear',
+                          curve,
                           from: shape.pitch,
                           to: destination.pitch,
                           start: new Fraction(0),
@@ -1449,7 +1455,7 @@ export function evaluateScoreSemantics(
                           segments: [
                             ...(previous.segments ?? []),
                             {
-                              curve: 'linear',
+                              curve,
                               from: segmentSource.pitch,
                               to: destination.pitch,
                               start: segmentStart ?? previous.duration,
@@ -1479,6 +1485,7 @@ export function evaluateScoreSemantics(
                     sourceShape: chainedSource,
                     ownerIndex: gliss.ownerIndex ?? sourceIndex,
                     segmentStart: (gliss.segmentStart ?? new Fraction(0)).add(sourceShape.duration),
+                    curve: gliss.nextCurve ?? 'linear',
                   }
                 : undefined
             }

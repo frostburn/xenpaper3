@@ -272,7 +272,7 @@ export interface AttackShape extends ShapeBase {
 export type DynamicMark = 'ppp' | 'pp' | 'p' | 'mp' | 'mf' | 'f' | 'ff' | 'fff'
 
 export interface PitchAutomation {
-  readonly curve: 'linear'
+  readonly curve: string
   readonly from: AttackShape['pitch']
   readonly to: AttackShape['pitch']
   readonly duration: Fraction
@@ -281,7 +281,7 @@ export interface PitchAutomation {
 }
 
 export interface PitchAutomationSegment {
-  readonly curve: 'linear'
+  readonly curve: string
   readonly from: AttackShape['pitch']
   readonly to: AttackShape['pitch']
   /** Offset from the beginning of the owning attack. */
