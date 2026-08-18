@@ -398,7 +398,7 @@ RepeatCount
     }
 
 Directive
-  = "@" body:(GlissDirectiveBody / GrooveDirectiveBody / ArticulationShorthandBody / NumericDirectiveBody / NamedDirectiveBody) {
+  = "@" body:(GlissDirectiveBody / GrooveDirectiveBody / DroneDirectiveBody / ArticulationShorthandBody / NumericDirectiveBody / NamedDirectiveBody) {
       return node('Directive', body);
     }
 
@@ -434,6 +434,18 @@ GrooveDirectiveBody
         name: 'groove',
         rawName: name,
         arguments: argument ? [argument] : [],
+        graceCount: 0,
+      };
+    }
+
+DroneDirectiveBody
+  = name:$('drone'i) !IdentifierContinue args:("(" Spacing argument:SequenceExpression? Spacing ")" {
+      return argument ? [argument] : [];
+    })? {
+      return {
+        name: 'drone',
+        rawName: name,
+        arguments: args ?? [],
         graceCount: 0,
       };
     }

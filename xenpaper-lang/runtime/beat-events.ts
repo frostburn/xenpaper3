@@ -48,6 +48,7 @@ export function flattenScoreSemantics(shape: ScoreShape): BeatEventFlatteningRes
     activeStart?: Fraction
     activeSpan?: Fraction
     groove?: Groove
+    drone?: MutableNoteEvent[]
   }
   const completedAutomations = new WeakSet<MutableNoteEvent>()
   type Groove = {
@@ -81,10 +82,16 @@ export function flattenScoreSemantics(shape: ScoreShape): BeatEventFlatteningRes
       : interpolated
   }
 
+  const stopDrone = (state: State, end: Fraction) => {
+    for (const event of state.drone ?? []) event.duration = end.sub(event.start)
+    state.drone = undefined
+  }
+
   const visit = (current: ScoreShape, start: Fraction, state: State): Fraction => {
     if (!current.isolatedDirectiveScope) return visitCurrent(current, start, state)
     const isolatedState = { ...state }
     const end = visitCurrent(current, start, isolatedState)
+    if (isolatedState.drone !== state.drone) stopDrone(isolatedState, end)
     state.active = isolatedState.active
     state.activeStart = isolatedState.activeStart
     state.activeSpan = isolatedState.activeSpan
@@ -169,6 +176,29 @@ export function flattenScoreSemantics(shape: ScoreShape): BeatEventFlatteningRes
           }
         }
       }
+    } else if (current.kind === 'drone') {
+      stopDrone(state, start)
+      if (current.template) {
+        const flattened = flattenScoreSemantics(current.template)
+        diagnostics.push(...flattened.diagnostics)
+        state.drone = flattened.score.events
+          .filter((event): event is BeatTimedNoteEvent => event.kind === 'note')
+          .map((event): MutableNoteEvent => {
+            const drone: MutableNoteEvent = {
+              ...event,
+              // The expression selects the drone's notes; its internal rhythm does not
+              // delay their attacks because every selected note begins with the directive.
+              start: copy(start),
+              duration: new Fraction(0),
+              dynamic: copy(event.dynamic),
+              origins: [...current.origins, ...event.origins],
+              articulation: new Fraction(1),
+              groove: state.groove,
+            }
+            events.push(drone)
+            return drone
+          })
+      }
     } else if (
       current.kind === 'barline' ||
       current.kind === 'annotation' ||
@@ -204,6 +234,8 @@ export function flattenScoreSemantics(shape: ScoreShape): BeatEventFlatteningRes
       const firstEvent = events.length
       const states = current.branches.map((): State => ({ active: [], groove: state.groove }))
       current.branches.forEach((branch, index) => visit(branch, start, states[index]!))
+      const end = start.add(current.duration)
+      for (const branchState of states) stopDrone(branchState, end)
       // A continuation after a parallel distributes over every attack in the
       // construction, rather than only the last attack in each branch.
       state.active = events
@@ -213,12 +245,14 @@ export function flattenScoreSemantics(shape: ScoreShape): BeatEventFlatteningRes
       // span: only the final notes of its longest branches remain active.
       state.activeStart = undefined
       state.activeSpan = undefined
-      return start.add(current.duration)
+      return end
     }
     return start.add(current.duration)
   }
 
-  visit(shape, new Fraction(0), { active: [] })
+  const rootState: State = { active: [] }
+  const end = visit(shape, new Fraction(0), rootState)
+  stopDrone(rootState, end)
   for (const event of events) {
     if (event.kind !== 'note') continue
     const mutable = event as MutableNoteEvent

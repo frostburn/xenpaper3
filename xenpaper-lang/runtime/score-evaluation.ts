@@ -496,6 +496,7 @@ function scaleShape(shape: ScoreShape, factor: Fraction): ScoreShape {
     case 'clef':
     case 'key-signature':
     case 'groove':
+    case 'drone':
       return { ...shape, duration }
     case 'sequence':
       return {
@@ -1271,6 +1272,28 @@ export function evaluateScoreSemantics(
               } else grooveTemplate = template.shape
             }
           }
+          let droneTemplate: ScoreShape | undefined
+          if (directive?.kind === 'drone' && directive.argument) {
+            const template = visit(
+              directive.argument,
+              activeContext,
+              activePulse,
+              activeDynamic,
+              activeArticulation,
+              activeArticulationMarks,
+            )
+            resolved.diagnostics.push(...template.diagnostics)
+            if ('shape' in template) {
+              if (!attacks(template.shape).length) {
+                resolved.diagnostics.push({
+                  code: 'XP_DRONE',
+                  severity: 'error',
+                  message: 'A drone expression must contain at least one note.',
+                  locations: [directive.argument.location],
+                })
+              } else droneTemplate = template.shape
+            }
+          }
           const shape: ScoreShape =
             directive?.kind === 'unknown'
               ? {
@@ -1294,14 +1317,21 @@ export function evaluateScoreSemantics(
                       duration: new Fraction(0),
                       origins: [origin(item, 'directive')],
                     }
-                  : directive?.kind === 'clef'
+                  : directive?.kind === 'drone'
                     ? {
-                        kind: 'clef',
-                        clef: directive.clef,
+                        kind: 'drone',
+                        template: droneTemplate,
                         duration: new Fraction(0),
                         origins: [origin(item, 'directive')],
                       }
-                    : sequence([], [origin(item, 'directive')])
+                    : directive?.kind === 'clef'
+                      ? {
+                          kind: 'clef',
+                          clef: directive.clef,
+                          duration: new Fraction(0),
+                          origins: [origin(item, 'directive')],
+                        }
+                      : sequence([], [origin(item, 'directive')])
           results.push({ shape, diagnostics: resolved.diagnostics })
           continue
         }
