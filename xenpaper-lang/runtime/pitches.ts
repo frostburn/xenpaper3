@@ -8,6 +8,7 @@ import type {
   PitchLiteral,
   MosIntervalLiteral,
   MosDeclaration,
+  SignatureDeclaration,
 } from '../parser.generated.js'
 import type { Diagnostic } from '../diagnostics'
 import { Value } from '../value'
@@ -231,6 +232,10 @@ export function applyPitchContextChange(
 ): PitchContext {
   let context = input
   for (const statement of node.statements) {
+    if (statement.type === 'SignatureDeclaration') {
+      context = applySignatureDeclaration(statement, context)
+      continue
+    }
     if (statement.type === 'MosDeclaration') {
       context = applyMosDeclaration(statement, context)
       continue
@@ -468,6 +473,120 @@ function mosOperatorInteger(expression: Expression, context: PitchContext): numb
   return exact.s * exact.n
 }
 
+function accidentalSteps(pitch: PitchLiteral, mos: boolean): number {
+  let steps = 0
+  for (const accidental of pitch.accidentals) {
+    if (mos) {
+      if (accidental.value === '&') steps += 1
+      else if (accidental.value === '@') steps -= 1
+      else if (accidental.value === 'e') steps += 0.5
+      else if (accidental.value === 'a') steps -= 0.5
+    } else if (accidental.value === '#' || accidental.value === '♯') steps += 1
+    else if (accidental.value === 'b' || accidental.value === '♭') steps -= 1
+    else if (accidental.value === 'x' || accidental.value === '𝄪') steps += 2
+    else if (accidental.value === '𝄫') steps -= 2
+    else if (accidental.value === 't' || accidental.value === '𝄲' || accidental.value === '‡')
+      steps += 0.5
+    else if (accidental.value === 'd' || accidental.value === '𝄳') steps -= 0.5
+  }
+  return steps
+}
+
+function signaturePitch(
+  nominal: string,
+  source: PitchLiteral,
+  steps: number,
+  mos: boolean,
+): PitchLiteral {
+  const positive = mos ? '&' : '#'
+  const negative = mos ? '@' : 'b'
+  const halfPositive = mos ? 'e' : 't'
+  const halfNegative = mos ? 'a' : 'd'
+  const whole = Math.trunc(Math.abs(steps))
+  const values: string[] = Array.from({ length: whole }, () => (steps > 0 ? positive : negative))
+  if (Math.abs(steps) % 1) values.push(steps > 0 ? halfPositive : halfNegative)
+  return {
+    ...source,
+    nominal: { ...source.nominal, value: nominal },
+    accidentals: values.map((value) => ({ type: 'Accidental', value, location: source.location })),
+    raw: nominal,
+  }
+}
+
+function applySignatureDeclaration(
+  declaration: SignatureDeclaration,
+  context: PitchContext,
+): PitchContext {
+  if (declaration.kind === 'sig') {
+    const signature = new Map<string, PitchLiteral>()
+    for (const pitch of declaration.pitches)
+      for (const nominal of tiedNominals(pitch.nominal.value)) signature.set(nominal, pitch)
+    return { ...context, signature }
+  }
+  if (declaration.pitches.length !== 1)
+    throw new TypeError('A key signature requires exactly one tonic pitch.')
+  const tonic = declaration.pitches[0]!
+  const mos = tonic.nominal.system === 'mos'
+  if (mos) {
+    if (!context.mos) throw new TypeError('A MOS key signature requires a MOS declaration.')
+    const names = [...context.mos.nominals.keys()]
+    const tonicName = tonic.nominal.value.toUpperCase()
+    const rotation = names.indexOf(tonicName)
+    if (rotation < 0) throw new TypeError(`Undefined MOS key nominal ${tonic.nominal.value}.`)
+    const tonicNatural = context.mos.nominals.get(tonicName)!
+    const chroma = context.mos.large.sub(context.mos.small).valueOf()
+    const tonicOffset = tonicNatural.valueOf() + accidentalSteps(tonic, true) * chroma
+    const signature = new Map<string, PitchLiteral>()
+    for (let index = 0; index < names.length; index++) {
+      const scaleIndex = mmod(index - rotation, names.length)
+      let desired = tonicOffset + context.mos.nominals.get(names[scaleIndex]!)!.valueOf()
+      while (desired >= context.mos.equave.valueOf()) desired -= context.mos.equave.valueOf()
+      while (desired < 0) desired += context.mos.equave.valueOf()
+      const natural = context.mos.nominals.get(names[index]!)!.valueOf()
+      let difference = desired - natural
+      while (difference > context.mos.equave.valueOf() / 2)
+        difference -= context.mos.equave.valueOf()
+      while (difference < -context.mos.equave.valueOf() / 2)
+        difference += context.mos.equave.valueOf()
+      const steps = Math.round((difference / chroma) * 2) / 2
+      const entry = signaturePitch(names[index]!, tonic, steps, true)
+      signature.set(names[index]!, entry)
+    }
+    return { ...context, signature }
+  }
+  if (tonic.nominal.system !== 'latin' && tonic.nominal.system !== 'greek')
+    throw new TypeError('Key signatures require a Latin or MOS tonic.')
+  const fifths: Record<string, number> = { C: 0, G: 1, D: 2, A: 3, E: 4, B: 5, F: -1 }
+  const tonicName = tiedNominals(tonic.nominal.value)[0]!
+  const signature = new Map<string, PitchLiteral>()
+  for (const name of ['C', 'D', 'E', 'F', 'G', 'A', 'B']) {
+    const baseCount = fifths[tonicName]!
+    const position = (
+      baseCount >= 0 ? ['F', 'C', 'G', 'D', 'A', 'E', 'B'] : ['B', 'E', 'A', 'D', 'G', 'C', 'F']
+    ).indexOf(name)
+    const baseSteps = position < Math.abs(baseCount) ? Math.sign(baseCount) : 0
+    const steps = baseSteps + accidentalSteps(tonic, false)
+    const entry = signaturePitch(name, tonic, steps, false)
+    for (const nominal of tiedNominals(name)) signature.set(nominal, entry)
+  }
+  return { ...context, signature }
+}
+
+const TIED_NOMINALS = [
+  ['C', 'GAM', 'Γ'],
+  ['D', 'DEL', 'Δ'],
+  ['E', 'EPS', 'Ε'],
+  ['F', 'ZET', 'Ζ'],
+  ['G', 'ETA', 'Η'],
+  ['A', 'ALP', 'Α'],
+  ['B', 'BET', 'Β'],
+] as const
+
+function tiedNominals(nominal: string): readonly string[] {
+  const upper = nominal.toUpperCase()
+  return TIED_NOMINALS.find((group) => group.includes(upper as never)) ?? [upper]
+}
+
 function applyMosDeclaration(declaration: MosDeclaration, context: PitchContext): PitchContext {
   let equave = Value.pitch(new Value(2))
   let equaveGiven = false
@@ -479,9 +598,22 @@ function applyMosDeclaration(declaration: MosDeclaration, context: PitchContext)
   let hardnessGiven = false
   const assignments = new Map<string, Value>()
   const integerOperatorAssignments = new Map<string, number>()
+  let signatureDeclaration: SignatureDeclaration | undefined
 
   for (const element of declaration.elements) {
-    if (element.type === 'MosPatternCounts') {
+    if (element.type === 'SignatureDeclaration') {
+      if (signatureDeclaration)
+        throw new TypeError('A MOS declaration may only contain one signature.')
+      signatureDeclaration = element
+      if (element.udp) {
+        if (udp) throw new TypeError('A MOS declaration may only contain one UD(P) selection.')
+        udp = {
+          up: Number(element.udp.up),
+          down: Number(element.udp.down),
+          ...(element.udp.period ? { period: Number(element.udp.period) } : {}),
+        }
+      }
+    } else if (element.type === 'MosPatternCounts') {
       if (pattern || counts) throw new TypeError('A MOS declaration may only contain one mode.')
       counts = { large: Number(element.large), small: Number(element.small) }
     } else if (element.type === 'MosAbstractPattern') {
@@ -540,7 +672,7 @@ function applyMosDeclaration(declaration: MosDeclaration, context: PitchContext)
     !assignments.has('s')
   ) {
     if (!context.mos) throw new TypeError('A MOS step setter requires an active MOS declaration.')
-    return {
+    const result: PitchContext = {
       ...context,
       mos: {
         ...context.mos,
@@ -560,6 +692,7 @@ function applyMosDeclaration(declaration: MosDeclaration, context: PitchContext)
               : context.mos.lift),
       },
     }
+    return signatureDeclaration ? applySignatureDeclaration(signatureDeclaration, result) : result
   }
 
   if (counts) {
@@ -629,12 +762,13 @@ function applyMosDeclaration(declaration: MosDeclaration, context: PitchContext)
     nominals,
     degrees,
   }
-  return {
+  const result: PitchContext = {
     ...context,
     mos,
     degrees: [...offsets.slice(1), equave],
     degreeEquave: equave,
   }
+  return signatureDeclaration ? applySignatureDeclaration(signatureDeclaration, result) : result
 }
 
 export function requirePitchOperator(context: PitchContext, operator: 'up' | 'lift'): Value {
@@ -823,6 +957,26 @@ export function evaluatePitchLiteral(
   input: PrimeMapping | PitchContext,
 ): AbsolutePitchValue {
   const context = asContext(input)
+  let fromSignature = false
+  const explicitlyNatural = node.accidentals.some(
+    (accidental) => accidental.value === '_' || accidental.value === '♮',
+  )
+  const defaultSpelling = context.signature?.get(node.nominal.value.toUpperCase())
+  if (
+    defaultSpelling &&
+    !explicitlyNatural &&
+    !node.accidentals.length &&
+    !node.modifiers.length &&
+    !node.inflections.length
+  ) {
+    fromSignature = true
+    node = {
+      ...node,
+      modifiers: defaultSpelling.modifiers,
+      accidentals: defaultSpelling.accidentals,
+      inflections: defaultSpelling.inflections,
+    }
+  }
   if (node.nominal.system === 'mos') {
     if (!context.mos) throw new TypeError('Diamond-MOS pitches require a MOS declaration.')
     const nominal = node.nominal.value.toUpperCase()
@@ -862,6 +1016,7 @@ export function evaluatePitchLiteral(
         system: 'mos',
         accidentals: node.accidentals.map((a) => a.value),
         modifiers: node.modifiers.map((m) => m.kind),
+        ...(fromSignature ? { signature: true } : {}),
       },
       mos: { rank: nominalRank + registers * context.mos.nominals.size, context: context.mos },
       origins: origin(node),
@@ -949,6 +1104,7 @@ export function evaluatePitchLiteral(
         flavor: inflection.flavor,
       })),
       modifiers: node.modifiers.map((modifier) => modifier.kind),
+      ...(fromSignature ? { signature: true } : {}),
     },
     origins: origin(node),
   }

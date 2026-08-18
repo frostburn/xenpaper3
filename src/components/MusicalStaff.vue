@@ -44,6 +44,7 @@ type StaffItemContent =
     }
   | { kind: 'dynamic'; mark: DynamicMark }
   | { kind: 'clef'; clef: StaffClef }
+  | { kind: 'key-signature'; pitches: readonly StaffPitch[] }
 
 type StaffItem = StaffItemContent & {
   column: number
@@ -200,6 +201,8 @@ const items = computed(() => {
       layout.push({ kind: 'dynamic', offset, mark: shape.mark, tuplets: [], voice })
     } else if (shape.kind === 'clef') {
       layout.push({ kind: 'clef', offset, clef: shape.clef, tuplets: [], voice })
+    } else if (shape.kind === 'key-signature') {
+      layout.push({ kind: 'key-signature', offset, pitches: shape.pitches, tuplets: [], voice })
     } else if (shape.kind === 'sequence') {
       const startOffset = offset
       const startIndex = layout.length
@@ -424,12 +427,25 @@ const repeatMarkerSpace = 24
 const repeatSpaceBefore = (column: number) =>
   [...repeatMarkerColumns.value].filter((markerColumn) => markerColumn <= column).length *
   repeatMarkerSpace
+const keySignatureSpaces = computed(() =>
+  items.value
+    .filter(
+      (item): item is Extract<StaffItem, { kind: 'key-signature' }> =>
+        item.kind === 'key-signature',
+    )
+    .map((item) => ({ column: item.column, width: Math.max(18, item.pitches.length * 10) })),
+)
+const keySignatureSpaceBefore = (column: number) =>
+  keySignatureSpaces.value
+    .filter((signature) => signature.column <= column)
+    .reduce((total, signature) => total + signature.width, 0)
 const width = computed(() =>
   Math.max(
     360,
     80 +
       (Math.max(-1, ...items.value.map((item) => item.column)) + 1) * 52 +
-      repeatMarkerColumns.value.size * repeatMarkerSpace,
+      repeatMarkerColumns.value.size * repeatMarkerSpace +
+      keySignatureSpaces.value.reduce((total, signature) => total + signature.width, 0),
   ),
 )
 const height = computed(() =>
@@ -447,7 +463,10 @@ const height = computed(() =>
         13,
   ),
 )
-const x = (column: number) => 60 + column * 52 + repeatSpaceBefore(column)
+const x = (column: number) =>
+  60 + column * 52 + repeatSpaceBefore(column) + keySignatureSpaceBefore(column)
+const keySignatureX = (item: Extract<StaffItem, { kind: 'key-signature' }>) =>
+  x(item.column) - Math.max(18, item.pitches.length * 10)
 const barlineX = (item: Extract<StaffItem, { kind: 'barline' }>) =>
   x(item.column) - 26 - (repeatMarkerColumns.value.has(item.column) ? repeatMarkerSpace / 2 : 0)
 const y = (position: number) => 100 - (position - 2) * 6
@@ -560,6 +579,15 @@ const accidental = (value: string) =>
     'half-flat': '𝄳',
     'half-sharp': '𝄲',
   })[value] ?? value
+const keySignaturePosition = (
+  item: Extract<StaffItem, { kind: 'key-signature' }>,
+  pitch: StaffPitch,
+) => {
+  let position = pitch.staffPosition + (clefAtColumn(item.column).kind === 'bass' ? 12 : 0)
+  while (position < 2) position += 7
+  while (position > 10) position -= 7
+  return position
+}
 
 const inflection = (
   value: StaffInflection,
@@ -749,6 +777,28 @@ const swingBeamCount = (durations: readonly Fraction[], tuplet?: number) =>
         />
       </g>
     </template>
+    <g
+      v-for="(item, index) in items.filter((item) => item.kind === 'key-signature')"
+      :key="`key-signature-${index}`"
+      class="key-signature"
+    >
+      <text
+        v-for="(pitch, pitchIndex) in item.pitches"
+        :key="pitchIndex"
+        class="key-signature__accidental"
+        :x="keySignatureX(item) + pitchIndex * 10"
+        :y="y(keySignaturePosition(item, pitch)) + 5"
+      >
+        <tspan
+          v-for="(value, inflectionIndex) in formattedInflections(pitch.inflections ?? [])"
+          :key="inflectionIndex"
+          class="inflection"
+        >
+          {{ value }}
+        </tspan>
+        <tspan>{{ pitch.accidentals.map(accidental).join('') }}</tspan>
+      </text>
+    </g>
     <text v-if="!items.length" class="empty-message" x="70" y="126">No notation loaded</text>
     <g v-for="(ending, index) in endingSpans" :key="`ending-${index}`" class="alternate-ending">
       <path
@@ -943,6 +993,9 @@ const swingBeamCount = (durations: readonly Fraction[], tuplet?: number) =>
       </g>
       <g v-else-if="item.kind === 'clef'" class="clef-event">
         <title>Clef change</title>
+      </g>
+      <g v-else-if="item.kind === 'key-signature'" class="key-signature-event">
+        <title>Key signature change</title>
       </g>
       <template v-else>
         <path

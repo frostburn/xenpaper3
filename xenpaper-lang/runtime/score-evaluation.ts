@@ -7,6 +7,7 @@ import { DYNAMIC_VELOCITIES, resolveDirective } from './directives'
 import {
   DEFAULT_PITCH_CONTEXT,
   applyPitchContextChange,
+  evaluatePitchLiteral,
   mapFormula,
   normalizeStaffAccidental,
 } from './pitches'
@@ -493,6 +494,7 @@ function scaleShape(shape: ScoreShape, factor: Fraction): ScoreShape {
     case 'annotation':
     case 'dynamic':
     case 'clef':
+    case 'key-signature':
     case 'groove':
       return { ...shape, duration }
     case 'sequence':
@@ -705,10 +707,64 @@ function contextShape(
   context: PitchContext,
   previousContext?: PitchContext,
 ): ScoreShape {
+  const signatureDeclared = node.statements.some(
+    (statement) =>
+      statement.type === 'SignatureDeclaration' ||
+      (statement.type === 'MosDeclaration' &&
+        statement.elements.some((element) => element.type === 'SignatureDeclaration')),
+  )
+  const signatureShape = () => {
+    let names = context.mos ? [...context.mos.nominals.keys()] : ['C', 'D', 'E', 'F', 'G', 'A', 'B']
+    if (!context.mos) {
+      const written = [...(context.signature?.values() ?? [])].flatMap((pitch) =>
+        pitch.accidentals.map((accidental) => accidental.value),
+      )
+      const sharps = written.some((value) => ['#', '♯', 'x', '𝄪', 't', '‡', '𝄲'].includes(value))
+      const flats = written.some((value) => ['b', '♭', '𝄫', 'd', '𝄳'].includes(value))
+      if (sharps && !flats) names = ['F', 'C', 'G', 'D', 'A', 'E', 'B']
+      else if (flats && !sharps) names = ['B', 'E', 'A', 'D', 'G', 'C', 'F']
+    }
+    const pitches = names.flatMap((name) => {
+      let pitch = context.signature?.get(name)
+      const decorated = (candidate: typeof pitch) =>
+        candidate &&
+        (candidate.accidentals.length || candidate.inflections.length || candidate.modifiers.length)
+      if (!decorated(pitch)) {
+        const previousPitch = previousContext?.signature?.get(name)
+        if (!previousPitch || !decorated(previousPitch)) return []
+        pitch = {
+          ...previousPitch,
+          modifiers: [],
+          accidentals: [{ type: 'Accidental', value: '_', location: node.location }],
+          inflections: [],
+          raw: name,
+        }
+      }
+      if (!pitch) return []
+      const system: 'mos' | 'latin' = context.mos ? 'mos' : 'latin'
+      const literal = {
+        ...pitch,
+        nominal: { ...pitch.nominal, value: name, system },
+      }
+      const value = evaluatePitchLiteral(literal, { ...context, signature: undefined })
+      const spelling = value.spelling
+      return spelling.accidentals?.length ||
+        spelling.inflections?.length ||
+        spelling.modifiers?.length
+        ? [value]
+        : []
+    })
+    return {
+      kind: 'key-signature' as const,
+      pitches,
+      duration: new Fraction(0),
+      origins: [origin(node, 'context')],
+    }
+  }
   if (node.statements.some((statement) => statement.type === 'MosDeclaration') && context.mos) {
     const large = [...context.mos.pattern].filter((step) => step === 'L').length
     const small = [...context.mos.pattern].filter((step) => step === 's').length
-    return {
+    const clef: ScoreShape = {
       kind: 'clef',
       clef:
         large === 5 && small === 2
@@ -717,15 +773,25 @@ function contextShape(
       duration: new Fraction(0),
       origins: [origin(node, 'context')],
     }
+    if (!signatureDeclared) return clef
+    return {
+      kind: 'sequence',
+      children: [clef, signatureShape()],
+      duration: new Fraction(0),
+      origins: [origin(node, 'context')],
+    }
   }
   if (previousContext?.mos && !context.mos) {
-    return {
+    const clef: ScoreShape = {
       kind: 'clef',
       clef: { kind: 'treble' },
       duration: new Fraction(0),
       origins: [origin(node, 'context')],
     }
+    if (!signatureDeclared) return clef
+    return sequence([clef, signatureShape()], [origin(node, 'context')])
   }
+  if (signatureDeclared) return signatureShape()
   return contextAnnotation(node)
 }
 

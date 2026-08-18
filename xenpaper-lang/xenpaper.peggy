@@ -470,7 +470,7 @@ PitchContextChange
   / "{" Spacing statements:ContextStatementList Spacing "}" {
       return node('PitchContextChange', { statements });
     }
-  / "{" Spacing expression:ParallelExpression Spacing "}" {
+  / "{" Spacing !ContextAssignmentStart expression:ParallelExpression Spacing "}" {
       return node('PitchContextChange', {
         statements: [node('ContextDegreeMapping', { values: [expression] })],
       });
@@ -485,8 +485,16 @@ ContextStatementList
       return [first, ...rest];
     }
 
+ContextAssignmentStart
+  = ("sig"i / "key"i / "root"i) !IdentifierContinue Spacing "="
+  / ContextAssignmentTarget Spacing "="
+
 ContextStatement
-  = name:$('root'i) !IdentifierContinue Spacing "=" Spacing
+  = kind:$("sig"i / "key"i) !IdentifierContinue Spacing "=" Spacing
+    pitches:SignaturePitchList {
+      return node('SignatureDeclaration', { kind: kind.toLowerCase(), pitches });
+    }
+  / name:$('root'i) !IdentifierContinue Spacing "=" Spacing
     value:(ScaleDegreeLiteral / UnaryExpression) {
       return node('ContextAssignment', {
         target: node('ContextNameTarget', { name: name.toLowerCase() }),
@@ -582,20 +590,37 @@ MosDeclaration
     }
 
 MosElementList
-  = first:MosElement rest:(Spacing element:MosElement { return element; })* {
-      return [first, ...rest];
+  = first:MosElement rest:(separator:(Spacing ";" Spacing { return ";"; } / Spacing { return " "; }) element:MosElement {
+      return { separator, element };
+    })* {
+      const elements = [first, ...rest.map(part => part.element)];
+      for (let index = 0; index < rest.length; index += 1) {
+        const left = elements[index];
+        const right = elements[index + 1];
+        const assignment = element => element.type === 'MosStepAssignment' || element.type === 'SignatureDeclaration';
+        if (rest[index].separator !== ";" && (assignment(left) || assignment(right))) {
+          expected('a semicolon between MOS assignments');
+        }
+      }
+      return elements;
     }
 
 MosElement
-  = target:$("^" / "/" / "L" / "s") Spacing "=" Spacing value:MosSetterValue {
+  = kind:$("sig"i) !IdentifierContinue Spacing "=" Spacing pitches:MosSignaturePitchList {
+      return node('SignatureDeclaration', { kind: kind.toLowerCase(), pitches, udp: null });
+    }
+  / kind:$("key"i) !IdentifierContinue Spacing "=" Spacing pitch:MosSignaturePitchLiteral
+    udp:(RequiredSpacing value:MosUdpValue { return value; })? {
+      return node('SignatureDeclaration', { kind: kind.toLowerCase(), pitches: [pitch], udp: udp ?? null });
+    }
+  / target:$("^" / "/" / "L" / "s") Spacing "=" Spacing value:MosSetterValue {
       return node('MosStepAssignment', { target, value });
     }
   / large:UnsignedInteger "L" Spacing small:UnsignedInteger "s" {
       return node('MosPatternCounts', { large, small });
     }
-  / up:UnsignedInteger Spacing "|" Spacing down:UnsignedInteger
-    period:(Spacing "(" Spacing value:UnsignedInteger Spacing ")" { return value; })? {
-      return node('MosUdp', { up, down, period: period ?? null });
+  / udp:MosUdpValue {
+      return node('MosUdp', udp);
     }
   / numerator:UnsignedInteger Spacing ":" Spacing denominator:UnsignedInteger {
       return node('MosHardness', { numerator, denominator });
@@ -618,6 +643,34 @@ MosSetterValue
   / RatioLiteral
   / QuantityLiteral
   / IntegerLiteral
+
+MosUdpValue
+  = up:UnsignedInteger Spacing "|" Spacing down:UnsignedInteger
+    period:(Spacing "(" Spacing value:UnsignedInteger Spacing ")" { return value; })? {
+      return { up, down, period: period ?? null };
+    }
+
+SignaturePitchList
+  = first:SignaturePitchLiteral
+    rest:(RequiredSpacing pitch:SignaturePitchLiteral { return pitch; })* {
+      return [first, ...rest];
+    }
+
+MosSignaturePitchList
+  = first:MosSignaturePitchLiteral
+    rest:(RequiredSpacing pitch:MosSignaturePitchLiteral { return pitch; })* {
+      return [first, ...rest];
+    }
+
+SignaturePitchLiteral
+  = modifiers:PitchModifier* pitch:PitchLiteral {
+      return { ...pitch, modifiers: [...modifiers, ...pitch.modifiers], raw: text() };
+    }
+
+MosSignaturePitchLiteral
+  = modifiers:PitchModifier* pitch:MosPitchLiteral {
+      return { ...pitch, modifiers: [...modifiers, ...pitch.modifiers], raw: text() };
+    }
 
 IntervalQuality
   = $("S" "A"+ / "s" "d"+ / "A"+ / "d"+ / "P" / "M" / "m" / "n")

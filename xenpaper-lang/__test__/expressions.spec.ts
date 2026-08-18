@@ -370,7 +370,7 @@ describe('arithmetic expression evaluation', () => {
   })
 
   it('reassociates a Diamond-MOS pitch with the root', () => {
-    const declaration = parse('MOS{5L2s 5|1 L=9/8}').body[0]
+    const declaration = parse('MOS{5L2s 5|1; L=9/8}').body[0]
     if (declaration.type !== 'PitchContextChange') throw new Error('Expected a MOS declaration.')
     const mosContext = applyPitchContextChange(declaration, DEFAULT_PITCH_CONTEXT)
     expect(mosContext.up).toBe(DEFAULT_PITCH_CONTEXT.up)

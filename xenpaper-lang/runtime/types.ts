@@ -1,4 +1,4 @@
-import type { Program } from '../parser.generated.js'
+import type { PitchLiteral, Program } from '../parser.generated.js'
 import type { Diagnostic } from '../diagnostics'
 import type { Value } from '../value'
 import type { LocationRange } from 'peggy'
@@ -94,6 +94,8 @@ export interface PitchSpelling {
   readonly raw: string
   /** The spelling was derived by pitch/interval arithmetic rather than written literally. */
   readonly derived?: boolean
+  /** The written decorations came from the active signature rather than this note token. */
+  readonly signature?: boolean
   readonly system?: 'latin' | 'greek' | 'mos'
   readonly accidentals?: readonly string[]
   readonly inflections?: readonly FjsSpelling[]
@@ -125,6 +127,8 @@ export interface PitchContext {
   readonly rootPitch: AbsolutePitchValue
   readonly up: Value
   readonly lift: Value
+  /** Defaults applied to otherwise unaltered written pitch nominals. */
+  readonly signature?: ReadonlyMap<string, PitchLiteral>
   /** Active Diamond-MOS notation, installed by a MOS declaration. */
   readonly mos?: MosContext
 }
@@ -205,6 +209,11 @@ export type StaffNotationShape =
     }
   | { readonly kind: 'dynamic'; readonly mark: DynamicMark; readonly duration: Fraction }
   | { readonly kind: 'clef'; readonly clef: StaffClef; readonly duration: Fraction }
+  | {
+      readonly kind: 'key-signature'
+      readonly pitches: readonly StaffPitch[]
+      readonly duration: Fraction
+    }
   | {
       readonly kind: 'sequence'
       readonly duration: Fraction
@@ -317,6 +326,11 @@ export interface ClefShape extends ShapeBase {
   readonly clef: StaffClef
 }
 
+export interface KeySignatureShape extends ShapeBase {
+  readonly kind: 'key-signature'
+  readonly pitches: readonly AbsolutePitchValue[]
+}
+
 /** A playback timing cycle. The authored template is retained so staff notation can
  * show the swing equivalence without applying it to engraved note positions. */
 export interface GrooveShape extends ShapeBase {
@@ -355,6 +369,7 @@ export type ScoreShape =
   | AnnotationShape
   | DynamicShape
   | ClefShape
+  | KeySignatureShape
   | GrooveShape
   | SequenceShape
   | ParallelShape

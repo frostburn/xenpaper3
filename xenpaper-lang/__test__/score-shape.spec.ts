@@ -15,6 +15,78 @@ function shape(source: string, pulse: Fraction | number = 1): ScoreShape {
 }
 
 describe('score-shape timing', () => {
+  it('applies custom and key signatures while explicit naturals cancel them', () => {
+    const custom = shape('{sig = C# ^D E^5 /Ad} C C_ D E A') as SequenceShape
+    const attacks = custom.children.filter((child) => child.kind === 'attack')
+    expect(attacks.map((attack) => attack.pitch.spelling)).toMatchObject([
+      { nominal: 'C', accidentals: ['#'] },
+      { nominal: 'C', accidentals: ['_'] },
+      { nominal: 'D', modifiers: ['up'] },
+      { nominal: 'E', inflections: [{ prime: 5n }] },
+      { nominal: 'A', accidentals: ['d'], modifiers: ['lift'] },
+    ])
+    expect(attacks[0]!.pitch.value.valueOf()).not.toBeCloseTo(attacks[1]!.pitch.value.valueOf())
+
+    const gMajor = shape('{key = G} C D E F G A B') as SequenceShape
+    const gAttacks = gMajor.children.filter((child) => child.kind === 'attack')
+    expect(gAttacks.map((attack) => attack.pitch.spelling.accidentals)).toEqual([
+      [],
+      [],
+      [],
+      ['#'],
+      [],
+      [],
+      [],
+    ])
+
+    const upF = shape('{key = ^F} C D E F G A B') as SequenceShape
+    const upFAttacks = upF.children.filter((child) => child.kind === 'attack')
+    expect(upFAttacks.map((attack) => attack.pitch.spelling.modifiers)).toEqual(
+      Array.from({ length: 7 }, () => ['up']),
+    )
+    expect(upFAttacks.map((attack) => attack.pitch.spelling.accidentals)).toEqual([
+      [],
+      [],
+      [],
+      [],
+      [],
+      [],
+      ['b'],
+    ])
+
+    const halfFlatC = shape('{key = Cd} C D E F G A B') as SequenceShape
+    const halfFlatAttacks = halfFlatC.children.filter((child) => child.kind === 'attack')
+    expect(halfFlatAttacks.map((attack) => attack.pitch.spelling.accidentals)).toEqual(
+      Array.from({ length: 7 }, () => ['d']),
+    )
+  })
+
+  it('ties Greek signature defaults to their corresponding Latin nominals', () => {
+    const latin = shape('{sig = C#} C Gam') as SequenceShape
+    const greek = shape('{sig = Gam#} C Gam') as SequenceShape
+    for (const score of [latin, greek]) {
+      const attacks = score.children.filter((child) => child.kind === 'attack')
+      expect(attacks.map((attack) => attack.pitch.spelling.accidentals)).toEqual([['#'], ['#']])
+    }
+    const greekKey = shape('{key = Eta} F Zet') as SequenceShape
+    const attacks = greekKey.children.filter((child) => child.kind === 'attack')
+    expect(attacks.map((attack) => attack.pitch.spelling.accidentals)).toEqual([['#'], ['#']])
+  })
+
+  it('applies signatures declared inside Diamond-MOS blocks', () => {
+    const custom = shape('MOS{5L2s; sig = J& L@} J K L') as SequenceShape
+    const attacks = custom.children.filter((child) => child.kind === 'attack')
+    expect(attacks.map((attack) => attack.pitch.spelling.accidentals)).toEqual([['&'], [], ['@']])
+
+    const keyed = shape('MOS{5L2s; key = K} J K L M N O P') as SequenceShape
+    const keyedAttacks = keyed.children.filter((child) => child.kind === 'attack')
+    expect(keyedAttacks.some((attack) => attack.pitch.spelling.accidentals.length)).toBe(true)
+
+    const udp = shape('MOS{5L2s; key = K 2|4} J') as SequenceShape
+    const udpAttack = udp.children.find((child) => child.kind === 'attack')
+    expect(udpAttack?.pitch.mos?.context.pattern).toBe('LsLLsLL')
+  })
+
   it('installs Diamond-MOS absolute pitches and relative mossteps', () => {
     const score = shape('MOS{5L2s} J K L M N O P') as SequenceShape
     const cents = score.children
@@ -61,7 +133,7 @@ describe('score-shape timing', () => {
   })
 
   it('aligns MOS and conventional nominal groups through root associations', () => {
-    const score = shape(`MOS{5L2s 5|1 L=9/8} {K = root} J K L M
+    const score = shape(`MOS{5L2s 5|1; L=9/8} {K = root} J K L M
 {D = root} C D E F`) as SequenceShape
     const cents = score.children
       .filter((child) => child.kind === 'attack')
@@ -90,13 +162,13 @@ describe('score-shape timing', () => {
     const setAttack = set.children.find((child) => child.kind === 'attack')
     expect(setAttack?.pitch.value.equals(Value.equalDivision(1, 24, new Value(2)))).toBe(true)
 
-    const integerSet = shape('MOS{5L2s ^ = 2} ^J') as SequenceShape
+    const integerSet = shape('MOS{5L2s; ^ = 2} ^J') as SequenceShape
     const integerSetAttack = integerSet.children.find((child) => child.kind === 'attack')
     expect(integerSetAttack?.pitch.value.equals(Value.equalDivision(2, 12, new Value(2)))).toBe(
       true,
     )
 
-    const unhosted = evaluateScoreShape(parse('MOS{5L 2s L=9/8} ^J').body[0] as Expression)
+    const unhosted = evaluateScoreShape(parse('MOS{5L 2s; L=9/8} ^J').body[0] as Expression)
     expect(unhosted.diagnostics[0]?.message).toContain('no equal-temperament host')
 
     const multiperiod = shape('MOS{4L2s} P3ms') as SequenceShape
@@ -104,11 +176,11 @@ describe('score-shape timing', () => {
     expect(Math.round(periodAttack!.pitch.value.valueOf())).toBe(600)
 
     const inconsistent = evaluateScoreShape(
-      parse('MOS{5L2s L = 300c s = 100c} J').body[0] as Expression,
+      parse('MOS{5L2s; L = 300c; s = 100c} J').body[0] as Expression,
     )
     expect(inconsistent.diagnostics[0]?.message).toContain('accumulate to the MOS equave')
 
-    const centsEquave = shape('MOS{5L2s L = 300c s = 100c <1700c>} J j') as SequenceShape
+    const centsEquave = shape('MOS{5L2s; L = 300c; s = 100c; <1700c>} J j') as SequenceShape
     const centsEquaveAttacks = centsEquave.children.filter((child) => child.kind === 'attack')
     expect(Math.round(centsEquaveAttacks[1]!.pitch.value.valueOf())).toBe(1700)
   })

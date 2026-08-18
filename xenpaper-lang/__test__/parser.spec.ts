@@ -126,6 +126,23 @@ describe('enumerated chords', () => {
 })
 
 describe('Diamond-MOS tokens', () => {
+  it('requires semicolons around MOS assignments and accepts a key UDP selector', () => {
+    expect(() => parse('MOS{5L2s key=K L=2\\12}')).toThrow(/semicolon/)
+    expect(parse('MOS{5L2s; key=K 2|4; L=2\\12}').body[0]).toMatchObject({
+      statements: [
+        {
+          elements: [
+            { type: 'MosPatternCounts' },
+            { type: 'SignatureDeclaration', kind: 'key', udp: { up: '2', down: '4' } },
+            { type: 'MosStepAssignment', target: 'L' },
+          ],
+        },
+      ],
+    })
+    expect(() => parse('{sig=C# key=G}')).toThrow(/Expected/)
+    expect(parse('{sig=C#; key=G}').body[0]).toMatchObject({ statements: [{}, {}] })
+  })
+
   it('parses the MOS sub-language structurally in any element order', () => {
     const elements = (source: string) =>
       (parse(source).body[0] as { statements: { elements: { type: string }[] }[] }).statements[0]!

@@ -56,6 +56,7 @@ export type Expression =
   | Repeat
   | Rest
   | Sequence
+  | SignatureDeclaration
   | TailElimination
   | UnaryExpression
 
@@ -219,6 +220,14 @@ export type MosElement =
   | MosPatternCounts
   | MosStepAssignment
   | MosUdp
+  | SignatureDeclaration
+
+export interface SignatureDeclaration extends Node {
+  type: 'SignatureDeclaration'
+  kind: 'sig' | 'key'
+  pitches: PitchLiteral[]
+  udp?: { up: string; down: string; period: string | null } | null
+}
 
 export interface MosAbstractPattern extends Node {
   type: 'MosAbstractPattern'
