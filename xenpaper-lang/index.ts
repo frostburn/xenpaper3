@@ -20,7 +20,12 @@ export {
   spellPitchDifference,
 } from './runtime/pitches'
 export type { ExpressionEvaluationResult } from './runtime/expressions'
-export { DIRECTIVE_REGISTRY, DYNAMIC_VELOCITIES, resolveDirective } from './runtime/directives'
+export {
+  DIRECTIVE_REGISTRY,
+  DYNAMIC_VELOCITIES,
+  GLISS_CURVES,
+  resolveDirective,
+} from './runtime/directives'
 export { evaluateProgramShape, evaluateScoreShape } from './runtime/score-shape'
 export { expandToBeatEvents } from './runtime/beat-events'
 export type { BeatEventExpansionOptions, BeatEventExpansionResult } from './runtime/beat-events'

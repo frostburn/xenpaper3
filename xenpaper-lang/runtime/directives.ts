@@ -15,6 +15,14 @@ export const DYNAMIC_VELOCITIES: Readonly<Record<DynamicMark, Fraction>> = {
   fff: new Fraction(1),
 }
 
+export const GLISS_CURVES: ReadonlyArray<string> = Object.freeze([
+  'linear',
+  'ease',
+  'ease-in',
+  'ease-out',
+  'ease-in-out',
+])
+
 export const DIRECTIVE_REGISTRY = Object.freeze({
   subdivision: 'subdivision',
   velocity: 'velocity',
@@ -43,7 +51,7 @@ export type ResolvedDirective =
   | { kind: 'grace'; duration: Fraction; count: number }
   | { kind: 'dynamic'; mark: DynamicMark; velocity: Fraction }
   | { kind: 'velocity'; velocity: Fraction }
-  | { kind: 'gliss'; curve: 'linear' }
+  | { kind: 'gliss'; curve: string }
   | { kind: 'groove'; argument?: Expression }
   | { kind: 'articulation'; ratio: Fraction; mark?: string; shorthand: boolean }
   | { kind: 'clef'; clef: Extract<StaffClef, { kind: 'treble' | 'bass' }> }
@@ -155,7 +163,8 @@ export function resolveDirective(
         : argument === undefined
           ? 'linear'
           : undefined
-    if (curve !== 'linear') return fail('The glissando curve must be linear.')
+    if (!curve || !GLISS_CURVES.includes(curve))
+      return fail(`The glissando curve must be one of: ${GLISS_CURVES.join(', ')}.`)
     return { directive: { kind: 'gliss', curve }, diagnostics: [] }
   }
   if (registered === 'velocity') {

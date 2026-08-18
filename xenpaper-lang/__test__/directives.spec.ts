@@ -197,6 +197,27 @@ describe('directive runtime', () => {
     expect(parallel.every(({ automation }) => automation?.curve === 'linear')).toBe(true)
   })
 
+  it.each(['linear', 'ease', 'ease-in', 'ease-out', 'ease-in-out'])(
+    'supports the %s gliss curve',
+    (curve) => {
+      const automation = notes(`@gliss(${curve}) C D`)[0]!.automation
+      expect(automation?.curve).toBe(curve)
+      expect(automation?.segments?.[0]?.curve).toBe(curve)
+    },
+  )
+
+  it('preserves distinct curves on chained gliss segments', () => {
+    const segments = notes('@gliss(ease-in) E @gliss(ease-out) F G')[0]!.automation?.segments
+    expect(segments?.map(({ curve }) => curve)).toEqual(['ease-in', 'ease-out'])
+  })
+
+  it('diagnoses unsupported gliss curve names', () => {
+    const result = compile('@gliss(bounce-in) C D')
+    expect(result.diagnostics).toContainEqual(
+      expect.objectContaining({ code: 'XP_DIRECTIVE', severity: 'error' }),
+    )
+  })
+
   it('keeps gliss automation separate from a continued normalized target', () => {
     const events = notes('@gliss [C D E]= [D E F]')
 

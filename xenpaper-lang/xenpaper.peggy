@@ -398,8 +398,34 @@ RepeatCount
     }
 
 Directive
-  = "@" body:(GrooveDirectiveBody / ArticulationShorthandBody / NumericDirectiveBody / NamedDirectiveBody) {
+  = "@" body:(GlissDirectiveBody / GrooveDirectiveBody / ArticulationShorthandBody / NumericDirectiveBody / NamedDirectiveBody) {
       return node('Directive', body);
+    }
+
+GlissDirectiveBody
+  = name:$('gliss'i) !IdentifierContinue args:GlissDirectiveArguments? {
+      return {
+        name: 'gliss',
+        rawName: name,
+        arguments: args ?? [],
+        graceCount: 0,
+      };
+    }
+
+GlissDirectiveArguments
+  = "(" Spacing args:GlissCurveNameList? Spacing ")" {
+      return args ?? [];
+    }
+
+GlissCurveNameList
+  = first:GlissCurveName
+    rest:(Spacing "," Spacing argument:GlissCurveName { return argument; })* {
+      return [first, ...rest];
+    }
+
+GlissCurveName
+  = name:$([A-Za-z_] [A-Za-z0-9_-]*) {
+      return node('Identifier', { name });
     }
 
 GrooveDirectiveBody
