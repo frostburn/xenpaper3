@@ -234,6 +234,8 @@ export function flattenScoreSemantics(shape: ScoreShape): BeatEventFlatteningRes
       const firstEvent = events.length
       const states = current.branches.map((): State => ({ active: [], groove: state.groove }))
       current.branches.forEach((branch, index) => visit(branch, start, states[index]!))
+      const end = start.add(current.duration)
+      for (const branchState of states) stopDrone(branchState, end)
       // A continuation after a parallel distributes over every attack in the
       // construction, rather than only the last attack in each branch.
       state.active = events
@@ -243,7 +245,7 @@ export function flattenScoreSemantics(shape: ScoreShape): BeatEventFlatteningRes
       // span: only the final notes of its longest branches remain active.
       state.activeStart = undefined
       state.activeSpan = undefined
-      return start.add(current.duration)
+      return end
     }
     return start.add(current.duration)
   }

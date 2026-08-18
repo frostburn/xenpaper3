@@ -156,6 +156,19 @@ describe('directive runtime', () => {
     ])
   })
 
+  it('holds drones in parallel branches until the parallel span ends', () => {
+    const events = notes('[@drone(C) D, E E] F')
+    expect(
+      events.map(({ start, duration }) => [start.toFraction(), duration.toFraction()]),
+    ).toEqual([
+      ['0', '1'],
+      ['0', '1/2'],
+      ['0', '1/2'],
+      ['1/2', '1/2'],
+      ['1', '1'],
+    ])
+  })
+
   it('realigns beats immediately when a groove is turned off mid-cycle', () => {
     const events = notes('@groove(C== C) C @groove C C')
     // The first note remains stretched to the groove, so it overlaps the next note.
