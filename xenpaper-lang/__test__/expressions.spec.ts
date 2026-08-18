@@ -129,9 +129,9 @@ describe('arithmetic expression evaluation', () => {
     })
     const lowerC = customEvaluate("'C")
     const upperC = customEvaluate('c')
-    expect(
-      lowerC.kind === 'absolutePitch' && lowerC.rootOffset.equals(Value.cents(1200)),
-    ).toBe(true)
+    expect(lowerC.kind === 'absolutePitch' && lowerC.rootOffset.equals(Value.cents(1200))).toBe(
+      true,
+    )
     expect(
       lowerC.kind === 'absolutePitch' &&
         upperC.kind === 'absolutePitch' &&
@@ -237,8 +237,7 @@ describe('arithmetic expression evaluation', () => {
 
       expect(pitch.kind).toBe('absolutePitch')
       expect(
-        pitch.kind === 'absolutePitch' &&
-          pitch.rootOffset.equals(Value.pitch(new Value(3n, 2n))),
+        pitch.kind === 'absolutePitch' && pitch.rootOffset.equals(Value.pitch(new Value(3n, 2n))),
       ).toBe(true)
       expect(pitch.kind === 'absolutePitch' && pitch.spelling).toMatchObject({ nominal: 'G' })
     }
