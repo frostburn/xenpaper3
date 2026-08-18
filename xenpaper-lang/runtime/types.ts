@@ -339,6 +339,12 @@ export interface GrooveShape extends ShapeBase {
   readonly controlCount?: number
 }
 
+/** Starts or stops notes which sustain independently of the rhythmic score. */
+export interface DroneShape extends ShapeBase {
+  readonly kind: 'drone'
+  readonly template?: ScoreShape
+}
+
 export type BarlineStyle =
   | 'single'
   | 'double'
@@ -371,6 +377,7 @@ export type ScoreShape =
   | ClefShape
   | KeySignatureShape
   | GrooveShape
+  | DroneShape
   | SequenceShape
   | ParallelShape
 

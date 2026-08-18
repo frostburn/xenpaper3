@@ -28,6 +28,7 @@ export const DIRECTIVE_REGISTRY = Object.freeze({
   velocity: 'velocity',
   gliss: 'gliss',
   groove: 'groove',
+  drone: 'drone',
   clef: 'clef',
   art: 'articulation',
   'articulation-shorthand': 'articulation',
@@ -53,6 +54,7 @@ export type ResolvedDirective =
   | { kind: 'velocity'; velocity: Fraction }
   | { kind: 'gliss'; curve: string }
   | { kind: 'groove'; argument?: Expression }
+  | { kind: 'drone'; argument?: Expression }
   | { kind: 'articulation'; ratio: Fraction; mark?: string; shorthand: boolean }
   | { kind: 'clef'; clef: Extract<StaffClef, { kind: 'treble' | 'bass' }> }
   | { kind: 'unknown' }
@@ -101,6 +103,14 @@ export function resolveDirective(
       return fail('@groove accepts one score argument, or no argument to turn it off.')
     return {
       directive: { kind: 'groove', argument: node.arguments[0] as Expression | undefined },
+      diagnostics: [],
+    }
+  }
+  if (registered === 'drone') {
+    if (node.arguments.length > 1 || node.arguments[0]?.type === 'NamedArgument')
+      return fail('@drone accepts one score argument, or no argument to turn it off.')
+    return {
+      directive: { kind: 'drone', argument: node.arguments[0] as Expression | undefined },
       diagnostics: [],
     }
   }

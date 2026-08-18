@@ -130,6 +130,32 @@ describe('directive runtime', () => {
     ).toEqual(['0', '2/3', '1', '3/2'])
   })
 
+  it('holds a drone until it is replaced or the snippet ends', () => {
+    const events = notes('@drone(C) D E @drone([F, A]) G @drone A')
+    expect(
+      events.map(({ start, duration }) => [start.toFraction(), duration.toFraction()]),
+    ).toEqual([
+      ['0', '2'],
+      ['0', '1'],
+      ['1', '1'],
+      ['2', '1'],
+      ['2', '1'],
+      ['2', '1'],
+      ['3', '1'],
+    ])
+  })
+
+  it('stops a drone with empty parentheses', () => {
+    const events = notes('@drone(C) D @drone() E')
+    expect(
+      events.map(({ start, duration }) => [start.toFraction(), duration.toFraction()]),
+    ).toEqual([
+      ['0', '1'],
+      ['0', '1'],
+      ['1', '1'],
+    ])
+  })
+
   it('realigns beats immediately when a groove is turned off mid-cycle', () => {
     const events = notes('@groove(C== C) C @groove C C')
     // The first note remains stretched to the groove, so it overlaps the next note.

@@ -48,6 +48,7 @@ export function flattenScoreSemantics(shape: ScoreShape): BeatEventFlatteningRes
     activeStart?: Fraction
     activeSpan?: Fraction
     groove?: Groove
+    drone?: MutableNoteEvent[]
   }
   const completedAutomations = new WeakSet<MutableNoteEvent>()
   type Groove = {
@@ -81,10 +82,16 @@ export function flattenScoreSemantics(shape: ScoreShape): BeatEventFlatteningRes
       : interpolated
   }
 
+  const stopDrone = (state: State, end: Fraction) => {
+    for (const event of state.drone ?? []) event.duration = end.sub(event.start)
+    state.drone = undefined
+  }
+
   const visit = (current: ScoreShape, start: Fraction, state: State): Fraction => {
     if (!current.isolatedDirectiveScope) return visitCurrent(current, start, state)
     const isolatedState = { ...state }
     const end = visitCurrent(current, start, isolatedState)
+    if (isolatedState.drone !== state.drone) stopDrone(isolatedState, end)
     state.active = isolatedState.active
     state.activeStart = isolatedState.activeStart
     state.activeSpan = isolatedState.activeSpan
@@ -169,6 +176,29 @@ export function flattenScoreSemantics(shape: ScoreShape): BeatEventFlatteningRes
           }
         }
       }
+    } else if (current.kind === 'drone') {
+      stopDrone(state, start)
+      if (current.template) {
+        const flattened = flattenScoreSemantics(current.template)
+        diagnostics.push(...flattened.diagnostics)
+        state.drone = flattened.score.events
+          .filter((event): event is BeatTimedNoteEvent => event.kind === 'note')
+          .map((event): MutableNoteEvent => {
+            const drone: MutableNoteEvent = {
+              ...event,
+              // The expression selects the drone's notes; its internal rhythm does not
+              // delay their attacks because every selected note begins with the directive.
+              start: copy(start),
+              duration: new Fraction(0),
+              dynamic: copy(event.dynamic),
+              origins: [...current.origins, ...event.origins],
+              articulation: new Fraction(1),
+              groove: state.groove,
+            }
+            events.push(drone)
+            return drone
+          })
+      }
     } else if (
       current.kind === 'barline' ||
       current.kind === 'annotation' ||
@@ -218,7 +248,9 @@ export function flattenScoreSemantics(shape: ScoreShape): BeatEventFlatteningRes
     return start.add(current.duration)
   }
 
-  visit(shape, new Fraction(0), { active: [] })
+  const rootState: State = { active: [] }
+  const end = visit(shape, new Fraction(0), rootState)
+  stopDrone(rootState, end)
   for (const event of events) {
     if (event.kind !== 'note') continue
     const mutable = event as MutableNoteEvent

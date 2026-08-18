@@ -386,6 +386,12 @@ export function constructStaffNotationShape(shape: ScoreShape): StaffNotationSha
           duration: shape.duration,
         }
       }
+    case 'drone':
+      return {
+        kind: 'annotation',
+        text: shape.template ? 'drone' : 'drone off',
+        duration: shape.duration,
+      }
     case 'sequence':
       return {
         kind: 'sequence',

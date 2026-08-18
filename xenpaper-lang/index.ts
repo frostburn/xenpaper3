@@ -50,6 +50,7 @@ export type {
   ContinueShape,
   ClefShape,
   DynamicShape,
+  DroneShape,
   GrooveShape,
   DynamicMark,
   PitchAutomation,
