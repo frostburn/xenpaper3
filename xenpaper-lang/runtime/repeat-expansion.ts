@@ -92,7 +92,8 @@ export function expandRepeats(
           ...path,
           { repeatOffset: node.location.start.offset, iteration: Number(iteration) },
         ]
-        const endings = (node.endings as { number: SyntaxNode & { value?: unknown }; body: SyntaxNode[] }[]) ?? []
+        const endings =
+          (node.endings as { number: SyntaxNode & { value?: unknown }; body: SyntaxNode[] }[]) ?? []
         const ending = endings.find(({ number }) => BigInt(String(number.value)) === iteration + 1n)
         const children = [...((node.body as SyntaxNode[]) ?? []), ...(ending?.body ?? [])]
           .flatMap((child) => cloneNode(child, iterationPath))
@@ -102,6 +103,12 @@ export function expandRepeats(
           .flatMap((child) =>
             child.type === 'Sequence' ? ((child.items as ExpandedNode[]) ?? []) : [child],
           )
+        // An empty, ending-free repeat has no observable occurrences. Stop
+        // after the first expansion instead of iterating a potentially huge
+        // authored count (this also covers bodies made empty by nested x0
+        // repeats). Alternate endings are excluded because a later iteration
+        // may still select a non-empty ending.
+        if (!endings.length && !children.length) return result
         if (endings.length && children.length) {
           const items = children.flatMap((child) =>
             child.type === 'Sequence' ? ((child.items as ExpandedNode[]) ?? []) : [child],

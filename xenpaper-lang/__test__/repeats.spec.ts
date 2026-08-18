@@ -70,6 +70,11 @@ describe('repeat expansion', () => {
     expect(body('|:@x0 C :|')).toEqual([])
   })
 
+  it('does not iterate enormous repeats whose expansion is empty', () => {
+    expect(body('|:@x999999999999999999999999 :|')).toEqual([])
+    expect(body('|:@x999999999999999999999999 |:@x0 C :| :|')).toEqual([])
+  })
+
   it('returns a diagnostic and no partial program at the expansion limit', () => {
     const result = expandRepeats(parse('|:@x3 C D :|'), { expansionLimit: 5 })
 
@@ -115,7 +120,7 @@ describe('repeat expansion', () => {
       nodes.flatMap((node) =>
         node.type === 'DegreeLiteral'
           ? [node.degree as string]
-          : degrees(((node.items as ExpandedNode[] | undefined) ?? [])),
+          : degrees((node.items as ExpandedNode[] | undefined) ?? []),
       )
 
     expect(degrees(body(source))).toEqual(expected)
