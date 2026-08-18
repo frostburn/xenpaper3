@@ -4,7 +4,7 @@ import { parse, type Expression } from '../parser.generated.js'
 import { evaluateScoreShape } from '../runtime/score-shape'
 import type { ParallelShape, ScoreShape, SequenceShape } from '../runtime/types'
 import { Value } from '../value'
-import { parseVal } from '../runtime/val'
+import { parseVal, valMapping } from '../runtime/val'
 
 function shape(source: string, pulse: Fraction | number = 1): ScoreShape {
   const node = parse(source).body[0] as Expression
@@ -473,6 +473,13 @@ describe('score-shape timing', () => {
     expect(() => shape('{13ed3} C')).not.toThrow()
     expect(() => shape('{7ed3/2} C')).not.toThrow()
     expect(() => shape('{17oooooooooooo} C')).not.toThrow()
+  })
+
+  it('resolves repeated warts at the safe-integer boundary', () => {
+    const divisions = 5_682_910_006_162_749
+    const mapped = valMapping(divisions, 2, 'bbb').mapPrime(3)
+
+    expect(mapped.equals(Value.equalDivision(9_007_199_254_740_989, divisions, 2))).toBe(true)
   })
 
   it('treats decimal cent temperaments as single-entry scales and integer c as a wart', () => {

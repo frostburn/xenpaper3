@@ -15,13 +15,18 @@ function primeAtWart(wart: string): number {
 function valuation(target: number, wartCount: number): number {
   const patent = Math.round(target)
   if (!wartCount) return patent
-  const candidates = Array.from(
-    { length: wartCount * 2 + 4 },
-    (_, index) => patent + index - wartCount - 2,
-  )
-    .filter((candidate) => candidate !== patent)
-    .sort((left, right) => Math.abs(left - target) - Math.abs(right - target) || left - right)
-  return candidates[wartCount - 1]!
+  // Walk the two monotonic candidate streams instead of allocating and
+  // sorting an array proportional to the number of repeated wart letters.
+  let lowerOffset = 1
+  let upperOffset = 1
+  let candidate = patent
+  for (let index = 0; index < wartCount; index++) {
+    const lowerDistance = Math.abs(patent - target - lowerOffset)
+    const upperDistance = Math.abs(patent - target + upperOffset)
+    if (lowerDistance <= upperDistance) candidate = patent - lowerOffset++
+    else candidate = patent + upperOffset++
+  }
+  return candidate
 }
 
 /** Construct a rank-1 val, including arbitrary repeated wart letters. */
