@@ -183,7 +183,7 @@ export function normalizeStaffAccidental(token: string): string {
 }
 
 export function createPitchContext(mapping: PrimeMapping = DEFAULT_MAPPING): PitchContext {
-  const edo = /^(\d+)edo$/i.exec(mapping.id)
+  const equalDivision = mapping.equalDivision
   const rootPitch: AbsolutePitchValue = {
     kind: 'absolutePitch',
     rootOffset: Value.cents(0),
@@ -205,8 +205,8 @@ export function createPitchContext(mapping: PrimeMapping = DEFAULT_MAPPING): Pit
     // five steps respectively. Mapping their default commas prime-by-prime
     // can instead produce zero, a fractional step, or even a displacement in
     // the wrong direction (as the up/down comma does in 16-EDO).
-    up: edo
-      ? Value.equalDivision(1, Number(edo[1]), new Value(2))
+    up: equalDivision
+      ? Value.equalDivision(1, equalDivision.divisions, equalDivision.equave)
       : mapFormula(
           new Map([
             [2, new Fraction(-1, 2)],
@@ -215,8 +215,8 @@ export function createPitchContext(mapping: PrimeMapping = DEFAULT_MAPPING): Pit
           ]),
           mapping,
         ),
-    lift: edo
-      ? Value.equalDivision(5, Number(edo[1]), new Value(2))
+    lift: equalDivision
+      ? Value.equalDivision(5, equalDivision.divisions, equalDivision.equave)
       : mapFormula(
           new Map([
             [2, new Fraction(1, 2)],
@@ -454,16 +454,20 @@ export function applyPitchContextChange(
       continue
     }
     if (statement.target.type === 'ContextOperatorTarget') {
-      const evaluated =
-        statement.value.type === 'IntervalLiteral'
-          ? evaluateIntervalLiteral(statement.value, context)
-          : undefined
-      if (!evaluated) throw new TypeError('Pitch operator assignment requires an interval literal.')
-      if (statement.target.operator === '^') context = { ...context, up: evaluated.value }
-      else if (statement.target.operator === 'v')
-        context = { ...context, up: evaluated.value.neg() }
-      else if (statement.target.operator === '/') context = { ...context, lift: evaluated.value }
-      else context = { ...context, lift: evaluated.value.neg() }
+      const evaluated = evaluateExpression(statement.value, context)
+      if (!('value' in evaluated) || evaluated.value.kind === 'absolutePitch')
+        throw new TypeError('Pitch operator assignment requires a pitch interval.')
+      const value =
+        evaluated.value.kind === 'pitchOffset'
+          ? evaluated.value.value
+          : evaluated.value.value.dimensions.isDimensionless
+            ? Value.pitch(evaluated.value.value)
+            : undefined
+      if (!value) throw new TypeError('Pitch operator assignment requires a pitch interval.')
+      if (statement.target.operator === '^') context = { ...context, up: value }
+      else if (statement.target.operator === 'v') context = { ...context, up: value.neg() }
+      else if (statement.target.operator === '/') context = { ...context, lift: value }
+      else context = { ...context, lift: value.neg() }
       continue
     }
     throw new TypeError('Unsupported pitch-context assignment.')
