@@ -91,6 +91,7 @@ export interface ContextAssignment extends Node {
   type: 'ContextAssignment'
   target: ContextNameTarget | ContextOperatorTarget | ContextPitchTarget
   value: Expression
+  association?: 'rootAsTarget' | 'targetAsRoot'
 }
 
 export interface ContextExpression extends Node {

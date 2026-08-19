@@ -697,6 +697,8 @@ function contextAnnotation(
           : statement.value.type === 'Identifier'
             ? statement.value.name
             : statement.value.type
+      if (statement.association === 'rootAsTarget') return `root as ${target}`
+      if (statement.association === 'targetAsRoot') return `${target} as root`
       return `${target} = ${value}`
     })
     .join('; ')

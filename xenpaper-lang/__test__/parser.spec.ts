@@ -123,6 +123,22 @@ describe('enumerated chords', () => {
       ],
     })
   })
+
+  it('parses root associations in both directions and rejects assignment syntax', () => {
+    for (const source of ['{root as D}', '{D as root}']) {
+      expect(parse(source).body[0]).toMatchObject({
+        type: 'PitchContextChange',
+        statements: [
+          {
+            type: 'ContextAssignment',
+            target: { type: 'ContextPitchTarget', pitch: { nominal: { value: 'D' } } },
+            value: { type: 'Identifier', name: 'root' },
+          },
+        ],
+      })
+    }
+    expect(() => parse('{D = root}')).toThrow(/Expected/)
+  })
 })
 
 describe('Diamond-MOS tokens', () => {
@@ -207,7 +223,7 @@ describe('Diamond-MOS tokens', () => {
   })
 
   it('parses MOS pitches as context-assignment targets and rejects FJS suffixes', () => {
-    expect(parse('MOS{5L2s} {K = root}').body[0]).toMatchObject({
+    expect(parse('MOS{5L2s} {K as root}').body[0]).toMatchObject({
       type: 'Sequence',
       items: [
         { type: 'PitchContextChange', statements: [{ type: 'MosDeclaration' }] },
@@ -240,7 +256,7 @@ A B . ||
 
 # Repeat remains an AST macro
 {root = 220Hz}
-{${'`'}A = root}
+{${'`'}A as root}
 {41edo}
 |:@x10
 [${'`'}A, Cv5, E]
