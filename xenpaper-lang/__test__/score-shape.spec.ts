@@ -524,6 +524,30 @@ describe('score-shape timing', () => {
     ])
     expect(tenEdo.children.filter((child) => child.kind === 'sequence')).toHaveLength(2)
   })
+  it('uses a downward EDO step for the down operator', () => {
+    const result = shape('{16edo} [C, vE, G]') as SequenceShape
+    const chord = result.children.find((child) => child.kind === 'parallel')
+    if (!chord || chord.kind !== 'parallel') throw new Error('Expected a chord.')
+
+    expect(
+      chord.branches.map((branch) => {
+        if (branch.kind !== 'attack') throw new Error('Expected an attack.')
+        return branch.pitch.value.valueOf()
+      }),
+    ).toEqual([0, 225, 675])
+  })
+  it('uses five EDO steps for the lift and drop operators', () => {
+    const result = shape(String.raw`{16edo} [/E, \E]`) as SequenceShape
+    const chord = result.children.find((child) => child.kind === 'parallel')
+    if (!chord || chord.kind !== 'parallel') throw new Error('Expected a chord.')
+
+    expect(
+      chord.branches.map((branch) => {
+        if (branch.kind !== 'attack') throw new Error('Expected an attack.')
+        return branch.pitch.value.valueOf()
+      }),
+    ).toEqual([675, -75])
+  })
   it('flows root reassociation through an ordinary sequence', () => {
     const result = shape('{A as root} A B') as SequenceShape
     expect(result.children).toHaveLength(3)

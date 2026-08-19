@@ -183,6 +183,7 @@ export function normalizeStaffAccidental(token: string): string {
 }
 
 export function createPitchContext(mapping: PrimeMapping = DEFAULT_MAPPING): PitchContext {
+  const edo = /^(\d+)edo$/i.exec(mapping.id)
   const rootPitch: AbsolutePitchValue = {
     kind: 'absolutePitch',
     rootOffset: Value.cents(0),
@@ -200,22 +201,30 @@ export function createPitchContext(mapping: PrimeMapping = DEFAULT_MAPPING): Pit
     // 12-EDO middle C, nine semitones below A4 = 440 Hz.
     rootFrequency: Value.hertz(new Value(440).div(new Value(2).pow(new Fraction(3, 4)))),
     rootPitch,
-    up: mapFormula(
-      new Map([
-        [2, new Fraction(-1, 2)],
-        [3, new Fraction(5, 2)],
-        [11, new Fraction(-1)],
-      ]),
-      mapping,
-    ),
-    lift: mapFormula(
-      new Map([
-        [2, new Fraction(1, 2)],
-        [5, new Fraction(1)],
-        [7, new Fraction(-1)],
-      ]),
-      mapping,
-    ),
+    // In an EDO, up/down and lift/drop are sensible inflections of one and
+    // five steps respectively. Mapping their default commas prime-by-prime
+    // can instead produce zero, a fractional step, or even a displacement in
+    // the wrong direction (as the up/down comma does in 16-EDO).
+    up: edo
+      ? Value.equalDivision(1, Number(edo[1]), new Value(2))
+      : mapFormula(
+          new Map([
+            [2, new Fraction(-1, 2)],
+            [3, new Fraction(5, 2)],
+            [11, new Fraction(-1)],
+          ]),
+          mapping,
+        ),
+    lift: edo
+      ? Value.equalDivision(5, Number(edo[1]), new Value(2))
+      : mapFormula(
+          new Map([
+            [2, new Fraction(1, 2)],
+            [5, new Fraction(1)],
+            [7, new Fraction(-1)],
+          ]),
+          mapping,
+        ),
   }
 }
 
