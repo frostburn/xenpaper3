@@ -569,7 +569,7 @@ ContextAssignmentTarget
   = operator:ContextOperatorTarget {
       return node('ContextOperatorTarget', { operator });
     }
-  / pitch:(MosPitchLiteral / PitchLiteral) {
+  / pitch:(MosSignaturePitchLiteral / SignaturePitchLiteral) {
       return node('ContextPitchTarget', { pitch });
     }
   / name:Identifier {

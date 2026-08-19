@@ -368,6 +368,23 @@ describe('arithmetic expression evaluation', () => {
     expect(context.rootFrequency.equals(middleC)).toBe(true)
   })
 
+  it.each(["{root as 'A}", "{'A as root}"])(
+    'reassociates an octave-shifted nominal with the root using %s',
+    (source) => {
+      const change = parse(source).body[0]
+      if (change.type !== 'PitchContextChange') throw new Error('Expected a context change.')
+      const context = applyPitchContextChange(change, DEFAULT_PITCH_CONTEXT)
+      const unshiftedChange = parse('{A as root}').body[0]
+      if (unshiftedChange.type !== 'PitchContextChange')
+        throw new Error('Expected a context change.')
+      const unshifted = applyPitchContextChange(unshiftedChange, DEFAULT_PITCH_CONTEXT)
+      expect(context.rootPitch.spelling.raw).toBe("'A")
+      expect(
+        context.rootPitch.rootOffset.sub(unshifted.rootPitch.rootOffset).equals(Value.cents(1200)),
+      ).toBe(true)
+    },
+  )
+
   it('reassociates a Diamond-MOS pitch with the root', () => {
     const declaration = parse('MOS{5L2s 5|1; L=9/8}').body[0]
     if (declaration.type !== 'PitchContextChange') throw new Error('Expected a MOS declaration.')

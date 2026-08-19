@@ -125,18 +125,27 @@ describe('enumerated chords', () => {
   })
 
   it('parses root associations in both directions and rejects assignment syntax', () => {
-    for (const source of ['{root as D}', '{D as root}']) {
+    for (const source of ['{root as D}', '{D as root}', "{root as 'A}", "{'A as root}"]) {
       expect(parse(source).body[0]).toMatchObject({
         type: 'PitchContextChange',
         statements: [
           {
             type: 'ContextAssignment',
-            target: { type: 'ContextPitchTarget', pitch: { nominal: { value: 'D' } } },
+            target: { type: 'ContextPitchTarget' },
             value: { type: 'Identifier', name: 'root' },
           },
         ],
       })
     }
+    expect(parse("{root as 'A}").body[0]).toMatchObject({
+      statements: [
+        {
+          target: {
+            pitch: { nominal: { value: 'A' }, modifiers: [{ kind: 'equaveUp', raw: "'" }] },
+          },
+        },
+      ],
+    })
     expect(() => parse('{D = root}')).toThrow(/Expected/)
   })
 })
