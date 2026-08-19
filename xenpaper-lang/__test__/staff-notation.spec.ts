@@ -273,28 +273,28 @@ describe('staff notation construction', () => {
   })
 
   it('derives transposition accidentals independently of a reassociated root', () => {
-    const node = parse('{A = root} A + M3').body[0] as Expression
+    const node = parse('{A as root} A + M3').body[0] as Expression
     const evaluated = evaluateScoreShape(node)
     if (!('shape' in evaluated)) throw new Error('Expected shape.')
 
     expect(constructStaffNotationShape(evaluated.shape)).toMatchObject({
       kind: 'sequence',
       children: [
-        { kind: 'annotation', text: 'A = root' },
+        { kind: 'annotation', text: 'A as root' },
         { kind: 'note', pitch: { staffPosition: 7, accidentals: ['sharp'] } },
       ],
     })
   })
 
   it('derives named interval accidentals from the root and 3-limit formula', () => {
-    const node = parse('{A = root} -M3 -m3').body[0] as Expression
+    const node = parse('{A as root} -M3 -m3').body[0] as Expression
     const evaluated = evaluateScoreShape(node)
     if (!('shape' in evaluated)) throw new Error('Expected shape.')
 
     expect(constructStaffNotationShape(evaluated.shape)).toMatchObject({
       kind: 'sequence',
       children: [
-        { kind: 'annotation', text: 'A = root' },
+        { kind: 'annotation', text: 'A as root' },
         { kind: 'note', pitch: { staffPosition: 3, accidentals: [] } },
         { kind: 'note', pitch: { staffPosition: 3, accidentals: ['sharp'] } },
       ],
@@ -525,14 +525,14 @@ describe('staff notation construction', () => {
   })
 
   it('places a unison ratio on the active staff root', () => {
-    const node = parse('{D = root} 1/1').body[0] as Expression
+    const node = parse('{D as root} 1/1').body[0] as Expression
     const evaluated = evaluateScoreShape(node)
     if (!('shape' in evaluated)) throw new Error('Expected shape.')
     const staff = constructStaffNotationShape(evaluated.shape)
     expect(staff).toMatchObject({
       kind: 'sequence',
       children: [
-        { kind: 'annotation', text: 'D = root' },
+        { kind: 'annotation', text: 'D as root' },
         { kind: 'note', pitch: { staffPosition: 1 } },
       ],
     })
@@ -545,7 +545,7 @@ describe('staff notation construction', () => {
   ])(
     'retains the accidental of a reassociated %s staff root',
     (root, annotation, staffPosition, accidental) => {
-      const node = parse(`1/1 {${root} = root} 1/1`).body[0] as Expression
+      const node = parse(`1/1 {${root} as root} 1/1`).body[0] as Expression
       const evaluated = evaluateScoreShape(node)
       if (!('shape' in evaluated)) throw new Error('Expected shape.')
 
@@ -553,7 +553,7 @@ describe('staff notation construction', () => {
         kind: 'sequence',
         children: [
           { kind: 'note', pitch: { staffPosition: 0, accidentals: [] } },
-          { kind: 'annotation', text: `${annotation} = root` },
+          { kind: 'annotation', text: `${annotation} as root` },
           { kind: 'note', pitch: { staffPosition, accidentals: [accidental] } },
         ],
       })
@@ -561,14 +561,14 @@ describe('staff notation construction', () => {
   )
 
   it('uses the complete absolute pitch as the reassociated staff root', () => {
-    const node = parse('{C^5 = root} 1/1').body[0] as Expression
+    const node = parse('{C^5 as root} 1/1').body[0] as Expression
     const evaluated = evaluateScoreShape(node)
     if (!('shape' in evaluated)) throw new Error('Expected shape.')
 
     expect(constructStaffNotationShape(evaluated.shape)).toMatchObject({
       kind: 'sequence',
       children: [
-        { kind: 'annotation', text: 'C^5 = root' },
+        { kind: 'annotation', text: 'C^5 as root' },
         {
           kind: 'note',
           pitch: {
@@ -582,14 +582,14 @@ describe('staff notation construction', () => {
   })
 
   it('restores the active root when engraving a spelled nominal', () => {
-    const node = parse('{A = root} A').body[0] as Expression
+    const node = parse('{A as root} A').body[0] as Expression
     const evaluated = evaluateScoreShape(node)
     if (!('shape' in evaluated)) throw new Error('Expected shape.')
 
     expect(constructStaffNotationShape(evaluated.shape)).toMatchObject({
       kind: 'sequence',
       children: [
-        { kind: 'annotation', text: 'A = root' },
+        { kind: 'annotation', text: 'A as root' },
         { kind: 'note', pitch: { staffPosition: 5, accidentals: [], notehead: 'normal' } },
       ],
     })

@@ -350,7 +350,7 @@ describe('arithmetic expression evaluation', () => {
   })
 
   it('reassociates a spelled pitch with the root', () => {
-    const change = parse('{A = root}').body[0]
+    const change = parse('{A as root}').body[0]
     if (change.type !== 'PitchContextChange') throw new Error('Expected a context change.')
     const context = applyPitchContextChange(change, DEFAULT_PITCH_CONTEXT)
     const a = evaluateExpression(expression('A'), context)
@@ -368,6 +368,23 @@ describe('arithmetic expression evaluation', () => {
     expect(context.rootFrequency.equals(middleC)).toBe(true)
   })
 
+  it.each(["{root as 'A}", "{'A as root}"])(
+    'reassociates an octave-shifted nominal with the root using %s',
+    (source) => {
+      const change = parse(source).body[0]
+      if (change.type !== 'PitchContextChange') throw new Error('Expected a context change.')
+      const context = applyPitchContextChange(change, DEFAULT_PITCH_CONTEXT)
+      const unshiftedChange = parse('{A as root}').body[0]
+      if (unshiftedChange.type !== 'PitchContextChange')
+        throw new Error('Expected a context change.')
+      const unshifted = applyPitchContextChange(unshiftedChange, DEFAULT_PITCH_CONTEXT)
+      expect(context.rootPitch.spelling.raw).toBe("'A")
+      expect(
+        context.rootPitch.rootOffset.sub(unshifted.rootPitch.rootOffset).equals(Value.cents(1200)),
+      ).toBe(true)
+    },
+  )
+
   it('reassociates a Diamond-MOS pitch with the root', () => {
     const declaration = parse('MOS{5L2s 5|1; L=9/8}').body[0]
     if (declaration.type !== 'PitchContextChange') throw new Error('Expected a MOS declaration.')
@@ -376,7 +393,7 @@ describe('arithmetic expression evaluation', () => {
     expect(mosContext.lift).toBe(DEFAULT_PITCH_CONTEXT.lift)
     expect(mosContext.mos?.up).toBeUndefined()
     expect(mosContext.mos?.lift).toBeUndefined()
-    const change = parse('{K = root}').body[0]
+    const change = parse('{K as root}').body[0]
     if (change.type !== 'PitchContextChange') throw new Error('Expected a context change.')
     const context = applyPitchContextChange(change, mosContext)
     const j = evaluateExpression(expression('J'), context)
@@ -394,7 +411,7 @@ describe('arithmetic expression evaluation', () => {
 
   it('uses a pitch frequency assignment as a root frequency and spelling shorthand', () => {
     const shorthand = parse('{A = 440Hz}').body[0]
-    const expanded = parse('{root = 440Hz; A = root}').body[0]
+    const expanded = parse('{root = 440Hz; A as root}').body[0]
     if (shorthand.type !== 'PitchContextChange' || expanded.type !== 'PitchContextChange')
       throw new Error('Expected context changes.')
 

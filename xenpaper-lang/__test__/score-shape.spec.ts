@@ -109,7 +109,7 @@ describe('score-shape timing', () => {
   })
 
   it('associates and transposes Diamond-MOS pitches by their written rank', () => {
-    const associated = shape('MOS{5L2s} {K = root} K') as SequenceShape
+    const associated = shape('MOS{5L2s} {K as root} K') as SequenceShape
     expect(associated.children.find((child) => child.kind === 'attack')).toMatchObject({
       pitch: { value: expect.any(Value) },
     })
@@ -124,7 +124,7 @@ describe('score-shape timing', () => {
       { nominal: 'K', system: 'mos', derived: true, accidentals: ['&'] },
     ])
 
-    const reassociated = shape('MOS{5L2s} {K = root} J + M1ms') as SequenceShape
+    const reassociated = shape('MOS{5L2s} {K as root} J + M1ms') as SequenceShape
     const reassociatedAttack = reassociated.children.find((child) => child.kind === 'attack')
     expect(reassociatedAttack?.pitch.spelling).toMatchObject({
       nominal: 'K',
@@ -133,8 +133,8 @@ describe('score-shape timing', () => {
   })
 
   it('aligns MOS and conventional nominal groups through root associations', () => {
-    const score = shape(`MOS{5L2s 5|1; L=9/8} {K = root} J K L M
-{D = root} C D E F`) as SequenceShape
+    const score = shape(`MOS{5L2s 5|1; L=9/8} {K as root} J K L M
+{D as root} C D E F`) as SequenceShape
     const cents = score.children
       .filter((child) => child.kind === 'attack')
       .map((attack) => attack.pitch.value.valueOf())
@@ -525,9 +525,9 @@ describe('score-shape timing', () => {
     expect(tenEdo.children.filter((child) => child.kind === 'sequence')).toHaveLength(2)
   })
   it('flows root reassociation through an ordinary sequence', () => {
-    const result = shape('{A = root} A B') as SequenceShape
+    const result = shape('{A as root} A B') as SequenceShape
     expect(result.children).toHaveLength(3)
-    expect(result.children[0]).toMatchObject({ kind: 'annotation', text: 'A = root' })
+    expect(result.children[0]).toMatchObject({ kind: 'annotation', text: 'A as root' })
     expect(result.children[1]).toMatchObject({ kind: 'attack' })
     expect(result.children[2]).toMatchObject({ kind: 'attack' })
     if (result.children[1]?.kind !== 'attack' || result.children[2]?.kind !== 'attack')

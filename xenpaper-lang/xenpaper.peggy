@@ -526,6 +526,8 @@ ContextStatementList
 ContextAssignmentStart
   = ("sig"i / "key"i / "root"i) !IdentifierContinue Spacing "="
   / ContextAssignmentTarget Spacing "="
+  / 'root'i !IdentifierContinue Spacing 'as'i !IdentifierContinue
+  / ContextAssignmentTarget Spacing 'as'i !IdentifierContinue Spacing 'root'i !IdentifierContinue
 
 ContextStatement
   = kind:$("sig"i / "key"i) !IdentifierContinue Spacing "=" Spacing
@@ -539,8 +541,25 @@ ContextStatement
         value,
       });
     }
-  / target:ContextAssignmentTarget Spacing "=" Spacing value:ContextValue {
+  / target:ContextAssignmentTarget Spacing "=" Spacing
+    !('root'i !IdentifierContinue) value:ContextValue {
       return node('ContextAssignment', { target, value });
+    }
+  / name:$('root'i) !IdentifierContinue Spacing 'as'i !IdentifierContinue Spacing
+    target:ContextAssignmentTarget {
+      return node('ContextAssignment', {
+        target,
+        value: node('Identifier', { name: name.toLowerCase() }),
+        association: 'rootAsTarget',
+      });
+    }
+  / target:ContextAssignmentTarget Spacing 'as'i !IdentifierContinue Spacing
+    name:$('root'i) !IdentifierContinue {
+      return node('ContextAssignment', {
+        target,
+        value: node('Identifier', { name: name.toLowerCase() }),
+        association: 'targetAsRoot',
+      });
     }
   / preset:ContextPreset {
       return node('ContextPreset', preset);
@@ -550,7 +569,7 @@ ContextAssignmentTarget
   = operator:ContextOperatorTarget {
       return node('ContextOperatorTarget', { operator });
     }
-  / pitch:(MosPitchLiteral / PitchLiteral) {
+  / pitch:(MosSignaturePitchLiteral / SignaturePitchLiteral) {
       return node('ContextPitchTarget', { pitch });
     }
   / name:Identifier {
