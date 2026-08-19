@@ -369,10 +369,17 @@ export function applyPitchContextChange(
         continue
       }
       if (!('value' in evaluated) || evaluated.value.kind !== 'scalar')
-        throw new TypeError('A root assignment requires a scale degree or frequency quantity.')
-      const frequency = evaluated.value.value
+        throw new TypeError(
+          'A root assignment requires a scale degree, frequency quantity, or ratio.',
+        )
+      const argument = evaluated.value.value
+      const frequency = argument.dimensions.isDimensionless
+        ? context.rootFrequency.mul(argument)
+        : argument
       if (!frequency.dimensions.equals({ seconds: -1 }) || frequency.valueOf() <= 0)
-        throw new TypeError('A root frequency assignment requires a positive frequency quantity.')
+        throw new TypeError(
+          'A root frequency assignment requires a positive frequency quantity or ratio.',
+        )
       const ratio = frequency.div(context.rootFrequency)
       context = {
         ...context,

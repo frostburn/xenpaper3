@@ -431,6 +431,18 @@ describe('arithmetic expression evaluation', () => {
     expect(d.value.rootOffset.equals(Value.pitch(new Value(9n, 8n)))).toBe(true)
   })
 
+  it('normalizes a root frequency ratio against the current frequency', () => {
+    const change = parse('{root = 8/9}').body[0]
+    if (change.type !== 'PitchContextChange') throw new Error('Expected a context change.')
+
+    const context = applyPitchContextChange(change, DEFAULT_PITCH_CONTEXT)
+
+    expect(
+      context.rootFrequency.equals(DEFAULT_PITCH_CONTEXT.rootFrequency.mul(new Fraction(8, 9))),
+    ).toBe(true)
+    expect(context.rootDisplacement.equals(Value.pitch(new Value(8n, 9n)))).toBe(true)
+  })
+
   it('applies FJS inflections and normalizes scaled interval spelling', () => {
     const e5 = evaluate('E^5')
     if (e5.kind !== 'absolutePitch') throw new Error('Expected a pitch.')
