@@ -1292,6 +1292,12 @@ export function spellIntervalFormula(input: PrimeMonzo): IntervalSpelling | unde
   if (chromatic.d !== 1 && chromatic.d !== 2) return undefined
   const chromaticSteps = chromatic.valueOf()
   const perfect = [1, 4, 5, 1.5, 4.5, 7.5].includes(simple)
+  const interordinal = !Number.isInteger(simple)
+  // Imperfect interordinals use half-step alterations for major/minor and
+  // augmented/diminished qualities. A non-zero integral alteration therefore
+  // has no interval quality that can be parsed back to the same formula.
+  if (interordinal && !perfect && Number.isInteger(chromaticSteps) && chromaticSteps !== 0)
+    return undefined
   let quality: string
   if (perfect)
     quality =
@@ -1304,11 +1310,11 @@ export function spellIntervalFormula(input: PrimeMonzo): IntervalSpelling | unde
             : chromaticSteps > 0
               ? 'A'.repeat(chromaticSteps)
               : 'd'.repeat(-chromaticSteps)
-  else if (chromaticSteps === (Number.isInteger(simple) ? 0 : 0.5)) quality = 'M'
-  else if (chromaticSteps === (Number.isInteger(simple) ? -0.5 : 0)) quality = 'n'
+  else if (chromaticSteps === (interordinal ? 0.5 : 0)) quality = 'M'
+  else if (chromaticSteps === (interordinal ? 0 : -0.5)) quality = 'n'
   else if (!Number.isInteger(chromaticSteps) && chromaticSteps > 0)
     quality = `S${'A'.repeat(chromaticSteps + 0.5)}`
-  else if (chromaticSteps === (Number.isInteger(simple) ? -1 : -0.5)) quality = 'm'
+  else if (chromaticSteps === (interordinal ? -0.5 : -1)) quality = 'm'
   else if (chromaticSteps < -1 && !Number.isInteger(chromaticSteps))
     quality = `s${'d'.repeat(-chromaticSteps - 0.5)}`
   else if (chromaticSteps > 0) quality = 'A'.repeat(chromaticSteps)

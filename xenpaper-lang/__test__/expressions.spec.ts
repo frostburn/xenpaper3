@@ -3,7 +3,12 @@ import { Fraction } from 'xen-dev-utils/fraction'
 import { parse, type Expression } from '../parser.generated.js'
 import { evaluateExpression } from '../runtime/expressions'
 import { fjsInflection, groupFjsInflections } from '../runtime/fjs'
-import { DEFAULT_PITCH_CONTEXT, applyPitchContextChange, edoMapping } from '../runtime/pitches'
+import {
+  DEFAULT_PITCH_CONTEXT,
+  applyPitchContextChange,
+  edoMapping,
+  spellIntervalFormula,
+} from '../runtime/pitches'
 import { Value } from '../value'
 
 function expression(source: string): Expression {
@@ -290,6 +295,39 @@ describe('arithmetic expression evaluation', () => {
     if (difference.kind !== 'pitchOffset') throw new Error('Expected an interval.')
     expect(difference.value.equals(direct.value)).toBe(true)
     expect(difference.spelling?.raw).toBe('P4.5')
+  })
+
+  it('round-trips every class of spellable interordinal quality', () => {
+    const perfectNumbers = ['1.5', '4.5', '7.5']
+    const imperfectNumbers = ['2.5', '3.5', '5.5', '6.5']
+    const perfectQualities = ['P', 'A', 'AA', 'd', 'dd', 'SA', 'SAA', 'sd', 'sdd']
+    const imperfectQualities = ['M', 'm', 'n', 'A', 'AA', 'd', 'dd', 'SA', 'SAA', 'sd', 'sdd']
+
+    for (const [numbers, qualities] of [
+      [perfectNumbers, perfectQualities],
+      [imperfectNumbers, imperfectQualities],
+    ] as const) {
+      for (const number of numbers) {
+        for (const quality of qualities) {
+          const original = evaluate(`${quality}${number}`)
+          if (original.kind !== 'pitchOffset' || !original.formula)
+            throw new Error('Expected an exact interval formula.')
+          const spelling = spellIntervalFormula(original.formula)
+          expect(spelling, `${quality}${number}`).toBeDefined()
+          const roundTrip = evaluate(spelling!.raw)
+          expect(
+            roundTrip.value.equals(original.value),
+            `${quality}${number} -> ${spelling!.raw}`,
+          ).toBe(true)
+        }
+      }
+    }
+  })
+
+  it('does not invent an unparseable quality for unspellable interordinal formulas', () => {
+    const divided = evaluate('d6/2')
+    expect(divided.kind).toBe('pitchOffset')
+    expect(divided.kind === 'pitchOffset' && divided.spelling).toBeUndefined()
   })
 
   it('derives traditional quality and direction from pitch differences', () => {
