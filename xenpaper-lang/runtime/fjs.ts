@@ -1,7 +1,7 @@
 import { circleDistance } from 'xen-dev-utils/core'
 import { valueToCents } from 'xen-dev-utils/conversion'
 import { Fraction } from 'xen-dev-utils/fraction'
-import { toMonzo, type Monzo } from 'xen-dev-utils/monzo'
+import { accumulate, toMonzo, type Monzo } from 'xen-dev-utils/monzo'
 import { isPrime, PRIMES } from 'xen-dev-utils/primes'
 import type { FjsSpelling, PrimeMonzo } from './types'
 
@@ -97,9 +97,10 @@ function digitComma(value: number, commas: Map<string, Monzo>): PrimeMonzo {
   if (!Number.isSafeInteger(value) || value < 0) return new Map()
   const result: Monzo = []
   for (const digit of value.toString()) {
-    commas.get(digit)?.forEach((exponent, index) => {
-      result[index] = (result[index] ?? 0) + exponent
-    })
+    const comma = commas.get(digit)
+    if (!comma) continue
+    while (result.length < comma.length) result.push(0)
+    accumulate(result, comma)
   }
   return monzoToPrimeMonzo(result)
 }
@@ -200,7 +201,8 @@ export function fjsPrimeComma(prime: number, flavor: FjsFlavor = ''): PrimeMonzo
 
 /** Factor an FJS label, deliberately ignoring its 2- and 3-limit factors. */
 export function fjsInflection(value: number, flavor: FjsFlavor = ''): PrimeMonzo {
-  if (!Number.isSafeInteger(value) || value < 1)
+  const digitFlavor = flavor === 'l' || flavor === 's'
+  if (!Number.isSafeInteger(value) || value < 0 || (!digitFlavor && value < 1))
     throw new TypeError(`Invalid FJS inflection ${value}.`)
   if (flavor === 'l') return digitComma(value, LUMI)
   if (flavor === 's') return digitComma(value, SYNTONIC_RASTMIC)
