@@ -491,6 +491,23 @@ describe('arithmetic expression evaluation', () => {
     expect(d.value.rootOffset.equals(Value.pitch(new Value(9n, 8n)))).toBe(true)
   })
 
+  it('moves the root frequency when assigning an absolute-pitch expression to root', () => {
+    const change = parse('{root = C# + M3}').body[0]
+    if (change.type !== 'PitchContextChange') throw new Error('Expected a context change.')
+    const target = evaluateExpression(expression('C# + M3'), DEFAULT_PITCH_CONTEXT)
+    if (!('value' in target) || target.value.kind !== 'absolutePitch')
+      throw new Error('Expected an absolute pitch.')
+
+    const context = applyPitchContextChange(change, DEFAULT_PITCH_CONTEXT)
+
+    expect(context.rootDisplacement.equals(target.value.rootOffset)).toBe(true)
+    expect(
+      context.rootFrequency.equals(
+        DEFAULT_PITCH_CONTEXT.rootFrequency.mul(Value.ratio(target.value.rootOffset)),
+      ),
+    ).toBe(true)
+  })
+
   it('normalizes a root frequency ratio against the current frequency', () => {
     const change = parse('{root = 8/9}').body[0]
     if (change.type !== 'PitchContextChange') throw new Error('Expected a context change.')
