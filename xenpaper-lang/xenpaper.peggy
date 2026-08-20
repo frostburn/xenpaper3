@@ -100,11 +100,17 @@ SequenceExpression
     }
 
 SequenceItem
-  = expression:(EnumeratedChordArithmetic / ScaleDegreeLiteral / AdditiveExpression)
+  = expression:(EnumeratedChordArithmetic / Expression)
     marks:AttachedPostfixMark* {
       if (!marks.length) return expression;
       return node('PostfixExpression', { expression, marks });
     }
+
+// A bare integer in score and pitch-context positions denotes a scale degree,
+// while every other value uses the regular arithmetic expression grammar.
+Expression
+  = ScaleDegreeLiteral
+  / AdditiveExpression
 
 EnumeratedChordArithmetic
   = first:EnumeratedChord
@@ -551,7 +557,7 @@ ContextStatement
       });
     }
   / name:$('root'i) !IdentifierContinue Spacing "=" Spacing
-    value:(ScaleDegreeLiteral / UnaryExpression) {
+    value:Expression {
       return node('ContextAssignment', {
         target: node('ContextNameTarget', { name: name.toLowerCase() }),
         value,

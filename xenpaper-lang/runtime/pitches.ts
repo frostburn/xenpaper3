@@ -357,21 +357,16 @@ export function applyPitchContextChange(
         continue
       }
     }
-    if (
-      statement.target.type === 'ContextNameTarget' &&
-      statement.target.name === 'root' &&
-      statement.value.type === 'PitchLiteral'
-    ) {
-      const target = evaluatePitchLiteral(statement.value, context)
-      context = {
-        ...context,
-        rootDisplacement: context.rootDisplacement.add(target.rootOffset),
-        rootFrequency: context.rootFrequency.mul(Value.ratio(target.rootOffset)),
-      }
-      continue
-    }
     if (statement.target.type === 'ContextNameTarget' && statement.target.name === 'root') {
       const evaluated = evaluateExpression(statement.value, context)
+      if ('value' in evaluated && evaluated.value.kind === 'absolutePitch') {
+        context = {
+          ...context,
+          rootDisplacement: context.rootDisplacement.add(evaluated.value.rootOffset),
+          rootFrequency: context.rootFrequency.mul(Value.ratio(evaluated.value.rootOffset)),
+        }
+        continue
+      }
       if ('value' in evaluated && evaluated.value.kind === 'pitchOffset') {
         context = {
           ...context,
