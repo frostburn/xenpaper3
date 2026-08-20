@@ -359,12 +359,11 @@ export function applyPitchContextChange(
         mappedPrimes.set(prime, value)
       })
 
-      const previousMapping = context.mapping
       const mapping: PrimeMapping = {
         id: 'custom',
         mapPrime: (prime) =>
           mappedPrimes.get(prime) ??
-          (literal.closingDelimiter === ']' ? previousMapping.mapPrime(prime) : Value.cents(0)),
+          (literal.closingDelimiter === ']' ? DEFAULT_MAPPING.mapPrime(prime) : Value.cents(0)),
       }
       context = {
         ...context,

@@ -495,14 +495,17 @@ describe('score-shape timing', () => {
     expect(() => shape('{17oooooooooooo} C')).not.toThrow()
   })
 
-  it('applies custom prime mappings and leaves omitted primes at their previous values', () => {
+  it('applies custom prime mappings and leaves omitted primes at their default values', () => {
     const change = parse('{map = <1199.559c 1903.939c 2784.414c]}').body[0] as PitchContextChange
-    const context = applyPitchContextChange(change)
+    const edo = applyPitchContextChange(parse('{12edo}').body[0] as PitchContextChange)
+    let context = edo
+    for (let index = 0; index < 20_000; index++) context = applyPitchContextChange(change, context)
 
     expect(context.mapping.mapPrime(2).valueOf()).toBeCloseTo(1199.559)
     expect(context.mapping.mapPrime(3).valueOf()).toBeCloseTo(1903.939)
     expect(context.mapping.mapPrime(5).valueOf()).toBeCloseTo(2784.414)
     expect(context.mapping.mapPrime(7).valueOf()).toBeCloseTo(1200 * Math.log2(7))
+    expect(context.mapping.mapPrime(7).equals(edo.mapping.mapPrime(7))).toBe(false)
   })
 
   it.each(['Pythagorean', 'JustIntonation', 'JI', 'Untempered'])(
