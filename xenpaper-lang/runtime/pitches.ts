@@ -250,10 +250,13 @@ export function applyPitchContextChange(
       continue
     }
     if (statement.type === 'ContextPreset') {
+      const untempered = /^(?:Pythagorean|JustIntonation|JI|Untempered)$/i.test(statement.raw)
       const edo = /^(\d+)edo$/i.exec(statement.raw)
-      const parsed = edo
-        ? { mapping: edoMapping(Number(edo[1])), divisions: Number(edo[1]), equave: 2 }
-        : parseVal(statement.raw)
+      const parsed = untempered
+        ? { mapping: DEFAULT_MAPPING, divisions: 12, equave: 2 }
+        : edo
+          ? { mapping: edoMapping(Number(edo[1])), divisions: Number(edo[1]), equave: 2 }
+          : parseVal(statement.raw)
       const { mapping } = parsed
       const equave = Value.pitch(new Value(parsed.equave))
       const degrees = Array.from({ length: parsed.divisions }, (_, index) =>

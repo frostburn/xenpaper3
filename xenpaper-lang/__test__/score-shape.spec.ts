@@ -494,6 +494,17 @@ describe('score-shape timing', () => {
     expect(() => shape('{17oooooooooooo} C')).not.toThrow()
   })
 
+  it.each(['Pythagorean', 'JustIntonation', 'JI', 'Untempered'])(
+    'uses %s to restore the original prime mapping',
+    (preset) => {
+      const result = shape(`{12edo} E {${preset}} E`) as SequenceShape
+      const attacks = result.children.filter((child) => child.kind === 'attack')
+
+      expect(attacks[0]!.pitch.value.equals(Value.cents(400))).toBe(true)
+      expect(attacks[1]!.pitch.value.equals(Value.pitch(new Value(81n, 64n)))).toBe(true)
+    },
+  )
+
   it('resolves repeated warts at the safe-integer boundary', () => {
     const divisions = 5_682_910_006_162_749
     const mapped = valMapping(divisions, 2, 'bbb').mapPrime(3)
