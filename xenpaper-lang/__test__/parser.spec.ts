@@ -124,6 +124,32 @@ describe('enumerated chords', () => {
     })
   })
 
+  it('accepts generic expressions in root assignments', () => {
+    expect(parse('{root = C#}').body[0]).toMatchObject({
+      statements: [
+        {
+          type: 'ContextAssignment',
+          target: { name: 'root' },
+          value: { type: 'PitchLiteral', raw: 'C#' },
+        },
+      ],
+    })
+    expect(parse('{root = C# + M3}').body[0]).toMatchObject({
+      statements: [
+        {
+          type: 'ContextAssignment',
+          target: { name: 'root' },
+          value: {
+            type: 'BinaryExpression',
+            operator: '+',
+            left: { type: 'PitchLiteral', raw: 'C#' },
+            right: { type: 'IntervalLiteral', raw: 'M3' },
+          },
+        },
+      ],
+    })
+  })
+
   it('parses root associations in both directions and rejects assignment syntax', () => {
     for (const source of ['{root as D}', '{D as root}', "{root as 'A}", "{'A as root}"]) {
       expect(parse(source).body[0]).toMatchObject({
