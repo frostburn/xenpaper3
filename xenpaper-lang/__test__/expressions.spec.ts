@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { Fraction } from 'xen-dev-utils/fraction'
 import { parse, type Expression } from '../parser.generated.js'
 import { evaluateExpression } from '../runtime/expressions'
-import { groupFjsInflections } from '../runtime/fjs'
+import { fjsInflection, groupFjsInflections } from '../runtime/fjs'
 import { DEFAULT_PITCH_CONTEXT, applyPitchContextChange, edoMapping } from '../runtime/pitches'
 import { Value } from '../value'
 
@@ -532,5 +532,42 @@ describe('arithmetic expression evaluation', () => {
     expect(highPrime.kind).toBe('pitchOffset')
     if (highPrime.kind !== 'pitchOffset') throw new Error('Expected an interval.')
     expect(highPrime.formula?.get(101)?.equals(1)).toBe(true)
+  })
+
+  it('supports Helmholtz-Ellis, HEWM53, Lumi, and syntonic-rastmic FJS', () => {
+    expect(fjsInflection(5, 'h')).toEqual(
+      new Map([
+        [2, new Fraction(-4)],
+        [3, new Fraction(4)],
+        [5, new Fraction(-1)],
+      ]),
+    )
+    expect(fjsInflection(17, 'm')).toEqual(
+      new Map([
+        [2, new Fraction(1)],
+        [3, new Fraction(2)],
+        [17, new Fraction(-1)],
+      ]),
+    )
+
+    // Lumi and syntonic-rastmic labels stack digit commas instead of factoring the label.
+    expect(fjsInflection(12, 'l')).toEqual(
+      new Map([
+        [2, new Fraction(-19, 4)],
+        [3, new Fraction(15, 4)],
+        [5, new Fraction(1)],
+        [11, new Fraction(-1)],
+      ]),
+    )
+    expect(fjsInflection(12, 's')).toEqual(
+      new Map([
+        [2, new Fraction(-3, 2)],
+        [3, new Fraction(15, 2)],
+        [11, new Fraction(-3)],
+      ]),
+    )
+
+    expect(expression('P1^12l')).toMatchObject({ inflections: [{ prime: '12', flavor: 'l' }] })
+    expect(expression('P1v12s')).toMatchObject({ inflections: [{ prime: '12', flavor: 's' }] })
   })
 })
