@@ -80,6 +80,11 @@ describe('arithmetic expression evaluation', () => {
   it('scales pitch offsets only by rational scalars', () => {
     expect(evaluate('2 * 350c').value.equals(Value.cents(700))).toBe(true)
     expect(evaluate('700c / 2').value.equals(Value.cents(350))).toBe(true)
+    expect(evaluate('P4/2').value.equals(evaluate('P4 / 2').value)).toBe(true)
+    expect(evaluate('P8 div 2').spelling).toMatchObject({
+      quality: 'P',
+      number: new Fraction(9, 2),
+    })
   })
 
   it('coerces a ratio when mixed with a pitch offset', () => {

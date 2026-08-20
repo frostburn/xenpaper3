@@ -238,6 +238,16 @@ describe('staff notation construction', () => {
     expect(notation('d2')).toMatchObject({ staffPosition: 1, accidentals: ['double-flat'] })
     expect(notation('-n3')).toMatchObject({ staffPosition: -2, accidentals: ['half-flat'] })
     expect(notation('SA4')).toMatchObject({ staffPosition: 3, accidentals: ['half-sharp'] })
+    expect(notation('P4/2')).toMatchObject({
+      staffPosition: 2,
+      accidentals: ['half-flat'],
+      notehead: 'triangle-down',
+    })
+    expect(notation('P8 div 2')).toMatchObject({
+      staffPosition: 4,
+      accidentals: [],
+      notehead: 'triangle-down',
+    })
     expect(notation('sd5')).toMatchObject({ staffPosition: 4, accidentals: ['half-flat'] })
     expect(notation('19 * n3 - 5 * P8')).toMatchObject({
       staffPosition: 3,

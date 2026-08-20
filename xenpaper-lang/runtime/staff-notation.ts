@@ -68,7 +68,7 @@ function inferredAccidentals(chromatic: number | undefined): string[] {
 
 function spellingChromatic(quality: string, number: number): number | undefined {
   const simple = ((number - 1) % 7) + 1
-  const perfect = simple === 1 || simple === 4 || simple === 5
+  const perfect = [1, 4, 5, 1.5, 4.5, 7.5].includes(simple)
   if (quality === 'P' && perfect) return 0
   if (quality === 'M' && !perfect) return 0
   if (quality === 'm' && !perfect) return -1

@@ -179,9 +179,15 @@ MultiplicativeOperator
   / "mod"i !IdentifierContinue { return "mod"; }
 
 // A slash attached to a pitch-like token is a lift modifier belonging to the
-// following sequence item, not division (for example `Cv5 /'C`).
+// following sequence item, not division (for example `Cv5 /'C`). An attached
+// slash after the left operand may divide by a number, so `P4/2` is arithmetic
+// while the spaced `P4 /2` remains a sequence containing a lifted degree.
 BinaryDivide
-  = "/" !(PitchModifier / StandardPitchNominal / MosPitchNominal / [0-9]) { return "/"; }
+  = "/" &{
+      const offset = location().start.offset;
+      return !/[0-9]/.test(input[offset + 1] ?? "") ||
+        (offset > 0 && !/[\t\n\r ]/.test(input[offset - 1]));
+    } !(PitchModifier / StandardPitchNominal / MosPitchNominal) { return "/"; }
 
 PowerExpression
   = left:UnaryExpression
