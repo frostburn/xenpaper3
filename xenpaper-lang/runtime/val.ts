@@ -42,6 +42,7 @@ export function valMapping(divisions: number, equave: number, warts = ''): Prime
   }
   return {
     id: `${warts}${divisions}ed${equave}`,
+    equalDivision: { divisions, equave: new Value(equave) },
     mapPrime: (prime) => {
       const target = valueToEquaveDivision(prime, divisions, equave)
       const steps = prime === equave ? divisions : valuation(target, counts.get(prime) ?? 0)
@@ -88,6 +89,7 @@ function equalDivisionRatioMapping(
   const equaveValue = numerator / denominator
   return {
     id: `${divisions}ed${numerator}/${denominator}`,
+    equalDivision: { divisions, equave },
     mapPrime: (prime) =>
       Value.equalDivision(
         new Fraction(Math.round(valueToEquaveDivision(prime, divisions, equaveValue))),

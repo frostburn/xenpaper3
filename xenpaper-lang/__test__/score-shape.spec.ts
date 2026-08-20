@@ -524,6 +524,55 @@ describe('score-shape timing', () => {
     ])
     expect(tenEdo.children.filter((child) => child.kind === 'sequence')).toHaveLength(2)
   })
+  it('uses a downward EDO step for the down operator', () => {
+    const result = shape('{16edo} [C, vE, G]') as SequenceShape
+    const chord = result.children.find((child) => child.kind === 'parallel')
+    if (!chord || chord.kind !== 'parallel') throw new Error('Expected a chord.')
+
+    expect(
+      chord.branches.map((branch) => {
+        if (branch.kind !== 'attack') throw new Error('Expected an attack.')
+        return branch.pitch.value.valueOf()
+      }),
+    ).toEqual([0, 225, 675])
+  })
+  it('uses five EDO steps for the lift and drop operators', () => {
+    const result = shape(String.raw`{16edo} [/E, \E]`) as SequenceShape
+    const chord = result.children.find((child) => child.kind === 'parallel')
+    if (!chord || chord.kind !== 'parallel') throw new Error('Expected a chord.')
+
+    expect(
+      chord.branches.map((branch) => {
+        if (branch.kind !== 'attack') throw new Error('Expected an attack.')
+        return branch.pitch.value.valueOf()
+      }),
+    ).toEqual([675, -75])
+  })
+  it('uses the equal temperament equave for sensible inflections', () => {
+    const result = shape('{19ed3} [^C, /C]') as SequenceShape
+    const chord = result.children.find((child) => child.kind === 'parallel')
+    if (!chord || chord.kind !== 'parallel') throw new Error('Expected a chord.')
+    const step = (1200 * Math.log2(3)) / 19
+
+    expect(
+      chord.branches.map((branch) => {
+        if (branch.kind !== 'attack') throw new Error('Expected an attack.')
+        return branch.pitch.value.valueOf()
+      }),
+    ).toEqual([expect.closeTo(step), expect.closeTo(5 * step)])
+  })
+  it('accepts pitch expressions in up and lift assignments', () => {
+    const result = shape('{^ = 200c; / = 3 * 100c} [^C, /C]') as SequenceShape
+    const chord = result.children.find((child) => child.kind === 'parallel')
+    if (!chord || chord.kind !== 'parallel') throw new Error('Expected a chord.')
+
+    expect(
+      chord.branches.map((branch) => {
+        if (branch.kind !== 'attack') throw new Error('Expected an attack.')
+        return branch.pitch.value.valueOf()
+      }),
+    ).toEqual([200, 300])
+  })
   it('flows root reassociation through an ordinary sequence', () => {
     const result = shape('{A as root} A B') as SequenceShape
     expect(result.children).toHaveLength(3)

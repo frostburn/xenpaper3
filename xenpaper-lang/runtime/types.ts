@@ -111,6 +111,11 @@ export type StaffInflection = FjsSpelling | StaffOperatorInflection
 export interface PrimeMapping {
   readonly id: string
   readonly mapPrime: (prime: number) => Value
+  /** Equal-division generator, when this mapping is rank-1 equal temperament. */
+  readonly equalDivision?: {
+    readonly divisions: number
+    readonly equave: Value
+  }
 }
 
 export interface PitchContext {
