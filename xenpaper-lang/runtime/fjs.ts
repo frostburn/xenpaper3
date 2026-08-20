@@ -1,10 +1,11 @@
 import { circleDistance } from 'xen-dev-utils/core'
 import { valueToCents } from 'xen-dev-utils/conversion'
 import { Fraction } from 'xen-dev-utils/fraction'
-import { isPrime } from 'xen-dev-utils/primes'
+import { accumulate, toMonzo, type Monzo } from 'xen-dev-utils/monzo'
+import { isPrime, PRIMES } from 'xen-dev-utils/primes'
 import type { FjsSpelling, PrimeMonzo } from './types'
 
-export type FjsFlavor = '' | 'c' | 'n' | 'q' | 't' | 'h' | 'm'
+export type FjsFlavor = '' | 'c' | 'n' | 'q' | 't' | 'h' | 'm' | 'l' | 's'
 
 export interface FjsInflectionInput {
   readonly direction: string
@@ -18,6 +19,91 @@ const TRITAVE = valueToCents(3)
 const FORMAL_RADIUS = valueToCents(65 / 63)
 const SEMIAPOTOME = valueToCents(2187 / 2048) / 2 + 1e-6
 const cache = new Map<string, PrimeMonzo>()
+
+const SYNTONIC_RASTMIC = new Map<string, Monzo>([
+  ['1', [-1 / 2, 5 / 2, 0, 0, -1]],
+  ['2', [-1, 5, 0, 0, -2]],
+  ['4', [-2, 10, 0, 0, -4]],
+  ['8', [-4, 20, 0, 0, -8]],
+  ['3', [-2, 2, -1 / 2]],
+  ['6', [-4, 4, -1]],
+  ['9', [-6, 6, -3 / 2]],
+])
+
+const LUMI = new Map<string, Monzo>([
+  ['0', [-25 / 4, 17 / 4, 1, -1]],
+  ['1', [3 / 4, 1 / 4, 1, 0, -1]],
+  ['2', [-11 / 2, 7 / 2]],
+  ['3', [1, -3 / 2, -1, 0, 0, 1]],
+  ['4', [-9 / 2, 4, -2, 1]],
+  ['5', [1 / 2, 0, 1, -1]],
+  ['6', [1 / 3, -5 / 3, 1]],
+  ['7', [5 / 3, -1 / 3, 1, 0, -1]],
+  ['8', [5 / 2, -1, 0, 1, 0, -1]],
+  ['9', [9 / 5, -13 / 5, 1]],
+])
+
+const HELMHOLTZ_ELLIS = new Map<number, string>([
+  [5, '81/80'],
+  [7, '64/63'],
+  [11, '33/32'],
+  [13, '27/26'],
+  [17, '2187/2176'],
+  [19, '513/512'],
+  [23, '736/729'],
+  [29, '261/256'],
+  [31, '32/31'],
+  [37, '37/36'],
+  [41, '82/81'],
+  [43, '129/128'],
+  [47, '752/729'],
+  [53, '54/53'],
+  [59, '243/236'],
+  [61, '244/243'],
+  [67, '2187/2144'],
+  [71, '72/71'],
+  [73, '73/72'],
+  [79, '81/79'],
+  [83, '256/249'],
+  [89, '729/712'],
+])
+
+const HEWM53 = new Map<number, string>([
+  [5, '81/80'],
+  [7, '64/63'],
+  [11, '33/32'],
+  [13, '27/26'],
+  [17, '18/17'],
+  [19, '19/18'],
+  [23, '24/23'],
+  [29, '261/256'],
+  [31, '32/31'],
+  [37, '37/36'],
+  [41, '82/81'],
+  [43, '129/128'],
+  [47, '48/47'],
+  [53, '54/53'],
+])
+
+function monzoToPrimeMonzo(monzo: Monzo): PrimeMonzo {
+  const result = new Map<number, Fraction>()
+  monzo.forEach((exponent, index) => {
+    if (exponent) result.set(PRIMES[index]!, new Fraction(exponent))
+  })
+  return result
+}
+
+function digitComma(value: number, commas: Map<string, Monzo>): PrimeMonzo {
+  if (!Number.isSafeInteger(value) || value < 0) return new Map()
+  const result: Monzo = []
+  for (const digit of value.toString()) {
+    const comma = commas.get(digit)
+    if (!comma) continue
+    while (result.length < comma.length) result.push(0)
+    accumulate(result, comma)
+  }
+  return monzoToPrimeMonzo(result)
+}
 
 /** Combine pairs of compatible FJS factors when their product remains a two-digit label. */
 export function groupFjsInflections(inflections: readonly FjsSpelling[]): FjsSpelling[] {
@@ -83,6 +169,12 @@ export function fjsPrimeComma(prime: number, flavor: FjsFlavor = ''): PrimeMonzo
   const key = `${prime}:${flavor}`
   const cached = cache.get(key)
   if (cached) return cached
+  if (flavor === 'h' || flavor === 'm') {
+    const ratio = (flavor === 'h' ? HELMHOLTZ_ELLIS : HEWM53).get(prime)
+    const result = ratio ? monzoToPrimeMonzo(toMonzo(ratio)) : new Map<number, Fraction>()
+    cache.set(key, result)
+    return result
+  }
   const cents = valueToCents(prime)
   let pair: [number, number]
   if (flavor === 'n') pair = neutralMaster(cents)
@@ -109,8 +201,11 @@ export function fjsPrimeComma(prime: number, flavor: FjsFlavor = ''): PrimeMonzo
 
 /** Factor an FJS label, deliberately ignoring its 2- and 3-limit factors. */
 export function fjsInflection(value: number, flavor: FjsFlavor = ''): PrimeMonzo {
-  if (!Number.isSafeInteger(value) || value < 1)
+  const digitFlavor = flavor === 'l' || flavor === 's'
+  if (!Number.isSafeInteger(value) || value < 0 || (!digitFlavor && value < 1))
     throw new TypeError(`Invalid FJS inflection ${value}.`)
+  if (flavor === 'l') return digitComma(value, LUMI)
+  if (flavor === 's') return digitComma(value, SYNTONIC_RASTMIC)
   const result = new Map<number, Fraction>()
   let remaining = value
   for (let prime = 2; prime * prime <= remaining; prime++) {
