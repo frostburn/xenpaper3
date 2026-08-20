@@ -530,9 +530,16 @@ ContextAssignmentStart
   / ContextAssignmentTarget Spacing 'as'i !IdentifierContinue Spacing 'root'i !IdentifierContinue
 
 ContextStatement
-  = kind:$("sig"i / "key"i) !IdentifierContinue Spacing "=" Spacing
-    pitches:SignaturePitchList {
+  = kind:$("sig"i) !IdentifierContinue Spacing "=" Spacing pitches:SignaturePitchList {
       return node('SignatureDeclaration', { kind: kind.toLowerCase(), pitches });
+    }
+  / kind:$("key"i) !IdentifierContinue Spacing "=" Spacing pitch:SignaturePitchLiteral
+    mode:(RequiredSpacing value:KeyModeName { return value; })? {
+      return node('SignatureDeclaration', {
+        kind: kind.toLowerCase(),
+        pitches: [pitch],
+        mode: mode ?? null,
+      });
     }
   / name:$('root'i) !IdentifierContinue Spacing "=" Spacing
     value:(ScaleDegreeLiteral / UnaryExpression) {
@@ -712,6 +719,10 @@ SignaturePitchList
     rest:(RequiredSpacing pitch:SignaturePitchLiteral { return pitch; })* {
       return [first, ...rest];
     }
+
+KeyModeName
+  = mode:$("Lydian"i / "Ionian"i / "Mixolydian"i / "Dorian"i / "Aeolian"i / "Phrygian"i / "Locrian"i / "Major"i / "Minor"i)
+    !IdentifierContinue { return mode.toLowerCase(); }
 
 MosSignaturePitchList
   = first:MosSignaturePitchLiteral
