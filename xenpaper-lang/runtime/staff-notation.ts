@@ -266,7 +266,7 @@ export function constructStaffNotation(
       staffPosition: position,
       accidentals: inferredAccidentals(chromatic),
       ...(formulaSpelling.inflections?.length ? { inflections: formulaSpelling.inflections } : {}),
-      notehead: 'normal',
+      notehead: Number.isInteger(numericNumber) ? 'normal' : 'triangle-down',
       cents,
     }
   }
