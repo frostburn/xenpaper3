@@ -610,7 +610,11 @@ MappingLiteral
     }
 
 ContextPreset
-  = raw:$(UnsignedInteger "ed"i (RatioText / UnsignedInteger)) !IdentifierContinue {
+  = raw:$("Pythagorean"i / "JustIntonation"i / "Untempered"i / "JI"i)
+    !IdentifierContinue {
+      return { kind: 'untempered', raw };
+    }
+  / raw:$(UnsignedInteger "ed"i (RatioText / UnsignedInteger)) !IdentifierContinue {
       return { kind: 'equalDivision', raw };
     }
   / raw:$(

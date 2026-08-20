@@ -358,6 +358,10 @@ describe('Xenpaper surface grammar', () => {
 
   it.each([
     ['{13edo}C D E', ['PitchContextChange', 'PitchLiteral', 'PitchLiteral', 'PitchLiteral']],
+    ['{Pythagorean}C', ['PitchContextChange', 'PitchLiteral']],
+    ['{JustIntonation}C', ['PitchContextChange', 'PitchLiteral']],
+    ['{JI}C', ['PitchContextChange', 'PitchLiteral']],
+    ['{Untempered}C', ['PitchContextChange', 'PitchLiteral']],
     ['[C D]E', ['NormalizeToSlot', 'PitchLiteral']],
     ['(C D)E', ['Group', 'PitchLiteral']],
     ['C[D E]F', ['PitchLiteral', 'NormalizeToSlot', 'PitchLiteral']],
