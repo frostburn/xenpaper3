@@ -577,10 +577,21 @@ function applySignatureDeclaration(
   if (tonic.nominal.system !== 'latin' && tonic.nominal.system !== 'greek')
     throw new TypeError('Key signatures require a Latin or MOS tonic.')
   const fifths: Record<string, number> = { C: 0, G: 1, D: 2, A: 3, E: 4, B: 5, F: -1 }
+  const modeFifths = {
+    lydian: 1,
+    ionian: 0,
+    major: 0,
+    mixolydian: -1,
+    dorian: -2,
+    aeolian: -3,
+    minor: -3,
+    phrygian: -4,
+    locrian: -5,
+  } as const
   const tonicName = tiedNominals(tonic.nominal.value)[0]!
   const signature = new Map<string, PitchLiteral>()
   for (const name of ['C', 'D', 'E', 'F', 'G', 'A', 'B']) {
-    const baseCount = fifths[tonicName]!
+    const baseCount = fifths[tonicName]! + modeFifths[declaration.mode ?? 'ionian']
     const position = (
       baseCount >= 0 ? ['F', 'C', 'G', 'D', 'A', 'E', 'B'] : ['B', 'E', 'A', 'D', 'G', 'C', 'F']
     ).indexOf(name)

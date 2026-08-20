@@ -39,6 +39,25 @@ describe('score-shape timing', () => {
       [],
     ])
 
+    const modeKeys = [
+      ['Lydian', ['#', '#', '#']],
+      ['Ionian', ['#', '#']],
+      ['Major', ['#', '#']],
+      ['Mixolydian', ['#']],
+      ['Dorian', []],
+      ['Aeolian', ['b']],
+      ['Minor', ['b']],
+      ['Phrygian', ['b', 'b']],
+      ['Locrian', ['b', 'b', 'b']],
+    ] as const
+    for (const [mode, expectedAccidentals] of modeKeys) {
+      const score = shape(`{key = D ${mode}} C D E F G A B`) as SequenceShape
+      const accidentals = score.children
+        .filter((child) => child.kind === 'attack')
+        .flatMap((attack) => attack.pitch.spelling.accidentals)
+      expect(accidentals).toEqual(expectedAccidentals)
+    }
+
     const upF = shape('{key = ^F} C D E F G A B') as SequenceShape
     const upFAttacks = upF.children.filter((child) => child.kind === 'attack')
     expect(upFAttacks.map((attack) => attack.pitch.spelling.modifiers)).toEqual(

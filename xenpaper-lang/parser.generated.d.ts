@@ -227,8 +227,20 @@ export interface SignatureDeclaration extends Node {
   type: 'SignatureDeclaration'
   kind: 'sig' | 'key'
   pitches: PitchLiteral[]
+  mode?: KeyMode | null
   udp?: { up: string; down: string; period: string | null } | null
 }
+
+export type KeyMode =
+  | 'lydian'
+  | 'ionian'
+  | 'mixolydian'
+  | 'dorian'
+  | 'aeolian'
+  | 'phrygian'
+  | 'locrian'
+  | 'major'
+  | 'minor'
 
 export interface MosAbstractPattern extends Node {
   type: 'MosAbstractPattern'

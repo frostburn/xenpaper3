@@ -45,6 +45,12 @@ ratio to a pitch displacement, `ratio(offset)` for the inverse conversion, and
 `sqrt(quantity)` for a square root. `sqrt()` retains an exact monomial when the
 value model is closed under the operation and halves the quantity's dimensions.
 
+Key signatures may include a diatonic mode after the tonic, such as
+`{key = D minor}`. The supported names are Lydian, Ionian, Mixolydian, Dorian,
+Aeolian, Phrygian, and Locrian; `major` aliases Ionian and `minor` aliases
+Aeolian. Mode names are case-insensitive, and a key without a mode remains
+Ionian.
+
 ## Exact values
 
 `Value` deliberately provides a small set of closed exact forms instead of a

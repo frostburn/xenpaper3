@@ -166,6 +166,13 @@ describe('Diamond-MOS tokens', () => {
     })
     expect(() => parse('{sig=C# key=G}')).toThrow(/Expected/)
     expect(parse('{sig=C#; key=G}').body[0]).toMatchObject({ statements: [{}, {}] })
+    expect(parse('{key=D minor}').body[0]).toMatchObject({
+      statements: [{ type: 'SignatureDeclaration', kind: 'key', mode: 'minor' }],
+    })
+    expect(parse('{key=F LYDIAN}').body[0]).toMatchObject({
+      statements: [{ type: 'SignatureDeclaration', kind: 'key', mode: 'lydian' }],
+    })
+    expect(() => parse('{key=D melodic}')).toThrow(/Expected/)
   })
 
   it('parses the MOS sub-language structurally in any element order', () => {
