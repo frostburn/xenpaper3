@@ -184,9 +184,12 @@ MultiplicativeOperator
 // while the spaced `P4 /2` remains a sequence containing a lifted degree.
 BinaryDivide
   = "/" &{
-      const offset = location().start.offset;
-      return !/[0-9]/.test(input[offset + 1] ?? "") ||
-        (offset > 0 && !/[\t\n\r ]/.test(input[offset - 1]));
+      // `location()` can include spacing consumed by the caller while Peggy is
+      // backtracking. `offset()` is the position immediately after the slash,
+      // so inspect the two adjacent source characters from there.
+      const slashOffset = offset() - 1;
+      return !/[0-9]/.test(input[slashOffset + 1] ?? "") ||
+        (slashOffset > 0 && !/[\t\n\r ]/.test(input[slashOffset - 1]));
     } !(PitchModifier / StandardPitchNominal / MosPitchNominal) { return "/"; }
 
 PowerExpression
@@ -629,7 +632,7 @@ CallArgumentList
     }
 
 IdentifierExpression
-  = !("v" &(MosPitchLiteral / PitchLiteral / IntervalLiteral)) name:Identifier {
+  = !("v" &([0-9] / MosPitchLiteral / PitchLiteral / IntervalLiteral)) name:Identifier {
       return node('Identifier', { name });
     }
 
