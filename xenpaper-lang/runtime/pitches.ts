@@ -1279,16 +1279,25 @@ export function spellIntervalFormula(input: PrimeMonzo): IntervalSpelling | unde
   const threes = base.get(3) ?? new Fraction(0)
   if ([...base].some(([prime, exponent]) => prime > 3 && exponent.n)) return undefined
   const stepspan = twos.mul(7).add(threes.mul(11))
-  if (stepspan.d !== 1 || stepspan.compare(0) < 0) return undefined
-  const span = stepspan.n
+  if (stepspan.mul(2).d !== 1 || stepspan.compare(0) < 0) return undefined
+  const span = stepspan.valueOf()
   const simple = (span % 7) + 1
-  const number = BigInt(simple + 7 * Math.floor(span / 7))
-  const natural = formula(NOMINALS[['C', 'D', 'E', 'F', 'G', 'A', 'B'][simple - 1]!]!)
-  addExponent(natural, 2, Math.floor(span / 7))
+  const octave = Math.floor(span / 7)
+  const number = stepspan.d === 1 ? BigInt(stepspan.n + 1) : stepspan.add(1)
+  const natural = Number.isInteger(simple)
+    ? formula(NOMINALS[['C', 'D', 'E', 'F', 'G', 'A', 'B'][simple - 1]!]!)
+    : formula(SEMIOCTAVE_INTERVALS[simple - 1.5]!)
+  addExponent(natural, 2, octave)
   const chromatic = threes.sub(natural.get(3) ?? 0).div(7)
   if (chromatic.d !== 1 && chromatic.d !== 2) return undefined
   const chromaticSteps = chromatic.valueOf()
-  const perfect = simple === 1 || simple === 4 || simple === 5
+  const perfect = [1, 4, 5, 1.5, 4.5, 7.5].includes(simple)
+  const interordinal = !Number.isInteger(simple)
+  // Imperfect interordinals use half-step alterations for major/minor and
+  // augmented/diminished qualities. A non-zero integral alteration therefore
+  // has no interval quality that can be parsed back to the same formula.
+  if (interordinal && !perfect && Number.isInteger(chromaticSteps) && chromaticSteps !== 0)
+    return undefined
   let quality: string
   if (perfect)
     quality =
@@ -1301,11 +1310,11 @@ export function spellIntervalFormula(input: PrimeMonzo): IntervalSpelling | unde
             : chromaticSteps > 0
               ? 'A'.repeat(chromaticSteps)
               : 'd'.repeat(-chromaticSteps)
-  else if (chromaticSteps === 0) quality = 'M'
-  else if (chromaticSteps === -0.5) quality = 'n'
+  else if (chromaticSteps === (interordinal ? 0.5 : 0)) quality = 'M'
+  else if (chromaticSteps === (interordinal ? 0 : -0.5)) quality = 'n'
   else if (!Number.isInteger(chromaticSteps) && chromaticSteps > 0)
     quality = `S${'A'.repeat(chromaticSteps + 0.5)}`
-  else if (chromaticSteps === -1) quality = 'm'
+  else if (chromaticSteps === (interordinal ? -0.5 : -1)) quality = 'm'
   else if (chromaticSteps < -1 && !Number.isInteger(chromaticSteps))
     quality = `s${'d'.repeat(-chromaticSteps - 0.5)}`
   else if (chromaticSteps > 0) quality = 'A'.repeat(chromaticSteps)
