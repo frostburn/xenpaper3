@@ -629,6 +629,34 @@ describe('Xenpaper surface grammar', () => {
     })
   })
 
+  it('reserves v followed by digits for down-shifted scale degrees', () => {
+    expect(parse('v2').body[0]).toMatchObject({
+      type: 'UnaryExpression',
+      operator: 'v',
+      operand: { type: 'DegreeLiteral', degree: '2' },
+    })
+  })
+
+  it('prioritizes attached musical inflections over spaced division', () => {
+    const program = parse(String.raw`{^ = 1\24; / = 5\25}
+0 ^0 1 v2 2 /0`)
+    const items = (program.body[0] as SyntaxNode).items as SyntaxNode[]
+
+    expect(items.slice(1).map((item) => item.type)).toEqual([
+      'DegreeLiteral',
+      'UnaryExpression',
+      'DegreeLiteral',
+      'UnaryExpression',
+      'DegreeLiteral',
+      'UnaryExpression',
+    ])
+    expect(items.slice(2).filter((item) => item.type === 'UnaryExpression')).toMatchObject([
+      { operator: '^', operand: { type: 'DegreeLiteral', degree: '0' } },
+      { operator: 'v', operand: { type: 'DegreeLiteral', degree: '2' } },
+      { operator: '/', operand: { type: 'DegreeLiteral', degree: '0' } },
+    ])
+  })
+
   it('sequences a pitch with an attached up modifier instead of treating it as power', () => {
     const expression = parse('C ^D').body[0]
     const items = expression.items as SyntaxNode[]
