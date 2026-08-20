@@ -559,6 +559,14 @@ describe('arithmetic expression evaluation', () => {
         [11, new Fraction(-1)],
       ]),
     )
+    expect(fjsInflection(0, 'l')).toEqual(
+      new Map([
+        [2, new Fraction(-25, 4)],
+        [3, new Fraction(17, 4)],
+        [5, new Fraction(1)],
+        [7, new Fraction(-1)],
+      ]),
+    )
     expect(fjsInflection(12, 's')).toEqual(
       new Map([
         [2, new Fraction(-3, 2)],
@@ -568,6 +576,7 @@ describe('arithmetic expression evaluation', () => {
     )
 
     expect(expression('P1^12l')).toMatchObject({ inflections: [{ prime: '12', flavor: 'l' }] })
+    expect(expression('P1^0l')).toMatchObject({ inflections: [{ prime: '0', flavor: 'l' }] })
     expect(expression('P1v12s')).toMatchObject({ inflections: [{ prime: '12', flavor: 's' }] })
   })
 })
