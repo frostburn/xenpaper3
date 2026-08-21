@@ -659,7 +659,7 @@ const inflection = (
   inflections: readonly StaffInflection[],
 ) => {
   if ('kind' in value) {
-    return { up: '^', down: '⌄', lift: '/', drop: '\\' }[value.kind]
+    return { up: '˄', down: '˅', lift: '/', drop: '\\' }[value.kind]
   }
   const hasMatchingFactor = inflections
     .slice(0, index)

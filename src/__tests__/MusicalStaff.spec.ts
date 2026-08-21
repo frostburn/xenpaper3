@@ -1055,8 +1055,8 @@ describe('MusicalStaff', () => {
     const wrapper = mount(MusicalStaff, { props: { notation: decorated } })
 
     expect(wrapper.findAll('.inflection').map((element) => element.text())).toEqual([
-      '^',
-      '⌄',
+      '˄',
+      '˅',
       '/',
       '\\',
       '5c',
@@ -1064,7 +1064,7 @@ describe('MusicalStaff', () => {
       '/7n',
       ',13',
     ])
-    expect(wrapper.get('.pitch-decorations').text()).toBe('^⌄/\\5c,11/7n,13♭')
+    expect(wrapper.get('.pitch-decorations').text()).toBe('˄˅/\\5c,11/7n,13♭')
     expect(
       wrapper.get('.pitch-decorations').element.lastElementChild?.classList.contains('accidental'),
     ).toBe(true)
