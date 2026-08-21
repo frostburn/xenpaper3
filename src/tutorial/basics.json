@@ -1,0 +1,249 @@
+[
+  {
+    "title": "Conventions",
+    "demos": [
+      {
+        "description": "Degree `0` is the current root, and the default scale is 12edo."
+      },
+      {
+        "description": "An unadorned note or rest occupies one current subdivision. Each `=` extends it by one more subdivision."
+      },
+      {
+        "description": "Spaces and line breaks usually have the same meaning. Bar lines are organizational unless a repeat or parallel section gives them special meaning."
+      },
+      {
+        "description": "Settings such as scales, roots, dynamics, and articulation remain active until changed, but only within their current scope. See Advanced score construction for the scope boundaries."
+      }
+    ]
+  },
+  {
+    "title": "Notes, rests, and duration",
+    "demos": [
+      {
+        "description": "Typing a number creates a note. Notes can be separated by spaces or new lines.",
+        "tune": "0 4 7\n11 12"
+      },
+      {
+        "description": "Append equal signs to extend a note, and use dots for rests. Pitches and rests may be adjacent, although spaces often improve readability.",
+        "tune": "0.2.3...3=2=0==."
+      },
+      {
+        "description": "Bar lines help organize the score without changing the timing. A leading `=` continues (ties) the preceding note across a bar line.",
+        "tune": "0 8 7=|0 8 7=|=5 4=="
+      },
+      {
+        "description": "Notes can be written as scale degrees, ratios, cents, diatonic pitches, steps of equal temperaments, cycles per second and more.",
+        "tune": "0 7 1/1 3/2 0c 702c C G\n0\\19 11\\19 262Hz 393Hz"
+      },
+      {
+        "description": "Notes can be shifted up or down octaves. Primes (apostrophes) shift up and graves (backticks) shift down.",
+        "tune": "0=3='0='3=\"0='\"0=`0=``0="
+      },
+      {
+        "description": "Play simultaneous pitches by putting a comma-separated expression in parentheses or square brackets. Square brackets without commas create tuplets instead (see **Timing**).",
+        "tune": "(3,7)=[5,8]=(0,3,7)==.[1/1,6/5,3/2]==."
+      },
+      {
+        "description": "Negative degrees are supported.",
+        "tune": "0 -1 1 0="
+      },
+      {
+        "description": "Chords can also be played by enumerating a colon-separated chord.",
+        "tune": "10:12:15==="
+      }
+    ]
+  },
+  {
+    "title": "Comments",
+    "demos": [
+      {
+        "description": "A `#` starts a comment that continues to the end of the line.",
+        "tune": "# a 7th chord\n[0,4,7,10]==..\n\n# a harmonic 7th chord\n4:5:6:7==.."
+      }
+    ]
+  },
+  {
+    "title": "Scales",
+    "demos": [
+      {
+        "description": "Change the scale at any point with braces. The default is 12 equal divisions of the octave (12edo); a scale change affects the notes that follow it.",
+        "tune": "[0,4,7]=== {31edo}[0,10,18]==="
+      },
+      {
+        "description": "Equal division equave size can be changed by replacing the “o” with a number or fraction.",
+        "tune": "{13ed3}0 1 2 3 4"
+      },
+      {
+        "description": "A scale can also be built from individual pitch intervals. The listed entries become degrees 1 onward; degree 0 remains the root.",
+        "tune": "{9/8 5/4 4/3 3/2 5/3 15/8 2/1}\n0 1 2 3 4 5 6 7="
+      },
+      {
+        "description": "The final listed pitch is also the equave. Degree indexing wraps through that equave, so the pattern continues beyond the entries shown.",
+        "tune": "{5/4 4/3 3/2}\n0 1 2 3 4 5 6 7 8="
+      },
+      {
+        "description": "An enumerated chord can define a scale compactly. Its first member becomes degree 0, and its final enumeral determines the equave.",
+        "tune": "{12:14:16:18:21:24}\n0 1 2 3 4 5 6 7="
+      },
+      {
+        "description": "Harmonic segments can be specified using two colons :: to enumerate a range.",
+        "tune": "{4::8}\n0 1 2 3 4=="
+      },
+      {
+        "description": "Enumerations can be retroverted by prefixing them with a slash.",
+        "tune": "{/6::3}\n0 1 2 3=="
+      },
+      {
+        "description": "Scales can reference the scale degrees at the moment they are encountered, which is useful for creating a subset of a scale.",
+        "tune": "{19edo}{3 6 8 11 14 17 19}\n0 1 2 3 4 5 6 7="
+      },
+      {
+        "description": "All pitch values other than cycles per second are relative to a root note.",
+        "tune": "0 2 4={root=432Hz}0 2 4="
+      },
+      {
+        "description": "As each root pitch change is relative to the current root, multiple roots can be chained.",
+        "tune": "4 0= {root = 2} 4 0= {root = 2} 4 0="
+      },
+      {
+        "description": "Root changes can also switch octaves for a time.",
+        "tune": "4 0={root = '0}4 0={root = `0}4 0="
+      }
+    ]
+  },
+  {
+    "title": "Timing",
+    "demos": [
+      {
+        "description": "Tuplets can be created by enclosing a sequence of notes inside square brackets.",
+        "tune": "0 2 7 [0 2 7] [0 2 3 5 7]"
+      },
+      {
+        "description": "Holding a tuplet stretches it as a whole.",
+        "tune": "[0 2 7] [0 2 7]==="
+      },
+      {
+        "description": "Set the number of subdivisions per beat with `@` followed by a positive number. For example, `@2` makes each plain note half a beat long; `@1/2` makes it two beats long.",
+        "tune": "@2 0 2 3 7 @3 0 2 3 7 @4 0 2 3 7 @1/2 0 2 3 7"
+      }
+    ]
+  },
+  {
+    "title": "Chord roots",
+    "demos": [
+      {
+        "description": "Enumerated chords can be shifted using arithmetic. The first enumeral defines where 1/1 falls.",
+        "tune": "4/3 * 4:5:6==\n3/2 * 4:5:3==\n5/4 * /6:5:4=="
+      },
+      {
+        "description": "Note that asterisks `*` only mean pitch shifts when both operands are ratios. Using + to shift is more common.",
+        "tune": "4/3   + ~4:5:6==  # Ratio + tempered ratios\n702c  + 4:5:3==   # Cents + ratios\n17\\53 + /6:5:4==  # Steps of equal temperaments + ratios"
+      }
+    ]
+  },
+  {
+    "title": "Other equal temperaments",
+    "demos": [
+      {
+        "description": "Use angle brackets to change the equave of steps of equal temperaments.",
+        "tune": "5\\13<3> 5\\13<3/2>"
+      }
+    ]
+  },
+  {
+    "title": "Repeats",
+    "demos": [
+      {
+        "description": "Everything between `|:` and `:|` is repeated twice by default. Alternate endings use `@^1` and `@^2`, or the equivalent superscript numerals attached to bar lines as below.",
+        "tune": "# Square little tune\n|: 0 2 4 5 |¹ 7 5 4 2 :|² 7 11 12= |\n12 11 9 7 | 5 4 2 -1 | 0=== ||"
+      },
+      {
+        "description": "To add more repeats use @x followed by a number attached to the opening |:.",
+        "tune": "|:@x6\n4:5:6\n4:5:3 * 5/4\n8:5:6 * 25/16\n{root = 125/128}\n:|"
+      }
+    ]
+  },
+  {
+    "title": "Glissando",
+    "demos": [
+      {
+        "description": "Use @gliss to slide legato into the next note and hold the target. Linear glissando is the default.",
+        "tune": "@gliss 0=== 7"
+      },
+      {
+        "description": "Use ? on the target to make it zero-duration. Easing modes include linear, ease and ease-in/out/in-out.",
+        "tune": "@gliss(ease-in-out)11=== 12==\n..\n@gliss(ease-in)0=== 7?\n..\n@gliss(ease-out)9=== 5="
+      },
+      {
+        "description": "Chord glissandi pair voices by index, so each chord tone slides legato.",
+        "tune": "@gliss[0, 3, 7]==@gliss[0, 3, 7]\n@gliss[0, 3, 9]==@gliss[0, 3, 9]\n[2, 7, 10]==="
+      }
+    ]
+  },
+  {
+    "title": "Articulation",
+    "demos": [
+      {
+        "description": "Articulation setters change how long notes sound without changing the duration they occupy. Use percentages, named setters, or compact shorthands: @' @staccatissimo, @. @staccato, @: @portato, @- @tenuto, and @_ @legato.",
+        "tune": "@. 0 2 4 7 .\n@: 0 2 4 7 .\n@- 0 2 4 7 .\n@_ 0 2 4 7 .\n@art(75%) 0 2 4 7"
+      }
+    ]
+  },
+  {
+    "title": "Grace notes",
+    "demos": [
+      {
+        "description": "Use a grace setter before a note to make that note borrow a short duration from the following note. Repeat the ? marker to apply the same grace duration to multiple notes.",
+        "tune": "@8? 5 3= @16? 7 5=\n@8?? 7 10 8==\n@4? 10 12=="
+      }
+    ]
+  },
+  {
+    "title": "Dynamics",
+    "demos": [
+      {
+        "description": "Control synth velocity with directives such as `@f` and `@pp`, or specify it directly with `@velocity(...)`. Dynamic settings remain active until the next dynamic directive.",
+        "tune": "@mf 0==   # 50% (default)\n@f 1==    # 65%\n@ff 2==   # 82%\n@fff 3==  # 100%\n\n@velocity(70%) 1==  # Fine-grained control\n\n@mp 0==    # 40%\n@p -1==    # 30%\n@pp -2==   # 20%\n@ppp -3==  # 10%"
+      }
+    ]
+  },
+  {
+    "title": "Drones",
+    "demos": [
+      {
+        "description": "Use `@drone(...)` to sustain a note or chord behind subsequent music. A new drone replaces the old one; empty parentheses stop it.",
+        "tune": "@drone([0, 7]) 0 2 4 5\n@drone(5) 7 5 4 2\n@drone() 0==="
+      }
+    ]
+  },
+  {
+    "title": "Parallel sections",
+    "demos": [
+      {
+        "description": "Use the comma `,` to separate sections that you want to play in parallel and terminate the group with a double bar line.",
+        "tune": "{root = '0} @4\n5 . 7  . 10 7 5 . 7  . 12 . 10 7 5  . |\n0 . 10 . 7  5 7 . 12 5 7  . 10 . 12 . |,\n\n@2\n[0,4,7]==    [5,9,12]==     [3,7,10]= |\n=   [2,7,12]==   [0,4,7,11,12]===     |,\n\n{root = `0}\n0= 0= | 5= 7= ||"
+      }
+    ]
+  },
+  {
+    "title": "Groove",
+    "demos": [
+      {
+        "description": "Set an uneven groove to play with a swung feel. Even divisions of the same span will be cyclically mapped to match it.",
+        "tune": "@2\n# Straight\n0 0 4 4 7 7 9 9 10 10 9 9 7 7 4 4 |\n# Triplet swing\n@groove([0=0]=)\n0 0 4 4 7 7 9 9 10 10 9 9 7 7 4 4 |\n# Quintuplet swing\n@groove([0==0=]=)\n0 0 4 4 7 7 9 9 10 10 9 9 7 7 4 4 |\n# Back to straight rhythm\n@groove\n0 0 4 4 7 7 9 9 '0===     . . . . ||"
+      },
+      {
+        "description": "More complex grooves can be set by using more than two notes.",
+        "tune": "@groove([0==0=0]==)\n0 1 2   5 4 3 |\n2 1 -1 -5 7 . |\n5 4 5   . . . |\n4 3 4   . . . |\n@4 3  2 1 0 -1\n  -3 -4== -5==|\n0===== ...... ||"
+      },
+      {
+        "description": "Groove patterns can include accent dynamics. Accent values stay in effect until the next accent and multiply each note velocity.",
+        "tune": "@4\n@groove(@ff 0 0 @pp 0 @ff 0 0 @pp 0 @ff 0 @pp 0)\n0  2  3 5   7  9 10 12\n0  2  3 5   7  9 10 12\n12 10 9 7   10 9 7  5\n9  7  5 3   7  5 3  2"
+      },
+      {
+        "description": "Groove patterns can also include articulation. Articulation values latch until the next articulation and shorten or lengthen each grooved note.",
+        "tune": "@groove([@: 0== @' 0=]=)\n0  6 8 2  3 9 10 4 |\n12 6 5 11 8 3 0=   ||"
+      }
+    ]
+  }
+]
