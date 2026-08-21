@@ -327,7 +327,9 @@ EndingParallelExpression
     }
 
 EndingSequenceExpression
-  = first:SequenceItem rest:(Spacing item:SequenceItem { return item; })* {
+  // A single bar followed by spacing terminates the final alternate ending;
+  // do not let ordinary sequence repetition consume it as a barline item.
+  = first:SequenceItem rest:(Spacing !("|" Spacing) item:SequenceItem { return item; })* {
       return sequence([first, ...rest]);
     }
 
@@ -944,7 +946,9 @@ Sign
   = $("+" / "-")
 
 Identifier
-  = $([A-Za-z_] IdentifierContinue*)
+  // A Diamond-MOS nominal followed by an FJS suffix is an invalid pitch, not
+  // an identifier followed by an adjacent prefix-modified degree.
+  = !([J-Zj-z] FjsInflection) name:$([A-Za-z_] IdentifierContinue*) { return name; }
 
 IdentifierContinue
   = [A-Za-z0-9_]

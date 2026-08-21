@@ -1,6 +1,48 @@
 import { describe, expect, it } from 'vitest'
 import { parse } from '../parser.generated.js'
 
+describe('grammar boundary roles', () => {
+  it('keeps signed degrees as sequence items while allowing explicit scalar arithmetic', () => {
+    expect(parse('-1 -2 0 +1').body[0]).toMatchObject({
+      type: 'Sequence',
+      items: [
+        { type: 'DegreeLiteral', degree: '-1' },
+        { type: 'DegreeLiteral', degree: '-2' },
+        { type: 'DegreeLiteral', degree: '0' },
+        { type: 'DegreeLiteral', degree: '1' },
+      ],
+    })
+    expect(parse('-1/1 - 2/1').body[0]).toMatchObject({ type: 'BinaryExpression', operator: '-' })
+    expect(parse('2 * M2').body[0]).toMatchObject({ type: 'BinaryExpression', operator: '*' })
+  })
+
+  it('distinguishes attached pitch arithmetic, signed items, and slash roles', () => {
+    expect(parse('G-n3').body[0]).toMatchObject({ type: 'BinaryExpression', operator: '-' })
+    expect(parse('D -n3').body[0]).toMatchObject({ type: 'Sequence' })
+    expect(parse('D - n3').body[0]).toMatchObject({ type: 'BinaryExpression', operator: '-' })
+    expect(parse('m7 / 2').body[0]).toMatchObject({ type: 'BinaryExpression', operator: '/' })
+    expect(parse('/2 /cb').body[0]).toMatchObject({ type: 'Sequence' })
+    expect(parse('3/2').body[0]).toMatchObject({ type: 'RatioLiteral' })
+  })
+
+  it('supports interordinals and adjacent self-delimiting sequence items', () => {
+    expect(parse('P4½ P4h').body[0]).toMatchObject({
+      type: 'Sequence',
+      items: [
+        { type: 'IntervalLiteral', number: '4.5' },
+        { type: 'IntervalLiteral', number: '4.5' },
+      ],
+    })
+    expect(parse('P4.5').body[0]).toMatchObject({
+      type: 'Sequence',
+      items: [{ type: 'IntervalLiteral', number: '4' }, { type: 'Rest' }, { degree: '5' }],
+    })
+    for (const source of ['0.2.3...3=2=0==.', 'C[D E]F', '{13edo}[0,4,7]']) {
+      expect(() => parse(source)).not.toThrow()
+    }
+  })
+})
+
 describe('enumerated chords', () => {
   it('preserves chords in the syntax tree with chord-tight arithmetic precedence', () => {
     expect(parse('3/2 * 4:5:6').body[0]).toMatchObject({
@@ -11,7 +53,7 @@ describe('enumerated chords', () => {
         enumerands: [{ value: '4' }, { value: '5' }, { value: '6' }],
       },
     })
-    expect(parse('4:(4+1):6').body[0]).toMatchObject({
+    expect(parse('4:(4 + 1):6').body[0]).toMatchObject({
       type: 'EnumeratedChord',
       enumerands: [
         { value: '4' },

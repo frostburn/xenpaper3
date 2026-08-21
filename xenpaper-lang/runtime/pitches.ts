@@ -990,10 +990,13 @@ export function spellPitchDifference(left: AbsolutePitchValue, right: AbsolutePi
       ? 'P'
       : 'M'
   const inflections = compatibleSpelling?.inflections
+  const writtenNumber = Number.isInteger(numericNumber)
+    ? numericNumber
+    : `${Math.floor(numericNumber)}h`
   return {
     quality,
     number,
-    raw: `${quality}${numericNumber}`,
+    raw: `${quality}${writtenNumber}`,
     ...(signedDistance < 0 ? { direction: 'descending' as const } : {}),
     ...(inflections?.length ? { inflections } : {}),
   }
@@ -1396,7 +1399,13 @@ export function spellIntervalFormula(input: PrimeMonzo): IntervalSpelling | unde
   const suffix = groupedInflections
     .map(({ direction, prime }) => `${direction === 'numerator' ? '^' : 'v'}${prime}`)
     .join('')
-  return { quality, number, inflections: groupedInflections, raw: `${quality}${number}${suffix}` }
+  const writtenNumber = interordinal ? `${Math.floor(Number(number.valueOf()))}h` : number
+  return {
+    quality,
+    number,
+    inflections: groupedInflections,
+    raw: `${quality}${writtenNumber}${suffix}`,
+  }
 }
 
 export type PitchEvaluationResult = {
