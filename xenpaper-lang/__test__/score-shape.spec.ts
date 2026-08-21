@@ -119,6 +119,11 @@ K L M N j k=`) as SequenceShape
       ...Array(5).fill('LLLsL'),
     ])
     expect(attacks[7]?.pitch.spelling).toMatchObject({ nominal: 'M', accidentals: ['@'] })
+
+    const setter = shape('MOS{4L 1s 3|1} MOS{key = K 1|3; ^ = 2} J ^J') as SequenceShape
+    const setAttacks = setter.children.filter((child) => child.kind === 'attack')
+    const setOffset = setAttacks[1]!.pitch.value.valueOf() - setAttacks[0]!.pitch.value.valueOf()
+    expect(setOffset).toBeCloseTo(Value.equalDivision(2, 9, new Value(2)).valueOf())
   })
 
   it('installs Diamond-MOS absolute pitches and relative mossteps', () => {

@@ -810,22 +810,25 @@ function applyMosDeclaration(declaration: MosDeclaration, context: PitchContext)
   const hostStep =
     Math.abs(largeUnit.valueOf() - smallUnit.valueOf()) <= 1e-8 ? largeUnit : undefined
 
-  const notation = generateNotation(pattern)
   const realize = (monzo: MosMonzo): Value =>
     large!.mul(new Value(monzo[0])).add(small!.mul(new Value(monzo[1])))
-  const nominals = new Map<string, Value>()
-  for (const [nominal, monzo] of notation.scale) nominals.set(nominal, realize(monzo))
-  const degrees = notation.degrees.map((degree) => ({
-    center: realize(degree.center),
-    imperfect: !degree.perfect,
-    ...(degree.mid ? { mid: realize(degree.mid) } : {}),
-  }))
-  const offsets = [...nominals.values()]
-  const period = realize(notation.period)
+  const realizeNotation = (notationPattern: string) => {
+    const notation = generateNotation(notationPattern)
+    const nominals = new Map<string, Value>()
+    for (const [nominal, monzo] of notation.scale) nominals.set(nominal, realize(monzo))
+    const degrees = notation.degrees.map((degree) => ({
+      center: realize(degree.center),
+      imperfect: !degree.perfect,
+      ...(degree.mid ? { mid: realize(degree.mid) } : {}),
+    }))
+    return { nominals, degrees, period: realize(notation.period) }
+  }
+  const notation = realizeNotation(pattern)
+  const offsets = [...notation.nominals.values()]
   const mos: MosContext = {
     pattern,
     equave,
-    period,
+    period: notation.period,
     large: large!,
     small: small!,
     ...(hostStep ? { hostStep } : {}),
@@ -843,8 +846,8 @@ function applyMosDeclaration(declaration: MosDeclaration, context: PitchContext)
         : preserveOperators
           ? context.mos?.lift
           : hostStep?.mul(new Value(5)),
-    nominals,
-    degrees,
+    nominals: notation.nominals,
+    degrees: notation.degrees,
   }
   const result: PitchContext = {
     ...context,
@@ -853,8 +856,21 @@ function applyMosDeclaration(declaration: MosDeclaration, context: PitchContext)
     degreeEquave: equave,
   }
   if (!signatureDeclaration) return result
-  if (selectsModeFromCurrentCounts)
-    return applySignatureDeclaration(signatureDeclaration, context, mos.nominals)
+  if (selectsModeFromCurrentCounts) {
+    const activeNotation = realizeNotation(context.mos!.pattern)
+    const activeResult: PitchContext = {
+      ...result,
+      mos: {
+        ...mos,
+        pattern: context.mos!.pattern,
+        period: activeNotation.period,
+        nominals: activeNotation.nominals,
+        degrees: activeNotation.degrees,
+      },
+      degrees: [...activeNotation.nominals.values()].slice(1).concat(equave),
+    }
+    return applySignatureDeclaration(signatureDeclaration, activeResult, mos.nominals)
+  }
   return applySignatureDeclaration(signatureDeclaration, result)
 }
 
