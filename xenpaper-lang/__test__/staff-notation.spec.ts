@@ -208,15 +208,16 @@ describe('staff notation construction', () => {
   })
 
   it('places Hz literals from root-relative cents and displays their frequencies', () => {
-    const node = parse('262Hz 393Hz').body[0] as Expression
+    const node = parse('262hz 393HZ 0.393KhZ').body[0] as Expression
     const evaluated = evaluateScoreShape(node)
     if (!('shape' in evaluated)) throw new Error('Expected a score shape.')
 
     const staff = constructStaffNotationShape(evaluated.shape)
     if (staff.kind !== 'sequence') throw new Error('Expected a staff sequence.')
     expect(staff.children).toMatchObject([
-      { kind: 'note', displayLabel: '262Hz', pitch: { staffPosition: 0, accidentals: [] } },
-      { kind: 'note', displayLabel: '393Hz', pitch: { staffPosition: 4, accidentals: [] } },
+      { kind: 'note', displayLabel: '262hz', pitch: { staffPosition: 0, accidentals: [] } },
+      { kind: 'note', displayLabel: '393HZ', pitch: { staffPosition: 4, accidentals: [] } },
+      { kind: 'note', displayLabel: '0.393KhZ', pitch: { staffPosition: 4, accidentals: [] } },
     ])
   })
 

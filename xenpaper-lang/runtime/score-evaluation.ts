@@ -1720,7 +1720,8 @@ export function evaluateScoreSemantics(
       ...(evaluated.justIntonation ? { justIntonation: true } : {}),
       ...(current.type === 'DegreeLiteral' ||
       current.type === 'EqualDivisionLiteral' ||
-      (current.type === 'QuantityLiteral' && ['c', 'Hz', 'kHz'].includes(current.unit))
+      (current.type === 'QuantityLiteral' &&
+        ['c', 'hz', 'khz'].includes(current.unit.toLowerCase()))
         ? { displayLabel: String(current.raw) }
         : {}),
     }
