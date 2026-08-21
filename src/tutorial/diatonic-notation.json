@@ -103,8 +103,8 @@
     "title": "Half-intervals",
     "demos": [
       {
-        "tune": "C + n3   Ed\nC + n4   Ft\nC + n5   Gd\nC + P4½  Gam\nC + P4.5 Γ",
-        "html": "<p>Every even equal temperament of the octave contains the semioctave √2 (i.e. 1\\2 or 600c) while every odd edo (besides 1edo) has a good approximation to either the neutral third √3/√2 or the semifourth 2/√3.</p><p>Relative diatonic intervals support neutral qualities and half-integer interval numbers. On imperfect intervals, the neutral quality <code>n</code> lies halfway between minor and major; <code>n4</code> lies between P4 and A4, while <code>n5</code> lies between d5 and P5. Their absolute counterparts above C use half-accidentals: <code>n3</code> is <code>Ed</code>, <code>n4</code> is <code>Ft</code>, and <code>n5</code> is <code>Gd</code>. Half-integer numbers instead reach the interordinal nominals: <code>P4½</code> (or ASCII <code>P4.5</code>) above C is <code>Gam</code> (Gamma). Each line below plays the same pitch twice.</p>"
+        "tune": "C + n3   Ed\nC + n4   Ft\nC + n5   Gd\nC + P4½  Gam\nC + P4h Γ",
+        "html": "<p>Every even equal temperament of the octave contains the semioctave √2 (i.e. 1\\2 or 600c) while every odd edo (besides 1edo) has a good approximation to either the neutral third √3/√2 or the semifourth 2/√3.</p><p>Relative diatonic intervals support neutral qualities and half-integer interval numbers. On imperfect intervals, the neutral quality <code>n</code> lies halfway between minor and major; <code>n4</code> lies between P4 and A4, while <code>n5</code> lies between d5 and P5. Their absolute counterparts above C use half-accidentals: <code>n3</code> is <code>Ed</code>, <code>n4</code> is <code>Ft</code>, and <code>n5</code> is <code>Gd</code>. Half-integer numbers instead reach the interordinal nominals: <code>P4½</code> (or ASCII <code>P4h</code>) above C is <code>Gam</code> (Gamma). Each line below plays the same pitch twice.</p>"
       },
       {
         "tune": "[1/1, 32/27,     3/2]==.  # Pythagorean minor\n[1/1, 6/5,       3/2]==.  # 5-limit minor\n[1/1, 11/9,      3/2]==.  # 11-limit neutral\n[1/1, sqrt(3/2), 3/2]==.  # true neutral\n[1/1, 5/4,       3/2]==.  # 5-limit major\n[1/1, 81/64,     3/2]==.  # Pythagorean major",
@@ -212,7 +212,7 @@
       },
       {
         "description": "Custom prime mappings are supported.",
-        "tune": "# Generator climb in WE tuned tetracot\n{map = <1199.559c 1903.939c 2784.414c]}\n`A    E     F     |\n`B^5  E     D^5   |\nC#^25 D^5   F^5   |\nD#^125-     E^125 |\nE#^5^5^5^5- C^5   |\n[E, A]===         ||"
+        "tune": "# Generator climb in WE tuned tetracot\n{map = <1199.559c 1903.939c 2784.414c]}\n`A    E     F     |\n`B^5  E     D^5   |\nC#^25 D^5   F^5   |\nD#^125=     E^125 |\nE#^5^5^5^5= C^5   |\n[E, A]===         ||"
       }
     ]
   }
