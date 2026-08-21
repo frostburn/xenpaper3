@@ -55,6 +55,8 @@ export interface PitchOffsetValue {
   readonly notationValue?: Value
   readonly formula?: PrimeMonzo
   readonly spelling?: IntervalSpelling
+  /** Authored numeric scale degree, retained so engraving does not infer an interordinal. */
+  readonly scaleDegree?: number
   readonly origins: readonly SourceOrigin[]
 }
 
@@ -195,9 +197,21 @@ export type StaffNotationShape =
       readonly grace?: boolean
       readonly notatedDuration?: Fraction
       readonly articulationMarks?: readonly string[]
+      /** Engraved glissando segments owned by this sounding note. */
+      readonly glissandi?: readonly {
+        readonly start: Fraction
+        readonly duration: Fraction
+        readonly from: StaffPitch
+        readonly to: StaffPitch
+      }[]
     }
   | { readonly kind: 'rest'; readonly duration: Fraction; readonly generated: boolean }
-  | { readonly kind: 'continue'; readonly duration: Fraction }
+  | {
+      readonly kind: 'continue'
+      readonly duration: Fraction
+      /** False for a glissando target whose time must not lengthen the source notehead. */
+      readonly extendsAutomation?: boolean
+    }
   | {
       readonly kind: 'barline'
       readonly style: BarlineStyle
@@ -280,6 +294,9 @@ export interface PitchAutomation {
   readonly curve: string
   readonly from: AttackShape['pitch']
   readonly to: AttackShape['pitch']
+  /** Notation context of the source and destination pitches. */
+  readonly fromRootPitch?: AbsolutePitchValue
+  readonly toRootPitch?: AbsolutePitchValue
   readonly duration: Fraction
   /** Consecutive glides, including this automation's first segment. */
   readonly segments?: readonly PitchAutomationSegment[]
@@ -289,6 +306,9 @@ export interface PitchAutomationSegment {
   readonly curve: string
   readonly from: AttackShape['pitch']
   readonly to: AttackShape['pitch']
+  /** Notation context at each endpoint, which may change during the glide. */
+  readonly fromRootPitch?: AbsolutePitchValue
+  readonly toRootPitch?: AbsolutePitchValue
   /** Offset from the beginning of the owning attack. */
   readonly start: Fraction
   readonly duration: Fraction

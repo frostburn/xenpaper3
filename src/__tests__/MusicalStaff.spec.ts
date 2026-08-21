@@ -94,7 +94,7 @@ describe('MusicalStaff', () => {
     ).toEqual([5, 5, 5])
     expect(wrapper.findAll('.clef').map((clef) => clef.text())).toEqual(['𝄞', '𝄞'])
     expect(wrapper.findAll('.diamond-clef')).toHaveLength(1)
-    expect(wrapper.findAll('.staff-lines > g')[0]!.find('line').attributes('x2')).toBe('294')
+    expect(wrapper.findAll('.staff-lines > g')[0]!.find('line').attributes('x2')).toBe('321')
   })
 
   it('renders Diamond-MOS pitches with diamond octave marks and minority-step boxes', () => {
@@ -1055,8 +1055,8 @@ describe('MusicalStaff', () => {
     const wrapper = mount(MusicalStaff, { props: { notation: decorated } })
 
     expect(wrapper.findAll('.inflection').map((element) => element.text())).toEqual([
-      '^',
-      'v',
+      '˄',
+      '˅',
       '/',
       '\\',
       '5c',
@@ -1064,9 +1064,134 @@ describe('MusicalStaff', () => {
       '/7n',
       ',13',
     ])
-    expect(wrapper.get('.pitch-decorations').text()).toBe('^v/\\5c,11/7n,13♭')
+    expect(wrapper.get('.pitch-decorations').text()).toBe('˄˅/\\5c,11/7n,13♭')
     expect(
       wrapper.get('.pitch-decorations').element.lastElementChild?.classList.contains('accidental'),
     ).toBe(true)
+  })
+
+  it('reserves horizontal space for authored clef changes', () => {
+    const evaluated = evaluateScoreShape(parse('C @clef(bass) D').body[0]!)
+    if (!('shape' in evaluated)) throw new Error('Expected a score shape.')
+    const wrapper = mount(MusicalStaff, {
+      props: { notation: constructStaffNotationShape(evaluated.shape) },
+    })
+    const clefX = Number(wrapper.findAll('.clef')[1]!.attributes('x'))
+    const noteX = Number(wrapper.findAll('.notehead')[1]!.attributes('cx'))
+
+    expect(noteX - clefX).toBe(38)
+  })
+
+  it('spaces implicit and explicit clefs consistently', () => {
+    const evaluated = evaluateScoreShape(parse('C @clef(bass) D').body[0]!)
+    if (!('shape' in evaluated)) throw new Error('Expected a score shape.')
+    const wrapper = mount(MusicalStaff, {
+      props: { notation: constructStaffNotationShape(evaluated.shape) },
+    })
+    const clefs = wrapper.findAll('.clef')
+    const notes = wrapper.findAll('.notehead')
+
+    expect(Number(notes[0]!.attributes('cx')) - Number(clefs[0]!.attributes('x'))).toBe(38)
+    expect(Number(notes[1]!.attributes('cx')) - Number(clefs[1]!.attributes('x'))).toBe(38)
+  })
+
+  it('lays out a redundant initial treble clef exactly like the implicit clef', () => {
+    const render = (source: string) => {
+      const evaluated = evaluateScoreShape(parse(source).body[0]!)
+      if (!('shape' in evaluated)) throw new Error('Expected a score shape.')
+      return mount(MusicalStaff, {
+        props: { notation: constructStaffNotationShape(evaluated.shape) },
+      })
+    }
+    const implicit = render('C D E F @clef(bass) `C `D `E `F')
+    const explicit = render('@clef(treble) C D E F @clef(bass) `C `D `E `F')
+
+    expect(explicit.attributes('viewBox')).toBe(implicit.attributes('viewBox'))
+    expect(explicit.findAll('.clef').map((clef) => clef.attributes('x'))).toEqual(
+      implicit.findAll('.clef').map((clef) => clef.attributes('x')),
+    )
+    expect(explicit.findAll('.notehead').map((note) => note.attributes('cx'))).toEqual(
+      implicit.findAll('.notehead').map((note) => note.attributes('cx')),
+    )
+  })
+
+  it('renders scale degrees with regular noteheads', () => {
+    const evaluated = evaluateScoreShape(parse('6').body[0]!)
+    if (!('shape' in evaluated)) throw new Error('Expected a score shape.')
+    const wrapper = mount(MusicalStaff, {
+      props: { notation: constructStaffNotationShape(evaluated.shape) },
+    })
+
+    expect(wrapper.get('.notehead').element.tagName).toBe('ellipse')
+  })
+
+  it('renders glissandi as wavy lines with rhythmic width', () => {
+    const evaluated = evaluateScoreShape(parse('@gliss E @gliss F G').body[0]!)
+    if (!('shape' in evaluated)) throw new Error('Expected a score shape.')
+    const wrapper = mount(MusicalStaff, {
+      props: { notation: constructStaffNotationShape(evaluated.shape) },
+    })
+
+    expect(wrapper.findAll('.glissando')).toHaveLength(2)
+    expect(wrapper.findAll('.glissando')[0]!.attributes('d')).toContain(' Q ')
+    expect(wrapper.findAll('.notehead')).toHaveLength(3)
+    expect(wrapper.findAll('.glissando-target')).toHaveLength(2)
+    expect(wrapper.find('.notation-error').exists()).toBe(false)
+    expect(wrapper.attributes('viewBox')).toBe('0 0 360 170')
+  })
+
+  it('does not turn a whole-note glissando source into an unsupported five-beat note', () => {
+    const evaluated = evaluateScoreShape(parse('@gliss 0=== 7').body[0]!)
+    if (!('shape' in evaluated)) throw new Error('Expected a score shape.')
+    const wrapper = mount(MusicalStaff, {
+      props: { notation: constructStaffNotationShape(evaluated.shape) },
+    })
+
+    expect(wrapper.find('.notation-error').exists()).toBe(false)
+    expect(wrapper.findAll('.glissando')).toHaveLength(1)
+    expect(wrapper.findAll('.notehead')).toHaveLength(2)
+    expect(wrapper.findAll('.notehead--open')).toHaveLength(1)
+  })
+
+  it('positions each glissando endpoint with the clef active at its column', () => {
+    const evaluated = evaluateScoreShape(parse('@gliss C @clef(bass) G').body[0]!)
+    if (!('shape' in evaluated)) throw new Error('Expected a score shape.')
+    const wrapper = mount(MusicalStaff, {
+      props: { notation: constructStaffNotationShape(evaluated.shape) },
+    })
+
+    expect(wrapper.get('.glissando-target').attributes('cy')).toBe('16')
+  })
+
+  it('preserves the pitch context at each glissando endpoint', () => {
+    const evaluated = evaluateScoreShape(parse('@gliss 0 {D as root} 0').body[0]!)
+    if (!('shape' in evaluated)) throw new Error('Expected a score shape.')
+    const wrapper = mount(MusicalStaff, {
+      props: { notation: constructStaffNotationShape(evaluated.shape) },
+    })
+
+    expect(wrapper.get('.glissando-target').attributes('cy')).toBe('106')
+  })
+
+  it('stacks simultaneous annotations instead of drawing them on top of each other', () => {
+    const annotated: StaffNotationShape = {
+      kind: 'sequence',
+      duration: notation.duration,
+      children: [
+        {
+          kind: 'annotation',
+          text: 'first',
+          duration: { n: 0, d: 1 } as StaffNotationShape['duration'],
+        },
+        {
+          kind: 'annotation',
+          text: 'second',
+          duration: { n: 0, d: 1 } as StaffNotationShape['duration'],
+        },
+      ],
+    }
+    const wrapper = mount(MusicalStaff, { props: { notation: annotated } })
+
+    expect(wrapper.findAll('.annotation').map((item) => item.attributes('y'))).toEqual(['25', '11'])
   })
 })

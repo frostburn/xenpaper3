@@ -266,7 +266,12 @@ export function constructStaffNotation(
       staffPosition: position,
       accidentals: inferredAccidentals(chromatic),
       ...(formulaSpelling.inflections?.length ? { inflections: formulaSpelling.inflections } : {}),
-      notehead: Number.isInteger(numericNumber) ? 'normal' : 'triangle-down',
+      notehead:
+        value.kind === 'pitchOffset' && value.scaleDegree !== undefined
+          ? 'normal'
+          : Number.isInteger(numericNumber)
+            ? 'normal'
+            : 'triangle-down',
       cents,
     }
   }
@@ -334,12 +339,37 @@ export function constructStaffNotationShape(shape: ScoreShape): StaffNotationSha
         ...(shape.grace ? { grace: true } : {}),
         ...(shape.notatedDuration ? { notatedDuration: shape.notatedDuration } : {}),
         ...(shape.articulationMarks?.length ? { articulationMarks: shape.articulationMarks } : {}),
+        ...(shape.automation
+          ? {
+              glissandi: (
+                shape.automation.segments ?? [
+                  {
+                    ...shape.automation,
+                    start: new Fraction(0),
+                  },
+                ]
+              ).map((segment) => ({
+                start: segment.start,
+                duration: segment.duration,
+                from: constructStaffNotation(segment.from, {
+                  rootPitch: segment.fromRootPitch ?? shape.rootPitch,
+                }),
+                to: constructStaffNotation(segment.to, {
+                  rootPitch: segment.toRootPitch ?? shape.rootPitch,
+                }),
+              })),
+            }
+          : {}),
       }
     }
     case 'rest':
       return { kind: 'rest', duration: shape.duration, generated: shape.generated }
     case 'continue':
-      return { kind: 'continue', duration: shape.duration }
+      return {
+        kind: 'continue',
+        duration: shape.duration,
+        ...(shape.extendsAutomation === false ? { extendsAutomation: false } : {}),
+      }
     case 'barline':
       return {
         kind: 'barline',
