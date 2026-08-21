@@ -135,6 +135,22 @@ describe('repeat expansion', () => {
     expect(repeat).toMatchObject({ type: 'Repeat', terminal: '|' })
   })
 
+  it('preserves attached barlines inside alternate endings', () => {
+    const program = parse('|: C |¹ D|E :|² F')
+    const repeat = program.body[0] as {
+      endings: Array<{ body: Array<{ type: string; items: Array<{ type: string; raw: string }> }> }>
+    }
+
+    expect(repeat.endings[0]!.body[0]).toMatchObject({
+      type: 'Sequence',
+      items: [
+        { type: 'PitchLiteral', raw: 'D' },
+        { type: 'Barline', raw: '|' },
+        { type: 'PitchLiteral', raw: 'E' },
+      ],
+    })
+  })
+
   it('accepts the end of the document as an alternate-ending terminal', () => {
     const source = '|: 1 2 |¹ 3 4 :|² 5 6'
     const repeat = parse(source).body[0]
