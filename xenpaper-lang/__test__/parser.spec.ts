@@ -425,6 +425,18 @@ describe('Xenpaper surface grammar', () => {
     expect(parse('E_5').body[0]).toMatchObject({ type: 'Identifier', name: 'E_5' })
   })
 
+  it('parses ASCII and Unicode naturals on Diamond-MOS pitches', () => {
+    const program = parse('MOS{5L2s} J_ K♮')
+    const items = ((program.body as SyntaxNode[])[0].items as SyntaxNode[]).slice(1)
+
+    expect(items.map((item) => item.raw)).toEqual(['J_', 'K♮'])
+    expect(
+      items.map((item) =>
+        (item.accidentals as SyntaxNode[]).map((accidental) => accidental.value),
+      ),
+    ).toEqual([['_'], ['♮']])
+  })
+
   it('keeps parallel branches and repeats as syntax-tree nodes', () => {
     const program = parse('C D,\nE F G,\nA B . ||\n|:@x10 [C, E, G] :|')
     const body = program.body as SyntaxNode[]

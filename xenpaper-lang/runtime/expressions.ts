@@ -19,6 +19,15 @@ import {
   requirePitchOperator,
 } from './pitches'
 
+const MOS_HALF_ALTERATIONS: Readonly<Record<string, number>> = {
+  '&': 2,
+  '@': -2,
+  e: 1,
+  a: -1,
+  _: 0,
+  '♮': 0,
+}
+
 function equaveShifts(modifiers: readonly { readonly kind: string }[]): number {
   return modifiers.reduce(
     (sum, modifier) =>
@@ -155,7 +164,7 @@ function addOrSubtract(
         .add(mos.context.equave.mul(new Value(sourceRegister)))
       const chroma = mos.context.large.sub(mos.context.small).valueOf()
       const sourceHalfAlterations = (pitch.spelling.accidentals ?? []).reduce(
-        (sum, token) => sum + (token === '&' ? 2 : token === '@' ? -2 : token === 'e' ? 1 : -1),
+        (sum, token) => sum + (MOS_HALF_ALTERATIONS[token] ?? 0),
         0,
       )
       const intervalAlteration = rootOffset

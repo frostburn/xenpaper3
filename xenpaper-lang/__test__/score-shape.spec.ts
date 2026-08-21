@@ -107,6 +107,24 @@ describe('score-shape timing', () => {
     expect(udpAttack?.pitch.mos?.context.pattern).toBe('LsLLsLL')
   })
 
+  it('uses MOS naturals to undo signature accidentals', () => {
+    const score = shape('MOS{5L2s; sig = J& K@} J J_ J♮ K K_ K♮') as SequenceShape
+    const attacks = score.children.filter((child) => child.kind === 'attack')
+
+    expect(attacks.map((attack) => attack.pitch.spelling.accidentals)).toEqual([
+      ['&'],
+      ['_'],
+      ['♮'],
+      ['@'],
+      ['_'],
+      ['♮'],
+    ])
+    expect(attacks[1]!.pitch.value.valueOf()).toBeCloseTo(attacks[2]!.pitch.value.valueOf())
+    expect(attacks[4]!.pitch.value.valueOf()).toBeCloseTo(attacks[5]!.pitch.value.valueOf())
+    expect(attacks[0]!.pitch.value.valueOf()).not.toBeCloseTo(attacks[1]!.pitch.value.valueOf())
+    expect(attacks[3]!.pitch.value.valueOf()).not.toBeCloseTo(attacks[4]!.pitch.value.valueOf())
+  })
+
   it('selects a keyed MOS mode using the current step counts', () => {
     const score = shape(`MOS{4L 1s 3|1}
 J K L M N j=
@@ -161,6 +179,15 @@ K L M N j k=`) as SequenceShape
       { nominal: 'K', system: 'mos', derived: true, modifiers: ['equaveUp'], accidentals: [] },
       { nominal: 'K', system: 'mos', derived: true, accidentals: ['&'] },
       { nominal: 'K', system: 'mos', derived: true, accidentals: ['&'] },
+    ])
+
+    const naturalTransposed = shape(
+      'MOS{5L2s; sig = J&} J_ + M1ms J♮ + M1ms',
+    ) as SequenceShape
+    const naturalAttacks = naturalTransposed.children.filter((child) => child.kind === 'attack')
+    expect(naturalAttacks.map((attack) => attack.pitch.spelling)).toMatchObject([
+      { nominal: 'K', system: 'mos', derived: true, accidentals: [] },
+      { nominal: 'K', system: 'mos', derived: true, accidentals: [] },
     ])
 
     const reassociated = shape('MOS{5L2s} {K as root} J + M1ms') as SequenceShape
