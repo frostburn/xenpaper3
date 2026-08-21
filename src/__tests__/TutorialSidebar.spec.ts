@@ -22,4 +22,15 @@ describe('TutorialSidebar', () => {
 
     expect(wrapper.emitted('selectTune')).toEqual([[source]])
   })
+
+  it('renders formatted descriptions and tutorial links as HTML', async () => {
+    const wrapper = mount(TutorialSidebar)
+
+    expect(wrapper.get('code').text()).toBe('=')
+    await wrapper.get('button:nth-child(3)').trigger('click')
+
+    const link = wrapper.get('a')
+    expect(link.text()).toBe('List of comma flavors')
+    expect(link.attributes()).toMatchObject({ target: '_blank', rel: 'noreferrer' })
+  })
 })

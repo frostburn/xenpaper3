@@ -1,26 +1,9 @@
 [
   {
-    "title": "Conventions",
-    "demos": [
-      {
-        "description": "Degree `0` is the current root, and the default scale is 12edo."
-      },
-      {
-        "description": "An unadorned note or rest occupies one current subdivision. Each `=` extends it by one more subdivision."
-      },
-      {
-        "description": "Spaces and line breaks usually have the same meaning. Bar lines are organizational unless a repeat or parallel section gives them special meaning."
-      },
-      {
-        "description": "Settings such as scales, roots, dynamics, and articulation remain active until changed, but only within their current scope. See Advanced score construction for the scope boundaries."
-      }
-    ]
-  },
-  {
     "title": "Notes, rests, and duration",
     "demos": [
       {
-        "description": "Typing a number creates a note. Notes can be separated by spaces or new lines.",
+        "description": "Typing a number creates a note. Notes can be separated by spaces or new lines. Click on the demo tune to load it.",
         "tune": "0 4 7\n11 12"
       },
       {
@@ -28,8 +11,8 @@
         "tune": "0.2.3...3=2=0==."
       },
       {
-        "description": "Bar lines help organize the score without changing the timing. A leading `=` continues (ties) the preceding note across a bar line.",
-        "tune": "0 8 7=|0 8 7=|=5 4=="
+        "tune": "0 8 7=|0 8 7=|=5 4== ||",
+        "html": "<p>Bar lines help organize the score without changing the timing. A leading <code>=</code> continues (ties) the preceding note across a bar line.</p>"
       },
       {
         "description": "Notes can be written as scale degrees, ratios, cents, diatonic pitches, steps of equal temperaments, cycles per second and more.",
@@ -40,8 +23,8 @@
         "tune": "0=3='0='3=\"0='\"0=`0=``0="
       },
       {
-        "description": "Play simultaneous pitches by putting a comma-separated expression in parentheses or square brackets. Square brackets without commas create tuplets instead (see **Timing**).",
-        "tune": "(3,7)=[5,8]=(0,3,7)==.[1/1,6/5,3/2]==."
+        "tune": "(3,7)=[5,8]=(0,3,7)==.[1/1,6/5,3/2]==.",
+        "html": "<p>Play simultaneous pitches by putting a comma-separated expression in parentheses or square brackets. Square brackets without commas create tuplets instead (see <strong>Timing</strong>).</p>"
       },
       {
         "description": "Negative degrees are supported.",
@@ -57,8 +40,8 @@
     "title": "Comments",
     "demos": [
       {
-        "description": "A `#` starts a comment that continues to the end of the line.",
-        "tune": "# a 7th chord\n[0,4,7,10]==..\n\n# a harmonic 7th chord\n4:5:6:7==.."
+        "tune": "# a 7th chord\n[0,4,7,10]==..\n\n# a harmonic 7th chord\n4:5:6:7==..",
+        "html": "<p>A <code>#</code> starts a comment that continues to the end of the line.</p>"
       }
     ]
   },
@@ -123,8 +106,8 @@
         "tune": "[0 2 7] [0 2 7]==="
       },
       {
-        "description": "Set the number of subdivisions per beat with `@` followed by a positive number. For example, `@2` makes each plain note half a beat long; `@1/2` makes it two beats long.",
-        "tune": "@2 0 2 3 7 @3 0 2 3 7 @4 0 2 3 7 @1/2 0 2 3 7"
+        "tune": "@2 0 2 3 7 @3 0 2 3 7 @4 0 2 3 7 @1/2 0 2 3 7",
+        "html": "<p>Set the number of subdivisions per beat with <code>@</code> followed by a positive number. For example, <code>@2</code> makes each plain note half a beat long; <code>@1/2</code> makes it two beats long.</p>"
       }
     ]
   },
@@ -136,8 +119,8 @@
         "tune": "4/3 * 4:5:6==\n3/2 * 4:5:3==\n5/4 * /6:5:4=="
       },
       {
-        "description": "Note that asterisks `*` only mean pitch shifts when both operands are ratios. Using + to shift is more common.",
-        "tune": "4/3   + ~4:5:6==  # Ratio + tempered ratios\n702c  + 4:5:3==   # Cents + ratios\n17\\53 + /6:5:4==  # Steps of equal temperaments + ratios"
+        "tune": "4/3   + ~4:5:6==  # Ratio + tempered ratios\n702c  + 4:5:3==   # Cents + ratios\n17\\53 + /6:5:4==  # Steps of equal temperaments + ratios",
+        "html": "<p>Note that asterisks <code>*</code> only mean pitch shifts when both operands are ratios. Using + to shift is more common.</p>"
       }
     ]
   },
@@ -154,8 +137,8 @@
     "title": "Repeats",
     "demos": [
       {
-        "description": "Everything between `|:` and `:|` is repeated twice by default. Alternate endings use `@^1` and `@^2`, or the equivalent superscript numerals attached to bar lines as below.",
-        "tune": "# Square little tune\n|: 0 2 4 5 |¹ 7 5 4 2 :|² 7 11 12= |\n12 11 9 7 | 5 4 2 -1 | 0=== ||"
+        "tune": "# Square little tune\n|: 0 2 4 5 |¹ 7 5 4 2 :|² 7 11 12= |\n12 11 9 7 | 5 4 2 -1 | 0=== ||",
+        "html": "<p>Everything between <code>|:</code> and <code>:|</code> is repeated twice by default. Alternate endings use <code>@^1</code> and <code>@^2</code>, or the equivalent superscript numerals attached to bar lines as below.</p>"
       },
       {
         "description": "To add more repeats use @x followed by a number attached to the opening |:.",
@@ -202,8 +185,8 @@
     "title": "Dynamics",
     "demos": [
       {
-        "description": "Control synth velocity with directives such as `@f` and `@pp`, or specify it directly with `@velocity(...)`. Dynamic settings remain active until the next dynamic directive.",
-        "tune": "@mf 0==   # 50% (default)\n@f 1==    # 65%\n@ff 2==   # 82%\n@fff 3==  # 100%\n\n@velocity(70%) 1==  # Fine-grained control\n\n@mp 0==    # 40%\n@p -1==    # 30%\n@pp -2==   # 20%\n@ppp -3==  # 10%"
+        "tune": "@mf 0==   # 50% (default)\n@f 1==    # 65%\n@ff 2==   # 82%\n@fff 3==  # 100%\n\n@velocity(70%) 1==  # Fine-grained control\n\n@mp 0==    # 40%\n@p -1==    # 30%\n@pp -2==   # 20%\n@ppp -3==  # 10%",
+        "html": "<p>Control synth velocity with directives such as <code>@f</code> and <code>@pp</code>, or specify it directly with <code>@velocity(...)</code>. Dynamic settings remain active until the next dynamic directive.</p>"
       }
     ]
   },
@@ -211,8 +194,8 @@
     "title": "Drones",
     "demos": [
       {
-        "description": "Use `@drone(...)` to sustain a note or chord behind subsequent music. A new drone replaces the old one; empty parentheses stop it.",
-        "tune": "@drone([0, 7]) 0 2 4 5\n@drone(5) 7 5 4 2\n@drone() 0==="
+        "tune": "@drone([0, 7]) 0 2 4 5\n@drone(5) 7 5 4 2\n@drone() 0===",
+        "html": "<p>Use <code>@drone(...)</code> to sustain a note or chord behind subsequent music. A new drone replaces the old one; empty parentheses stop it.</p>"
       }
     ]
   },
@@ -220,8 +203,8 @@
     "title": "Parallel sections",
     "demos": [
       {
-        "description": "Use the comma `,` to separate sections that you want to play in parallel and terminate the group with a double bar line.",
-        "tune": "{root = '0} @4\n5 . 7  . 10 7 5 . 7  . 12 . 10 7 5  . |\n0 . 10 . 7  5 7 . 12 5 7  . 10 . 12 . |,\n\n@2\n[0,4,7]==    [5,9,12]==     [3,7,10]= |\n=   [2,7,12]==   [0,4,7,11,12]===     |,\n\n{root = `0}\n0= 0= | 5= 7= ||"
+        "tune": "{root = '0} @4\n5 . 7  . 10 7 5 . 7  . 12 . 10 7 5  . |\n0 . 10 . 7  5 7 . 12 5 7  . 10 . 12 . |,\n\n@2\n[0,4,7]==    [5,9,12]==     [3,7,10]= |\n=   [2,7,12]==   [0,4,7,11,12]===     |,\n\n{root = `0}\n0= 0= | 5= 7= ||",
+        "html": "<p>Use the comma <code>,</code> to separate sections that you want to play in parallel and terminate the group with a double bar line.</p>"
       }
     ]
   },

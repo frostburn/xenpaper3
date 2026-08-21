@@ -6,8 +6,7 @@ export type SidebarSection = {
 export type SidebarDemo = {
   description?: string
   tune?: string
-  link?: string
-  href?: string
+  html?: string
 }
 
 export type TutorialChapter = {

@@ -11,12 +11,12 @@
     "title": "Setting scopes",
     "demos": [
       {
-        "description": "Settings are inherited by nested expressions, but changes made inside a parenthesized group, square-bracket tuplet, or parallel branch stay inside that construction. After the construction ends, the outer scale, root, subdivision, dynamic, articulation, groove, and other settings resume.\n\nIn this example, the group inherits `@p` and 12edo, temporarily switches to `@f` and 19edo, and then discards those changes. The final degree 7 is quiet and uses 12edo again.",
-        "tune": "@p {12edo}\n0 2 (@f {19edo} 6 8) 7="
+        "tune": "@p {12edo}\n0 2 (@f {19edo} 6 8) 7=",
+        "html": "<p>Settings are inherited by nested expressions, but changes made inside a parenthesized group, square-bracket tuplet, or parallel branch stay inside that construction. After the construction ends, the outer scale, root, subdivision, dynamic, articulation, groove, and other settings resume.</p><p>In this example, the group inherits <code>@p</code> and 12edo, temporarily switches to <code>@f</code> and 19edo, and then discards those changes. The final degree 7 is quiet and uses 12edo again.</p>"
       },
       {
-        "description": "Tuplets create the same kind of boundary. Inside the brackets, `@3` controls the first four notes before `@2` changes the final pair. After the slot, the outer `@2` and `@p` settings resume.",
-        "tune": "@2 @p\n0 [@3 @f 2 4 6 @2 5 3] 7 9"
+        "tune": "@2 @p\n0 [@3 @f 2 4 6 @2 5 3] 7 9",
+        "html": "<p>Tuplets create the same kind of boundary. Inside the brackets, <code>@3</code> controls the first four notes before <code>@2</code> changes the final pair. After the slot, the outer <code>@2</code> and <code>@p</code> settings resume.</p>"
       },
       {
         "description": "Each parallel branch also receives its own copy of the outer settings. A change in one branch affects neither its siblings nor the music following the parallel section.",
