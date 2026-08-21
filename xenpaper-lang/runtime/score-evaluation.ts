@@ -897,9 +897,9 @@ export function evaluateScoreSemantics(
     if (current.type === 'Sequence') {
       return current.items.reduce((active, item) => contextAfter(item, active), context)
     }
-    if (current.type === 'Group') return contextAfter(current.expression, context)
-    if (current.type === 'NormalizeToSlot' && current.expression)
-      return contextAfter(current.expression, context)
+    // Explicit groups and normalized slots inherit the surrounding pitch context, but changes
+    // made inside them are lexical and must not escape into the containing sequence.
+    if (current.type === 'Group' || current.type === 'NormalizeToSlot') return context
     if (current.type === 'PostfixExpression') return contextAfter(current.expression, context)
     if (current.type === 'Repeat') {
       let active = context
