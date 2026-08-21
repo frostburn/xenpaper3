@@ -30,6 +30,20 @@ vi.mock('../../xenpaper-lang', () => ({
 }))
 
 describe('XenpaperLangTestingView', () => {
+  it('loads tutorial tunes into the editor and populates the visualisers', async () => {
+    parse.mockClear()
+    const wrapper = mount(XenpaperLangTestingView)
+    const tune = wrapper.get('button.tune')
+    const source = tune.get('pre').text()
+
+    await tune.trigger('click')
+
+    expect(wrapper.get('textarea').element.value).toBe(source)
+    expect(parse).toHaveBeenCalledWith(source)
+    expect(expandToBeatEvents).toHaveBeenCalled()
+    expect(evaluateProgramShape).toHaveBeenCalled()
+  })
+
   it('parses and logs the textarea contents', async () => {
     const log = vi.spyOn(console, 'log').mockImplementation(() => undefined)
     const wrapper = mount(XenpaperLangTestingView)
