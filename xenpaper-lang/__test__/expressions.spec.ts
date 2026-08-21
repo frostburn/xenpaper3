@@ -85,7 +85,9 @@ describe('arithmetic expression evaluation', () => {
   it('scales pitch offsets only by rational scalars', () => {
     expect(evaluate('2 * 350c').value.equals(Value.cents(700))).toBe(true)
     expect(evaluate('700c / 2').value.equals(Value.cents(350))).toBe(true)
-    expect(evaluate('P4/2').value.equals(evaluate('P4 / 2').value)).toBe(true)
+    expect(evaluate('P4 / 2').value.equals(Value.pitch(new Value(4n, 3n)).div(new Value(2)))).toBe(
+      true,
+    )
     expect(evaluate('P8 div 2').spelling).toMatchObject({
       quality: 'P',
       number: new Fraction(9, 2),
@@ -288,18 +290,18 @@ describe('arithmetic expression evaluation', () => {
   })
 
   it('evaluates and derives interordinal intervals', () => {
-    const direct = evaluate('P4.5')
+    const direct = evaluate('P4h')
     expect(direct.value.equals(Value.equalDivision(1, 2, new Value(2)))).toBe(true)
     const difference = evaluate('Gam - C')
     expect(difference.kind).toBe('pitchOffset')
     if (difference.kind !== 'pitchOffset') throw new Error('Expected an interval.')
     expect(difference.value.equals(direct.value)).toBe(true)
-    expect(difference.spelling?.raw).toBe('P4.5')
+    expect(difference.spelling?.raw).toBe('P4h')
   })
 
   it('round-trips every class of spellable interordinal quality', () => {
-    const perfectNumbers = ['1.5', '4.5', '7.5']
-    const imperfectNumbers = ['2.5', '3.5', '5.5', '6.5']
+    const perfectNumbers = ['1h', '4h', '7h']
+    const imperfectNumbers = ['2h', '3h', '5h', '6h']
     const perfectQualities = ['P', 'A', 'AA', 'd', 'dd', 'SA', 'SAA', 'sd', 'sdd']
     const imperfectQualities = ['M', 'm', 'n', 'A', 'AA', 'd', 'dd', 'SA', 'SAA', 'sd', 'sdd']
 
@@ -325,7 +327,7 @@ describe('arithmetic expression evaluation', () => {
   })
 
   it('does not invent an unparseable quality for unspellable interordinal formulas', () => {
-    const divided = evaluate('d6/2')
+    const divided = evaluate('d6 / 2')
     expect(divided.kind).toBe('pitchOffset')
     expect(divided.kind === 'pitchOffset' && divided.spelling).toBeUndefined()
   })
@@ -362,7 +364,7 @@ describe('arithmetic expression evaluation', () => {
     expect(evaluate('n4').value.equals(evaluate('Ft - C').value)).toBe(true)
     expect(evaluate('n5').value.equals(evaluate('Gd - C').value)).toBe(true)
     expect(evaluate('P4½').value.equals(evaluate('Gam - C').value)).toBe(true)
-    expect(evaluate('P4.5').value.equals(evaluate('Γ - C').value)).toBe(true)
+    expect(evaluate('P4h').value.equals(evaluate('Γ - C').value)).toBe(true)
     expect(
       evaluate('n4').value.equals(
         Value.pitch(new Value(3).pow(new Value(5n, 2n)).div(new Value(2).pow(new Value(7n, 2n)))),
