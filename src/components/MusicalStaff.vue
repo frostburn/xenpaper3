@@ -130,7 +130,12 @@ const items = computed(() => {
     } else if (shape.kind === 'continue' && state.activeItems.length) {
       const continuedDuration = fraction(shape.duration)
       const activeSpan = state.activeSpan ? fraction(state.activeSpan) : undefined
-      if (state.barlineSinceActiveItems) {
+      if (shape.extendsAutomation === false) {
+        state.activeItems = []
+        state.activeNotes = []
+        state.activeSpan = undefined
+        state.barlineSinceActiveItems = false
+      } else if (state.barlineSinceActiveItems) {
         const activeStartOffset = state.activeItems.reduce(
           (earliest, item) => (item.offset.compare(earliest) < 0 ? item.offset : earliest),
           state.activeItems[0]!.offset,
@@ -474,7 +479,7 @@ const keySignatureSpaceBefore = (column: number) =>
   keySignatureSpaces.value
     .filter((signature) => signature.column <= column)
     .reduce((total, signature) => total + signature.width, 0)
-const clefSpace = 38
+const clefSpace = 30
 const clefSpaceBefore = (column: number) =>
   items.value.filter((item) => item.kind === 'clef' && item.column <= column).length * clefSpace
 const width = computed(() =>
@@ -569,7 +574,11 @@ const staffSegments = computed(() =>
         : width.value - 20,
   })),
 )
-const clefX = (column: number, implicit?: boolean) => (implicit ? 25 : x(column) - clefSpace - 8)
+const clefX = (column: number, implicit?: boolean) => {
+  // Both the default and authored clefs use the same glyph-to-note inset.
+  void implicit
+  return x(column) - 35
+}
 const diamondPositions = (config: DiamondMos | undefined) => {
   if (!config) return []
   const result: number[] = []

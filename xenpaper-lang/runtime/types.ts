@@ -206,7 +206,12 @@ export type StaffNotationShape =
       }[]
     }
   | { readonly kind: 'rest'; readonly duration: Fraction; readonly generated: boolean }
-  | { readonly kind: 'continue'; readonly duration: Fraction }
+  | {
+      readonly kind: 'continue'
+      readonly duration: Fraction
+      /** False for a glissando target whose time must not lengthen the source notehead. */
+      readonly extendsAutomation?: boolean
+    }
   | {
       readonly kind: 'barline'
       readonly style: BarlineStyle

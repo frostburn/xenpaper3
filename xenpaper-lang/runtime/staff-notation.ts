@@ -365,7 +365,11 @@ export function constructStaffNotationShape(shape: ScoreShape): StaffNotationSha
     case 'rest':
       return { kind: 'rest', duration: shape.duration, generated: shape.generated }
     case 'continue':
-      return { kind: 'continue', duration: shape.duration }
+      return {
+        kind: 'continue',
+        duration: shape.duration,
+        ...(shape.extendsAutomation === false ? { extendsAutomation: false } : {}),
+      }
     case 'barline':
       return {
         kind: 'barline',

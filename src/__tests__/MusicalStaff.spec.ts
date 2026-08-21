@@ -94,7 +94,7 @@ describe('MusicalStaff', () => {
     ).toEqual([5, 5, 5])
     expect(wrapper.findAll('.clef').map((clef) => clef.text())).toEqual(['𝄞', '𝄞'])
     expect(wrapper.findAll('.diamond-clef')).toHaveLength(1)
-    expect(wrapper.findAll('.staff-lines > g')[0]!.find('line').attributes('x2')).toBe('332')
+    expect(wrapper.findAll('.staff-lines > g')[0]!.find('line').attributes('x2')).toBe('324')
   })
 
   it('renders Diamond-MOS pitches with diamond octave marks and minority-step boxes', () => {
@@ -1082,6 +1082,19 @@ describe('MusicalStaff', () => {
     expect(noteX - clefX).toBeGreaterThanOrEqual(30)
   })
 
+  it('spaces implicit and explicit clefs consistently', () => {
+    const evaluated = evaluateScoreShape(parse('C @clef(bass) D').body[0]!)
+    if (!('shape' in evaluated)) throw new Error('Expected a score shape.')
+    const wrapper = mount(MusicalStaff, {
+      props: { notation: constructStaffNotationShape(evaluated.shape) },
+    })
+    const clefs = wrapper.findAll('.clef')
+    const notes = wrapper.findAll('.notehead')
+
+    expect(Number(notes[0]!.attributes('cx')) - Number(clefs[0]!.attributes('x'))).toBe(35)
+    expect(Number(notes[1]!.attributes('cx')) - Number(clefs[1]!.attributes('x'))).toBe(35)
+  })
+
   it('renders scale degrees with regular noteheads', () => {
     const evaluated = evaluateScoreShape(parse('6').body[0]!)
     if (!('shape' in evaluated)) throw new Error('Expected a score shape.')
@@ -1105,6 +1118,19 @@ describe('MusicalStaff', () => {
     expect(wrapper.findAll('.glissando-target')).toHaveLength(2)
     expect(wrapper.find('.notation-error').exists()).toBe(false)
     expect(wrapper.attributes('viewBox')).toBe('0 0 360 170')
+  })
+
+  it('does not turn a whole-note glissando source into an unsupported five-beat note', () => {
+    const evaluated = evaluateScoreShape(parse('@gliss 0=== 7').body[0]!)
+    if (!('shape' in evaluated)) throw new Error('Expected a score shape.')
+    const wrapper = mount(MusicalStaff, {
+      props: { notation: constructStaffNotationShape(evaluated.shape) },
+    })
+
+    expect(wrapper.find('.notation-error').exists()).toBe(false)
+    expect(wrapper.findAll('.glissando')).toHaveLength(1)
+    expect(wrapper.findAll('.notehead')).toHaveLength(2)
+    expect(wrapper.findAll('.notehead--open')).toHaveLength(1)
   })
 
   it('positions each glissando endpoint with the clef active at its column', () => {
