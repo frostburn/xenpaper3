@@ -34,6 +34,9 @@ const activeChapter = ref(0)
         <h3>{{ section.title }}</h3>
         <div v-for="(demo, demoIndex) in section.demos" :key="demoIndex" class="tutorial-demo">
           <p v-if="demo.description">{{ demo.description }}</p>
+          <!-- Tutorial HTML is trusted, repository-owned content rather than user input. -->
+          <!-- eslint-disable-next-line vue/no-v-html -->
+          <div v-if="demo.html" class="html-description" v-html="demo.html" />
           <button
             v-if="demo.tune"
             type="button"
@@ -43,9 +46,6 @@ const activeChapter = ref(0)
           >
             <pre>{{ demo.tune }}</pre>
           </button>
-          <a v-if="demo.link && demo.href" :href="demo.href" target="_blank" rel="noreferrer">
-            {{ demo.link }}
-          </a>
         </div>
       </section>
     </div>
@@ -114,9 +114,15 @@ p {
   gap: 0.4rem;
 }
 
-.tutorial-demo p {
+.tutorial-demo p,
+.html-description :deep(p) {
+  margin: 0;
   line-height: 1.4;
   white-space: pre-line;
+}
+
+.html-description :deep(p + p) {
+  margin-top: 0.6rem;
 }
 
 .tune {
