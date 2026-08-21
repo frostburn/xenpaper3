@@ -289,6 +289,9 @@ export interface PitchAutomation {
   readonly curve: string
   readonly from: AttackShape['pitch']
   readonly to: AttackShape['pitch']
+  /** Notation context of the source and destination pitches. */
+  readonly fromRootPitch?: AbsolutePitchValue
+  readonly toRootPitch?: AbsolutePitchValue
   readonly duration: Fraction
   /** Consecutive glides, including this automation's first segment. */
   readonly segments?: readonly PitchAutomationSegment[]
@@ -298,6 +301,9 @@ export interface PitchAutomationSegment {
   readonly curve: string
   readonly from: AttackShape['pitch']
   readonly to: AttackShape['pitch']
+  /** Notation context at each endpoint, which may change during the glide. */
+  readonly fromRootPitch?: AbsolutePitchValue
+  readonly toRootPitch?: AbsolutePitchValue
   /** Offset from the beginning of the owning attack. */
   readonly start: Fraction
   readonly duration: Fraction

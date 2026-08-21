@@ -569,7 +569,7 @@ const staffSegments = computed(() =>
         : width.value - 20,
   })),
 )
-const clefX = (column: number, implicit?: boolean) => (implicit ? 25 : x(column) - clefSpace + 5)
+const clefX = (column: number, implicit?: boolean) => (implicit ? 25 : x(column) - clefSpace - 8)
 const diamondPositions = (config: DiamondMos | undefined) => {
   if (!config) return []
   const result: number[] = []
@@ -673,9 +673,13 @@ const glissandoPath = (
   const segmentStartX = x(segment.startColumn ?? item.column)
   const segmentEndX = x(segment.endColumn ?? item.column + 1)
   const startY = y(
-    segment.from.staffPosition + (clefAtColumn(item.column).kind === 'bass' ? 12 : 0),
+    segment.from.staffPosition +
+      (clefAtColumn(segment.startColumn ?? item.column).kind === 'bass' ? 12 : 0),
   )
-  const endY = y(segment.to.staffPosition + (clefAtColumn(item.column).kind === 'bass' ? 12 : 0))
+  const endY = y(
+    segment.to.staffPosition +
+      (clefAtColumn(segment.endColumn ?? item.column + 1).kind === 'bass' ? 12 : 0),
+  )
   const length = Math.max(1, segmentEndX - segmentStartX - 16)
   const waves = Math.max(2, Math.round(length / 10))
   let path = `M ${segmentStartX + 8} ${startY}`
@@ -688,6 +692,15 @@ const glissandoPath = (
   }
   return path
 }
+
+const glissandoTargetY = (
+  item: Extract<StaffItem, { kind: 'note' }>,
+  segment: NonNullable<Extract<StaffItemContent, { kind: 'note' }>['glissandi']>[number],
+) =>
+  y(
+    segment.to.staffPosition +
+      (clefAtColumn(segment.endColumn ?? item.column + 1).kind === 'bass' ? 12 : 0),
+  )
 
 const flagCount = (duration?: Fraction, scale = 1) => {
   if (!duration) return 0
@@ -1088,6 +1101,15 @@ const swingBeamCount = (durations: readonly Fraction[], tuplet?: number) =>
             :key="`glissando-${segmentIndex}`"
             class="glissando"
             :d="glissandoPath(item, segment)"
+          />
+          <ellipse
+            v-for="(segment, segmentIndex) in item.glissandi"
+            :key="`glissando-target-${segmentIndex}`"
+            class="notehead glissando-target"
+            :cx="x(segment.endColumn ?? item.column + 1)"
+            :cy="glissandoTargetY(item, segment)"
+            rx="7"
+            ry="5"
           />
           <path
             v-if="item.tiedFromColumn !== undefined"

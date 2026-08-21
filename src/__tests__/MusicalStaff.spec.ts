@@ -1101,8 +1101,30 @@ describe('MusicalStaff', () => {
 
     expect(wrapper.findAll('.glissando')).toHaveLength(2)
     expect(wrapper.findAll('.glissando')[0]!.attributes('d')).toContain(' Q ')
-    expect(wrapper.findAll('.notehead')).toHaveLength(1)
+    expect(wrapper.findAll('.notehead')).toHaveLength(3)
+    expect(wrapper.findAll('.glissando-target')).toHaveLength(2)
+    expect(wrapper.find('.notation-error').exists()).toBe(false)
     expect(wrapper.attributes('viewBox')).toBe('0 0 360 170')
+  })
+
+  it('positions each glissando endpoint with the clef active at its column', () => {
+    const evaluated = evaluateScoreShape(parse('@gliss C @clef(bass) G').body[0]!)
+    if (!('shape' in evaluated)) throw new Error('Expected a score shape.')
+    const wrapper = mount(MusicalStaff, {
+      props: { notation: constructStaffNotationShape(evaluated.shape) },
+    })
+
+    expect(wrapper.get('.glissando-target').attributes('cy')).toBe('16')
+  })
+
+  it('preserves the pitch context at each glissando endpoint', () => {
+    const evaluated = evaluateScoreShape(parse('@gliss 0 {D as root} 0').body[0]!)
+    if (!('shape' in evaluated)) throw new Error('Expected a score shape.')
+    const wrapper = mount(MusicalStaff, {
+      props: { notation: constructStaffNotationShape(evaluated.shape) },
+    })
+
+    expect(wrapper.get('.glissando-target').attributes('cy')).toBe('106')
   })
 
   it('stacks simultaneous annotations instead of drawing them on top of each other', () => {

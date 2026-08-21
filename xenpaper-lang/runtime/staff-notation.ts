@@ -351,8 +351,12 @@ export function constructStaffNotationShape(shape: ScoreShape): StaffNotationSha
               ).map((segment) => ({
                 start: segment.start,
                 duration: segment.duration,
-                from: constructStaffNotation(segment.from, { rootPitch: shape.rootPitch }),
-                to: constructStaffNotation(segment.to, { rootPitch: shape.rootPitch }),
+                from: constructStaffNotation(segment.from, {
+                  rootPitch: segment.fromRootPitch ?? shape.rootPitch,
+                }),
+                to: constructStaffNotation(segment.to, {
+                  rootPitch: segment.toRootPitch ?? shape.rootPitch,
+                }),
               })),
             }
           : {}),
