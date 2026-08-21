@@ -16,6 +16,22 @@ function shape(source: string, pulse: Fraction | number = 1): ScoreShape {
 }
 
 describe('score-shape timing', () => {
+  it('isolates pitch-context changes in groups, normalized slots, and parallel branches', () => {
+    const score = shape(`{12edo}
+0 ({19edo} 6) 7
+[{31edo} 10] 9
+{19edo} 6, {31edo} 10 ||`) as SequenceShape
+    const pitches: number[] = []
+    const collectPitches = (current: ScoreShape) => {
+      if (current.kind === 'attack') pitches.push(current.pitch.value.valueOf())
+      else if (current.kind === 'sequence') current.children.forEach(collectPitches)
+      else if (current.kind === 'parallel') current.branches.forEach(collectPitches)
+    }
+    collectPitches(score)
+
+    expect(pitches.map(Math.round)).toEqual([0, 379, 700, 387, 900, 379, 387])
+  })
+
   it('applies custom and key signatures while explicit naturals cancel them', () => {
     const custom = shape('{sig = C# ^D E^5 /Ad} C C_ D E A') as SequenceShape
     const attacks = custom.children.filter((child) => child.kind === 'attack')

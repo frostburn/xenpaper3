@@ -7,7 +7,7 @@ A few conventions recur throughout the examples:
 - Degree `0` is the current root, and the default scale is 12edo.
 - An unadorned note or rest occupies one current subdivision. Each `=` extends it by one more subdivision.
 - Spaces and line breaks usually have the same meaning. Bar lines are organizational unless a repeat or parallel section gives them special meaning.
-- Settings such as scales, roots, dynamics, and articulation remain active until changed.
+- Settings such as scales, roots, dynamics, and articulation remain active until changed, but only within their current scope. See **Advanced score construction** for the scope boundaries.
 
 # Basics
 
@@ -332,6 +332,73 @@ Groove patterns can also include articulation. Articulation values latch until t
 @groove([@: 0== @' 0=]=)
 0  6 8 2  3 9 10 4 |
 12 6 5 11 8 3 0=   ||
+```
+
+# Advanced score construction
+
+These features are most useful once you are comfortable with notes, timing, and pitch contexts. They explain how larger expressions are evaluated and where settings take effect.
+
+## Setting scopes
+
+Settings are inherited by nested expressions, but changes made inside a parenthesized group, square-bracket tuplet, or parallel branch stay inside that construction. After the construction ends, the outer scale, root, subdivision, dynamic, articulation, groove, and other settings resume.
+
+In this example, the group inherits `@p` and 12edo, temporarily switches to `@f` and 19edo, and then discards those changes. The final degree 7 is quiet and uses 12edo again.
+
+```
+@p {12edo}
+0 2 (@f {19edo} 6 8) 7=
+```
+
+Tuplets create the same kind of boundary. Here `@3` and `@f` apply only inside the brackets; the final two notes return to `@2` and `@p`.
+
+```
+@2 @p
+0 [@3 @f 2 4 6] 7 9
+```
+
+Each parallel branch also receives its own copy of the outer settings. A change in one branch affects neither its siblings nor the music following the parallel section.
+
+```
+@p
+@f 0 4, @pp 7 11 ||
+12===
+```
+
+By contrast, an ungrouped setting in the ordinary surrounding sequence remains active, including after a repeat. Use an explicit group when a change should be temporary.
+
+## Groups, tuplets, and parallel expressions
+
+Parentheses group an expression without rescaling its duration. Square brackets without a top-level comma normalize the entire contents into one rhythmic slot, producing a tuplet. A top-level comma creates parallel branches; the construction lasts as long as its longest branch, and shorter branches are padded with silence.
+
+```
+# Three ordinary beats
+(0 2 4)
+# Three notes fitted into one beat
+[0 2 4]
+# Two simultaneous branches lasting three beats
+0 2 4, [7, 11]===
+```
+
+Commas nested inside a chord do not split the surrounding sequence. Use parentheses when you need to make the intended grouping explicit.
+
+## Arithmetic over score shapes
+
+Pitch arithmetic can broadcast over a whole sequence or chord. This makes interval patterns reusable without spelling every resulting pitch. The shapes of both operands must be compatible when both sides are score constructions.
+
+```
+# Transpose an interval sequence from G
+G + [P1 M2 M3 P5]
+# Transpose every member of a chord
+C + [P1, M3, P5]===
+```
+
+## Zero-duration attacks
+
+Append `?` to give a note zero notated duration. This is primarily useful as the target of a glissando or in other constructions where an attack supplies a pitch without advancing the score. It is different from `=`, which continues the preceding duration.
+
+```
+@gliss(ease-in-out) C=== G?
+A B? c=
 ```
 
 # Diatonic notation
