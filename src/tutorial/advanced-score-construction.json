@@ -1,0 +1,51 @@
+[
+  {
+    "title": "Overview",
+    "demos": [
+      {
+        "description": "These features are most useful once you are comfortable with notes, timing, and pitch contexts. They explain how larger expressions are evaluated and where settings take effect."
+      }
+    ]
+  },
+  {
+    "title": "Setting scopes",
+    "demos": [
+      {
+        "description": "Settings are inherited by nested expressions, but changes made inside a parenthesized group, square-bracket tuplet, or parallel branch stay inside that construction. After the construction ends, the outer scale, root, subdivision, dynamic, articulation, groove, and other settings resume.\n\nIn this example, the group inherits `@p` and 12edo, temporarily switches to `@f` and 19edo, and then discards those changes. The final degree 7 is quiet and uses 12edo again.",
+        "tune": "@p {12edo}\n0 2 (@f {19edo} 6 8) 7="
+      },
+      {
+        "description": "Tuplets create the same kind of boundary. Inside the brackets, `@3` controls the first four notes before `@2` changes the final pair. After the slot, the outer `@2` and `@p` settings resume.",
+        "tune": "@2 @p\n0 [@3 @f 2 4 6 @2 5 3] 7 9"
+      },
+      {
+        "description": "Each parallel branch also receives its own copy of the outer settings. A change in one branch affects neither its siblings nor the music following the parallel section.",
+        "tune": "@p ||\n@f 0 4, @pp 7 11 ||\n12==="
+      },
+      {
+        "description": "By contrast, an ungrouped setting in the ordinary surrounding sequence remains active, including after a repeat. Use an explicit group when a change should be temporary."
+      }
+    ]
+  },
+  {
+    "title": "Groups, tuplets, and parallel expressions",
+    "demos": [
+      {
+        "description": "Parentheses group an expression without rescaling its duration. Square brackets without a top-level comma normalize the entire contents into one rhythmic slot, producing a tuplet. A top-level comma creates parallel branches; the construction lasts as long as its longest branch, and shorter branches are padded with silence.",
+        "tune": "# Three ordinary beats\n(0 2 4)\n# Three notes fitted into one beat\n[0 2 4]\n# Two simultaneous branches lasting four beats\n|| 0 2 4, [7, 11]=== ||\n# Three ordinary beats after the parallel section\n0 2 4"
+      },
+      {
+        "description": "Commas nested inside a chord do not split the surrounding sequence. Use parentheses when you need to make the intended grouping explicit."
+      }
+    ]
+  },
+  {
+    "title": "Arithmetic over score shapes",
+    "demos": [
+      {
+        "description": "Pitch arithmetic can broadcast over a whole sequence or chord. This makes interval patterns reusable without spelling every resulting pitch. The shapes of both operands must be compatible when both sides are score constructions.",
+        "tune": "# Transpose an interval sequence from G\nG + [P1 M2 M3 P5]\n# Transpose every member of a chord\nF + [P1, M3, P5]==="
+      }
+    ]
+  }
+]
