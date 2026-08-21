@@ -107,6 +107,20 @@ describe('score-shape timing', () => {
     expect(udpAttack?.pitch.mos?.context.pattern).toBe('LsLLsLL')
   })
 
+  it('selects a keyed MOS mode using the current step counts', () => {
+    const score = shape(`MOS{4L 1s 3|1}
+J K L M N j=
+MOS{key = K 1|3}
+K L M N j k=`) as SequenceShape
+    const attacks = score.children.filter((child) => child.kind === 'attack')
+
+    expect(attacks.map((attack) => attack.pitch.mos?.context.pattern)).toEqual([
+      ...Array(5).fill('LLLsL'),
+      ...Array(5).fill('LLLsL'),
+    ])
+    expect(attacks[7]?.pitch.spelling).toMatchObject({ nominal: 'M', accidentals: ['@'] })
+  })
+
   it('installs Diamond-MOS absolute pitches and relative mossteps', () => {
     const score = shape('MOS{5L2s} J K L M N O P') as SequenceShape
     const cents = score.children

@@ -574,6 +574,7 @@ function signaturePitch(
 function applySignatureDeclaration(
   declaration: SignatureDeclaration,
   context: PitchContext,
+  modeNominals?: ReadonlyMap<string, Value>,
 ): PitchContext {
   if (declaration.kind === 'sig') {
     const signature = new Map<string, PitchLiteral>()
@@ -597,7 +598,8 @@ function applySignatureDeclaration(
     const signature = new Map<string, PitchLiteral>()
     for (let index = 0; index < names.length; index++) {
       const scaleIndex = mmod(index - rotation, names.length)
-      let desired = tonicOffset + context.mos.nominals.get(names[scaleIndex]!)!.valueOf()
+      let desired =
+        tonicOffset + (modeNominals ?? context.mos.nominals).get(names[scaleIndex]!)!.valueOf()
       while (desired >= context.mos.equave.valueOf()) desired -= context.mos.equave.valueOf()
       while (desired < 0) desired += context.mos.equave.valueOf()
       const natural = context.mos.nominals.get(names[index]!)!.valueOf()
@@ -729,7 +731,9 @@ function applyMosDeclaration(declaration: MosDeclaration, context: PitchContext)
     }
   }
 
-  const preserveOperators = !counts && !pattern && !hardnessGiven && !equaveGiven && !udp
+  const selectsModeFromCurrentCounts = !counts && !pattern && !!udp
+  const preserveOperators =
+    !counts && !pattern && !hardnessGiven && !equaveGiven && (!udp || selectsModeFromCurrentCounts)
 
   if (
     !counts &&
@@ -762,6 +766,17 @@ function applyMosDeclaration(declaration: MosDeclaration, context: PitchContext)
       },
     }
     return signatureDeclaration ? applySignatureDeclaration(signatureDeclaration, result) : result
+  }
+
+  if (selectsModeFromCurrentCounts) {
+    if (!context.mos) throw new TypeError('UD(P) selection requires a large/small count pattern.')
+    counts = {
+      large: [...context.mos.pattern].filter((step) => step === 'L').length,
+      small: [...context.mos.pattern].filter((step) => step === 's').length,
+    }
+    if (!equaveGiven) equave = context.mos.equave
+    if (!assignments.has('L')) assignments.set('L', context.mos.large)
+    if (!assignments.has('s')) assignments.set('s', context.mos.small)
   }
 
   if (counts) {
@@ -837,7 +852,10 @@ function applyMosDeclaration(declaration: MosDeclaration, context: PitchContext)
     degrees: [...offsets.slice(1), equave],
     degreeEquave: equave,
   }
-  return signatureDeclaration ? applySignatureDeclaration(signatureDeclaration, result) : result
+  if (!signatureDeclaration) return result
+  if (selectsModeFromCurrentCounts)
+    return applySignatureDeclaration(signatureDeclaration, context, mos.nominals)
+  return applySignatureDeclaration(signatureDeclaration, result)
 }
 
 export function requirePitchOperator(context: PitchContext, operator: 'up' | 'lift'): Value {
