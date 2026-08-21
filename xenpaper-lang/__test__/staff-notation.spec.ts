@@ -184,7 +184,7 @@ describe('staff notation construction', () => {
     expect(collect(staff)).toEqual([['.'], ['.'], ['.']])
   })
 
-  it('only infers FJS accidentals from rational frequency ratios', () => {
+  it('positions frequency literals by cents against the root without FJS accidentals', () => {
     const node = parse('300Hz').body[0] as Expression
     const evaluated = evaluateScoreShape(node)
     if (!('shape' in evaluated) || evaluated.shape.kind !== 'attack')
@@ -200,8 +200,23 @@ describe('staff notation construction', () => {
     const rationalStaff = constructStaffNotationShape(rational.shape)
     if (rationalStaff.kind !== 'sequence' || rationalStaff.children[1]?.kind !== 'note')
       throw new Error('Expected a frequency note after the root assignment.')
-    expect(rationalStaff.children[1].pitch.inflections).toEqual([
-      { direction: 'numerator', prime: 5n },
+    expect(rationalStaff.children[1].pitch).toMatchObject({
+      staffPosition: 16,
+      accidentals: [],
+    })
+    expect(rationalStaff.children[1].pitch.inflections).toBeUndefined()
+  })
+
+  it('places Hz literals from root-relative cents and displays their frequencies', () => {
+    const node = parse('262Hz 393Hz').body[0] as Expression
+    const evaluated = evaluateScoreShape(node)
+    if (!('shape' in evaluated)) throw new Error('Expected a score shape.')
+
+    const staff = constructStaffNotationShape(evaluated.shape)
+    if (staff.kind !== 'sequence') throw new Error('Expected a staff sequence.')
+    expect(staff.children).toMatchObject([
+      { kind: 'note', displayLabel: '262Hz', pitch: { staffPosition: 0, accidentals: [] } },
+      { kind: 'note', displayLabel: '393Hz', pitch: { staffPosition: 4, accidentals: [] } },
     ])
   })
 
@@ -355,7 +370,7 @@ describe('staff notation construction', () => {
     expect(notation('610c')).toMatchObject({ staffPosition: 3, accidentals: ['sharp'] })
   })
 
-  it('labels degrees and raw cent values below the staff', () => {
+  it('labels degrees, raw cent values, and frequencies below the staff', () => {
     const node = parse(String.raw`3 123c 4\17 5\13<3> C`).body[0] as Expression
     const evaluated = evaluateScoreShape(node)
     if (!('shape' in evaluated)) throw new Error('Expected shape.')

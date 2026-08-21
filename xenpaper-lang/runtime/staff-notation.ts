@@ -257,7 +257,7 @@ export function constructStaffNotation(
   }
 
   const formula = formulaOf(value)
-  const formulaSpelling = formula ? spellIntervalFormula(formula) : undefined
+  const formulaSpelling = formula?.size ? spellIntervalFormula(formula) : undefined
   if (formulaSpelling) {
     const numericNumber = Number(formulaSpelling.number.valueOf())
     const position = rootPosition + Math.ceil(numericNumber - 1)
