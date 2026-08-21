@@ -358,6 +358,11 @@ describe('arithmetic expression evaluation', () => {
 
   it('supports neutral intervals and half accidentals', () => {
     expect(evaluate('n3').value.equals(Value.pitch(new Value(3n, 2n)).div(new Value(2)))).toBe(true)
+    expect(evaluate('n3').value.equals(evaluate('Ed - C').value)).toBe(true)
+    expect(evaluate('n4').value.equals(evaluate('Ft - C').value)).toBe(true)
+    expect(evaluate('n5').value.equals(evaluate('Gd - C').value)).toBe(true)
+    expect(evaluate('P4½').value.equals(evaluate('Gam - C').value)).toBe(true)
+    expect(evaluate('P4.5').value.equals(evaluate('Γ - C').value)).toBe(true)
     expect(
       evaluate('n4').value.equals(
         Value.pitch(new Value(3).pow(new Value(5n, 2n)).div(new Value(2).pow(new Value(7n, 2n)))),
