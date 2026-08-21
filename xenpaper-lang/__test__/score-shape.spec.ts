@@ -181,6 +181,15 @@ K L M N j k=`) as SequenceShape
       { nominal: 'K', system: 'mos', derived: true, accidentals: ['&'] },
     ])
 
+    const naturalTransposed = shape(
+      'MOS{5L2s; sig = J&} J_ + M1ms J♮ + M1ms',
+    ) as SequenceShape
+    const naturalAttacks = naturalTransposed.children.filter((child) => child.kind === 'attack')
+    expect(naturalAttacks.map((attack) => attack.pitch.spelling)).toMatchObject([
+      { nominal: 'K', system: 'mos', derived: true, accidentals: [] },
+      { nominal: 'K', system: 'mos', derived: true, accidentals: [] },
+    ])
+
     const reassociated = shape('MOS{5L2s} {K as root} J + M1ms') as SequenceShape
     const reassociatedAttack = reassociated.children.find((child) => child.kind === 'attack')
     expect(reassociatedAttack?.pitch.spelling).toMatchObject({
