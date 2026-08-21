@@ -431,9 +431,7 @@ describe('Xenpaper surface grammar', () => {
 
     expect(items.map((item) => item.raw)).toEqual(['J_', 'K♮'])
     expect(
-      items.map((item) =>
-        (item.accidentals as SyntaxNode[]).map((accidental) => accidental.value),
-      ),
+      items.map((item) => (item.accidentals as SyntaxNode[]).map((accidental) => accidental.value)),
     ).toEqual([['_'], ['♮']])
   })
 

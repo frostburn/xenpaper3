@@ -197,9 +197,7 @@ K L M N j k=`) as SequenceShape
       { nominal: 'K', system: 'mos', derived: true, accidentals: ['&'] },
     ])
 
-    const naturalTransposed = shape(
-      'MOS{5L2s; sig = J&} J_ + M1ms J♮ + M1ms',
-    ) as SequenceShape
+    const naturalTransposed = shape('MOS{5L2s; sig = J&} J_ + M1ms J♮ + M1ms') as SequenceShape
     const naturalAttacks = naturalTransposed.children.filter((child) => child.kind === 'attack')
     expect(naturalAttacks.map((attack) => attack.pitch.spelling)).toMatchObject([
       { nominal: 'K', system: 'mos', derived: true, accidentals: [] },
