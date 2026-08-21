@@ -266,7 +266,12 @@ export function constructStaffNotation(
       staffPosition: position,
       accidentals: inferredAccidentals(chromatic),
       ...(formulaSpelling.inflections?.length ? { inflections: formulaSpelling.inflections } : {}),
-      notehead: Number.isInteger(numericNumber) ? 'normal' : 'triangle-down',
+      notehead:
+        value.kind === 'pitchOffset' && value.scaleDegree !== undefined
+          ? 'normal'
+          : Number.isInteger(numericNumber)
+            ? 'normal'
+            : 'triangle-down',
       cents,
     }
   }
@@ -334,6 +339,23 @@ export function constructStaffNotationShape(shape: ScoreShape): StaffNotationSha
         ...(shape.grace ? { grace: true } : {}),
         ...(shape.notatedDuration ? { notatedDuration: shape.notatedDuration } : {}),
         ...(shape.articulationMarks?.length ? { articulationMarks: shape.articulationMarks } : {}),
+        ...(shape.automation
+          ? {
+              glissandi: (
+                shape.automation.segments ?? [
+                  {
+                    ...shape.automation,
+                    start: new Fraction(0),
+                  },
+                ]
+              ).map((segment) => ({
+                start: segment.start,
+                duration: segment.duration,
+                from: constructStaffNotation(segment.from, { rootPitch: shape.rootPitch }),
+                to: constructStaffNotation(segment.to, { rootPitch: shape.rootPitch }),
+              })),
+            }
+          : {}),
       }
     }
     case 'rest':

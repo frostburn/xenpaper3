@@ -32,6 +32,14 @@ type StaffItemContent =
       grace?: boolean
       notatedDuration?: Fraction
       articulationMarks?: readonly string[]
+      glissandi?: readonly {
+        start: Fraction
+        duration: Fraction
+        from: StaffPitch
+        to: StaffPitch
+        startColumn?: number
+        endColumn?: number
+      }[]
     }
   | { kind: 'rest'; duration: Fraction }
   | { kind: 'barline'; style: BarlineStyle; endingNumber?: number }
@@ -54,6 +62,7 @@ type StaffItem = StaffItemContent & {
   tiedToColumn?: number
   tiedToPosition?: number
   displayLabelRow?: number
+  annotationRow?: number
 }
 
 type LayoutItem = StaffItemContent & {
@@ -109,6 +118,7 @@ const items = computed(() => {
         grace: shape.grace,
         notatedDuration: shape.notatedDuration,
         articulationMarks: shape.articulationMarks,
+        glissandi: shape.glissandi,
         tuplets: [],
         voice,
       }
@@ -267,6 +277,13 @@ const items = computed(() => {
 
   const offsets = [
     ...layout.map((item) => item.offset),
+    ...layout.flatMap((item) =>
+      item.kind === 'note'
+        ? (item.glissandi ?? []).map((segment) =>
+            item.offset.add(segment.start).add(segment.duration),
+          )
+        : [],
+    ),
     ...layout.flatMap((item) => item.tuplets.map((tuplet) => tuplet.endOffset)),
   ].sort((a, b) => a.compare(b))
   const uniqueOffsets = offsets.filter(
@@ -289,6 +306,15 @@ const items = computed(() => {
         endColumn: column(tuplet.endOffset),
       })),
       tiedFromColumn: tiedFromOffset ? column(tiedFromOffset) : undefined,
+      ...(item.kind === 'note' && item.glissandi
+        ? {
+            glissandi: item.glissandi.map((segment) => ({
+              ...segment,
+              startColumn: column(offset.add(segment.start)),
+              endColumn: column(offset.add(segment.start).add(segment.duration)),
+            })),
+          }
+        : {}),
     }
   }) as StaffItem[]
 
@@ -383,6 +409,15 @@ const items = computed(() => {
       })
   })
 
+  const annotationsByColumn = new Map<number, Extract<StaffItem, { kind: 'annotation' }>[]>()
+  staffItems.forEach((item) => {
+    if (item.kind !== 'annotation') return
+    const annotations = annotationsByColumn.get(item.column) ?? []
+    item.annotationRow = annotations.length
+    annotations.push(item)
+    annotationsByColumn.set(item.column, annotations)
+  })
+
   return staffItems
 })
 
@@ -439,13 +474,17 @@ const keySignatureSpaceBefore = (column: number) =>
   keySignatureSpaces.value
     .filter((signature) => signature.column <= column)
     .reduce((total, signature) => total + signature.width, 0)
+const clefSpace = 38
+const clefSpaceBefore = (column: number) =>
+  items.value.filter((item) => item.kind === 'clef' && item.column <= column).length * clefSpace
 const width = computed(() =>
   Math.max(
     360,
     80 +
       (Math.max(-1, ...items.value.map((item) => item.column)) + 1) * 52 +
       repeatMarkerColumns.value.size * repeatMarkerSpace +
-      keySignatureSpaces.value.reduce((total, signature) => total + signature.width, 0),
+      keySignatureSpaces.value.reduce((total, signature) => total + signature.width, 0) +
+      items.value.filter((item) => item.kind === 'clef').length * clefSpace,
   ),
 )
 const height = computed(() =>
@@ -464,7 +503,11 @@ const height = computed(() =>
   ),
 )
 const x = (column: number) =>
-  60 + column * 52 + repeatSpaceBefore(column) + keySignatureSpaceBefore(column)
+  60 +
+  column * 52 +
+  repeatSpaceBefore(column) +
+  keySignatureSpaceBefore(column) +
+  clefSpaceBefore(column)
 const keySignatureX = (item: Extract<StaffItem, { kind: 'key-signature' }>) =>
   x(item.column) - Math.max(18, item.pitches.length * 10)
 const barlineX = (item: Extract<StaffItem, { kind: 'barline' }>) =>
@@ -526,7 +569,7 @@ const staffSegments = computed(() =>
         : width.value - 20,
   })),
 )
-const clefX = (column: number, implicit?: boolean) => (implicit ? 25 : x(column) - 20)
+const clefX = (column: number, implicit?: boolean) => (implicit ? 25 : x(column) - clefSpace + 5)
 const diamondPositions = (config: DiamondMos | undefined) => {
   if (!config) return []
   const result: number[] = []
@@ -595,7 +638,7 @@ const inflection = (
   inflections: readonly StaffInflection[],
 ) => {
   if ('kind' in value) {
-    return { up: '^', down: 'v', lift: '/', drop: '\\' }[value.kind]
+    return { up: '^', down: '⌄', lift: '/', drop: '\\' }[value.kind]
   }
   const hasMatchingFactor = inflections
     .slice(0, index)
@@ -621,6 +664,29 @@ const ledgerPositions = (position: number) => {
   for (let current = 0; current >= position; current -= 2) positions.push(current)
   for (let current = 12; current <= position; current += 2) positions.push(current)
   return positions
+}
+
+const glissandoPath = (
+  item: Extract<StaffItem, { kind: 'note' }>,
+  segment: NonNullable<Extract<StaffItemContent, { kind: 'note' }>['glissandi']>[number],
+) => {
+  const segmentStartX = x(segment.startColumn ?? item.column)
+  const segmentEndX = x(segment.endColumn ?? item.column + 1)
+  const startY = y(
+    segment.from.staffPosition + (clefAtColumn(item.column).kind === 'bass' ? 12 : 0),
+  )
+  const endY = y(segment.to.staffPosition + (clefAtColumn(item.column).kind === 'bass' ? 12 : 0))
+  const length = Math.max(1, segmentEndX - segmentStartX - 16)
+  const waves = Math.max(2, Math.round(length / 10))
+  let path = `M ${segmentStartX + 8} ${startY}`
+  for (let wave = 0; wave < waves; wave++) {
+    const x1 = segmentStartX + 8 + (length * (wave + 0.5)) / waves
+    const x2 = segmentStartX + 8 + (length * (wave + 1)) / waves
+    const base1 = startY + ((endY - startY) * (wave + 0.5)) / waves
+    const base2 = startY + ((endY - startY) * (wave + 1)) / waves
+    path += ` Q ${x1} ${base1 + (wave % 2 ? -3 : 3)} ${x2} ${base2}`
+  }
+  return path
 }
 
 const flagCount = (duration?: Fraction, scale = 1) => {
@@ -851,7 +917,12 @@ const swingBeamCount = (durations: readonly Fraction[], tuplet?: number) =>
           r="2"
         />
       </template>
-      <text v-else-if="item.kind === 'annotation'" class="annotation" :x="x(item.column)" y="25">
+      <text
+        v-else-if="item.kind === 'annotation'"
+        class="annotation"
+        :x="x(item.column)"
+        :y="25 - (item.annotationRow ?? 0) * 14"
+      >
         {{ item.text }}
       </text>
       <g v-else-if="item.kind === 'swing'" class="swing-annotation">
@@ -1012,6 +1083,12 @@ const swingBeamCount = (durations: readonly Fraction[], tuplet?: number) =>
           ?
         </text>
         <template v-else>
+          <path
+            v-for="(segment, segmentIndex) in item.glissandi"
+            :key="`glissando-${segmentIndex}`"
+            class="glissando"
+            :d="glissandoPath(item, segment)"
+          />
           <path
             v-if="item.tiedFromColumn !== undefined"
             class="tie"
@@ -1209,6 +1286,13 @@ const swingBeamCount = (durations: readonly Fraction[], tuplet?: number) =>
 
 .tie {
   fill: none;
+}
+
+.glissando {
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-width: 1.4;
 }
 
 .clef {

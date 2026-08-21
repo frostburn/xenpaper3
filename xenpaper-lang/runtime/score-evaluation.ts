@@ -691,12 +691,17 @@ function contextAnnotation(
           : statement.target.type === 'ContextPitchTarget'
             ? pitchText(statement.target.pitch)
             : statement.target.operator
-      const value =
-        'raw' in statement.value
-          ? String(statement.value.raw)
-          : statement.value.type === 'Identifier'
-            ? statement.value.name
-            : statement.value.type
+      const expressionText = (value: Expression): string => {
+        if ('raw' in value) return String(value.raw)
+        if (value.type === 'Identifier') return value.name
+        if (value.type === 'UnaryExpression')
+          return `${value.operator}${expressionText(value.operand)}`
+        if (value.type === 'BinaryExpression')
+          return `${expressionText(value.left)} ${value.operator} ${expressionText(value.right)}`
+        if (value.type === 'Group') return `(${expressionText(value.expression)})`
+        return value.type
+      }
+      const value = expressionText(statement.value)
       if (statement.association === 'rootAsTarget') return `root as ${target}`
       if (statement.association === 'targetAsRoot') return `${target} as root`
       return `${target} = ${value}`

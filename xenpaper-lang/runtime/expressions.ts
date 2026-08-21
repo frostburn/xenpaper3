@@ -336,7 +336,10 @@ export function evaluateExpression(
           : Value.cents(0)
       ).add(context.degreeEquave.mul(new Value(equaveShifts(node.modifiers))))
       return {
-        value: result('pitchOffset', value, [{ location: node.location, role: 'literal' }]),
+        value: {
+          ...result('pitchOffset', value, [{ location: node.location, role: 'literal' }]),
+          scaleDegree: degree,
+        },
         diagnostics: [],
       }
     }

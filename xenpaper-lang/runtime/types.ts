@@ -55,6 +55,8 @@ export interface PitchOffsetValue {
   readonly notationValue?: Value
   readonly formula?: PrimeMonzo
   readonly spelling?: IntervalSpelling
+  /** Authored numeric scale degree, retained so engraving does not infer an interordinal. */
+  readonly scaleDegree?: number
   readonly origins: readonly SourceOrigin[]
 }
 
@@ -195,6 +197,13 @@ export type StaffNotationShape =
       readonly grace?: boolean
       readonly notatedDuration?: Fraction
       readonly articulationMarks?: readonly string[]
+      /** Engraved glissando segments owned by this sounding note. */
+      readonly glissandi?: readonly {
+        readonly start: Fraction
+        readonly duration: Fraction
+        readonly from: StaffPitch
+        readonly to: StaffPitch
+      }[]
     }
   | { readonly kind: 'rest'; readonly duration: Fraction; readonly generated: boolean }
   | { readonly kind: 'continue'; readonly duration: Fraction }

@@ -509,6 +509,15 @@ describe('staff notation construction', () => {
     expect(staff.children[1].pitch).not.toHaveProperty('inflections')
   })
 
+  it('preserves unary root expressions in context annotations', () => {
+    const evaluated = evaluateScoreShape(parse("{root = '0} 0").body[0]!)
+    if (!('shape' in evaluated)) throw new Error('Expected shape.')
+    const staff = constructStaffNotationShape(evaluated.shape)
+    if (staff.kind !== 'sequence') throw new Error('Expected a sequence.')
+
+    expect(staff.children[0]).toMatchObject({ kind: 'annotation', text: "root = '0" })
+  })
+
   it('engraves a root-frequency shift relative to the moved root', () => {
     const node = parse('C D 1/1 {root = D} C D 1/1').body[0] as Expression
     const evaluated = evaluateScoreShape(node)
