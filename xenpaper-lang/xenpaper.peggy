@@ -327,9 +327,9 @@ EndingParallelExpression
     }
 
 EndingSequenceExpression
-  // A single bar followed by spacing terminates the final alternate ending;
-  // do not let ordinary sequence repetition consume it as a barline item.
-  = first:SequenceItem rest:(Spacing !("|" Spacing) item:SequenceItem { return item; })* {
+  // A detached single bar (or one at EOF) terminates the final alternate
+  // ending. An attached bar remains a sequence item, as in `D|E`.
+  = first:SequenceItem rest:(Spacing !("|" (RequiredSpacing / !.)) item:SequenceItem { return item; })* {
       return sequence([first, ...rest]);
     }
 
