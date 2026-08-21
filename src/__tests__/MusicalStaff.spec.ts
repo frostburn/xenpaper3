@@ -94,7 +94,7 @@ describe('MusicalStaff', () => {
     ).toEqual([5, 5, 5])
     expect(wrapper.findAll('.clef').map((clef) => clef.text())).toEqual(['𝄞', '𝄞'])
     expect(wrapper.findAll('.diamond-clef')).toHaveLength(1)
-    expect(wrapper.findAll('.staff-lines > g')[0]!.find('line').attributes('x2')).toBe('324')
+    expect(wrapper.findAll('.staff-lines > g')[0]!.find('line').attributes('x2')).toBe('321')
   })
 
   it('renders Diamond-MOS pitches with diamond octave marks and minority-step boxes', () => {
@@ -1079,7 +1079,7 @@ describe('MusicalStaff', () => {
     const clefX = Number(wrapper.findAll('.clef')[1]!.attributes('x'))
     const noteX = Number(wrapper.findAll('.notehead')[1]!.attributes('cx'))
 
-    expect(noteX - clefX).toBeGreaterThanOrEqual(30)
+    expect(noteX - clefX).toBe(38)
   })
 
   it('spaces implicit and explicit clefs consistently', () => {
@@ -1091,8 +1091,28 @@ describe('MusicalStaff', () => {
     const clefs = wrapper.findAll('.clef')
     const notes = wrapper.findAll('.notehead')
 
-    expect(Number(notes[0]!.attributes('cx')) - Number(clefs[0]!.attributes('x'))).toBe(35)
-    expect(Number(notes[1]!.attributes('cx')) - Number(clefs[1]!.attributes('x'))).toBe(35)
+    expect(Number(notes[0]!.attributes('cx')) - Number(clefs[0]!.attributes('x'))).toBe(38)
+    expect(Number(notes[1]!.attributes('cx')) - Number(clefs[1]!.attributes('x'))).toBe(38)
+  })
+
+  it('lays out a redundant initial treble clef exactly like the implicit clef', () => {
+    const render = (source: string) => {
+      const evaluated = evaluateScoreShape(parse(source).body[0]!)
+      if (!('shape' in evaluated)) throw new Error('Expected a score shape.')
+      return mount(MusicalStaff, {
+        props: { notation: constructStaffNotationShape(evaluated.shape) },
+      })
+    }
+    const implicit = render('C D E F @clef(bass) `C `D `E `F')
+    const explicit = render('@clef(treble) C D E F @clef(bass) `C `D `E `F')
+
+    expect(explicit.attributes('viewBox')).toBe(implicit.attributes('viewBox'))
+    expect(explicit.findAll('.clef').map((clef) => clef.attributes('x'))).toEqual(
+      implicit.findAll('.clef').map((clef) => clef.attributes('x')),
+    )
+    expect(explicit.findAll('.notehead').map((note) => note.attributes('cx'))).toEqual(
+      implicit.findAll('.notehead').map((note) => note.attributes('cx')),
+    )
   })
 
   it('renders scale degrees with regular noteheads', () => {

@@ -479,9 +479,24 @@ const keySignatureSpaceBefore = (column: number) =>
   keySignatureSpaces.value
     .filter((signature) => signature.column <= column)
     .reduce((total, signature) => total + signature.width, 0)
-const clefSpace = 30
+const sameClef = (left: StaffClef, right: StaffClef) =>
+  left.kind === right.kind &&
+  (left.kind !== 'diamond-mos' || (right.kind === 'diamond-mos' && left.pattern === right.pattern))
+const clefSpaceColumns = computed(() => {
+  const columns: number[] = []
+  let active: StaffClef = { kind: 'treble' }
+  for (const item of items.value) {
+    if (item.kind !== 'clef' || sameClef(active, item.clef)) continue
+    active = item.clef
+    // The initial clef uses the staff's built-in leading inset, just like the
+    // implicit treble clef, rather than adding another layout slot.
+    if (item.column > 0) columns.push(item.column)
+  }
+  return columns
+})
+const clefSpace = 27
 const clefSpaceBefore = (column: number) =>
-  items.value.filter((item) => item.kind === 'clef' && item.column <= column).length * clefSpace
+  clefSpaceColumns.value.filter((clefColumn) => clefColumn <= column).length * clefSpace
 const width = computed(() =>
   Math.max(
     360,
@@ -489,7 +504,7 @@ const width = computed(() =>
       (Math.max(-1, ...items.value.map((item) => item.column)) + 1) * 52 +
       repeatMarkerColumns.value.size * repeatMarkerSpace +
       keySignatureSpaces.value.reduce((total, signature) => total + signature.width, 0) +
-      items.value.filter((item) => item.kind === 'clef').length * clefSpace,
+      clefSpaceColumns.value.length * clefSpace,
   ),
 )
 const height = computed(() =>
@@ -520,9 +535,6 @@ const barlineX = (item: Extract<StaffItem, { kind: 'barline' }>) =>
 const y = (position: number) => 100 - (position - 2) * 6
 type DiamondMos = NonNullable<StaffPitch['diamondMos']>
 type ClefChange = { column: number; clef: StaffClef; implicit?: boolean }
-const sameClef = (left: StaffClef, right: StaffClef) =>
-  left.kind === right.kind &&
-  (left.kind !== 'diamond-mos' || (right.kind === 'diamond-mos' && left.pattern === right.pattern))
 const clefChanges = computed(() => {
   const changes: ClefChange[] = [{ column: 0, clef: { kind: 'treble' }, implicit: true }]
   for (const item of items.value) {
@@ -577,7 +589,7 @@ const staffSegments = computed(() =>
 const clefX = (column: number, implicit?: boolean) => {
   // Both the default and authored clefs use the same glyph-to-note inset.
   void implicit
-  return x(column) - 35
+  return x(column) - 38
 }
 const diamondPositions = (config: DiamondMos | undefined) => {
   if (!config) return []
