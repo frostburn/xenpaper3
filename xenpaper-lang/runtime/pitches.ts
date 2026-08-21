@@ -1,4 +1,5 @@
 import { Fraction, gcd, mmod } from 'xen-dev-utils/fraction'
+import { PRIMES } from 'xen-dev-utils/primes'
 import { stepString } from 'moment-of-symmetry/core'
 import { generateNotation, type MosMonzo } from 'moment-of-symmetry/notation'
 import type {
@@ -335,6 +336,45 @@ export function applyPitchContextChange(
     }
     if (statement.type !== 'ContextAssignment')
       throw new TypeError('Unsupported pitch-context statement.')
+    if (
+      statement.target.type === 'ContextNameTarget' &&
+      statement.target.name === 'map' &&
+      statement.value.type === 'MappingLiteral'
+    ) {
+      const literal = statement.value
+      const mappedPrimes = new Map<number, Value>()
+      literal.values.forEach((expression, index) => {
+        const prime = PRIMES[index]
+        if (prime === undefined) throw new RangeError('Prime mapping exceeds the supported primes.')
+        const evaluated = evaluateExpression(expression, context)
+        if (!('value' in evaluated) || evaluated.value.kind === 'absolutePitch')
+          throw new TypeError('Prime mapping entries require pitch intervals.')
+        const value =
+          evaluated.value.kind === 'pitchOffset'
+            ? evaluated.value.value
+            : evaluated.value.value.dimensions.isDimensionless
+              ? Value.pitch(evaluated.value.value)
+              : undefined
+        if (!value) throw new TypeError('Prime mapping entries require pitch intervals.')
+        mappedPrimes.set(prime, value)
+      })
+
+      const mapping: PrimeMapping = {
+        id: 'custom',
+        mapPrime: (prime) =>
+          mappedPrimes.get(prime) ??
+          (literal.closingDelimiter === ']' ? DEFAULT_MAPPING.mapPrime(prime) : Value.cents(0)),
+      }
+      context = {
+        ...context,
+        mapping,
+        rootPitch: {
+          ...context.rootPitch,
+          rootOffset: mapFormula(context.rootPitch.formula, mapping),
+        },
+      }
+      continue
+    }
     if (statement.target.type === 'ContextPitchTarget') {
       const evaluated = evaluateExpression(statement.value, context)
       if ('value' in evaluated && evaluated.value.kind === 'scalar') {
