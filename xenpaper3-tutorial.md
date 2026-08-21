@@ -262,15 +262,6 @@ Use `@drone(...)` to sustain a note or chord behind subsequent music. A new dron
 @drone() 0===
 ```
 
-## Staff clefs
-
-The notation view supports treble and bass clef changes. Clef directives affect notation only, not pitch or playback.
-
-```
-@clef(treble) C D E F
-@clef(bass) `C `D `E `F
-```
-
 ## Parallel sections
 
 Use the comma `,` to separate sections that you want to play in parallel and terminate the group with a double bar line.
@@ -349,17 +340,17 @@ In this example, the group inherits `@p` and 12edo, temporarily switches to `@f`
 0 2 (@f {19edo} 6 8) 7=
 ```
 
-Tuplets create the same kind of boundary. Here `@3` and `@f` apply only inside the brackets; the final two notes return to `@2` and `@p`.
+Tuplets create the same kind of boundary. Inside the brackets, `@3` controls the first four notes before `@2` changes the final pair. After the slot, the outer `@2` and `@p` settings resume.
 
 ```
 @2 @p
-0 [@3 @f 2 4 6] 7 9
+0 [@3 @f 2 4 6 @2 5 3] 7 9
 ```
 
 Each parallel branch also receives its own copy of the outer settings. A change in one branch affects neither its siblings nor the music following the parallel section.
 
 ```
-@p
+@p ||
 @f 0 4, @pp 7 11 ||
 12===
 ```
@@ -375,8 +366,10 @@ Parentheses group an expression without rescaling its duration. Square brackets 
 (0 2 4)
 # Three notes fitted into one beat
 [0 2 4]
-# Two simultaneous branches lasting three beats
-0 2 4, [7, 11]===
+# Two simultaneous branches lasting four beats
+|| 0 2 4, [7, 11]=== ||
+# Three ordinary beats after the parallel section
+0 2 4
 ```
 
 Commas nested inside a chord do not split the surrounding sequence. Use parentheses when you need to make the intended grouping explicit.
@@ -389,16 +382,7 @@ Pitch arithmetic can broadcast over a whole sequence or chord. This makes interv
 # Transpose an interval sequence from G
 G + [P1 M2 M3 P5]
 # Transpose every member of a chord
-C + [P1, M3, P5]===
-```
-
-## Zero-duration attacks
-
-Append `?` to give a note zero notated duration. This is primarily useful as the target of a glissando or in other constructions where an attack supplies a pitch without advancing the score. It is different from `=`, which continues the preceding duration.
-
-```
-@gliss(ease-in-out) C=== G?
-A B? c=
+F + [P1, M3, P5]===
 ```
 
 # Diatonic notation
@@ -419,6 +403,15 @@ Lower-case nominals are always an octave above upper-case nominals. Primes and g
 ```
 # Minor pentatonic
 `A `B D E G A B d e g a b 'd 'e 'g 'a=
+```
+
+## Staff clefs
+
+The notation view supports treble and bass clef changes. Clef directives affect notation only, not pitch or playback.
+
+```
+@clef(treble) C D E F
+@clef(bass) `C `D `E `F
 ```
 
 Relative pitch offsets are supported too.
@@ -570,6 +563,18 @@ Inflections respond to tempering.
 ## Half-intervals
 
 Every even equal temperament of the octave contains the semioctave √2 (i.e. 1\2 or 600c) while every odd edo (besides 1edo) has a good approximation to either the neutral third √3/√2 or the semifourth 2/√3.
+
+Relative diatonic intervals support neutral qualities and half-integer interval numbers. On imperfect intervals, the neutral quality `n` lies halfway between minor and major; `n4` lies between P4 and A4, while `n5` lies between d5 and P5. Their absolute counterparts above C use half-accidentals: `n3` is `Ed`, `n4` is `Ft`, and `n5` is `Gd`. Half-integer numbers instead reach the interordinal nominals: `P4½` (or ASCII `P4.5`) above C is `Gam` (Gamma). Each line below plays the same pitch twice.
+
+```
+C + n3   Ed
+C + n4   Ft
+C + n5   Gd
+C + P4½  Gam
+C + P4.5 Γ
+```
+
+These are Pythagorean geometric midpoints under the default tuning: `n3` is √(3/2), while `P4½` is the semioctave √2. Like other relative intervals, they follow the active temperament.
 
 Neutral chords fall exactly between minor and major.
 ```
