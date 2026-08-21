@@ -795,7 +795,7 @@ MosPitchNominal
     }
 
 MosAccidental
-  = value:$([&@ea]) { return node('Accidental', { value }); }
+  = value:$([&@ea_] / "♮") { return node('Accidental', { value }); }
 
 // Bare integer tokens in score position are scale degrees, not scalar integer
 // expressions. They intentionally stop before binary operators so `2 - 3`

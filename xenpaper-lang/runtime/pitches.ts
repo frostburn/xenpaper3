@@ -1095,6 +1095,7 @@ export function evaluatePitchLiteral(
       else if (accidental.value === '@') rootOffset = rootOffset.sub(chroma)
       else if (accidental.value === 'e') rootOffset = rootOffset.add(chroma.div(new Value(2)))
       else if (accidental.value === 'a') rootOffset = rootOffset.sub(chroma.div(new Value(2)))
+      else if (accidental.value === '_' || accidental.value === '♮') continue
       else throw new TypeError(`Unsupported Diamond-MOS accidental ${accidental.value}.`)
     }
     if (context.rootPitch.mos?.context === context.mos) {
