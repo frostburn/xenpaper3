@@ -574,6 +574,7 @@ function signaturePitch(
 function applySignatureDeclaration(
   declaration: SignatureDeclaration,
   context: PitchContext,
+  modeNominals?: ReadonlyMap<string, Value>,
 ): PitchContext {
   if (declaration.kind === 'sig') {
     const signature = new Map<string, PitchLiteral>()
@@ -597,7 +598,8 @@ function applySignatureDeclaration(
     const signature = new Map<string, PitchLiteral>()
     for (let index = 0; index < names.length; index++) {
       const scaleIndex = mmod(index - rotation, names.length)
-      let desired = tonicOffset + context.mos.nominals.get(names[scaleIndex]!)!.valueOf()
+      let desired =
+        tonicOffset + (modeNominals ?? context.mos.nominals).get(names[scaleIndex]!)!.valueOf()
       while (desired >= context.mos.equave.valueOf()) desired -= context.mos.equave.valueOf()
       while (desired < 0) desired += context.mos.equave.valueOf()
       const natural = context.mos.nominals.get(names[index]!)!.valueOf()
@@ -729,7 +731,9 @@ function applyMosDeclaration(declaration: MosDeclaration, context: PitchContext)
     }
   }
 
-  const preserveOperators = !counts && !pattern && !hardnessGiven && !equaveGiven && !udp
+  const selectsModeFromCurrentCounts = !counts && !pattern && !!udp
+  const preserveOperators =
+    !counts && !pattern && !hardnessGiven && !equaveGiven && (!udp || selectsModeFromCurrentCounts)
 
   if (
     !counts &&
@@ -764,6 +768,17 @@ function applyMosDeclaration(declaration: MosDeclaration, context: PitchContext)
     return signatureDeclaration ? applySignatureDeclaration(signatureDeclaration, result) : result
   }
 
+  if (selectsModeFromCurrentCounts) {
+    if (!context.mos) throw new TypeError('UD(P) selection requires a large/small count pattern.')
+    counts = {
+      large: [...context.mos.pattern].filter((step) => step === 'L').length,
+      small: [...context.mos.pattern].filter((step) => step === 's').length,
+    }
+    if (!equaveGiven) equave = context.mos.equave
+    if (!assignments.has('L')) assignments.set('L', context.mos.large)
+    if (!assignments.has('s')) assignments.set('s', context.mos.small)
+  }
+
   if (counts) {
     if (udp?.period !== undefined && udp.period !== gcd(counts.large, counts.small))
       throw new TypeError('MOS period must be consistent with the step counts.')
@@ -795,22 +810,25 @@ function applyMosDeclaration(declaration: MosDeclaration, context: PitchContext)
   const hostStep =
     Math.abs(largeUnit.valueOf() - smallUnit.valueOf()) <= 1e-8 ? largeUnit : undefined
 
-  const notation = generateNotation(pattern)
   const realize = (monzo: MosMonzo): Value =>
     large!.mul(new Value(monzo[0])).add(small!.mul(new Value(monzo[1])))
-  const nominals = new Map<string, Value>()
-  for (const [nominal, monzo] of notation.scale) nominals.set(nominal, realize(monzo))
-  const degrees = notation.degrees.map((degree) => ({
-    center: realize(degree.center),
-    imperfect: !degree.perfect,
-    ...(degree.mid ? { mid: realize(degree.mid) } : {}),
-  }))
-  const offsets = [...nominals.values()]
-  const period = realize(notation.period)
+  const realizeNotation = (notationPattern: string) => {
+    const notation = generateNotation(notationPattern)
+    const nominals = new Map<string, Value>()
+    for (const [nominal, monzo] of notation.scale) nominals.set(nominal, realize(monzo))
+    const degrees = notation.degrees.map((degree) => ({
+      center: realize(degree.center),
+      imperfect: !degree.perfect,
+      ...(degree.mid ? { mid: realize(degree.mid) } : {}),
+    }))
+    return { nominals, degrees, period: realize(notation.period) }
+  }
+  const notation = realizeNotation(pattern)
+  const offsets = [...notation.nominals.values()]
   const mos: MosContext = {
     pattern,
     equave,
-    period,
+    period: notation.period,
     large: large!,
     small: small!,
     ...(hostStep ? { hostStep } : {}),
@@ -828,8 +846,8 @@ function applyMosDeclaration(declaration: MosDeclaration, context: PitchContext)
         : preserveOperators
           ? context.mos?.lift
           : hostStep?.mul(new Value(5)),
-    nominals,
-    degrees,
+    nominals: notation.nominals,
+    degrees: notation.degrees,
   }
   const result: PitchContext = {
     ...context,
@@ -837,7 +855,23 @@ function applyMosDeclaration(declaration: MosDeclaration, context: PitchContext)
     degrees: [...offsets.slice(1), equave],
     degreeEquave: equave,
   }
-  return signatureDeclaration ? applySignatureDeclaration(signatureDeclaration, result) : result
+  if (!signatureDeclaration) return result
+  if (selectsModeFromCurrentCounts) {
+    const activeNotation = realizeNotation(context.mos!.pattern)
+    const activeResult: PitchContext = {
+      ...result,
+      mos: {
+        ...mos,
+        pattern: context.mos!.pattern,
+        period: activeNotation.period,
+        nominals: activeNotation.nominals,
+        degrees: activeNotation.degrees,
+      },
+      degrees: [...activeNotation.nominals.values()].slice(1).concat(equave),
+    }
+    return applySignatureDeclaration(signatureDeclaration, activeResult, mos.nominals)
+  }
+  return applySignatureDeclaration(signatureDeclaration, result)
 }
 
 export function requirePitchOperator(context: PitchContext, operator: 'up' | 'lift'): Value {
