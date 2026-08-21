@@ -1,6 +1,17 @@
+# Xenpaper 3 tutorial
+
+These short, self-contained sidebars introduce Xenpaper from its basic score syntax through advanced microtonal notation. Try each example in order if you are new to the language; experienced users can jump directly to a topic.
+
+A few conventions recur throughout the examples:
+
+- Degree `0` is the current root, and the default scale is 12edo.
+- An unadorned note or rest occupies one current subdivision. Each `=` extends it by one more subdivision.
+- Spaces and line breaks usually have the same meaning. Bar lines are organizational unless a repeat or parallel section gives them special meaning.
+- Settings such as scales, roots, dynamics, and articulation remain active until changed.
+
 # Basics
 
-## How it works
+## Notes, rests, and duration
 
 Typing a number creates a note. Notes can be separated by spaces or new lines.
 ```
@@ -8,12 +19,12 @@ Typing a number creates a note. Notes can be separated by spaces or new lines.
 11 12
 ```
 
-Notes can be held longer with double-hyphens (i.e. equal signs), and rests can be added with dots.
+Append equal signs to extend a note, and use dots for rests. Pitches and rests may be adjacent, although spaces often improve readability.
 ```
 0.2.3...3=2=0==.
 ```
 
-Bar lines help you organize your music. Ties can extend across bars.
+Bar lines help organize the score without changing the timing. A leading `=` continues (ties) the preceding note across a bar line.
 ```
 0 8 7=|0 8 7=|=5 4==
 ```
@@ -29,7 +40,7 @@ Notes can be shifted up or down octaves. Primes (apostrophes) shift up and grave
 0=3='0='3="0='"0=`0=``0=
 ```
 
-Chords can be played by using parenthesis or square brackets around comma-separated pitches.
+Play simultaneous pitches by putting a comma-separated expression in parentheses or square brackets. Square brackets without commas create tuplets instead (see **Timing**).
 ```
 (3,7)=[5,8]=(0,3,7)==.[1/1,6/5,3/2]==.
 ```
@@ -45,7 +56,7 @@ Chords can also be played by enumerating a colon-separated chord.
 ```
 
 ## Comments
-Comments can be added using # before the comment.
+A `#` starts a comment that continues to the end of the line.
 ```
 # a 7th chord
 [0,4,7,10]==..
@@ -55,7 +66,7 @@ Comments can be added using # before the comment.
 ```
 
 ## Scales
-The scale can be changed at any time with braces. The default is 12 equal divisions of the octave.
+Change the scale at any point with braces. The default is 12 equal divisions of the octave (12edo); a scale change affects the notes that follow it.
 ```
 [0,4,7]=== {31edo}[0,10,18]===
 ```
@@ -65,19 +76,19 @@ Equal division equave size can be changed by replacing the “o” with a number
 {13ed3}0 1 2 3 4
 ```
 
-Scales can be comprised of individual pitches. Counting starts from degree 1.
+A scale can also be built from individual pitch intervals. The listed entries become degrees 1 onward; degree 0 remains the root.
 ```
 {9/8 5/4 4/3 3/2 5/3 15/8 2/1}
 0 1 2 3 4 5 6 7=
 ```
 
-The final pitch also sets the equave.
+The final listed pitch is also the equave. Degree indexing wraps through that equave, so the pattern continues beyond the entries shown.
 ```
 {5/4 4/3 3/2}
 0 1 2 3 4 5 6 7 8=
 ```
 
-Scales can use enumerated chords. Here counting starts from degree 0 and the final enumeral determines the equave.
+An enumerated chord can define a scale compactly. Its first member becomes degree 0, and its final enumeral determines the equave.
 ```
 {12:14:16:18:21:24}
 0 1 2 3 4 5 6 7=
@@ -128,7 +139,7 @@ Holding a tuplet stretches it as a whole.
 [0 2 7] [0 2 7]===
 ```
 
-Subdivisions of the beat can be set using an @ symbol followed by a number.
+Set the number of subdivisions per beat with `@` followed by a positive number. For example, `@2` makes each plain note half a beat long; `@1/2` makes it two beats long.
 ```
 @2 0 2 3 7 @3 0 2 3 7 @4 0 2 3 7 @1/2 0 2 3 7
 ```
@@ -161,7 +172,7 @@ Use angle brackets to change the equave of steps of equal temperaments.
 
 ## Repeats
 
-Everything between |: and :| is repeated literally. Alternate endings use @^1 and @^2 or superscripts on a bar line.
+Everything between `|:` and `:|` is repeated twice by default. Alternate endings use `@^1` and `@^2`, or the equivalent superscript numerals attached to bar lines as below.
 
 ```
 # Square little tune
@@ -226,7 +237,7 @@ Use a grace setter before a note to make that note borrow a short duration from 
 
 ## Dynamics
 
-Synth velocity can be controlled using dynamic markers like (f) and (pp) or by directly specifying the velocity.
+Control synth velocity with directives such as `@f` and `@pp`, or specify it directly with `@velocity(...)`. Dynamic settings remain active until the next dynamic directive.
 ```
 @mf 0==   # 50% (default)
 @f 1==    # 65%
@@ -239,6 +250,25 @@ Synth velocity can be controlled using dynamic markers like (f) and (pp) or by d
 @p -1==    # 30%
 @pp -2==   # 20%
 @ppp -3==  # 10%
+```
+
+## Drones
+
+Use `@drone(...)` to sustain a note or chord behind subsequent music. A new drone replaces the old one; empty parentheses stop it.
+
+```
+@drone([0, 7]) 0 2 4 5
+@drone(5) 7 5 4 2
+@drone() 0===
+```
+
+## Staff clefs
+
+The notation view supports treble and bass clef changes. Clef directives affect notation only, not pitch or playback.
+
+```
+@clef(treble) C D E F
+@clef(bass) `C `D `E `F
 ```
 
 ## Parallel sections
@@ -305,7 +335,7 @@ Groove patterns can also include articulation. Articulation values latch until t
 ```
 
 # Diatonic notation
-Xenpaper 3 tunes middle C to around 261.6Hz (i.e. the 12-TET C below A=440Hz) and tunes the chain of fifths to pure 3/2.
+By default, Xenpaper 3 associates degree 0 and middle C with 12edo middle C below A4 = 440 Hz (about 261.626 Hz). Diatonic intervals themselves follow a pure 3/2 chain of fifths until a temperament is selected.
 
 ```
 # Ascending Pythagorean Major scale
@@ -432,13 +462,13 @@ Use the pythagorean accidentals p/q (a.k.a. po and qu from Color notation) to ju
 
 ## FJS inflections
 
-The Functional Just System lets you spell just intonation by tweaking the Pythagorean spine with small inflections. E.g. A Pythagorean major third 81/64 can be turned into 5/4 by multiplying it by the syntonic inflection 81/80. The "five" is in the numerator so in FJS the "arrow" ^ points up.
+The Functional Just System lets you spell just intonation by tweaking the Pythagorean spine with small inflections. For example, the Pythagorean major third 81/64 becomes 5/4 by dividing by the syntonic comma 81/80. In FJS, `^5` indicates that prime 5 occurs in the target interval’s numerator; the symbol describes the prime spelling, not necessarily the direction of the pitch adjustment.
 ```
 1/1 5/4 4/3 3/2 9/5  2/1 ..
 C   E^5 F   G   Bbv5 c   ..
 ```
 
-On the other hand that 81/80 goes up in pitch so in HEJI the arrow ^ points up and the *flavor* h goes after the prime factor.
+HEJI instead chooses the arrow by the inflection’s pitch direction and appends the flavor `h` to the prime. Consequently, the same 5-limit pitches use the opposite arrow from their FJS spellings.
 
 ```
 1/1 5/4  4/3 3/2 9/5   2/1 ..
@@ -759,7 +789,7 @@ J ^J Je vJ& J&
 
 MOS ups and lifts are customizable. Integers are interpreted as steps of the host edo.
 ```
-MOS{7L 1s 43:10 3|4 ^=4 /=12}
+MOS{7L 1s 43:10 3|4; ^=4; /=12}
 [J, vL, /N, O, ^Q, j, k]===
 ```
 
