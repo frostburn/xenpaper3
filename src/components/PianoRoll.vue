@@ -43,10 +43,21 @@ const raw = <T>(value: T) => toRaw(value)
 const beat = (value: { valueOf(): number }) => raw(value).valueOf()
 const cents = (note: (typeof notes.value)[number]) => beat(note.pitch.value)
 const duration = computed(() => (props.score ? beat(props.score.duration) : 0))
-const low = computed(() => Math.floor((Math.min(0, ...notes.value.map(cents)) - 100) / 100) * 100)
-const high = computed(
-  () => Math.ceil((Math.max(1200, ...notes.value.map(cents)) + 100) / 100) * 100,
-)
+const pitchBounds = computed(() => {
+  let minimum = 0
+  let maximum = 1200
+  for (const note of notes.value) {
+    const value = cents(note)
+    if (value < minimum) minimum = value
+    if (value > maximum) maximum = value
+  }
+  return {
+    low: Math.floor((minimum - 100) / 100) * 100,
+    high: Math.ceil((maximum + 100) / 100) * 100,
+  }
+})
+const low = computed(() => pitchBounds.value.low)
+const high = computed(() => pitchBounds.value.high)
 const rulerWidth = 70
 const rulerGuideStart = -1000
 const rightPadding = 50

@@ -437,19 +437,20 @@ const itemTupletScale = (item: StaffItem) =>
     ? item.tuplets.reduce((scale, tuplet) => scale * tupletScale(tuplet.count), 1)
     : undefined
 
-const endingSpans = computed(() =>
-  items.value.flatMap((item, index) => {
-    if (item.kind !== 'barline' || item.style !== 'ending-start') return []
-    const end = items.value
-      .slice(index + 1)
-      .find(
-        (candidate) =>
-          candidate.kind === 'barline' &&
-          (candidate.style === 'repeat-end' || candidate.style === 'ending-end'),
-      )
-    return end?.kind === 'barline' ? [{ start: item, end, number: item.endingNumber }] : []
-  }),
-)
+type BarlineItem = Extract<StaffItem, { kind: 'barline' }>
+type EndingSpan = { start: BarlineItem; end: BarlineItem; number: BarlineItem['endingNumber'] }
+const endingSpans = computed(() => {
+  const spans: EndingSpan[] = []
+  let nextEnd: BarlineItem | undefined
+  for (let index = items.value.length - 1; index >= 0; index--) {
+    const item = items.value[index]!
+    if (item.kind !== 'barline') continue
+    if (item.style === 'repeat-end' || item.style === 'ending-end') nextEnd = item
+    else if (item.style === 'ending-start' && nextEnd)
+      spans.push({ start: item, end: nextEnd, number: item.endingNumber })
+  }
+  return spans.reverse()
+})
 
 const repeatMarkerColumns = computed(
   () =>
@@ -463,22 +464,43 @@ const repeatMarkerColumns = computed(
         .map((item) => item.column),
     ),
 )
+const repeatMarkerColumnList = computed(() => [...repeatMarkerColumns.value].sort((a, b) => a - b))
+const countThrough = (values: readonly number[], limit: number) => {
+  let low = 0
+  let high = values.length
+  while (low < high) {
+    const middle = (low + high) >>> 1
+    if (values[middle]! <= limit) low = middle + 1
+    else high = middle
+  }
+  return low
+}
 const repeatMarkerSpace = 24
 const repeatSpaceBefore = (column: number) =>
-  [...repeatMarkerColumns.value].filter((markerColumn) => markerColumn <= column).length *
-  repeatMarkerSpace
+  countThrough(repeatMarkerColumnList.value, column) * repeatMarkerSpace
 const keySignatureSpaces = computed(() =>
   items.value
     .filter(
       (item): item is Extract<StaffItem, { kind: 'key-signature' }> =>
         item.kind === 'key-signature',
     )
-    .map((item) => ({ column: item.column, width: Math.max(18, item.pitches.length * 10) })),
+    .map((item) => ({ column: item.column, width: Math.max(18, item.pitches.length * 10) }))
+    .sort((left, right) => left.column - right.column),
 )
-const keySignatureSpaceBefore = (column: number) =>
-  keySignatureSpaces.value
-    .filter((signature) => signature.column <= column)
-    .reduce((total, signature) => total + signature.width, 0)
+const keySignatureOffsets = computed(() => {
+  let total = 0
+  return keySignatureSpaces.value.map((signature) => ({
+    column: signature.column,
+    total: (total += signature.width),
+  }))
+})
+const keySignatureColumns = computed(() =>
+  keySignatureOffsets.value.map((signature) => signature.column),
+)
+const keySignatureSpaceBefore = (column: number) => {
+  const index = countThrough(keySignatureColumns.value, column)
+  return index ? keySignatureOffsets.value[index - 1]!.total : 0
+}
 const sameClef = (left: StaffClef, right: StaffClef) =>
   left.kind === right.kind &&
   (left.kind !== 'diamond-mos' || (right.kind === 'diamond-mos' && left.pattern === right.pattern))
@@ -492,11 +514,10 @@ const clefSpaceColumns = computed(() => {
     // implicit treble clef, rather than adding another layout slot.
     if (item.column > 0) columns.push(item.column)
   }
-  return columns
+  return columns.sort((left, right) => left - right)
 })
 const clefSpace = 27
-const clefSpaceBefore = (column: number) =>
-  clefSpaceColumns.value.filter((clefColumn) => clefColumn <= column).length * clefSpace
+const clefSpaceBefore = (column: number) => countThrough(clefSpaceColumns.value, column) * clefSpace
 const width = computed(() =>
   Math.max(
     360,
