@@ -7,6 +7,7 @@ export default mergeConfig(
   defineConfig({
     test: {
       exclude: [...configDefaults.exclude, 'e2e/**'],
+      pool: 'threads',
       root: fileURLToPath(new URL('./', import.meta.url)),
       projects: [
         {
