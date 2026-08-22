@@ -320,6 +320,9 @@ describe('Diamond-MOS tokens', () => {
       ],
     })
     expect(() => parse('MOS{5L2s} J^5')).toThrow(/Expected/)
+    expect(() => parse('MOS{5L2s} JJ^5')).toThrow(/Expected/)
+    expect(() => parse('MOS{5L2s} KZ^5')).toThrow(/Expected/)
+    expect(() => parse('MOS{5L2s} ZZ^5')).toThrow(/Expected/)
   })
 })
 

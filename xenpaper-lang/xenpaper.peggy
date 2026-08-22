@@ -948,7 +948,7 @@ Sign
 Identifier
   // A Diamond-MOS nominal followed by an FJS suffix is an invalid pitch, not
   // an identifier followed by an adjacent prefix-modified degree.
-  = !([J-Zj-z] FjsInflection) name:$([A-Za-z_] IdentifierContinue*) { return name; }
+  = !([J-Zj-z] [J-Zj-z]? FjsInflection) name:$([A-Za-z_] IdentifierContinue*) { return name; }
 
 IdentifierContinue
   = [A-Za-z0-9_]
