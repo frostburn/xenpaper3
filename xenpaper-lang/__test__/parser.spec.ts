@@ -371,6 +371,24 @@ describe('Xenpaper surface grammar', () => {
       subgroup: ['101', '2'],
       continuation: true,
     })
+    expect(parse('[2, -1>@').body[0]).toMatchObject({
+      type: 'MonzoLiteral',
+      components: ['2', '-1'],
+    })
+  })
+
+  it('accepts optional commas between mapping components', () => {
+    const change = parse('{map = <1222c, 1999c]}').body[0] as SyntaxNode
+    const mapping = (change.statements as SyntaxNode[])[0]!.value as SyntaxNode
+
+    expect(mapping).toMatchObject({
+      type: 'MappingLiteral',
+      values: [
+        { type: 'QuantityLiteral', magnitude: '1222', unit: 'c' },
+        { type: 'QuantityLiteral', magnitude: '1999', unit: 'c' },
+      ],
+      closingDelimiter: ']',
+    })
   })
   it('parses adjacent dots as a single cluster rest', () => {
     expect(parse('...').body[0]).toMatchObject({ type: 'Rest', raw: '...' })
