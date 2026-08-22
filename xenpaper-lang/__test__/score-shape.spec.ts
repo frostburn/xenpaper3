@@ -722,7 +722,7 @@ K L M N j k=`) as SequenceShape
     expect(pitches[1]!.equals(Value.pitch(new Value(6n, 5n)))).toBe(true)
     expect(pitches[2]!.equals(Value.pitch(new Value(3n, 2n)))).toBe(true)
 
-    const expressions = shape('3/2 * 4:(4+1):6') as ParallelShape
+    const expressions = shape('3/2 * 4:(4 + 1):6') as ParallelShape
     const expressionPitches = expressions.branches.map((branch) => {
       if (branch.kind !== 'attack') throw new Error('Expected an attack.')
       return branch.pitch.value

@@ -93,9 +93,12 @@ ParallelExpression
       return parallel([first, ...rest]);
     }
 
+// Sequencing needs no synthetic separator token. `Spacing` may be empty, so
+// adjacent self-delimiting items (`0.2`, `C[D E]F`, `C=F`) are parsed by
+// ordinary PEG repetition. Individual literal rules decide where tokens end.
 SequenceExpression
   = first:SequenceItem
-    rest:(SequenceGap item:SequenceItem { return item; })* {
+    rest:(Spacing item:SequenceItem { return item; })* {
       return sequence([first, ...rest]);
     }
 
@@ -114,89 +117,47 @@ Expression
 
 EnumeratedChordArithmetic
   = first:EnumeratedChord
-    multiplicative:(Spacing operator:MultiplicativeOperator Spacing right:PowerExpression {
-      return { operator, right };
-    })*
-    additive:(
-      operator:AttachedAdditiveOperator Spacing right:MultiplicativeExpression {
-        return { operator, right };
-      }
-      / RequiredSpacing operator:AdditiveOperator Spacing right:MultiplicativeExpression {
-        return { operator, right };
-      }
-    )* {
+    multiplicative:MultiplicativeTail*
+    additive:AdditiveTail* {
       return foldBinary(foldBinary(first, multiplicative), additive);
     }
 
 AdditiveExpression
-  = first:MultiplicativeExpression
-    rest:(
-      operator:AttachedAdditiveOperator Spacing right:MultiplicativeExpression {
-        return { operator, right };
-      }
-      / RequiredSpacing operator:AdditiveOperator Spacing right:MultiplicativeExpression {
-        return { operator, right };
-      }
-    )* {
+  = first:MultiplicativeExpression rest:AdditiveTail* {
       return foldBinary(first, rest);
     }
 
-// Without whitespace before the operator, plus and minus are unambiguously
-// arithmetic. In particular, `G-n3` and `M3-n3` must not be mistaken for a
-// sequence whose second item is a unary-negated interval.
-AttachedAdditiveOperator
-  = "+" { return "+"; }
-  / "-" { return "-"; }
-
-AdditiveOperator
-  = BinaryPlus
-  / BinaryMinus
-
-// A plus immediately followed by a digit belongs to the following signed
-// integer. This mirrors binary minus so `0 +5` is a sequence item while
-// `0 + 5` remains addition.
-BinaryPlus
-  = "+" ![0-9] { return "+"; }
-
-// A minus immediately followed by a digit or named interval belongs to the
-// following signed sequence item. This makes `-1 -2` a sequence of two
-// negative integer leaves and `D -n3` a D followed by a descending neutral
-// third. Whitespace after the minus keeps it binary, as in `D - n3`.
-// Write arithmetic subtraction of integer literals as `-1/1 - 2/1` or put
-// whitespace after the binary minus.
-BinaryMinus
-  = "-" !([0-9] / NamedIntervalStart) { return "-"; }
-
-NamedIntervalStart
-  = PitchModifier* IntervalQuality [0-9]
+// Compact pitch arithmetic such as `G-n3` is accepted when the right operand
+// cannot be mistaken for a signed scale degree. For numeric right operands,
+// put whitespace on both sides of the operator: `3/2 - 1.95c`.
+AdditiveTail
+  = operator:$("+" / "-") ![0-9] Spacing right:MultiplicativeExpression {
+      return { operator, right };
+    }
+  / RequiredSpacing operator:$("+" / "-") RequiredSpacing right:MultiplicativeExpression {
+      return { operator, right };
+    }
 
 MultiplicativeExpression
-  = first:PowerExpression
-    rest:(Spacing operator:MultiplicativeOperator Spacing right:PowerExpression {
-      return { operator, right };
-    })* {
+  = first:PowerExpression rest:MultiplicativeTail* {
       return foldBinary(first, rest);
+    }
+
+MultiplicativeTail
+  = Spacing operator:MultiplicativeOperator Spacing right:PowerExpression {
+      return { operator, right };
+    }
+  // `/` is both a pitch lift prefix and ordinary division. Requiring whitespace
+  // on both sides for binary division keeps the distinction purely grammatical:
+  // `m7 / 2` divides, while `/2` is a lifted degree and `/cb` is a lifted pitch.
+  / RequiredSpacing "/" RequiredSpacing right:PowerExpression {
+      return { operator: "/", right };
     }
 
 MultiplicativeOperator
   = "*" { return "*"; }
-  / BinaryDivide
   / "div"i !IdentifierContinue { return "div"; }
   / "mod"i !IdentifierContinue { return "mod"; }
-
-// A slash attached to a pitch-like token is a lift modifier belonging to the
-// following sequence item, not division (for example `Cv5 /'C`). An attached
-// slash after the left operand may divide by a number, so `P4/2` is arithmetic
-// while the spaced `P4 /2` remains a sequence containing a lifted degree.
-BinaryDivide
-  = "/" &{
-      // `location()` can include spacing consumed by the caller while Peggy is
-      // backtracking. `offset()` is the position immediately after the slash,
-      // so inspect the two adjacent source characters from there.
-      const slashOffset = offset() - 1;
-      return !/[0-9]/.test(input[slashOffset + 1] ?? "") ||
-        (slashOffset > 0 && !/[\t\n\r ]/.test(input[slashOffset - 1]));
-    } !(PitchModifier / StandardPitchNominal / MosPitchNominal) { return "/"; }
 
 PowerExpression
   = left:UnaryExpression
@@ -366,15 +327,11 @@ EndingParallelExpression
     }
 
 EndingSequenceExpression
-  = first:SequenceItem rest:(EndingSequenceGap item:SequenceItem { return item; })* {
+  // A detached single bar (or one at EOF) terminates the final alternate
+  // ending. An attached bar remains a sequence item, as in `D|E`.
+  = first:SequenceItem rest:(Spacing !("|" (RequiredSpacing / !.)) item:SequenceItem { return item; })* {
       return sequence([first, ...rest]);
     }
-
-EndingSequenceGap
-  = RequiredSpacing !("|" Spacing)
-  / &("|:" / "[" / "(" / "{")
-  / &Rest
-  / PreviousItemBoundary
 
 FirstEndingMarker
   = "|" number:EndingNumber { return number; }
@@ -607,7 +564,7 @@ ContextValue
 
 MappingLiteral
   = "<" Spacing first:AdditiveExpression
-    rest:(SequenceGap value:AdditiveExpression { return value; })*
+    rest:(RequiredSpacing value:AdditiveExpression { return value; })*
     Spacing close:("]" / ">") {
       return node('MappingLiteral', {
         values: [first, ...rest],
@@ -763,7 +720,15 @@ IntervalQuality
   = $("S" "A"+ / "s" "d"+ / "A"+ / "d"+ / "P" / "M" / "m" / "n")
 
 IntervalNumber
-  = $(UnsignedInteger (".5" / "½")?)
+  = whole:UnsignedInteger half:HalfIntervalSuffix? {
+      // Keep the semantic representation compatible with existing runtime code
+      // without admitting the visually ambiguous surface spelling `P4.5`.
+      return half ? whole + ".5" : whole;
+    }
+
+HalfIntervalSuffix
+  = "½"
+  / "h"
 
 PitchLiteral
   = nominal:StandardPitchNominal
@@ -797,12 +762,14 @@ MosPitchNominal
 MosAccidental
   = value:$([&@ea_] / "♮") { return node('Accidental', { value }); }
 
-// Bare integer tokens in score position are scale degrees, not scalar integer
-// expressions. They intentionally stop before binary operators so `2 - 3`
-// remains an integer subtraction expression while `2 -3` remains a sequence of
-// degrees.
+// Bare signed integers are scale degrees unless the following characters
+// clearly continue the token as scalar arithmetic. This is a forward syntactic
+// predicate only: `-1 -2` stays two degrees, while `2 * M2` is arithmetic.
+// Explicit ratios (`2/1`, `-1/1`) remain the escape hatch for ambiguous integer
+// arithmetic.
 ScaleDegreeLiteral
-  = sign:Sign? degree:UnsignedInteger !NumericLiteralSuffix !IdentifierContinue !BinaryOperatorAfterSpacing {
+  = sign:Sign? degree:UnsignedInteger
+    !NumericLiteralSuffix !IdentifierContinue !BinaryTailStart {
       return node('DegreeLiteral', {
         modifiers: [],
         degree: sign === '-' ? sign + degree : degree,
@@ -813,8 +780,13 @@ ScaleDegreeLiteral
 NumericLiteralSuffix
   = "/" / "\\" / "." [0-9]+ ("e" / "r" / UnitSuffix)
 
-BinaryOperatorAfterSpacing
-  = Spacing (AdditiveOperator / MultiplicativeOperator / "**")
+BinaryTailStart
+  = ("+" / "-") ![0-9]
+  / RequiredSpacing ("+" / "-") RequiredSpacing
+  / Spacing MultiplicativeOperator
+  / RequiredSpacing "/" RequiredSpacing
+  / "**"
+  / RequiredSpacing "**" RequiredSpacing
 
 PitchModifier
   = raw:$("'" / '"' / "`" / "^" / "v" / "/" / "\\") {
@@ -974,24 +946,12 @@ Sign
   = $("+" / "-")
 
 Identifier
-  = $([A-Za-z_] IdentifierContinue*)
+  // A Diamond-MOS nominal followed by an FJS suffix is an invalid pitch, not
+  // an identifier followed by an adjacent prefix-modified degree.
+  = !([J-Zj-z] [J-Zj-z]? FjsInflection) name:$([A-Za-z_] IdentifierContinue*) { return name; }
 
 IdentifierContinue
   = [A-Za-z0-9_]
-
-SequenceGap
-  = RequiredSpacing
-  // Structural notation separates adjacent sequence items without requiring
-  // whitespace on either side (`C[D E]F`, `{13edo}C`, and `E|:F G:||`).
-  / &("|:" / Barline / "[" / "(" / "{")
-  / &Rest
-  / PreviousItemBoundary
-
-// Peggy has no lookbehind predicate. This zero-width rule recognizes
-// continues, bars, rests, and structural closers immediately before the gap.
-// The closing brace is escaped because it would end the semantic predicate.
-PreviousItemBoundary
-  = &{ return offset() > 0 && "=).]|\u007d".includes(input[offset() - 1]); }
 
 Spacing
   = (White / Comment)*
