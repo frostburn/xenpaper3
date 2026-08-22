@@ -426,7 +426,10 @@ function repeatCount(node: Extract<Expression, { type: 'Repeat' }>): number | un
   } catch {
     return undefined
   }
-  const longestEnding = Math.max(0, ...node.endings.map((ending) => ending.body.length))
+  let longestEnding = 0
+  for (const ending of node.endings) {
+    if (ending.body.length > longestEnding) longestEnding = ending.body.length
+  }
   const expandedNodes = count * BigInt(Math.max(1, node.body.length + longestEnding))
   if (count < 0n || expandedNodes > BigInt(MAX_REPEAT_EXPANSION_NODES)) return undefined
   return Number(count)
@@ -436,6 +439,14 @@ const repeatEndingBodies = new WeakMap<
   Extract<Expression, { type: 'Repeat' }>,
   Map<bigint, Expression[]>
 >()
+
+function appendRepeatItems(result: Expression[], items: readonly Expression[]) {
+  for (const item of items) {
+    if (item.type === 'Sequence') {
+      for (const child of item.items) result.push(child)
+    } else result.push(item)
+  }
+}
 
 function repeatBody(
   node: Extract<Expression, { type: 'Repeat' }>,
@@ -450,9 +461,10 @@ function repeatBody(
     }
     repeatEndingBodies.set(node, endings)
   }
-  return [...node.body, ...(endings.get(BigInt(iteration + 1)) ?? [])].flatMap((item) =>
-    item.type === 'Sequence' ? item.items : [item],
-  )
+  const result: Expression[] = []
+  appendRepeatItems(result, node.body)
+  appendRepeatItems(result, endings.get(BigInt(iteration + 1)) ?? [])
+  return result
 }
 
 function hasShape(
