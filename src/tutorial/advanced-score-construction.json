@@ -47,5 +47,22 @@
         "tune": "# Transpose an interval sequence from G\nG + [P1 M2 M3 P5]\n# Transpose every member of a chord\nF + [P1, M3, P5]==="
       }
     ]
+  },
+  {
+    "title": "Prime-count literals",
+    "demos": [
+      {
+        "html": "\"Ket\" vectors of prime exponents, also known as <i>monzos</i>, are supported but with a mandatory subgroup indicator. The subgroup itself may be empty to default to primes 2.3.5.7.11...",
+        "tune": "[0 0 0>@  # 2⁰·3⁰·5⁰  = 1/1\n[-1 1 0>@ # 2⁻¹·3¹·5⁰ = 3/2\n[1 1 -1>@ # 2¹·3¹·5⁻¹ = 6/5\n\n[5 -1>@2.31 # 2⁵·31⁻¹ = 32/31"
+      }
+    ]
+  },
+  {
+    "title": "Syntax philosophy",
+    "demos": [
+      {
+        "description": "Xenpaper 3 tries to be consistent by enclosing context assignments that affect tuning in curly brackets while everything else uses @style directives."
+      }
+    ]
   }
 ]
