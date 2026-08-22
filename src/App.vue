@@ -10,7 +10,7 @@ import TheFooter from './components/TheFooter.vue'
         <RouterLink to="/xenpaper-lang-testing">Test xenpaper-lang</RouterLink>
         <RouterLink to="/patch-testing">Test sw-patch</RouterLink>
       </nav>
-      <h2>About the alpha release</h2>
+      <h2>About the beta release</h2>
       <p>
         Hi! It's me Lumi, the lead developer of Scale Workshop 3, Xenpaper 2 and now Xenpaper 3.
       </p>
@@ -20,7 +20,7 @@ import TheFooter from './components/TheFooter.vue'
         AI agents can do the grunt work and uphold good software design principles.
       </p>
       <p>
-        This is an early alpha release so expect it to be quite broken. I'm still in huge knowledge
+        This is an early beta release so expect it to be quite broken. I'm still in huge knowledge
         debt due to vibe-coding most of the project with OpenAI Codex.
       </p>
       <p>
