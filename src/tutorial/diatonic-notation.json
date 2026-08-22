@@ -103,12 +103,11 @@
     "title": "Half-intervals",
     "demos": [
       {
-        "tune": "C + n3   Ed\nC + n4   Ft\nC + n5   Gd\nC + P4½  Gam\nC + P4h Γ",
-        "html": "<p>Every even equal temperament of the octave contains the semioctave √2 (i.e. 1\\2 or 600c) while every odd edo (besides 1edo) has a good approximation to either the neutral third √3/√2 or the semifourth 2/√3.</p><p>Relative diatonic intervals support neutral qualities and half-integer interval numbers. On imperfect intervals, the neutral quality <code>n</code> lies halfway between minor and major; <code>n4</code> lies between P4 and A4, while <code>n5</code> lies between d5 and P5. Their absolute counterparts above C use half-accidentals: <code>n3</code> is <code>Ed</code>, <code>n4</code> is <code>Ft</code>, and <code>n5</code> is <code>Gd</code>. Half-integer numbers instead reach the interordinal nominals: <code>P4½</code> (or ASCII <code>P4h</code>) above C is <code>Gam</code> (Gamma). Each line below plays the same pitch twice.</p>"
+        "html": "<p>Every even equal temperament of the octave contains the semioctave √2 (i.e. 1\\2 or 600c) while every odd edo (besides 1edo) has a good approximation to either the neutral third √3/√2 or the semifourth 2/√3.</p>"
       },
       {
         "tune": "[1/1, 32/27,     3/2]==.  # Pythagorean minor\n[1/1, 6/5,       3/2]==.  # 5-limit minor\n[1/1, 11/9,      3/2]==.  # 11-limit neutral\n[1/1, sqrt(3/2), 3/2]==.  # true neutral\n[1/1, 5/4,       3/2]==.  # 5-limit major\n[1/1, 81/64,     3/2]==.  # Pythagorean major",
-        "html": "<p>These are Pythagorean geometric midpoints under the default tuning: <code>n3</code> is √(3/2), while <code>P4½</code> is the semioctave √2. Like other relative intervals, they follow the active temperament.</p><p>Neutral chords fall exactly between minor and major.</p>"
+        "description": "Neutral chords fall exactly between minor and major."
       },
       {
         "description": "Semiquartal chords can be fun to mess around with.",
@@ -124,7 +123,7 @@
     "title": "Neutral tunings",
     "demos": [
       {
-        "description": "When the closest approximation to 3/2 spans an even number of edosteps it often makes sense to use half-sharps (𝄲, ‡ or t) and half-flats (𝄳 or d) to reach the neutral third.",
+        "html": "<p>When the closest approximation to 3/2 spans an even number of edosteps it often makes sense to use half-sharps (𝄲, ‡ or t) and half-flats (𝄳 or d) to reach the neutral third <code>n3</code>.</p>",
         "tune": "{10edo}\n# All 10 notes (and the octave)\nC Ct D Ed F F𝄲 G G‡ A B𝄳 c"
       },
       {
@@ -133,6 +132,10 @@
       {
         "description": "Key signatures support quartertones.",
         "tune": "{key = C Locrian}\nC F B e a 'd 'g\n{key = Cd Locrian}\nC F B e a 'd 'g\n{key = Cb Locrian}\nC F B e a 'd 'g\n{key = Cdb Locrian}\nC F B e a 'd 'g"
+      },
+      {
+        "description": "Relative neutral intervals fall exactly between minor and major, mid fourth falls between perfect and augmented, while mid fifth falls between diminished and perfect. Like other relative intervals, they follow the active temperament.",
+        "tune": "Ct  SA1   # Semi-augmented unison\nDdb sd2   # Semi-diminished second\nDd  n2    # Neutral second\nDt  SA2   # Semi-augmented second\nEd  n3    # Neutral third\nFd  sd4   # Semi-diminished fourth\nFt SA4 n4 # Semi-augmented i.e. mid fourth\nGd sd5 n5 # Semi-diminished i.e. mid fifth\nGt  SA5   # Semi-augmented fifth"
       }
     ]
   },
@@ -150,6 +153,10 @@
       {
         "description": "Key signatures translate across semioctaves.",
         "tune": "{key = F major}\nF Zet G eta A alp\n# Both B and Bet become flat\nB bet\n\nc gam d del e eps f Zet F="
+      },
+      {
+        "html": "<p>Relative semi-octave intervals exist and are interordinal. E.g. <code>P8 / 2</code> is <code>P4½</code>. The ASCII for \"½\" is \"h\" in this context.</p>",
+        "tune": "Eta P1½\nAlp M2½\nBet M3½\nGam P4h\nDel M5h\nEps M6½\nZet P7½"
       }
     ]
   },
@@ -162,6 +169,10 @@
       },
       {
         "tune": "{53edo}\n# Barbados[9]\nc d αd βd f g δd εd bb 'c"
+      },
+      {
+        "description": "Relative semiquartal intervals are spelled as neutral qualities of interordinals.",
+        "tune": "n2½ P4 / 2\nn3½ M6 / 2\nn5½ m10 / 2\nn6½ P8 - P4 / 2"
       }
     ]
   },

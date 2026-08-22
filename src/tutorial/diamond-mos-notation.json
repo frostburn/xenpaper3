@@ -109,5 +109,14 @@
         "tune": "@8\nMOS{14L5s}\nJ=== K L M N O P Q R S T\nU V W X Y Z JJ JK j==="
       }
     ]
+  },
+  {
+    "title": "Just intonation",
+    "demos": [
+      {
+        "description": "MOS scales tuned to just intonation have irrational hardness so you have to define the size of a step directly.",
+        "tune": "# Size of the small step is inferred from the pattern and equave\nMOS{5L 1s; L = 8/7}\nJ K L M N O j"
+      }
+    ]
   }
 ]
