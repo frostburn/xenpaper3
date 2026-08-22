@@ -7,7 +7,7 @@
     "dev": "run-s compile:sw-patch compile:xenpaper-lang && vite",
     "build": "run-s compile:sw-patch compile:xenpaper-lang && run-p type-check \"build-only {@}\" --",
     "preview": "vite preview",
-    "test:unit": "run-s compile:sw-patch compile:xenpaper-lang && vitest",
+    "test:unit": "run-p compile:sw-patch compile:xenpaper-lang && vitest",
     "build-only": "vite build",
     "type-check": "vue-tsc --build",
     "lint": "run-s \"lint:*\"",
