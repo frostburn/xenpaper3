@@ -276,7 +276,7 @@ MonzoLiteral
     }
 
 MonzoComponents
-  = first:MonzoComponent rest:(RequiredSpacing value:MonzoComponent { return value; })* {
+  = first:MonzoComponent rest:(ComponentSeparator value:MonzoComponent { return value; })* {
       return [first, ...rest];
     }
 
@@ -564,13 +564,17 @@ ContextValue
 
 MappingLiteral
   = "<" Spacing first:AdditiveExpression
-    rest:(RequiredSpacing value:AdditiveExpression { return value; })*
+    rest:(ComponentSeparator value:AdditiveExpression { return value; })*
     Spacing close:("]" / ">") {
       return node('MappingLiteral', {
         values: [first, ...rest],
         closingDelimiter: close,
       });
     }
+
+ComponentSeparator
+  = Spacing "," Spacing
+  / RequiredSpacing
 
 ContextPreset
   = raw:$("Pythagorean"i / "JustIntonation"i / "Untempered"i / "JI"i)
