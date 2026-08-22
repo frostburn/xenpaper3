@@ -432,12 +432,25 @@ function repeatCount(node: Extract<Expression, { type: 'Repeat' }>): number | un
   return Number(count)
 }
 
+const repeatEndingBodies = new WeakMap<
+  Extract<Expression, { type: 'Repeat' }>,
+  Map<bigint, Expression[]>
+>()
+
 function repeatBody(
   node: Extract<Expression, { type: 'Repeat' }>,
   iteration: number,
 ): readonly Expression[] {
-  const ending = node.endings.find(({ number }) => BigInt(number.value) === BigInt(iteration + 1))
-  return [...node.body, ...(ending?.body ?? [])].flatMap((item) =>
+  let endings = repeatEndingBodies.get(node)
+  if (!endings) {
+    endings = new Map()
+    for (const ending of node.endings) {
+      const number = BigInt(ending.number.value)
+      if (!endings.has(number)) endings.set(number, ending.body)
+    }
+    repeatEndingBodies.set(node, endings)
+  }
+  return [...node.body, ...(endings.get(BigInt(iteration + 1)) ?? [])].flatMap((item) =>
     item.type === 'Sequence' ? item.items : [item],
   )
 }
