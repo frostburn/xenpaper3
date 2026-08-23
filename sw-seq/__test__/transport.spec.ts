@@ -50,8 +50,13 @@ describe('Sample-accurate look-ahead transport', () => {
     const calls: { which: 'on' | 'off'; time: number }[] = []
     const transport = createTransport()
     const id = transport.scheduleParametricNote({
-      noteOn: (time: number) => calls.push({ which: 'on', time }),
-      noteOff: (time: number) => calls.push({ which: 'off', time }),
+      noteOn: (time: number) => {
+        calls.push({ which: 'on', time })
+        return (end: number) => {
+          calls.push({ which: 'off', time: end })
+          return end + 0.5
+        }
+      },
       when: 0.5,
       duration: 1,
     })
@@ -124,8 +129,13 @@ describe('Sample-accurate look-ahead transport', () => {
     const calls: { which: 'on' | 'off'; time: number }[] = []
     const transport = createTransport()
     const id = transport.scheduleParametricNote({
-      noteOn: (time: number) => calls.push({ which: 'on', time }),
-      noteOff: (time: number) => calls.push({ which: 'off', time }),
+      noteOn: (time: number) => {
+        calls.push({ which: 'on', time })
+        return (end: number) => {
+          calls.push({ which: 'off', time: end })
+          return end + 0.5
+        }
+      },
       when: 1.5,
       duration: 1,
     })
@@ -155,14 +165,24 @@ describe('Sample-accurate look-ahead transport', () => {
     })
 
     transport.scheduleParametricNote({
-      noteOn: () => calls.push('late on'),
-      noteOff: () => calls.push('late off'),
+      noteOn: () => {
+        calls.push('late on')
+        return (end) => {
+          calls.push('late off')
+          return end
+        }
+      },
       when: 1,
       duration: 0.1,
     })
     transport.scheduleParametricNote({
-      noteOn: () => calls.push('early on'),
-      noteOff: () => calls.push('early off'),
+      noteOn: () => {
+        calls.push('early on')
+        return (end) => {
+          calls.push('early off')
+          return end
+        }
+      },
       when: 0,
       duration: 0.1,
     })

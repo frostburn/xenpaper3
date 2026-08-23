@@ -15,7 +15,11 @@ export default mergeConfig(
           test: {
             name: 'node',
             environment: 'node',
-            include: ['xenpaper-lang/__test__/**/*.spec.ts', 'sw-patch/__test__/**/*.spec.ts'],
+            include: [
+              'xenpaper-lang/__test__/**/*.spec.ts',
+              'sw-patch/__test__/**/*.spec.ts',
+              'sw-seq/__test__/**/*.spec.ts',
+            ],
           },
         },
         {
