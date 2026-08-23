@@ -76,6 +76,31 @@ export function expandRepeats(
       }
 
       const result: ExpandedNode[] = []
+      const endings =
+        (node.endings as { number: SyntaxNode & { value?: unknown }; body: SyntaxNode[] }[]) ?? []
+      const endingsByIteration = new Map<bigint, SyntaxNode[]>()
+      for (const ending of endings) {
+        const iteration = BigInt(String(ending.number.value)) - 1n
+        // Duplicate ending numbers select the first ending, matching Array.find's behavior.
+        if (!endingsByIteration.has(iteration)) endingsByIteration.set(iteration, ending.body)
+      }
+      const body = (node.body as SyntaxNode[]) ?? []
+      const appendChildren = (
+        target: ExpandedNode[],
+        source: readonly SyntaxNode[],
+        iterationPath: ExpansionPath,
+      ) => {
+        for (const child of source) {
+          for (const clone of cloneNode(child, iterationPath)) {
+            // A repeat is an AST splice, not an evaluation boundary. The grammar
+            // represents a run of score items as a Sequence, so retaining that
+            // wrapper per iteration would incorrectly isolate stateful directives.
+            if (clone.type === 'Sequence') {
+              for (const item of (clone.items as ExpandedNode[]) ?? []) target.push(item)
+            } else target.push(clone)
+          }
+        }
+      }
       for (let iteration = 0n; iteration < count; iteration += 1n) {
         if (iteration > BigInt(Number.MAX_SAFE_INTEGER)) {
           // The normal node limit makes this unreachable with default options,
@@ -92,17 +117,9 @@ export function expandRepeats(
           ...path,
           { repeatOffset: node.location.start.offset, iteration: Number(iteration) },
         ]
-        const endings =
-          (node.endings as { number: SyntaxNode & { value?: unknown }; body: SyntaxNode[] }[]) ?? []
-        const ending = endings.find(({ number }) => BigInt(String(number.value)) === iteration + 1n)
-        const children = [...((node.body as SyntaxNode[]) ?? []), ...(ending?.body ?? [])]
-          .flatMap((child) => cloneNode(child, iterationPath))
-          // A repeat is an AST splice, not an evaluation boundary. The grammar
-          // represents a run of score items as a Sequence, so retaining that
-          // wrapper per iteration would incorrectly isolate stateful directives.
-          .flatMap((child) =>
-            child.type === 'Sequence' ? ((child.items as ExpandedNode[]) ?? []) : [child],
-          )
+        const children: ExpandedNode[] = []
+        appendChildren(children, body, iterationPath)
+        appendChildren(children, endingsByIteration.get(iteration) ?? [], iterationPath)
         // An empty, ending-free repeat has no observable occurrences. Stop
         // after the first expansion instead of iterating a potentially huge
         // authored count (this also covers bodies made empty by nested x0
@@ -110,10 +127,7 @@ export function expandRepeats(
         // may still select a non-empty ending.
         if (!endings.length && !children.length) return result
         if (endings.length && children.length) {
-          const items = children.flatMap((child) =>
-            child.type === 'Sequence' ? ((child.items as ExpandedNode[]) ?? []) : [child],
-          )
-          result.push(makeSequence(items, node.location, iterationPath))
+          result.push(makeSequence(children, node.location, iterationPath))
         } else {
           result.push(...children)
         }

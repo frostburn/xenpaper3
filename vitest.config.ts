@@ -6,10 +6,28 @@ export default mergeConfig(
   viteConfig,
   defineConfig({
     test: {
-      environment: 'jsdom',
       exclude: [...configDefaults.exclude, 'e2e/**'],
+      pool: 'threads',
       root: fileURLToPath(new URL('./', import.meta.url)),
-      setupFiles: ['./src/__tests__/setup.ts'],
+      projects: [
+        {
+          extends: true,
+          test: {
+            name: 'node',
+            environment: 'node',
+            include: ['xenpaper-lang/__test__/**/*.spec.ts', 'sw-patch/__test__/**/*.spec.ts'],
+          },
+        },
+        {
+          extends: true,
+          test: {
+            name: 'ui',
+            environment: 'jsdom',
+            include: ['src/__tests__/**/*.spec.ts'],
+            setupFiles: ['./src/__tests__/setup.ts'],
+          },
+        },
+      ],
     },
   }),
 )
