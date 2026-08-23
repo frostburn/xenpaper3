@@ -234,6 +234,10 @@ textarea {
 .syntax-mos-udp {
   color: #f7768e;
 }
+.syntax-mos-hardness {
+  color: #ff9e64;
+  font-weight: 600;
+}
 .syntax-operator {
   color: #ff7a93;
 }

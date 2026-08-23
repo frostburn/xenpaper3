@@ -47,6 +47,27 @@ describe('highlightXenpaper', () => {
     )
   })
 
+  it('highlights integer ratios according to their parsed expression context', () => {
+    const tokens = highlightXenpaper(parse('4::7 5\\13<3> 5\\13<3/2>'))
+
+    expect(tokens.filter(({ kind }) => kind === 'ratio').map(({ text }) => text)).toEqual([
+      '4',
+      '7',
+      '3',
+      '3/2',
+    ])
+  })
+
+  it('gives MOS hardness a dedicated highlight kind', () => {
+    const tokens = highlightXenpaper(parse('MOS{2L 5s 3:2}'))
+
+    expect(tokens).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ kind: 'mos-hardness', text: '3:2', nodeType: 'MosHardness' }),
+      ]),
+    )
+  })
+
   it('gives comments precedence over enclosing expressions', () => {
     const tokens = highlightXenpaper(parse('@foo(1 + # note\n2)'))
 

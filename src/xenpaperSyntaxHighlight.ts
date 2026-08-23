@@ -13,6 +13,7 @@ export type XenpaperHighlightKind =
   | 'mos-declaration'
   | 'mos-pattern'
   | 'mos-udp'
+  | 'mos-hardness'
   | 'number'
   | 'operator'
   | 'punctuation'
@@ -86,6 +87,7 @@ const kindsByNodeType: Partial<Record<string, XenpaperHighlightKind>> = {
   MosIntegerPattern: 'mos-pattern',
   MosPatternCounts: 'mos-pattern',
   MosUdp: 'mos-udp',
+  MosHardness: 'mos-hardness',
   SignatureDeclaration: 'keyword',
   ContextAssignment: 'keyword',
   ContextPreset: 'keyword',
@@ -116,7 +118,8 @@ const kindsByNodeType: Partial<Record<string, XenpaperHighlightKind>> = {
   Rest: 'rest',
 }
 
-function kindForNode(node: Node): XenpaperHighlightKind | undefined {
+function kindForNode(node: Node, ratioInteger = false): XenpaperHighlightKind | undefined {
+  if (ratioInteger && node.type === 'IntegerLiteral') return 'ratio'
   if (node.type !== 'PitchLiteral') return kindsByNodeType[node.type]
   const system = (node as Node & { nominal?: { system?: string } }).nominal?.system
   if (system === 'latin') return 'pitch-latin'
@@ -134,8 +137,13 @@ function isNode(value: unknown): value is Node {
   )
 }
 
-function collectRanges(node: Node, ranges: HighlightRange[], depth = 0): void {
-  const kind = kindForNode(node)
+function collectRanges(
+  node: Node,
+  ranges: HighlightRange[],
+  depth = 0,
+  ratioInteger = false,
+): void {
+  const kind = kindForNode(node, ratioInteger)
   if (kind) {
     ranges.push({
       kind,
@@ -148,17 +156,28 @@ function collectRanges(node: Node, ranges: HighlightRange[], depth = 0): void {
   }
 
   for (const [key, value] of Object.entries(node)) {
-    if (key !== 'location') collectNestedRanges(value, ranges, depth + 1)
+    if (key === 'location') continue
+    const childRatioInteger =
+      ratioInteger ||
+      node.type === 'EnumeratedChord' ||
+      (node.type === 'EqualDivisionLiteral' && key === 'equave')
+    collectNestedRanges(value, ranges, depth + 1, childRatioInteger)
   }
 }
 
-function collectNestedRanges(value: unknown, ranges: HighlightRange[], depth: number): void {
+function collectNestedRanges(
+  value: unknown,
+  ranges: HighlightRange[],
+  depth: number,
+  ratioInteger: boolean,
+): void {
   if (isNode(value)) {
-    collectRanges(value, ranges, depth)
+    collectRanges(value, ranges, depth, ratioInteger)
   } else if (Array.isArray(value)) {
-    for (const item of value) collectNestedRanges(item, ranges, depth)
+    for (const item of value) collectNestedRanges(item, ranges, depth, ratioInteger)
   } else if (value && typeof value === 'object') {
-    for (const child of Object.values(value)) collectNestedRanges(child, ranges, depth)
+    for (const child of Object.values(value))
+      collectNestedRanges(child, ranges, depth, ratioInteger)
   }
 }
 
