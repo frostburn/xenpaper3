@@ -13,36 +13,39 @@ import PianoRoll from '../components/PianoRoll.vue'
 import type { PianoRollInspection } from '../components/PianoRoll.vue'
 import PianoRollInspector from '../components/PianoRollInspector.vue'
 import TutorialSidebar from '../components/TutorialSidebar.vue'
-import { highlightXenpaper } from '../xenpaperSyntaxHighlight'
+import { highlightXenpaper, type XenpaperHighlightToken } from '../xenpaperSyntaxHighlight'
 
 const source = ref('C D E F G')
 const notation = ref<StaffNotationShape>()
 const pianoRoll = ref<BeatTimedScore>()
 const pianoRollInspection = ref<PianoRollInspection>({ selected: [] })
-const highlightResult = computed(() => {
+const highlightedSource = ref<XenpaperHighlightToken[]>([])
+const highlightError = ref<string>()
+const updateHighlight = () => {
   try {
-    return { tokens: highlightXenpaper(parse(source.value)), error: undefined }
+    const program = parse(source.value)
+    highlightedSource.value = highlightXenpaper(program)
+    highlightError.value = undefined
+    return program
   } catch (error) {
-    return {
-      tokens: source.value
-        ? [{ kind: 'unparsed' as const, text: source.value, start: 0, end: source.value.length }]
-        : [],
-      error: error instanceof Error ? error.message : String(error),
-    }
+    highlightedSource.value = source.value
+      ? [{ kind: 'unparsed', text: source.value, start: 0, end: source.value.length }]
+      : []
+    highlightError.value = error instanceof Error ? error.message : String(error)
   }
-})
-const highlightedSource = computed(() => highlightResult.value.tokens)
-const highlightError = computed(() => highlightResult.value.error)
+}
 const visibleHighlightTokens = computed(() =>
   highlightedSource.value.filter((token) => token.kind !== 'whitespace'),
 )
 
 const logParsedOutput = () => {
-  console.log(parse(source.value))
+  const program = updateHighlight()
+  if (program) console.log(program)
 }
 
 const populateStaff = () => {
-  const program = parse(source.value)
+  const program = updateHighlight()
+  if (!program) return
   const expanded = expandToBeatEvents(program)
   pianoRoll.value = 'score' in expanded ? expanded.score : undefined
   if (!('score' in expanded)) {
@@ -75,6 +78,11 @@ const logStaffNotation = () => {
     <div class="source-editor">
       <label for="xenpaper-source">Xenpaper source</label>
       <textarea id="xenpaper-source" v-model="source" rows="16" cols="80" />
+      <div class="actions">
+        <button type="button" @click="logParsedOutput">Parse and log output</button>
+        <button type="button" @click="populateStaff">Populate visualisers</button>
+        <button type="button" @click="logStaffNotation">Log staff notation</button>
+      </div>
       <section class="highlight-preview" aria-labelledby="highlight-preview-title">
         <h2 id="highlight-preview-title">Highlighted source</h2>
         <pre aria-label="Syntax-highlighted Xenpaper source"><code><span
@@ -108,11 +116,6 @@ const logStaffNotation = () => {
           </tbody>
         </table>
       </details>
-      <div class="actions">
-        <button type="button" @click="logParsedOutput">Parse and log output</button>
-        <button type="button" @click="populateStaff">Populate visualisers</button>
-        <button type="button" @click="logStaffNotation">Log staff notation</button>
-      </div>
     </div>
     <TutorialSidebar @select-tune="loadTutorialTune" />
     <div class="visualisers">
@@ -202,8 +205,34 @@ textarea {
 .syntax-pitch {
   color: #7dcfff;
 }
+.syntax-pitch-latin {
+  color: #7dcfff;
+}
+.syntax-pitch-greek {
+  color: #2ac3de;
+}
+.syntax-pitch-mos {
+  color: #89ddff;
+}
 .syntax-number {
   color: #9ece6a;
+}
+.syntax-ratio {
+  color: #73daca;
+}
+.syntax-rest {
+  color: #c0caf5;
+  font-weight: 600;
+}
+.syntax-mos-declaration {
+  color: #bb9af7;
+  font-weight: 600;
+}
+.syntax-mos-pattern {
+  color: #e0af68;
+}
+.syntax-mos-udp {
+  color: #f7768e;
 }
 .syntax-operator {
   color: #ff7a93;

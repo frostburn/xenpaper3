@@ -42,6 +42,7 @@ describe('XenpaperLangTestingView', () => {
     await tune.trigger('click')
 
     expect(wrapper.get('textarea').element.value).toBe(source)
+    expect(wrapper.get('[aria-label="Syntax-highlighted Xenpaper source"]').text()).toBe(source)
     expect(parse).toHaveBeenCalledWith(source)
     expect(expandToBeatEvents).toHaveBeenCalled()
     expect(evaluateProgramShape).toHaveBeenCalled()
@@ -67,6 +68,9 @@ describe('XenpaperLangTestingView', () => {
   it('renders a separate highlighted copy and exposes its token ranges for debugging', async () => {
     const wrapper = mount(XenpaperLangTestingView)
     await wrapper.get('textarea').setValue('@tempo(120) C# # fast')
+
+    expect(wrapper.get('[aria-label="Syntax-highlighted Xenpaper source"]').text()).toBe('')
+    await wrapper.findAll('button')[0]!.trigger('click')
 
     const highlighted = wrapper.get('[aria-label="Syntax-highlighted Xenpaper source"]')
     expect(highlighted.text()).toBe('@tempo(120) C# # fast')
