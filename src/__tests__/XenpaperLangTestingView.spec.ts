@@ -16,9 +16,12 @@ const { constructStaffNotationShape, evaluateProgramShape, expandToBeatEvents, p
       score: { duration: { valueOf: () => 1 }, events: [] },
       diagnostics: [],
     })),
-    parse: vi.fn<(source: string) => object>(() => ({
+    parse: vi.fn<(source: string) => object>((source) => ({
       type: 'Program',
+      source,
       body: [{ type: 'Sequence' }],
+      comments: [],
+      location: { start: { offset: 0 }, end: { offset: source.length } },
     })),
   }),
 )
@@ -39,6 +42,7 @@ describe('XenpaperLangTestingView', () => {
     await tune.trigger('click')
 
     expect(wrapper.get('textarea').element.value).toBe(source)
+    expect(wrapper.get('[aria-label="Syntax-highlighted Xenpaper source"]').text()).toBe(source)
     expect(parse).toHaveBeenCalledWith(source)
     expect(expandToBeatEvents).toHaveBeenCalled()
     expect(evaluateProgramShape).toHaveBeenCalled()
@@ -51,8 +55,28 @@ describe('XenpaperLangTestingView', () => {
     await wrapper.findAll('button')[0]!.trigger('click')
 
     expect(parse).toHaveBeenCalledWith('C E G')
-    expect(log).toHaveBeenCalledWith({ type: 'Program', body: [{ type: 'Sequence' }] })
+    expect(log).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'Program',
+        source: 'C E G',
+        body: [{ type: 'Sequence' }],
+      }),
+    )
     log.mockRestore()
+  })
+
+  it('renders a separate highlighted copy and exposes its token ranges for debugging', async () => {
+    const wrapper = mount(XenpaperLangTestingView)
+    await wrapper.get('textarea').setValue('@tempo(120) C# # fast')
+
+    expect(wrapper.get('[aria-label="Syntax-highlighted Xenpaper source"]').text()).toBe('')
+    await wrapper.findAll('button')[0]!.trigger('click')
+
+    const highlighted = wrapper.get('[aria-label="Syntax-highlighted Xenpaper source"]')
+    expect(highlighted.text()).toBe('@tempo(120) C# # fast')
+    expect(highlighted.findAll('[data-highlight="punctuation"]').length).toBeGreaterThan(0)
+    expect(wrapper.get('.highlight-debugger').text()).toContain('0–11')
+    expect(wrapper.get('.highlight-debugger').text()).toContain('punctuation')
   })
 
   it('populates the staff from the parsed source', async () => {
@@ -61,10 +85,12 @@ describe('XenpaperLangTestingView', () => {
     await wrapper.findAll('button')[1]!.trigger('click')
 
     expect(parse).toHaveBeenCalledWith('C D E')
-    expect(evaluateProgramShape).toHaveBeenCalledWith({
-      type: 'Program',
-      body: [{ type: 'Sequence' }],
-    })
+    expect(evaluateProgramShape).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'Program',
+        body: [{ type: 'Sequence' }],
+      }),
+    )
     expect(constructStaffNotationShape).toHaveBeenCalledWith({ kind: 'attack' })
     expect(expandToBeatEvents).toHaveBeenCalled()
     expect(wrapper.getComponent({ name: 'PianoRoll' }).props('score')).toMatchObject({ events: [] })
