@@ -8,12 +8,18 @@ type ParametricEvent = {
   when: number
 }
 
-type ParametricNoteHandle = {
-  id: number
-  noteOn: (time: number) => void
-  noteOff: (time: number) => void
+/** Releases a scheduled note and returns the time at which its audio tail is silent. */
+export type NoteOff = (time: number) => number
+
+export type ParametricNote = {
+  /** Starts the note and returns its matching release callback. */
+  noteOn: (time: number) => NoteOff
   when: number
   duration: number
+}
+
+type ParametricNoteHandle = ParametricNote & {
+  id: number
 }
 type TransportEvent = {
   id: number
@@ -199,11 +205,13 @@ export class Transport extends EventTarget {
       .filter((event) => event.when >= startPos && event.when < endPos)
       .sort((a, b) => a.when - b.when || a.id - b.id)
     for (const event of notes) {
-      event.noteOn((event.when - startPos + startTime + this._lookAhead) / this.context.sampleRate)
+      const noteOff = event.noteOn(
+        (event.when - startPos + startTime + this._lookAhead) / this.context.sampleRate,
+      )
 
-      // XXX: Commiting to a note off this early is not the best or most accurate scheduling model
+      // XXX: Committing to a note off this early is not the best or most accurate scheduling model.
       // However it's important to commit somehow. Unpaired events are hard to debug and can lead to bad UX.
-      event.noteOff(
+      noteOff(
         (event.when + event.duration - startPos + startTime + this._lookAhead) /
           this.context.sampleRate,
       )
@@ -266,7 +274,7 @@ export class Transport extends EventTarget {
     return id
   }
 
-  scheduleParametricNote(note: Omit<ParametricNoteHandle, 'id'>) {
+  scheduleParametricNote(note: ParametricNote) {
     const id = this.nextEventId++
     this.parametricNotesById.set(id, {
       ...note,
