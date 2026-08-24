@@ -28,6 +28,7 @@ import type {
   SourceOrigin,
   PitchContext,
   DynamicMark,
+  DirectiveExtensionState,
   ScoreShapeOptions,
   ScoreShapeEvaluationResult,
 } from './types'
@@ -916,6 +917,45 @@ export function evaluateScoreSemantics(
 ): ScoreShapeEvaluationResult {
   const pulse = new Fraction(options.pulse ?? 1)
   if (pulse.compare(0) <= 0) throw new RangeError('pulse must be positive.')
+  const extensions = new Map(
+    (options.directiveExtensions ?? []).map((extension) => [
+      extension.name.toLowerCase(),
+      extension,
+    ]),
+  )
+  if (extensions.size !== (options.directiveExtensions ?? []).length)
+    throw new RangeError('Directive extension names must be unique.')
+  const initialDirectiveState: DirectiveExtensionState = Object.fromEntries(
+    [...extensions].map(([name, extension]) => [name, extension.initialState]),
+  )
+
+  const applyExtension = (
+    directive: Extract<Expression, { type: 'Directive' }>,
+    context: PitchContext,
+    state: DirectiveExtensionState,
+  ): { state: DirectiveExtensionState; diagnostics: readonly Diagnostic[] } | undefined => {
+    const extension = extensions.get(directive.name)
+    if (!extension) return undefined
+    try {
+      const result = extension.apply(directive, context, state[directive.name])
+      return {
+        state: { ...state, [directive.name]: result.state },
+        diagnostics: result.diagnostics ?? [],
+      }
+    } catch (error) {
+      return {
+        state,
+        diagnostics: [
+          {
+            code: 'XP_DIRECTIVE_EXTENSION',
+            severity: 'error',
+            message: error instanceof Error ? error.message : `Invalid @${directive.name}.`,
+            locations: [directive.location],
+          },
+        ],
+      }
+    }
+  }
 
   const contextAfter = (current: Expression, context: PitchContext): PitchContext => {
     if (current.type === 'PitchContextChange') {
@@ -1016,6 +1056,33 @@ export function evaluateScoreSemantics(
     return { ratio, marks }
   }
 
+  const directiveStateAfter = (
+    current: Expression,
+    state: DirectiveExtensionState,
+    context: PitchContext,
+  ): DirectiveExtensionState => {
+    if (current.type === 'Directive') {
+      return applyExtension(current, context, state)?.state ?? state
+    }
+    if (current.type === 'Sequence')
+      return current.items.reduce(
+        (active, item) => directiveStateAfter(item, active, context),
+        state,
+      )
+    if (current.type === 'Repeat') {
+      let active = state
+      const count = repeatCount(current)
+      if (count === undefined) return active
+      for (let iteration = 0; iteration < count; iteration++)
+        active = repeatBody(current, iteration).reduce(
+          (bodyState, item) => directiveStateAfter(item, bodyState, context),
+          active,
+        )
+      return active
+    }
+    return state
+  }
+
   const visit = (
     current: Expression,
     context: PitchContext,
@@ -1023,6 +1090,7 @@ export function evaluateScoreSemantics(
     currentDynamic: DynamicMark = 'mf',
     currentArticulation: Fraction = new Fraction(1),
     currentArticulationMarks: readonly string[] = [],
+    currentDirectiveState: DirectiveExtensionState = initialDirectiveState,
   ): ScoreShapeEvaluationResult => {
     const broadcast = broadcastScalarOperation(current, context)
     if (broadcast)
@@ -1033,6 +1101,7 @@ export function evaluateScoreSemantics(
         currentDynamic,
         currentArticulation,
         currentArticulationMarks,
+        currentDirectiveState,
       )
     const expandedChord = expandEnumeratedChord(current, context)
     if (expandedChord.diagnostics.length) return { diagnostics: expandedChord.diagnostics }
@@ -1045,6 +1114,7 @@ export function evaluateScoreSemantics(
           currentDynamic,
           currentArticulation,
           currentArticulationMarks,
+          currentDirectiveState,
         ),
       )
       const diagnostics = results.flatMap((result) => result.diagnostics)
@@ -1105,6 +1175,7 @@ export function evaluateScoreSemantics(
       }
       let activeContext = context
       let activePulse = currentPulse
+      let activeDirectiveState = currentDirectiveState
       let displayedShapes: ScoreShape[] | undefined
       let displayedAttacks: AttackShape[] = []
       const alternatives: AttackAppearance[][] = []
@@ -1126,9 +1197,15 @@ export function evaluateScoreSemantics(
           currentDynamic,
           currentArticulation,
           currentArticulationMarks,
+          activeDirectiveState,
         )
         iterationPulse = pulseAfter(iterationNode, iterationPulse, iterationContext)
         iterationContext = contextAfter(iterationNode, iterationContext)
+        activeDirectiveState = directiveStateAfter(
+          iterationNode,
+          activeDirectiveState,
+          iterationContext,
+        )
         diagnostics.push(...result.diagnostics)
         if (!hasShape(result)) return { diagnostics }
         const iterationShapes = [result.shape]
@@ -1172,6 +1249,7 @@ export function evaluateScoreSemantics(
         currentArticulationMarks,
         context,
       )
+      const endingDirectiveState = directiveStateAfter(commonNode, currentDirectiveState, context)
       const commonResult = visit(
         commonNode,
         context,
@@ -1179,6 +1257,7 @@ export function evaluateScoreSemantics(
         currentDynamic,
         currentArticulation,
         currentArticulationMarks,
+        currentDirectiveState,
       )
       diagnostics.push(...commonResult.diagnostics)
       const commonShapes = hasShape(commonResult) ? [commonResult.shape] : []
@@ -1195,6 +1274,7 @@ export function evaluateScoreSemantics(
           currentDynamic,
           endingArticulation.ratio,
           endingArticulation.marks,
+          endingDirectiveState,
         )
         diagnostics.push(...result.diagnostics)
         return hasShape(result) ? [result.shape] : []
@@ -1222,6 +1302,7 @@ export function evaluateScoreSemantics(
       let activeDynamic = currentDynamic
       let activeArticulation = currentArticulation
       let activeArticulationMarks = [...currentArticulationMarks]
+      let activeDirectiveState = currentDirectiveState
       let velocity: Fraction | undefined
       let grace: { duration: Fraction; count: number; indices: number[] } | undefined
       let gliss:
@@ -1261,6 +1342,15 @@ export function evaluateScoreSemantics(
           continue
         }
         if (item.type === 'Directive') {
+          const extended = applyExtension(item, activeContext, activeDirectiveState)
+          if (extended) {
+            activeDirectiveState = extended.state
+            results.push({
+              shape: sequence([], [origin(item, 'directive')]),
+              diagnostics: extended.diagnostics,
+            })
+            continue
+          }
           const resolved = resolveDirective(item, activeContext)
           const directive = resolved.directive
           if (directive?.kind === 'subdivision') activePulse = directive.pulse
@@ -1375,6 +1465,7 @@ export function evaluateScoreSemantics(
           activeDynamic,
           activeArticulation,
           activeArticulationMarks,
+          activeDirectiveState,
         )
         const index = results.length
         if ('shape' in result && attacks(result.shape).length) {
@@ -1563,6 +1654,7 @@ export function evaluateScoreSemantics(
         }
         activeContext = contextAfter(item, activeContext)
         activePulse = pulseAfter(item, activePulse, activeContext)
+        activeDirectiveState = directiveStateAfter(item, activeDirectiveState, activeContext)
       }
       const diagnostics = results.flatMap((result) => result.diagnostics)
       if (grace || gliss)
@@ -1590,6 +1682,7 @@ export function evaluateScoreSemantics(
           currentDynamic,
           currentArticulation,
           currentArticulationMarks,
+          currentDirectiveState,
         ),
       )
       const diagnostics = results.flatMap((result) => result.diagnostics)
@@ -1615,6 +1708,7 @@ export function evaluateScoreSemantics(
         currentDynamic,
         currentArticulation,
         currentArticulationMarks,
+        currentDirectiveState,
       )
       if (!('shape' in grouped)) return grouped
       return {
@@ -1641,6 +1735,7 @@ export function evaluateScoreSemantics(
         currentDynamic,
         currentArticulation,
         currentArticulationMarks,
+        currentDirectiveState,
       )
       if (!('shape' in evaluated)) return evaluated
       if (!evaluated.shape.duration.n) {
@@ -1686,6 +1781,7 @@ export function evaluateScoreSemantics(
         currentDynamic,
         currentArticulation,
         currentArticulationMarks,
+        currentDirectiveState,
       )
       if (!('shape' in evaluated)) return evaluated
       const elimination = current.marks.find((mark) => mark.type === 'TailElimination')
@@ -1751,6 +1847,7 @@ export function evaluateScoreSemantics(
       dynamic: currentDynamic,
       velocity: DYNAMIC_VELOCITIES[currentDynamic],
       articulation,
+      directiveState: { ...currentDirectiveState },
       ...(currentArticulationMarks.length ? { articulationMarks: currentArticulationMarks } : {}),
       ...('raw' in current ? { authoredLabel: String(current.raw) } : {}),
       ...(evaluated.justIntonation ? { justIntonation: true } : {}),

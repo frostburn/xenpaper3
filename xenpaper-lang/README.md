@@ -89,6 +89,21 @@ npm run compile:xenpaper-lang
 `parser.generated.d.ts` is maintained alongside the grammar and describes the
 syntax tree returned to TypeScript callers.
 
+## Directive extensions
+
+Xenpaper parses named directive arguments without assigning synthesizer or real-time
+meaning to them. Second-party runtimes can supply `DirectiveExtension` objects through
+`ScoreShapeOptions.directiveExtensions`. An extension owns its initial and prevailing
+state, interprets the directive arguments, and returns any source-located diagnostics.
+Extension state follows the same sequencing, repeat, explicit-group, normalized-slot,
+and parallel-branch isolation rules as core prevailing directives.
+
+Every attack and `BeatTimedNoteEvent` contains a `directiveState` snapshot keyed by
+extension name. Extensions should treat their state values as immutable; returning a new
+value for each change ensures already-produced notes cannot be affected later. This lets
+an audio engine implement ADSR, drum patches without sustain, or arbitrary patch
+parameters without adding those concepts to Xenpaper itself.
+
 ## Tests
 
 The unit tests in [`__test__/`](__test__/) cover the grammar, exact values,

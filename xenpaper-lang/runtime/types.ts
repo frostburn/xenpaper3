@@ -4,6 +4,26 @@ import type { Value } from '../value'
 import type { LocationRange } from 'peggy'
 import type { Fraction } from 'xen-dev-utils/fraction'
 
+/** Immutable, extension-owned prevailing state, keyed by extension name. */
+export type DirectiveExtensionState = Readonly<Record<string, unknown>>
+
+export interface DirectiveExtensionResult {
+  readonly state: unknown
+  readonly diagnostics?: readonly Diagnostic[]
+}
+
+/** A second-party prevailing directive interpreted outside Xenpaper's core vocabulary. */
+export interface DirectiveExtension {
+  readonly name: string
+  readonly initialState?: unknown
+  /** Pure state transition; return immutable state so earlier snapshots remain stable. */
+  readonly apply: (
+    directive: import('../parser.generated.js').Directive,
+    context: PitchContext,
+    previousState: unknown,
+  ) => DirectiveExtensionResult
+}
+
 export interface ExpansionStep {
   readonly repeatOffset: number
   readonly iteration: number
@@ -29,6 +49,7 @@ export interface RepeatExpansionOptions {
 export interface ScoreShapeOptions {
   readonly pulse?: import('xen-dev-utils/fraction').FractionValue
   readonly pitchContext?: PitchContext
+  readonly directiveExtensions?: readonly DirectiveExtension[]
 }
 
 export type ScoreShapeEvaluationResult =
@@ -284,6 +305,8 @@ export interface AttackShape extends ShapeBase {
   readonly articulation?: Fraction
   /** Shorthand marks retained for staff engraving. */
   readonly articulationMarks?: readonly string[]
+  /** Extension-owned prevailing state captured at this attack. */
+  readonly directiveState: DirectiveExtensionState
   /** Other contexts in which this source attack occurs after repeat expansion. */
   readonly alternateAppearances?: readonly AttackAppearance[]
 }
@@ -415,6 +438,8 @@ export interface BeatTimedNoteEvent {
   readonly rootPitch?: AbsolutePitchValue
   /** Effective amplitude from either the prevailing dynamic or a one-shot velocity. */
   readonly dynamic: Fraction
+  /** Extension-owned prevailing state captured at this note's attack. */
+  readonly directiveState: DirectiveExtensionState
   readonly automation?: PitchAutomation
   /** Faithful authored pitch expression, when one exists. */
   readonly label?: string
