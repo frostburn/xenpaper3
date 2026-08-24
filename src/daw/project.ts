@@ -35,6 +35,7 @@ export interface InstrumentLane {
   name: string
   patchSource: string
   oscillatorType: OscillatorType
+  gain: number
   clips: SourceClip[]
 }
 
@@ -45,7 +46,10 @@ export interface DawProject {
   instrumentLanes: InstrumentLane[]
 }
 
-export const DEFAULT_CLIP_SOURCE = '# New Xenpaper clip\n[0,4,7]===\n'
+export const DEFAULT_CLIP_SOURCE = `# New Xenpaper clip
+@patch(attack: 25ms, decay: 180ms, sustain: 65%, release: 250ms)
+[0,4,7]===
+`
 export const DEFAULT_SW_PATCH_SOURCE = 'default'
 
 export const beat = (numerator: number, denominator = 1): Beat => {
@@ -82,6 +86,7 @@ export const createDefaultProject = (): DawProject => ({
       name: 'Instrument 1',
       patchSource: DEFAULT_SW_PATCH_SOURCE,
       oscillatorType: 'sawtooth',
+      gain: 0.8,
       clips: [],
     },
   ],
