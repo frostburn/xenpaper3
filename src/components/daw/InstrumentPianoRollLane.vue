@@ -37,7 +37,32 @@ const pianoRoll = computed(() => {
       return { clip, notes: [] }
     }
   })
-  const pitches = parsedClips.flatMap(({ notes }) => notes.map(({ cents }) => cents))
+  const clipCenters = parsedClips
+    .filter(({ notes }) => notes.length)
+    .map(({ notes }) => {
+      const pitches = notes.map(({ cents }) => cents)
+      return (Math.min(...pitches) + Math.max(...pitches)) / 2
+    })
+    .sort((left, right) => left - right)
+  const middle = Math.floor(clipCenters.length / 2)
+  const laneCenter = clipCenters.length
+    ? clipCenters.length % 2
+      ? clipCenters[middle]!
+      : (clipCenters[middle - 1]! + clipCenters[middle]!) / 2
+    : 0
+  const displayClips = parsedClips.map(({ clip, notes }) => {
+    if (!notes.length) return { clip, notes, registerOffset: 0 }
+    const pitches = notes.map(({ cents }) => cents)
+    const clipCenter = (Math.min(...pitches) + Math.max(...pitches)) / 2
+    const distance = clipCenter - laneCenter
+    // Fold disparate registers into the representative lane range by whole octaves.
+    // The authored register remains explicit in the label rendered on that clip.
+    const registerOffset = Math.abs(distance) >= 1200 ? Math.round(distance / 1200) * 1200 : 0
+    return { clip, notes, registerOffset }
+  })
+  const pitches = displayClips.flatMap(({ notes, registerOffset }) =>
+    notes.map(({ cents }) => cents - registerOffset),
+  )
   // Keep zero visible as the pitch reference and guarantee enough room around tightly
   // clustered material. Outlying clips still expand this single lane-wide scale.
   const lowestPitch = Math.min(0, ...pitches)
@@ -61,21 +86,26 @@ const pianoRoll = computed(() => {
   return {
     guides,
     notesByClip: Object.fromEntries(
-      parsedClips.map(({ clip, notes }) => {
+      displayClips.map(({ clip, notes, registerOffset }) => {
         const clipDuration = beatToNumber(clip.length)
         return [
           clip.id,
-          notes.map((note) => ({
-            ...note,
-            left: `${(note.beat / clipDuration) * 100}%`,
-            width: `${(note.duration / clipDuration) * 100}%`,
-            top: pitchTop(note.cents),
-          })),
+          {
+            registerOffset,
+            notes: notes.map((note) => ({
+              ...note,
+              left: `${(note.beat / clipDuration) * 100}%`,
+              width: `${(note.duration / clipDuration) * 100}%`,
+              top: pitchTop(note.cents - registerOffset),
+            })),
+          },
         ]
       }),
     ),
   }
 })
+
+const clipPreview = (clipId: string) => pianoRoll.value.notesByClip[clipId]!
 
 const pointerBeat = (event: MouseEvent) =>
   pointerXToBeat(
@@ -138,6 +168,10 @@ const moveDrag = (event: PointerEvent) => {
     >
       <pre v-if="displayMode === 'source'">{{ clip.source }}</pre>
       <span v-else class="piano-roll" aria-label="Piano roll preview">
+        <span v-if="clipPreview(clip.id).registerOffset" class="register-label"
+          >{{ clipPreview(clip.id).registerOffset > 0 ? '+' : ''
+          }}{{ clipPreview(clip.id).registerOffset }} cents</span
+        >
         <span
           v-for="guide in pianoRoll.guides"
           :key="guide.cents"
@@ -147,7 +181,7 @@ const moveDrag = (event: PointerEvent) => {
           :style="{ top: guide.top }"
         />
         <i
-          v-for="(note, index) in pianoRoll.notesByClip[clip.id]"
+          v-for="(note, index) in clipPreview(clip.id).notes"
           :key="index"
           :data-beat="note.beat"
           :data-duration="note.duration"
@@ -206,6 +240,17 @@ const moveDrag = (event: PointerEvent) => {
 .pitch-guide.reference {
   border-top-style: solid;
   border-top-color: #ff4b4be6;
+}
+.register-label {
+  position: absolute;
+  z-index: 2;
+  top: 0.2rem;
+  right: 0.25rem;
+  padding: 0.08rem 0.25rem;
+  border-radius: 2px;
+  background: #1b2638dd;
+  color: #ffaaaa;
+  font: 0.65rem/1.2 monospace;
 }
 .piano-roll i {
   position: absolute;

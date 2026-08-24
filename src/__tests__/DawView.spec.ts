@@ -230,6 +230,26 @@ describe('DawView', () => {
     expect(previews[0]!.get('.pitch-guide[data-cents="0"]').classes()).toContain('reference')
   })
 
+  it('folds disparate clip registers into view and labels their octave offset', () => {
+    const project = createDefaultProject()
+    const lane = project.instrumentLanes[0]!
+    lane.clips = [
+      { id: 'home-1', start: beat(0), length: beat(1), source: 'C' },
+      { id: 'home-2', start: beat(1), length: beat(1), source: 'D' },
+      { id: 'high', start: beat(2), length: beat(1), source: "''C" },
+    ]
+    const wrapper = mount(InstrumentPianoRollLane, {
+      props: { lane, pixelsPerBeat: 64, scrollLeft: 0, displayMode: 'piano-roll' },
+    })
+
+    expect(wrapper.findAll('.register-label')).toHaveLength(1)
+    expect(wrapper.get('.register-label').text()).toBe('+2400 cents')
+    const previews = wrapper.findAll('[aria-label="Piano roll preview"]')
+    expect((previews[0]!.get('i').element as HTMLElement).style.top).toBe(
+      (previews[2]!.get('i').element as HTMLElement).style.top,
+    )
+  })
+
   it('moves clips on the snapped grid and wires play and stop', async () => {
     const wrapper = mount(DawView)
     const lane = wrapper.getComponent(InstrumentPianoRollLane)
