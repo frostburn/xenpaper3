@@ -176,7 +176,7 @@ const moveDrag = (event: PointerEvent) => {
           v-for="guide in pianoRoll.guides"
           :key="guide.cents"
           class="pitch-guide"
-          :class="{ reference: guide.cents === 0 }"
+          :class="{ 'global-reference': guide.cents === 0 }"
           :data-cents="guide.cents"
           :style="{ top: guide.top }"
         />
@@ -237,9 +237,11 @@ const moveDrag = (event: PointerEvent) => {
   left: 0;
   border-top: 1px dashed #ff6666aa;
 }
-.pitch-guide.reference {
+.pitch-guide.global-reference {
+  z-index: 1;
+  border-top-width: 3px;
   border-top-style: solid;
-  border-top-color: #ff4b4be6;
+  border-top-color: #ff3535;
 }
 .register-label {
   position: absolute;
@@ -254,7 +256,7 @@ const moveDrag = (event: PointerEvent) => {
 }
 .piano-roll i {
   position: absolute;
-  z-index: 1;
+  z-index: 2;
   transform: translateY(-50%);
   height: 9%;
   min-width: 2px;

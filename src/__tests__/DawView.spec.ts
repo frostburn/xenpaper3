@@ -227,7 +227,7 @@ describe('DawView', () => {
 
     const guides = previews[0]!.findAll('.pitch-guide')
     expect(guides.every((guide) => Number(guide.attributes('data-cents')) % 1200 === 0)).toBe(true)
-    expect(previews[0]!.get('.pitch-guide[data-cents="0"]').classes()).toContain('reference')
+    expect(previews[0]!.get('.pitch-guide[data-cents="0"]').classes()).toContain('global-reference')
   })
 
   it('folds disparate clip registers into view and labels their octave offset', () => {
@@ -245,6 +245,8 @@ describe('DawView', () => {
     expect(wrapper.findAll('.register-label')).toHaveLength(1)
     expect(wrapper.get('.register-label').text()).toBe('+2400 cents')
     const previews = wrapper.findAll('[aria-label="Piano roll preview"]')
+    const globalZero = previews[2]!.get('.pitch-guide[data-cents="0"]')
+    expect(globalZero.classes()).toContain('global-reference')
     expect((previews[0]!.get('i').element as HTMLElement).style.top).toBe(
       (previews[2]!.get('i').element as HTMLElement).style.top,
     )
