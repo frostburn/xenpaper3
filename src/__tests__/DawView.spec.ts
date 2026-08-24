@@ -4,6 +4,7 @@ import router from '../router'
 import DawView from '../views/DawView.vue'
 import InstrumentPianoRollLane from '../components/daw/InstrumentPianoRollLane.vue'
 import { beat, beatToNumber, createDefaultProject, pointerXToBeat, snapBeat } from '../daw/project'
+import { parseProjectNotes } from '../daw/audio-engine'
 
 describe('DAW project model', () => {
   it('creates the production-ready project defaults', () => {
@@ -28,6 +29,22 @@ describe('DAW project model', () => {
   it('converts scrolled, zoomed pointer coordinates and snaps exactly', () => {
     expect(pointerXToBeat(96, 32, 64)).toBe(2)
     expect(snapBeat(2.13, beat(1, 4))).toEqual(beat(9, 4))
+  })
+
+  it('parses Xenpaper clip notes and offsets them onto the project timeline', () => {
+    const project = createDefaultProject()
+    project.instrumentLanes[0]!.clips.push({
+      id: 'melody',
+      start: beat(2),
+      length: beat(4),
+      source: 'C D E',
+    })
+
+    const notes = parseProjectNotes(project)
+    expect(notes).toHaveLength(3)
+    expect(notes.map(({ beat: start }) => start)).toEqual([2, 3, 4])
+    expect(notes.every(({ duration }) => duration === 1)).toBe(true)
+    expect(notes[0]!.cents).not.toBe(notes[1]!.cents)
   })
 })
 

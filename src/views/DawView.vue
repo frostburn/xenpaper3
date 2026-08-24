@@ -5,6 +5,7 @@ import GlobalLane from '../components/daw/GlobalLane.vue'
 import InstrumentHeader from '../components/daw/InstrumentHeader.vue'
 import InstrumentPianoRollLane from '../components/daw/InstrumentPianoRollLane.vue'
 import TransportControls from '../components/daw/TransportControls.vue'
+import { DawAudioEngine } from '../daw/audio-engine'
 import {
   beatToNumber,
   createClip,
@@ -22,10 +23,20 @@ const scrollLeft = ref(0)
 const grid = ref<Beat>({ numerator: 1, denominator: 4 })
 const displayMode = ref<'source' | 'piano-roll'>('piano-roll')
 const playing = ref(false)
+const playbackError = ref('')
 let playTimer: ReturnType<typeof setInterval> | undefined
+let audioEngine: DawAudioEngine | undefined
 const editor = ref<InstanceType<typeof ClipSourceEditor>>()
 const lane = computed(() => project.value.instrumentLanes[0]!)
 const selectedClip = computed(() => lane.value.clips.find(({ id }) => id === selectedClipId.value))
+
+const finishPlayback = () => {
+  playing.value = false
+  if (playTimer) clearInterval(playTimer)
+  playTimer = undefined
+  audioEngine?.dispose()
+  audioEngine = undefined
+}
 
 const insertClip = async (rawBeat: number) => {
   const start = snapBeat(Math.max(0, rawBeat), grid.value)
@@ -42,15 +53,42 @@ const selectClip = (clip: SourceClip) => {
   playhead.value = beatToNumber(clip.start)
 }
 
-const togglePlayback = () => {
-  playing.value = !playing.value
-  if (playTimer) clearInterval(playTimer)
-  playTimer = playing.value ? setInterval(() => (playhead.value += 0.05), 25) : undefined
+const togglePlayback = async () => {
+  if (playing.value) {
+    audioEngine?.dispose()
+    audioEngine = undefined
+    playing.value = false
+    if (playTimer) clearInterval(playTimer)
+    playTimer = undefined
+    return
+  }
+  playbackError.value = ''
+  try {
+    // Keep the transport usable in SSR/test environments; browsers take the audio path below.
+    if (typeof AudioContext === 'undefined') {
+      playing.value = true
+      playTimer = setInterval(() => (playhead.value += 0.05), 25)
+      return
+    }
+    audioEngine ??= new DawAudioEngine()
+    audioEngine.addEventListener('ended', finishPlayback)
+    if (audioEngine.context.state === 'suspended') await audioEngine.context.resume()
+    audioEngine.play(project.value, playhead.value)
+    playing.value = true
+    playTimer = setInterval(() => {
+      playhead.value = audioEngine?.positionBeats ?? playhead.value
+    }, 25)
+  } catch (error) {
+    playbackError.value = error instanceof Error ? error.message : String(error)
+    playing.value = false
+  }
 }
 
 const stopPlayback = () => {
   playing.value = false
   playhead.value = 0
+  audioEngine?.dispose()
+  audioEngine = undefined
   if (playTimer) clearInterval(playTimer)
   playTimer = undefined
 }
@@ -62,6 +100,8 @@ const moveClip = (clip: SourceClip, rawBeat: number) => {
 
 onBeforeUnmount(() => {
   if (playTimer) clearInterval(playTimer)
+  audioEngine?.dispose()
+  audioEngine?.removeEventListener('ended', finishPlayback)
 })
 </script>
 
@@ -74,6 +114,7 @@ onBeforeUnmount(() => {
       @play="togglePlayback"
       @stop="stopPlayback"
     />
+    <p v-if="playbackError" class="playback-error" role="alert">{{ playbackError }}</p>
     <div class="timeline-controls">
       <label>Zoom <input v-model.number="pixelsPerBeat" type="range" min="32" max="160" /></label>
       <label>Scroll <input v-model.number="scrollLeft" type="range" min="0" max="2048" /></label>
@@ -132,5 +173,9 @@ onBeforeUnmount(() => {
   display: flex;
   align-items: center;
   gap: 0.5rem;
+}
+.playback-error {
+  color: #ff9b9b;
+  margin: 0 0.75rem;
 }
 </style>
