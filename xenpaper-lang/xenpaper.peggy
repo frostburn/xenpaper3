@@ -466,6 +466,8 @@ DirectiveArgumentList
     }
 
 DirectiveArgument
+  // Named arguments are deliberately semantic-free so second-party directive
+  // extensions can interpret arbitrary vocabularies and dimensions.
   = name:Identifier Spacing ":" Spacing value:AdditiveExpression {
       return node('NamedArgument', { name, value });
     }
