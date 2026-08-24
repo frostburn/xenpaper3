@@ -5,10 +5,13 @@ import TheFooter from './components/TheFooter.vue'
 <template>
   <main>
     <template v-if="$route.name === 'home'">
-      <h1>Xenpaper 3 test pages</h1>
+      <h1>Xenpaper 3</h1>
       <nav>
-        <RouterLink to="/xenpaper-lang-testing">Test xenpaper-lang</RouterLink>
-        <RouterLink to="/patch-testing">Test sw-patch</RouterLink>
+        <RouterLink to="/daw">Open the Xenpaper DAW</RouterLink>
+        <RouterLink to="/xenpaper-lang-testing"
+          >xenpaper-lang debugging/development view</RouterLink
+        >
+        <RouterLink to="/patch-testing">sw-patch debugging/development view</RouterLink>
       </nav>
       <h2>About the beta release</h2>
       <p>
