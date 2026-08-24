@@ -206,6 +206,30 @@ describe('DawView', () => {
     expect(notes[0]!.attributes('data-cents')).not.toBe(notes[1]!.attributes('data-cents'))
   })
 
+  it('uses a lane-wide pitch scale and renders octave reference guides', () => {
+    const project = createDefaultProject()
+    const lane = project.instrumentLanes[0]!
+    lane.clips = [
+      { id: 'ascending', start: beat(0), length: beat(2), source: 'C D' },
+      { id: 'descending', start: beat(2), length: beat(2), source: 'B C' },
+    ]
+    const wrapper = mount(InstrumentPianoRollLane, {
+      props: { lane, pixelsPerBeat: 64, scrollLeft: 0, displayMode: 'piano-roll' },
+    })
+
+    const cPitch = String(parseClipNotes('C')[0]!.cents)
+    const previews = wrapper.findAll('[aria-label="Piano roll preview"]')
+    const firstC = previews[0]!.get(`i[data-cents="${cPitch}"]`)
+    const secondC = previews[1]!.get(`i[data-cents="${cPitch}"]`)
+    expect((firstC.element as HTMLElement).style.top).toBe(
+      (secondC.element as HTMLElement).style.top,
+    )
+
+    const guides = previews[0]!.findAll('.pitch-guide')
+    expect(guides.every((guide) => Number(guide.attributes('data-cents')) % 1200 === 0)).toBe(true)
+    expect(previews[0]!.get('.pitch-guide[data-cents="0"]').classes()).toContain('reference')
+  })
+
   it('moves clips on the snapped grid and wires play and stop', async () => {
     const wrapper = mount(DawView)
     const lane = wrapper.getComponent(InstrumentPianoRollLane)

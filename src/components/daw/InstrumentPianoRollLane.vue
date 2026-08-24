@@ -25,32 +25,57 @@ const emit = defineEmits<{
 const dragging = ref<{ clip: SourceClip; pointerOffset: number }>()
 const laneElement = ref<HTMLElement>()
 
-const pianoRolls = computed(() =>
-  Object.fromEntries(
-    props.lane.clips.map((clip) => {
-      const clipDuration = beatToNumber(clip.length)
-      try {
-        const notes = parseClipNotes(clip.source, clipDuration)
-        const pitches = notes.map(({ cents }) => cents)
-        const lowest = Math.min(...pitches)
-        const highest = Math.max(...pitches)
-        const pitchSpan = highest - lowest
+const pianoRoll = computed(() => {
+  const parsedClips = props.lane.clips.map((clip) => {
+    try {
+      return {
+        clip,
+        notes: parseClipNotes(clip.source, beatToNumber(clip.length)),
+      }
+    } catch {
+      // Invalid source is expected while the user is editing; show an empty preview.
+      return { clip, notes: [] }
+    }
+  })
+  const pitches = parsedClips.flatMap(({ notes }) => notes.map(({ cents }) => cents))
+  // Keep zero visible as the pitch reference and guarantee enough room around tightly
+  // clustered material. Outlying clips still expand this single lane-wide scale.
+  const lowestPitch = Math.min(0, ...pitches)
+  const highestPitch = Math.max(0, ...pitches)
+  const minimumSpan = 2400
+  const contentSpan = highestPitch - lowestPitch
+  const padding = Math.max(100, contentSpan * 0.06)
+  const missingSpan = Math.max(0, minimumSpan - contentSpan)
+  const lowerBound = lowestPitch - padding - missingSpan / 2
+  const upperBound = highestPitch + padding + missingSpan / 2
+  const pitchSpan = upperBound - lowerBound
+  const pitchTop = (cents: number) => `${((upperBound - cents) / pitchSpan) * 100}%`
+
+  const firstOctave = Math.ceil(lowerBound / 1200)
+  const lastOctave = Math.floor(upperBound / 1200)
+  const guides = Array.from({ length: lastOctave - firstOctave + 1 }, (_, index) => {
+    const cents = (firstOctave + index) * 1200
+    return { cents, top: pitchTop(cents) }
+  })
+
+  return {
+    guides,
+    notesByClip: Object.fromEntries(
+      parsedClips.map(({ clip, notes }) => {
+        const clipDuration = beatToNumber(clip.length)
         return [
           clip.id,
           notes.map((note) => ({
             ...note,
             left: `${(note.beat / clipDuration) * 100}%`,
             width: `${(note.duration / clipDuration) * 100}%`,
-            top: `${pitchSpan ? 8 + ((highest - note.cents) / pitchSpan) * 76 : 46}%`,
+            top: pitchTop(note.cents),
           })),
         ]
-      } catch {
-        // Invalid source is expected while the user is editing; show an empty preview.
-        return [clip.id, []]
-      }
-    }),
-  ),
-)
+      }),
+    ),
+  }
+})
 
 const pointerBeat = (event: MouseEvent) =>
   pointerXToBeat(
@@ -113,8 +138,16 @@ const moveDrag = (event: PointerEvent) => {
     >
       <pre v-if="displayMode === 'source'">{{ clip.source }}</pre>
       <span v-else class="piano-roll" aria-label="Piano roll preview">
+        <span
+          v-for="guide in pianoRoll.guides"
+          :key="guide.cents"
+          class="pitch-guide"
+          :class="{ reference: guide.cents === 0 }"
+          :data-cents="guide.cents"
+          :style="{ top: guide.top }"
+        />
         <i
-          v-for="(note, index) in pianoRolls[clip.id]"
+          v-for="(note, index) in pianoRoll.notesByClip[clip.id]"
           :key="index"
           :data-beat="note.beat"
           :data-duration="note.duration"
@@ -164,8 +197,20 @@ const moveDrag = (event: PointerEvent) => {
   background: repeating-linear-gradient(0deg, transparent 0 11%, #ffffff13 12% 13%);
   pointer-events: none;
 }
+.pitch-guide {
+  position: absolute;
+  right: 0;
+  left: 0;
+  border-top: 1px dashed #ff6666aa;
+}
+.pitch-guide.reference {
+  border-top-style: solid;
+  border-top-color: #ff4b4be6;
+}
 .piano-roll i {
   position: absolute;
+  z-index: 1;
+  transform: translateY(-50%);
   height: 9%;
   min-width: 2px;
   border-radius: 2px;
