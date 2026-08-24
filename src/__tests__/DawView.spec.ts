@@ -7,12 +7,19 @@ import { beat, beatToNumber, createDefaultProject, pointerXToBeat, snapBeat } fr
 import {
   parseProjectNotes,
   parseClipNotes,
+  notePlaybackWindow,
   projectBeatToSeconds,
   projectSecondsToBeat,
   sourceClipLength,
 } from '../daw/audio-engine'
 
 describe('DAW project model', () => {
+  it('resumes sustained notes at the playhead with their remaining duration', () => {
+    expect(notePlaybackWindow(0, 4, 2)).toEqual({ startBeat: 2, endBeat: 4 })
+    expect(notePlaybackWindow(3, 1, 2)).toEqual({ startBeat: 3, endBeat: 4 })
+    expect(notePlaybackWindow(0, 2, 2)).toBeUndefined()
+  })
+
   it('creates the production-ready project defaults', () => {
     const project = createDefaultProject()
 

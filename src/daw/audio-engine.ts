@@ -13,6 +13,16 @@ export { projectBeatToSeconds, projectSecondsToBeat } from './timeline'
 
 type PatchSynth = PlayableSynthPatch
 
+export function notePlaybackWindow(
+  noteBeat: number,
+  noteDuration: number,
+  fromBeat: number,
+): { startBeat: number; endBeat: number } | undefined {
+  const endBeat = noteBeat + noteDuration
+  if (endBeat <= fromBeat) return undefined
+  return { startBeat: Math.max(noteBeat, fromBeat), endBeat }
+}
+
 /** One disposable Web Audio playback session backed by sw-seq and default.swpatch. */
 export class DawAudioEngine extends EventTarget {
   readonly context: AudioContext
@@ -57,10 +67,11 @@ export class DawAudioEngine extends EventTarget {
       this.synths.push(synth)
       const laneProject = { ...project, instrumentLanes: [lane] }
       for (const note of parseProjectNotes(laneProject)) {
-        if (note.beat < fromBeat) continue
-        endBeat = Math.max(endBeat, note.beat + note.duration)
-        const start = projectBeatToSeconds(project, note.beat)
-        const end = projectBeatToSeconds(project, note.beat + note.duration)
+        const playbackWindow = notePlaybackWindow(note.beat, note.duration, fromBeat)
+        if (!playbackWindow) continue
+        endBeat = Math.max(endBeat, playbackWindow.endBeat)
+        const start = projectBeatToSeconds(project, playbackWindow.startBeat)
+        const end = projectBeatToSeconds(project, playbackWindow.endBeat)
         transport.scheduleParametricNote({
           when: start,
           duration: end - start,
