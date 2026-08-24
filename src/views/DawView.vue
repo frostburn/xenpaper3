@@ -96,6 +96,13 @@ const moveClip = (clip: SourceClip, rawBeat: number) => {
   playhead.value = beatToNumber(clip.start)
 }
 
+const deleteClip = (clip: SourceClip) => {
+  const index = lane.value.clips.findIndex(({ id }) => id === clip.id)
+  if (index === -1) return
+  lane.value.clips.splice(index, 1)
+  if (selectedClipId.value === clip.id) selectedClipId.value = undefined
+}
+
 const updateClipSource = (clip: SourceClip, source: string) => {
   clip.source = source
   const signature = project.value.globalTrack.timeSignatureChanges[0]!
@@ -155,6 +162,7 @@ onBeforeUnmount(() => {
       @select="selectClip"
       @place-playhead="playhead = $event"
       @move="moveClip"
+      @delete="deleteClip"
     />
     <ClipSourceEditor
       ref="editor"

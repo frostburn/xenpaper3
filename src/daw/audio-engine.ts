@@ -37,6 +37,25 @@ export interface EnvelopeSettings {
   readonly release: number
 }
 
+/** Parse the note events in one clip, keeping their positions relative to its start. */
+export const parseClipNotes = (source: string, duration = Number.POSITIVE_INFINITY) => {
+  const result = expandToBeatEvents(parse(source), { directiveExtensions: [envelopeExtension] })
+  const errors = result.diagnostics.filter(({ severity }) => severity === 'error')
+  if (errors.length) throw new Error(errors.map(({ message }) => message).join('\n'))
+  if (!('score' in result)) return []
+
+  return result.score.events
+    .filter((event) => event.kind === 'note')
+    .filter((event) => event.start.valueOf() < duration)
+    .map((event) => ({
+      beat: event.start.valueOf(),
+      duration: Math.min(event.duration.valueOf(), duration - event.start.valueOf()),
+      cents: event.pitch.value.valueOf(),
+      velocity: event.dynamic.valueOf(),
+      envelope: (event.directiveState.patch as EnvelopeSettings | undefined) ?? DEFAULT_ENVELOPE,
+    }))
+}
+
 const DEFAULT_ENVELOPE: EnvelopeSettings = Object.freeze({
   attack: 0.1,
   decay: 0.2,
@@ -78,24 +97,11 @@ export const parseProjectNotes = (project: DawProject): ScheduledLaneNote[] => {
   const notes: ScheduledLaneNote[] = []
   for (const lane of project.instrumentLanes) {
     for (const clip of lane.clips) {
-      const result = expandToBeatEvents(parse(clip.source), {
-        directiveExtensions: [envelopeExtension],
-      })
-      const errors = result.diagnostics.filter(({ severity }) => severity === 'error')
-      if (errors.length) throw new Error(errors.map(({ message }) => message).join('\n'))
-      if (!('score' in result)) continue
       const clipStart = beatToNumber(clip.start)
-      const clipEnd = clipStart + beatToNumber(clip.length)
-      for (const event of result.score.events) {
-        if (event.kind !== 'note') continue
-        const beat = clipStart + event.start.valueOf()
-        if (beat >= clipEnd) continue
+      for (const event of parseClipNotes(clip.source, beatToNumber(clip.length))) {
         notes.push({
-          beat,
-          duration: Math.min(event.duration.valueOf(), clipEnd - beat),
-          cents: event.pitch.value.valueOf(),
-          velocity: event.dynamic.valueOf(),
-          envelope: (event.directiveState.patch as EnvelopeSettings | undefined) ?? DEFAULT_ENVELOPE,
+          ...event,
+          beat: clipStart + event.beat,
         })
       }
     }

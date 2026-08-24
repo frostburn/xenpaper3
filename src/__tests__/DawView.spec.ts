@@ -6,6 +6,7 @@ import InstrumentPianoRollLane from '../components/daw/InstrumentPianoRollLane.v
 import { beat, beatToNumber, createDefaultProject, pointerXToBeat, snapBeat } from '../daw/project'
 import {
   parseProjectNotes,
+  parseClipNotes,
   projectBeatToSeconds,
   projectSecondsToBeat,
   sourceClipLength,
@@ -50,6 +51,13 @@ describe('DAW project model', () => {
     expect(notes.map(({ beat: start }) => start)).toEqual([2, 3, 4])
     expect(notes.every(({ duration }) => duration === 1)).toBe(true)
     expect(notes[0]!.cents).not.toBe(notes[1]!.cents)
+  })
+
+  it('parses clip-local notes for piano-roll rendering', () => {
+    expect(parseClipNotes('C D E', 2)).toMatchObject([
+      { beat: 0, duration: 1 },
+      { beat: 1, duration: 1 },
+    ])
   })
 
   it('derives clip length from source and keeps zero-duration source visible for a bar', () => {
@@ -144,6 +152,22 @@ describe('DawView', () => {
     expect(wrapper.findAll('button.clip')).toHaveLength(1)
   })
 
+  it('deletes the selected clip with Delete while the instrument lane has focus', async () => {
+    const wrapper = mount(DawView, { attachTo: document.body })
+    const lane = wrapper.getComponent(InstrumentPianoRollLane)
+    await lane.trigger('dblclick', { clientX: 64 })
+    const laneElement = lane.element as HTMLElement
+    laneElement.focus()
+
+    expect(document.activeElement).toBe(laneElement)
+    await lane.trigger('keydown', { key: 'Delete' })
+
+    expect(wrapper.find('button.clip').exists()).toBe(false)
+    expect(wrapper.find('textarea[aria-label="Xenpaper clip source"]').exists()).toBe(false)
+    expect(wrapper.text()).toContain('Select or create a clip')
+    wrapper.unmount()
+  })
+
   it('keeps the visual grid aligned with zoom and scroll', async () => {
     const wrapper = mount(DawView)
     const controls = wrapper.findAll<HTMLInputElement>('.timeline-controls input')
@@ -183,6 +207,94 @@ describe('DawView', () => {
     await wrapper.get('textarea[aria-label="Xenpaper clip source"]').setValue('C D')
 
     expect(wrapper.get('button.clip').attributes('style')).toContain('width: 128px')
+  })
+
+  it('renders piano-roll notes parsed from the edited clip source', async () => {
+    const wrapper = mount(DawView)
+    await wrapper.getComponent(InstrumentPianoRollLane).trigger('dblclick', { clientX: 64 })
+    await wrapper.get('textarea[aria-label="Xenpaper clip source"]').setValue('C D E')
+
+    const notes = wrapper.findAll('[aria-label="Piano roll preview"] i')
+    expect(notes).toHaveLength(3)
+    expect(notes.map((note) => note.attributes('data-beat'))).toEqual(['0', '1', '2'])
+    expect(notes[0]!.attributes('style')).toContain('left: 0%')
+    expect(notes[1]!.attributes('style')).toContain('left: 33.333')
+    expect(notes[0]!.attributes('data-cents')).not.toBe(notes[1]!.attributes('data-cents'))
+  })
+
+  it('uses a lane-wide pitch scale and renders octave reference guides', () => {
+    const project = createDefaultProject()
+    const lane = project.instrumentLanes[0]!
+    lane.clips = [
+      { id: 'ascending', start: beat(0), length: beat(2), source: 'C D' },
+      { id: 'descending', start: beat(2), length: beat(2), source: 'B C' },
+    ]
+    const wrapper = mount(InstrumentPianoRollLane, {
+      props: { lane, pixelsPerBeat: 64, scrollLeft: 0, displayMode: 'piano-roll' },
+    })
+
+    const cPitch = String(parseClipNotes('C')[0]!.cents)
+    const previews = wrapper.findAll('[aria-label="Piano roll preview"]')
+    const firstC = previews[0]!.get(`i[data-cents="${cPitch}"]`)
+    const secondC = previews[1]!.get(`i[data-cents="${cPitch}"]`)
+    expect((firstC.element as HTMLElement).style.top).toBe(
+      (secondC.element as HTMLElement).style.top,
+    )
+
+    const guides = previews[0]!.findAll('.pitch-guide')
+    expect(guides.every((guide) => Number(guide.attributes('data-cents')) % 1200 === 0)).toBe(true)
+    expect(previews[0]!.get('.pitch-guide[data-cents="0"]').classes()).toContain('global-reference')
+  })
+
+  it('renders the zero-cent guide as solid for the default chord clip', async () => {
+    const wrapper = mount(DawView)
+    await wrapper.getComponent(InstrumentPianoRollLane).trigger('dblclick', { clientX: 64 })
+
+    const preview = wrapper.get('[aria-label="Piano roll preview"]')
+    const zeroGuides = preview.findAll('.pitch-guide[data-cents="0"]')
+    expect(zeroGuides).toHaveLength(1)
+    expect(zeroGuides[0]!.classes()).toContain('global-reference')
+  })
+
+  it('folds disparate clip registers into view and labels their octave offset', () => {
+    const project = createDefaultProject()
+    const lane = project.instrumentLanes[0]!
+    lane.clips = [
+      { id: 'home-1', start: beat(0), length: beat(1), source: 'C' },
+      { id: 'home-2', start: beat(1), length: beat(1), source: 'D' },
+      { id: 'high', start: beat(2), length: beat(1), source: "''C" },
+    ]
+    const wrapper = mount(InstrumentPianoRollLane, {
+      props: { lane, pixelsPerBeat: 64, scrollLeft: 0, displayMode: 'piano-roll' },
+    })
+
+    expect(wrapper.findAll('.register-label')).toHaveLength(1)
+    expect(wrapper.get('.register-label').text()).toBe('+2400¢')
+    const previews = wrapper.findAll('[aria-label="Piano roll preview"]')
+    expect((previews[0]!.get('i').element as HTMLElement).style.top).toBe(
+      (previews[2]!.get('i').element as HTMLElement).style.top,
+    )
+  })
+
+  it('keeps the solid global-zero guide correct in a downward-shifted clip', () => {
+    const project = createDefaultProject()
+    const lane = project.instrumentLanes[0]!
+    lane.clips = [
+      { id: 'home-1', start: beat(0), length: beat(1), source: 'C' },
+      { id: 'home-2', start: beat(1), length: beat(1), source: 'D' },
+      { id: 'low', start: beat(2), length: beat(1), source: '`C' },
+    ]
+    const wrapper = mount(InstrumentPianoRollLane, {
+      props: { lane, pixelsPerBeat: 64, scrollLeft: 0, displayMode: 'piano-roll' },
+    })
+
+    expect(wrapper.get('.register-label').text()).toBe('-1200¢')
+    const lowPreview = wrapper.findAll('[aria-label="Piano roll preview"]')[2]!
+    const globalZero = lowPreview.get('.pitch-guide[data-cents="0"]')
+    expect(globalZero.classes()).toContain('global-reference')
+    expect((globalZero.element as HTMLElement).style.top).not.toBe(
+      (lowPreview.get('i').element as HTMLElement).style.top,
+    )
   })
 
   it('moves clips on the snapped grid and wires play and stop', async () => {
