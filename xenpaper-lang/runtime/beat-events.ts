@@ -38,6 +38,7 @@ export function flattenScoreSemantics(shape: ScoreShape): BeatEventFlatteningRes
     start: Fraction
     duration: Fraction
     dynamic: Fraction
+    directiveState: BeatTimedNoteEvent['directiveState']
     automation?: BeatTimedNoteEvent['automation']
     origins: readonly BeatTimedNoteEvent['origins'][number][]
     groove?: Groove
@@ -107,6 +108,7 @@ export function flattenScoreSemantics(shape: ScoreShape): BeatEventFlatteningRes
         pitch: current.pitch,
         rootPitch: current.rootPitch,
         dynamic: copy((current as typeof current & { readonly velocity: Fraction }).velocity),
+        directiveState: { ...current.directiveState },
         automation: current.automation,
         label: current.authoredLabel ?? current.displayLabel,
         origins: current.origins,
