@@ -4,6 +4,12 @@ import router from '../router'
 import DawView from '../views/DawView.vue'
 import InstrumentPianoRollLane from '../components/daw/InstrumentPianoRollLane.vue'
 import { beat, beatToNumber, createDefaultProject, pointerXToBeat, snapBeat } from '../daw/project'
+import {
+  parseProjectNotes,
+  projectBeatToSeconds,
+  projectSecondsToBeat,
+  sourceClipLength,
+} from '../daw/audio-engine'
 
 describe('DAW project model', () => {
   it('creates the production-ready project defaults', () => {
@@ -28,6 +34,56 @@ describe('DAW project model', () => {
   it('converts scrolled, zoomed pointer coordinates and snaps exactly', () => {
     expect(pointerXToBeat(96, 32, 64)).toBe(2)
     expect(snapBeat(2.13, beat(1, 4))).toEqual(beat(9, 4))
+  })
+
+  it('parses Xenpaper clip notes and offsets them onto the project timeline', () => {
+    const project = createDefaultProject()
+    project.instrumentLanes[0]!.clips.push({
+      id: 'melody',
+      start: beat(2),
+      length: beat(4),
+      source: 'C D E',
+    })
+
+    const notes = parseProjectNotes(project)
+    expect(notes).toHaveLength(3)
+    expect(notes.map(({ beat: start }) => start)).toEqual([2, 3, 4])
+    expect(notes.every(({ duration }) => duration === 1)).toBe(true)
+    expect(notes[0]!.cents).not.toBe(notes[1]!.cents)
+  })
+
+  it('derives clip length from source and keeps zero-duration source visible for a bar', () => {
+    expect(sourceClipLength('C D E')).toEqual(beat(3))
+    expect(sourceClipLength('# only a comment')).toEqual(beat(4))
+    expect(sourceClipLength('@tempo(120)')).toEqual(beat(4))
+  })
+
+  it('carries authored patch envelope parameters into scheduled notes', () => {
+    const project = createDefaultProject()
+    project.instrumentLanes[0]!.clips.push({
+      id: 'envelope',
+      start: beat(0),
+      length: beat(4),
+      source: '@patch(attack: 20ms, decay: 150ms, sustain: 55%, release: 400ms) C',
+    })
+
+    expect(parseProjectNotes(project)[0]!.envelope).toMatchObject({
+      attack: expect.closeTo(0.02),
+      decay: expect.closeTo(0.15),
+      sustain: expect.closeTo(0.55),
+      release: expect.closeTo(0.4),
+    })
+  })
+
+  it('integrates every tempo segment and converts audio time back to beats', () => {
+    const project = createDefaultProject()
+    project.globalTrack.tempoChanges.push({ id: 'slow', beat: beat(4), bpm: 60 })
+    project.globalTrack.tempoChanges.push({ id: 'fast', beat: beat(6), bpm: 240 })
+
+    expect(projectBeatToSeconds(project, 4)).toBe(2)
+    expect(projectBeatToSeconds(project, 6)).toBe(4)
+    expect(projectBeatToSeconds(project, 8)).toBe(4.5)
+    expect(projectSecondsToBeat(project, 4.5)).toBe(8)
   })
 })
 
@@ -105,6 +161,7 @@ describe('DawView', () => {
     await wrapper.get('[aria-label="Time signature numerator"]').setValue('7')
     await wrapper.get('[aria-label="Time signature denominator"]').setValue('8')
     await wrapper.get('[aria-label="Waveform"]').setValue('triangle')
+    await wrapper.get('[aria-label="Instrument gain"]').setValue('0.42')
 
     expect((wrapper.get('[aria-label="Tempo in BPM"]').element as HTMLInputElement).value).toBe(
       '144',
@@ -112,11 +169,20 @@ describe('DawView', () => {
     expect((wrapper.get('[aria-label="Waveform"]').element as HTMLSelectElement).value).toBe(
       'triangle',
     )
+    expect(wrapper.get('.instrument-header output').text()).toBe('42%')
 
     await wrapper.getComponent(InstrumentPianoRollLane).trigger('dblclick', { clientX: 64 })
     expect(wrapper.find('[aria-label="Piano roll preview"]').exists()).toBe(true)
     await wrapper.get('[aria-label="Clip display"]').setValue('source')
     expect(wrapper.get('button.clip pre').text()).toContain('[0,4,7]===')
+  })
+
+  it('resizes a clip when its source duration changes', async () => {
+    const wrapper = mount(DawView)
+    await wrapper.getComponent(InstrumentPianoRollLane).trigger('dblclick', { clientX: 64 })
+    await wrapper.get('textarea[aria-label="Xenpaper clip source"]').setValue('C D')
+
+    expect(wrapper.get('button.clip').attributes('style')).toContain('width: 128px')
   })
 
   it('moves clips on the snapped grid and wires play and stop', async () => {
