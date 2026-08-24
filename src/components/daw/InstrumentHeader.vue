@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { InstrumentLane } from '../../daw/project'
+import { OSCILLATOR_TYPES, type InstrumentLane } from '../../daw/project'
 
 defineProps<{ lane: InstrumentLane }>()
 defineEmits<{
@@ -23,7 +23,7 @@ defineEmits<{
           )
         "
       >
-        <option v-for="type in ['sine', 'square', 'sawtooth', 'triangle']" :key="type">
+        <option v-for="type in OSCILLATOR_TYPES" :key="type">
           {{ type }}
         </option>
       </select>
