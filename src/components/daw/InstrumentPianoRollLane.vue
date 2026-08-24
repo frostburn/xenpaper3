@@ -20,6 +20,7 @@ const emit = defineEmits<{
   select: [clip: SourceClip]
   'place-playhead': [beat: number]
   move: [clip: SourceClip, beat: number]
+  delete: [clip: SourceClip]
 }>()
 
 const dragging = ref<{ clip: SourceClip; pointerOffset: number }>()
@@ -138,6 +139,14 @@ const moveDrag = (event: PointerEvent) => {
   if (!dragging.value) return
   emit('move', dragging.value.clip, Math.max(0, pointerBeat(event) - dragging.value.pointerOffset))
 }
+
+const onKeyDown = (event: KeyboardEvent) => {
+  if (event.key !== 'Delete' || !props.selectedClipId) return
+  const clip = props.lane.clips.find(({ id }) => id === props.selectedClipId)
+  if (!clip) return
+  event.preventDefault()
+  emit('delete', clip)
+}
 </script>
 
 <template>
@@ -145,6 +154,7 @@ const moveDrag = (event: PointerEvent) => {
     ref="laneElement"
     class="lane"
     aria-label="Instrument piano roll"
+    tabindex="0"
     @click="onClick"
     :style="{
       '--beat-width': `${pixelsPerBeat}px`,
@@ -154,6 +164,7 @@ const moveDrag = (event: PointerEvent) => {
     @pointermove="moveDrag"
     @pointerup="dragging = undefined"
     @pointercancel="dragging = undefined"
+    @keydown="onKeyDown"
   >
     <button
       v-for="clip in lane.clips"

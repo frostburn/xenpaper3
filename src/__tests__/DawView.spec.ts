@@ -152,6 +152,22 @@ describe('DawView', () => {
     expect(wrapper.findAll('button.clip')).toHaveLength(1)
   })
 
+  it('deletes the selected clip with Delete while the instrument lane has focus', async () => {
+    const wrapper = mount(DawView, { attachTo: document.body })
+    const lane = wrapper.getComponent(InstrumentPianoRollLane)
+    await lane.trigger('dblclick', { clientX: 64 })
+    const laneElement = lane.element as HTMLElement
+    laneElement.focus()
+
+    expect(document.activeElement).toBe(laneElement)
+    await lane.trigger('keydown', { key: 'Delete' })
+
+    expect(wrapper.find('button.clip').exists()).toBe(false)
+    expect(wrapper.find('textarea[aria-label="Xenpaper clip source"]').exists()).toBe(false)
+    expect(wrapper.text()).toContain('Select or create a clip')
+    wrapper.unmount()
+  })
+
   it('keeps the visual grid aligned with zoom and scroll', async () => {
     const wrapper = mount(DawView)
     const controls = wrapper.findAll<HTMLInputElement>('.timeline-controls input')
