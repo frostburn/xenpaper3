@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { parse } from '../parser.generated.js'
 import { expandToBeatEvents } from '../runtime/beat-events'
 import { evaluateExpression } from '../runtime/expressions'
+import { evaluateScoreShape } from '../runtime/score-shape'
 import type { BeatTimedNoteEvent, DirectiveExtension, PitchContext } from '../runtime/types'
 import { DEFAULT_PITCH_CONTEXT } from '../runtime/pitches'
 import type { Value } from '../value'
@@ -47,6 +48,21 @@ const notes = (source: string) => {
 }
 const patch = (event: BeatTimedNoteEvent) => event.directiveState.patch as MockPatch
 
+const shapeNotes = (source: string, extensions: readonly DirectiveExtension[]) => {
+  const result = evaluateScoreShape(parse(source).body[0]!, { directiveExtensions: extensions })
+  expect(result.diagnostics.filter(({ severity }) => severity === 'error')).toEqual([])
+  if (!('shape' in result)) throw new Error('Expected shape.')
+  const visit = (shape: typeof result.shape): (typeof result.shape & { kind: 'attack' })[] =>
+    shape.kind === 'attack'
+      ? [shape]
+      : shape.kind === 'sequence'
+        ? shape.children.flatMap(visit)
+        : shape.kind === 'parallel'
+          ? shape.branches.flatMap(visit)
+          : []
+  return visit(result.shape)
+}
+
 describe('second-party directive extensions', () => {
   it('lets an audio engine define unrelated and sustainless patch geometries', () => {
     const events = notes('C @patch(name: kick, decay: 80ms, pitchDrop: 2) D @patch(click: 25%) E')
@@ -69,6 +85,30 @@ describe('second-party directive extensions', () => {
       'plain',
       'tom',
     ])
+  })
+
+  it('threads pitch context while accumulating state across authored repeats', () => {
+    const memo: DirectiveExtension = {
+      name: 'memo',
+      initialState: [] as number[],
+      apply(_directive, context, previous) {
+        return {
+          state: [...(previous as number[]), context.rootDisplacement.valueOf()],
+        }
+      },
+    }
+    const events = shapeNotes('|: @memo C {root = D} :| E', [memo])
+    const memories = events.at(-1)!.directiveState.memo as number[]
+    expect(memories).toHaveLength(2)
+    expect(memories[0]).not.toBe(memories[1])
+  })
+
+  it('propagates extensions through postfix-wrapped repeats and into drones', () => {
+    const wrapped = shapeNotes('|: @patch(name: tom) C :|= D', [patchExtension])
+    expect((wrapped.at(-1)!.directiveState.patch as MockPatch).name).toBe('tom')
+
+    const droned = notes('@patch(name: kick) @drone(C) D @drone()')
+    expect(droned.map((event) => patch(event).name)).toEqual(['kick', 'kick'])
   })
 
   it('turns extension failures into source-located diagnostics', () => {

@@ -1064,20 +1064,28 @@ export function evaluateScoreSemantics(
     if (current.type === 'Directive') {
       return applyExtension(current, context, state)?.state ?? state
     }
-    if (current.type === 'Sequence')
-      return current.items.reduce(
-        (active, item) => directiveStateAfter(item, active, context),
-        state,
-      )
+    if (current.type === 'Sequence') {
+      let activeState = state
+      let activeContext = context
+      for (const item of current.items) {
+        activeState = directiveStateAfter(item, activeState, activeContext)
+        activeContext = contextAfter(item, activeContext)
+      }
+      return activeState
+    }
+    if (current.type === 'PostfixExpression')
+      return directiveStateAfter(current.expression, state, context)
     if (current.type === 'Repeat') {
       let active = state
       const count = repeatCount(current)
       if (count === undefined) return active
-      for (let iteration = 0; iteration < count; iteration++)
-        active = repeatBody(current, iteration).reduce(
-          (bodyState, item) => directiveStateAfter(item, bodyState, context),
-          active,
-        )
+      let activeContext = context
+      for (let iteration = 0; iteration < count; iteration++) {
+        for (const item of repeatBody(current, iteration)) {
+          active = directiveStateAfter(item, active, activeContext)
+          activeContext = contextAfter(item, activeContext)
+        }
+      }
       return active
     }
     return state
@@ -1404,6 +1412,7 @@ export function evaluateScoreSemantics(
               activeDynamic,
               activeArticulation,
               activeArticulationMarks,
+              activeDirectiveState,
             )
             resolved.diagnostics.push(...template.diagnostics)
             if ('shape' in template) {
@@ -1652,9 +1661,9 @@ export function evaluateScoreSemantics(
           }
           if (gliss?.indices.length === 2) gliss = undefined
         }
+        activeDirectiveState = directiveStateAfter(item, activeDirectiveState, activeContext)
         activeContext = contextAfter(item, activeContext)
         activePulse = pulseAfter(item, activePulse, activeContext)
-        activeDirectiveState = directiveStateAfter(item, activeDirectiveState, activeContext)
       }
       const diagnostics = results.flatMap((result) => result.diagnostics)
       if (grace || gliss)
