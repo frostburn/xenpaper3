@@ -4,7 +4,11 @@ import router from '../router'
 import DawView from '../views/DawView.vue'
 import InstrumentPianoRollLane from '../components/daw/InstrumentPianoRollLane.vue'
 import { beat, beatToNumber, createDefaultProject, pointerXToBeat, snapBeat } from '../daw/project'
-import { parseProjectNotes } from '../daw/audio-engine'
+import {
+  parseProjectNotes,
+  projectBeatToSeconds,
+  projectSecondsToBeat,
+} from '../daw/audio-engine'
 
 describe('DAW project model', () => {
   it('creates the production-ready project defaults', () => {
@@ -45,6 +49,17 @@ describe('DAW project model', () => {
     expect(notes.map(({ beat: start }) => start)).toEqual([2, 3, 4])
     expect(notes.every(({ duration }) => duration === 1)).toBe(true)
     expect(notes[0]!.cents).not.toBe(notes[1]!.cents)
+  })
+
+  it('integrates every tempo segment and converts audio time back to beats', () => {
+    const project = createDefaultProject()
+    project.globalTrack.tempoChanges.push({ id: 'slow', beat: beat(4), bpm: 60 })
+    project.globalTrack.tempoChanges.push({ id: 'fast', beat: beat(6), bpm: 240 })
+
+    expect(projectBeatToSeconds(project, 4)).toBe(2)
+    expect(projectBeatToSeconds(project, 6)).toBe(4)
+    expect(projectBeatToSeconds(project, 8)).toBe(4.5)
+    expect(projectSecondsToBeat(project, 4.5)).toBe(8)
   })
 })
 

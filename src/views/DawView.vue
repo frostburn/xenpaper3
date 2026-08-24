@@ -34,8 +34,6 @@ const finishPlayback = () => {
   playing.value = false
   if (playTimer) clearInterval(playTimer)
   playTimer = undefined
-  audioEngine?.dispose()
-  audioEngine = undefined
 }
 
 const insertClip = async (rawBeat: number) => {
@@ -55,8 +53,7 @@ const selectClip = (clip: SourceClip) => {
 
 const togglePlayback = async () => {
   if (playing.value) {
-    audioEngine?.dispose()
-    audioEngine = undefined
+    audioEngine?.stop()
     playing.value = false
     if (playTimer) clearInterval(playTimer)
     playTimer = undefined
@@ -87,8 +84,7 @@ const togglePlayback = async () => {
 const stopPlayback = () => {
   playing.value = false
   playhead.value = 0
-  audioEngine?.dispose()
-  audioEngine = undefined
+  audioEngine?.stop()
   if (playTimer) clearInterval(playTimer)
   playTimer = undefined
 }
