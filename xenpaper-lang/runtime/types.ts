@@ -1,8 +1,8 @@
-import type { PitchLiteral, Program } from '../parser.generated.js'
+import type { Directive, PitchLiteral, Program } from '../parser.generated.js'
 import type { Diagnostic } from '../diagnostics'
 import type { Value } from '../value'
 import type { LocationRange } from 'peggy'
-import type { Fraction } from 'xen-dev-utils/fraction'
+import type { Fraction, FractionValue } from 'xen-dev-utils/fraction'
 
 /** Immutable, extension-owned prevailing state, keyed by extension name. */
 export type DirectiveExtensionState = Readonly<Record<string, unknown>>
@@ -18,7 +18,7 @@ export interface DirectiveExtension {
   readonly initialState?: unknown
   /** Pure state transition; return immutable state so earlier snapshots remain stable. */
   readonly apply: (
-    directive: import('../parser.generated.js').Directive,
+    directive: Directive,
     context: PitchContext,
     previousState: unknown,
   ) => DirectiveExtensionResult
@@ -47,7 +47,7 @@ export interface RepeatExpansionOptions {
 }
 
 export interface ScoreShapeOptions {
-  readonly pulse?: import('xen-dev-utils/fraction').FractionValue
+  readonly pulse?: FractionValue
   readonly pitchContext?: PitchContext
   readonly directiveExtensions?: readonly DirectiveExtension[]
 }

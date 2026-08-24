@@ -5,28 +5,49 @@ import { evaluateExpression } from '../runtime/expressions'
 import { evaluateScoreShape } from '../runtime/score-shape'
 import type { BeatTimedNoteEvent, DirectiveExtension, PitchContext } from '../runtime/types'
 import { DEFAULT_PITCH_CONTEXT } from '../runtime/pitches'
-import type { Value } from '../value'
+import { Value } from '../value'
 
 interface MockPatch {
-  readonly name: string
-  readonly parameters: Readonly<Record<string, Value>>
+  readonly file: string
+  readonly onArguments: Readonly<Record<string, Value>>
 }
 
-// A mock audio engine owns patch geometry. Xenpaper only carries its immutable state.
+const DEFAULT_ON_ARGUMENTS = Object.freeze({
+  attack: Value.seconds(0.1),
+  decay: Value.seconds(0.2),
+  sustain: new Value(7n, 10n),
+  release: Value.seconds(0.3),
+})
+
+// Mirrors the DAW's SW Patch boundary: default.swpatch has ADSR parameters,
+// while adr-bass.swpatch has no sustain and adds its own Q parameter.
 const patchExtension: DirectiveExtension = {
   name: 'patch',
-  initialState: { name: 'plain', parameters: {} } satisfies MockPatch,
+  initialState: {
+    file: 'default.swpatch',
+    onArguments: DEFAULT_ON_ARGUMENTS,
+  } satisfies MockPatch,
   apply(directive, context: PitchContext, previousState) {
     const previous = previousState as MockPatch
-    let name = previous.name
-    const parameters = { ...previous.parameters }
+    let file = previous.file
+    let onArguments = { ...previous.onArguments }
     const diagnostics = []
     for (const argument of directive.arguments) {
       if (argument.type !== 'NamedArgument') throw new Error('@patch accepts named arguments.')
       if (argument.name === 'name') {
         if (argument.value.type !== 'Identifier')
           throw new Error('Patch name must be an identifier.')
-        name = argument.value.name
+        const patchName = argument.value.name
+        file = patchName === 'adrBass' ? 'adr-bass.swpatch' : `${patchName}.swpatch`
+        onArguments =
+          patchName === 'adrBass'
+            ? {
+                attack: Value.seconds(0.01),
+                decay: Value.seconds(0.5),
+                release: Value.seconds(0.1),
+                Q: Value.decibels(5),
+              }
+            : {}
         continue
       }
       const evaluated = evaluateExpression(argument.value, context)
@@ -34,9 +55,9 @@ const patchExtension: DirectiveExtension = {
       if (!('value' in evaluated) || evaluated.value.kind !== 'scalar')
         throw new Error(`Patch parameter ${argument.name} must be scalar.`)
       // Parameters deliberately have no universal name or dimension restriction.
-      parameters[argument.name] = evaluated.value.value
+      onArguments[argument.name] = evaluated.value.value
     }
-    return { state: { name, parameters } satisfies MockPatch, diagnostics }
+    return { state: { file, onArguments } satisfies MockPatch, diagnostics }
   },
 }
 
@@ -65,25 +86,41 @@ const shapeNotes = (source: string, extensions: readonly DirectiveExtension[]) =
 
 describe('second-party directive extensions', () => {
   it('lets an audio engine define unrelated and sustainless patch geometries', () => {
-    const events = notes('C @patch(name: kick, decay: 80ms, pitchDrop: 2) D @patch(click: 25%) E')
-    expect(events.map((event) => patch(event).name)).toEqual(['plain', 'kick', 'kick'])
-    expect(Object.keys(patch(events[0]!).parameters)).toEqual([])
-    expect(patch(events[1]!).parameters.decay!.dimensions.equals({ seconds: 1 })).toBe(true)
-    expect(patch(events[1]!).parameters.pitchDrop!.valueOf()).toBe(2)
-    expect(patch(events[2]!).parameters.click!.valueOf()).toBe(0.25)
+    const events = notes(
+      'C @patch(name: adrBass, decay: 80ms, pitchDrop: 2) D @patch(click: 25%) E',
+    )
+    expect(events.map((event) => patch(event).file)).toEqual([
+      'default.swpatch',
+      'adr-bass.swpatch',
+      'adr-bass.swpatch',
+    ])
+    expect(Object.keys(patch(events[0]!).onArguments)).toEqual([
+      'attack',
+      'decay',
+      'sustain',
+      'release',
+    ])
+    expect(patch(events[1]!).onArguments.sustain).toBeUndefined()
+    expect(patch(events[1]!).onArguments.decay!.dimensions.equals({ seconds: 1 })).toBe(true)
+    expect(patch(events[1]!).onArguments.pitchDrop!.valueOf()).toBe(2)
+    expect(patch(events[2]!).onArguments.click!.valueOf()).toBe(0.25)
     expect(patch(events[1]!)).not.toBe(patch(events[2]!))
   })
 
   it('uses core repeat expansion and lexical isolation without leaking engine state', () => {
     const repeated = notes('|: @patch(name: snare, noise: 40%) C :| D')
-    expect(repeated.map((event) => patch(event).name)).toEqual(['snare', 'snare', 'snare'])
+    expect(repeated.map((event) => patch(event).file)).toEqual([
+      'snare.swpatch',
+      'snare.swpatch',
+      'snare.swpatch',
+    ])
 
     const scoped = notes('C (@patch(name: tom, bend: 3/2) D) E, @patch(name: hat) F')
-    expect(scoped.map((event) => patch(event).name).sort()).toEqual([
-      'hat',
-      'plain',
-      'plain',
-      'tom',
+    expect(scoped.map((event) => patch(event).file).sort()).toEqual([
+      'default.swpatch',
+      'default.swpatch',
+      'hat.swpatch',
+      'tom.swpatch',
     ])
   })
 
@@ -105,10 +142,10 @@ describe('second-party directive extensions', () => {
 
   it('propagates extensions through postfix-wrapped repeats and into drones', () => {
     const wrapped = shapeNotes('|: @patch(name: tom) C :|= D', [patchExtension])
-    expect((wrapped.at(-1)!.directiveState.patch as MockPatch).name).toBe('tom')
+    expect((wrapped.at(-1)!.directiveState.patch as MockPatch).file).toBe('tom.swpatch')
 
     const droned = notes('@patch(name: kick) @drone(C) D @drone()')
-    expect(droned.map((event) => patch(event).name)).toEqual(['kick', 'kick'])
+    expect(droned.map((event) => patch(event).file)).toEqual(['kick.swpatch', 'kick.swpatch'])
   })
 
   it('turns extension failures into source-located diagnostics', () => {
