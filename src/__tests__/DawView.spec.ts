@@ -225,7 +225,7 @@ describe('DawView', () => {
       (secondC.element as HTMLElement).style.top,
     )
 
-    const guides = previews[0]!.findAll('.pitch-guide:not(.global-reference)')
+    const guides = previews[0]!.findAll('.pitch-guide')
     expect(guides.every((guide) => Number(guide.attributes('data-cents')) % 1200 === 0)).toBe(true)
     expect(previews[0]!.get('.pitch-guide[data-cents="0"]').classes()).toContain('global-reference')
   })
@@ -253,12 +253,31 @@ describe('DawView', () => {
     })
 
     expect(wrapper.findAll('.register-label')).toHaveLength(1)
-    expect(wrapper.get('.register-label').text()).toBe('+2400 cents')
+    expect(wrapper.get('.register-label').text()).toBe('+2400¢')
     const previews = wrapper.findAll('[aria-label="Piano roll preview"]')
-    const globalZero = previews[2]!.get('.pitch-guide[data-cents="0"]')
-    expect(globalZero.classes()).toContain('global-reference')
     expect((previews[0]!.get('i').element as HTMLElement).style.top).toBe(
       (previews[2]!.get('i').element as HTMLElement).style.top,
+    )
+  })
+
+  it('keeps the solid global-zero guide correct in a downward-shifted clip', () => {
+    const project = createDefaultProject()
+    const lane = project.instrumentLanes[0]!
+    lane.clips = [
+      { id: 'home-1', start: beat(0), length: beat(1), source: 'C' },
+      { id: 'home-2', start: beat(1), length: beat(1), source: 'D' },
+      { id: 'low', start: beat(2), length: beat(1), source: '`C' },
+    ]
+    const wrapper = mount(InstrumentPianoRollLane, {
+      props: { lane, pixelsPerBeat: 64, scrollLeft: 0, displayMode: 'piano-roll' },
+    })
+
+    expect(wrapper.get('.register-label').text()).toBe('-1200¢')
+    const lowPreview = wrapper.findAll('[aria-label="Piano roll preview"]')[2]!
+    const globalZero = lowPreview.get('.pitch-guide[data-cents="0"]')
+    expect(globalZero.classes()).toContain('global-reference')
+    expect((globalZero.element as HTMLElement).style.top).not.toBe(
+      (lowPreview.get('i').element as HTMLElement).style.top,
     )
   })
 

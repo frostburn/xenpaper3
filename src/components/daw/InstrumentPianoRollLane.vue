@@ -78,14 +78,12 @@ const pianoRoll = computed(() => {
 
   const firstOctave = Math.ceil(lowerBound / 1200)
   const lastOctave = Math.floor(upperBound / 1200)
-  const guides = Array.from({ length: lastOctave - firstOctave + 1 }, (_, index) => {
-    const cents = (firstOctave + index) * 1200
-    return { cents, top: pitchTop(cents) }
-  }).filter(({ cents }) => cents !== 0)
+  const displayGuides = Array.from(
+    { length: lastOctave - firstOctave + 1 },
+    (_, index) => (firstOctave + index) * 1200,
+  )
 
   return {
-    guides,
-    globalZeroTop: pitchTop(0),
     notesByClip: Object.fromEntries(
       displayClips.map(({ clip, notes, registerOffset }) => {
         const clipDuration = beatToNumber(clip.length)
@@ -93,6 +91,10 @@ const pianoRoll = computed(() => {
           clip.id,
           {
             registerOffset,
+            guides: displayGuides.map((displayCents) => ({
+              cents: displayCents + registerOffset,
+              top: pitchTop(displayCents),
+            })),
             notes: notes.map((note) => ({
               ...note,
               left: `${(note.beat / clipDuration) * 100}%`,
@@ -171,17 +173,13 @@ const moveDrag = (event: PointerEvent) => {
       <span v-else class="piano-roll" aria-label="Piano roll preview">
         <span v-if="clipPreview(clip.id).registerOffset" class="register-label"
           >{{ clipPreview(clip.id).registerOffset > 0 ? '+' : ''
-          }}{{ clipPreview(clip.id).registerOffset }} cents</span
+          }}{{ clipPreview(clip.id).registerOffset }}¢</span
         >
         <span
-          class="pitch-guide global-reference"
-          data-cents="0"
-          :style="{ top: pianoRoll.globalZeroTop }"
-        />
-        <span
-          v-for="guide in pianoRoll.guides"
+          v-for="guide in clipPreview(clip.id).guides"
           :key="guide.cents"
           class="pitch-guide"
+          :class="{ 'global-reference': guide.cents === 0 }"
           :data-cents="guide.cents"
           :style="{ top: guide.top }"
         />
