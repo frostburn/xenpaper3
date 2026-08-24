@@ -1,6 +1,12 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
-import { createPatch, registerMathWorklets, type RuntimeOptions } from '../../sw-patch'
+import {
+  createPatch,
+  registerMathWorklets,
+  type NoteOff,
+  type PlayableSynthPatch,
+  type RuntimeOptions,
+} from '../../sw-patch'
 import TimeDomainVisualiser from '../components/TimeDomainVisualiser.vue'
 import BASS_PATCH from '../patches/adr-bass.swpatch?raw'
 import DEFAULT_PATCH from '../patches/default.swpatch?raw'
@@ -9,17 +15,11 @@ import PTOLEMY_PATCH from '../patches/ptolemy.swpatch?raw'
 import SOFTSAW_PATCH from '../patches/softsaw.swpatch?raw'
 import SOFT_NATIVE_PATCH from '../patches/soft-native.swpatch?raw'
 
-type NoteOff = (end: number) => number
-interface Synth {
-  on: (...args: unknown[]) => NoteOff
-  dispose: () => void
-}
-
-type SynthPatch = 'default' | 'bass' | 'ptolemy' | 'softsaw' | 'soft'
-type OscillatorType = 'sine' | 'triangle' | 'sawtooth' | 'square' | 'parabolic'
-
 const standardOscillatorTypes = ['sine', 'square', 'sawtooth', 'triangle'] as const
 const softOscillatorTypes = ['triangle', 'sawtooth', 'square', 'parabolic'] as const
+type OscillatorType =
+  | (typeof softOscillatorTypes)[number]
+  | (typeof standardOscillatorTypes)[number]
 
 // Dummy audio code just to get something going
 const ctx = new AudioContext({ latencyHint: 'interactive' })
@@ -34,14 +34,14 @@ for (const signal of [delayTime, feedback, wet, Q]) signal.start()
 const inputDelay = 0.01
 let mounted = true
 let delay: AudioNode
-let synth: Synth | undefined
+let synth: PlayableSynthPatch | undefined
 let activeSynthPatch: SynthPatch
 const synthPatchModel = ref<SynthPatch>('bass')
 const oscillatorTypeModel = ref<OscillatorType>('sawtooth')
 const oscillatorTypeOptions = computed<readonly OscillatorType[]>(() =>
   synthPatchModel.value === 'soft' ? softOscillatorTypes : standardOscillatorTypes,
 )
-const retiredSynths = new Map<Synth, ReturnType<typeof setTimeout>>()
+const retiredSynths = new Map<PlayableSynthPatch, ReturnType<typeof setTimeout>>()
 
 watch(synthPatchModel, () => {
   if (!oscillatorTypeOptions.value.includes(oscillatorTypeModel.value)) {
@@ -49,20 +49,21 @@ watch(synthPatchModel, () => {
   }
 })
 
-const synthPatches: Record<SynthPatch, string> = {
+const synthPatches = {
   bass: BASS_PATCH,
   default: DEFAULT_PATCH,
   ptolemy: PTOLEMY_PATCH,
   softsaw: SOFTSAW_PATCH,
   soft: SOFT_NATIVE_PATCH,
-}
+} as const satisfies Record<string, string>
+type SynthPatch = keyof typeof synthPatches
 
 const createSynth = (patch: SynthPatch, oscillatorType: OscillatorType) =>
   createPatch(synthPatches[patch], ctx, {
     config: { oscillatorType },
-  } as RuntimeOptions) as unknown as Synth
+  } as RuntimeOptions) as PlayableSynthPatch
 
-const retireSynth = (oldSynth: Synth, after: number) => {
+const retireSynth = (oldSynth: PlayableSynthPatch, after: number) => {
   const delayMilliseconds = Math.max(0, (after - ctx.currentTime) * 1000)
   if (delayMilliseconds === 0) {
     oldSynth.dispose()
@@ -163,7 +164,14 @@ const handleKeyDown = (e: KeyboardEvent) => {
     })
     const velocity = 0.8
     pitch.start()
-    const commonArgs = [delay, ctx.currentTime + inputDelay, pitch, velocity, 0.01, 0.5]
+    const commonArgs: [AudioNode, number, AudioNode, number, number, number] = [
+      delay,
+      ctx.currentTime + inputDelay,
+      pitch,
+      velocity,
+      0.01,
+      0.5,
+    ]
     // The stock patch takes sustain before release, while the bass patch takes
     // release and its filter Q signal. Keeping the calls distinct prevents an
     // AudioNode from being interpreted as the default patch's release duration.

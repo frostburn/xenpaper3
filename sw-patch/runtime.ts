@@ -17,6 +17,25 @@ export interface SynthPatch {
   dispose(): void
 }
 
+/** Releases a synth voice and returns the time at which its audio tail is silent. */
+export type NoteOff = (time: number) => number
+
+/**
+ * Conventional interface implemented by the bundled note-playing patches.
+ *
+ * The patch language itself does not require an `on` function, so callers that
+ * load arbitrary source must still validate or assert this more specific shape.
+ */
+export interface PlayableSynthPatch extends SynthPatch {
+  on(
+    destination: AudioNode,
+    start: number,
+    pitch: AudioNode,
+    velocity: number,
+    ...parameters: unknown[]
+  ): NoteOff
+}
+
 /** A patch whose top-level `input` and `output` bindings make it audio-connectable. */
 export type EffectPatch = SynthPatch & AudioNode
 
