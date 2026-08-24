@@ -6,4 +6,11 @@ export {
   PatchRuntime,
   registerMathWorklets,
 } from './runtime.js'
-export type { EffectPatch, PatchFunction, RuntimeOptions, SynthPatch } from './runtime.js'
+export type {
+  EffectPatch,
+  NoteOff,
+  PatchFunction,
+  PlayableSynthPatch,
+  RuntimeOptions,
+  SynthPatch,
+} from './runtime.js'

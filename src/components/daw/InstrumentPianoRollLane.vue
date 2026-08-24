@@ -1,9 +1,10 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
-import { parseClipNotes } from '../../daw/audio-engine'
+import { parseClipNotes } from '../../daw/score'
 import {
   beatToNumber,
   pointerXToBeat,
+  type ClipDisplayMode,
   type InstrumentLane,
   type SourceClip,
 } from '../../daw/project'
@@ -13,7 +14,7 @@ const props = defineProps<{
   selectedClipId?: string
   pixelsPerBeat: number
   scrollLeft: number
-  displayMode: 'source' | 'piano-roll'
+  displayMode: ClipDisplayMode
 }>()
 const emit = defineEmits<{
   insert: [beat: number]

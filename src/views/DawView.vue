@@ -5,7 +5,8 @@ import GlobalLane from '../components/daw/GlobalLane.vue'
 import InstrumentHeader from '../components/daw/InstrumentHeader.vue'
 import InstrumentPianoRollLane from '../components/daw/InstrumentPianoRollLane.vue'
 import TransportControls from '../components/daw/TransportControls.vue'
-import { DawAudioEngine, sourceClipLength } from '../daw/audio-engine'
+import { DawAudioEngine } from '../daw/audio-engine'
+import { sourceClipLength } from '../daw/score'
 import {
   beat,
   beatToNumber,
@@ -13,6 +14,7 @@ import {
   createDefaultProject,
   snapBeat,
   type Beat,
+  type ClipDisplayMode,
   type SourceClip,
 } from '../daw/project'
 
@@ -22,7 +24,7 @@ const playhead = ref(0)
 const pixelsPerBeat = ref(64)
 const scrollLeft = ref(0)
 const grid = ref<Beat>({ numerator: 1, denominator: 4 })
-const displayMode = ref<'source' | 'piano-roll'>('piano-roll')
+const displayMode = ref<ClipDisplayMode>('piano-roll')
 const playing = ref(false)
 const playbackError = ref('')
 let playTimer: ReturnType<typeof setInterval> | undefined

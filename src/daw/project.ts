@@ -21,7 +21,11 @@ export interface GlobalTrack {
   timeSignatureChanges: TimeSignatureChange[]
 }
 
-export type OscillatorType = 'sine' | 'square' | 'sawtooth' | 'triangle'
+export const OSCILLATOR_TYPES = ['sine', 'square', 'sawtooth', 'triangle'] as const
+export type OscillatorType = (typeof OSCILLATOR_TYPES)[number]
+
+export const CLIP_DISPLAY_MODES = ['piano-roll', 'source'] as const
+export type ClipDisplayMode = (typeof CLIP_DISPLAY_MODES)[number]
 
 export interface SourceClip {
   id: string

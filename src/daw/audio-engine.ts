@@ -1,161 +1,17 @@
-import {
-  evaluateExpression,
-  expandToBeatEvents,
-  parse,
-  type DirectiveExtension,
-} from '../../xenpaper-lang'
-import { createPatch, type SynthPatch } from '../../sw-patch'
+import { createPatch, type PlayableSynthPatch } from '../../sw-patch'
 import { Transport } from '../../sw-seq'
 import DEFAULT_PATCH_SOURCE from '../patches/default.swpatch?raw'
-import { beat, beatToNumber, type Beat, type DawProject } from './project'
+import type { DawProject } from './project'
+import { parseProjectNotes } from './score'
+import { projectBeatToSeconds, projectSecondsToBeat } from './timeline'
 
-type PatchSynth = SynthPatch & {
-  on(
-    destination: AudioNode,
-    start: number,
-    pitch: AudioNode,
-    velocity: number,
-    attack?: number,
-    decay?: number,
-    sustain?: number,
-    release?: number,
-  ): (end: number) => number
-}
+// Compatibility exports for non-UI consumers; implementations live in their
+// domain modules so rendering never depends on the Web Audio engine.
+export { parseClipNotes, parseProjectNotes, sourceClipLength } from './score'
+export type { EnvelopeSettings, ScheduledLaneNote } from './score'
+export { projectBeatToSeconds, projectSecondsToBeat } from './timeline'
 
-export interface ScheduledLaneNote {
-  readonly beat: number
-  readonly duration: number
-  readonly cents: number
-  readonly velocity: number
-  readonly envelope: EnvelopeSettings
-}
-
-export interface EnvelopeSettings {
-  readonly attack: number
-  readonly decay: number
-  readonly sustain: number
-  readonly release: number
-}
-
-/** Parse the note events in one clip, keeping their positions relative to its start. */
-export const parseClipNotes = (source: string, duration = Number.POSITIVE_INFINITY) => {
-  const result = expandToBeatEvents(parse(source), { directiveExtensions: [envelopeExtension] })
-  const errors = result.diagnostics.filter(({ severity }) => severity === 'error')
-  if (errors.length) throw new Error(errors.map(({ message }) => message).join('\n'))
-  if (!('score' in result)) return []
-
-  return result.score.events
-    .filter((event) => event.kind === 'note')
-    .filter((event) => event.start.valueOf() < duration)
-    .map((event) => ({
-      beat: event.start.valueOf(),
-      duration: Math.min(event.duration.valueOf(), duration - event.start.valueOf()),
-      cents: event.pitch.value.valueOf(),
-      velocity: event.dynamic.valueOf(),
-      envelope: (event.directiveState.patch as EnvelopeSettings | undefined) ?? DEFAULT_ENVELOPE,
-    }))
-}
-
-const DEFAULT_ENVELOPE: EnvelopeSettings = Object.freeze({
-  attack: 0.1,
-  decay: 0.2,
-  sustain: 0.7,
-  release: 0.3,
-})
-
-const envelopeExtension: DirectiveExtension = {
-  name: 'patch',
-  initialState: DEFAULT_ENVELOPE,
-  apply(directive, context, previousState) {
-    const envelope = { ...(previousState as EnvelopeSettings) }
-    const diagnostics = []
-    for (const argument of directive.arguments) {
-      if (argument.type !== 'NamedArgument' || !(argument.name in envelope))
-        throw new Error('@patch accepts the named attack, decay, sustain, and release parameters.')
-      const result = evaluateExpression(argument.value, context)
-      diagnostics.push(...result.diagnostics)
-      if (!('value' in result) || result.value.kind !== 'scalar')
-        throw new Error(`Patch parameter ${argument.name} must be scalar.`)
-      envelope[argument.name as keyof EnvelopeSettings] = result.value.value.valueOf()
-    }
-    return { state: Object.freeze(envelope), diagnostics }
-  },
-}
-
-/** Derive a clip's visual span from its evaluated source, using one bar for empty scores. */
-export const sourceClipLength = (source: string, defaultBar = beat(4)): Beat => {
-  const result = expandToBeatEvents(parse(source), { directiveExtensions: [envelopeExtension] })
-  if (!('score' in result) || result.diagnostics.some(({ severity }) => severity === 'error'))
-    return defaultBar
-  const duration = result.score.duration
-  if (!duration.n) return defaultBar
-  return beat(Number(duration.s * duration.n), duration.d)
-}
-
-/** Parse every clip in a lane and place its Xenpaper events on the project timeline. */
-export const parseProjectNotes = (project: DawProject): ScheduledLaneNote[] => {
-  const notes: ScheduledLaneNote[] = []
-  for (const lane of project.instrumentLanes) {
-    for (const clip of lane.clips) {
-      const clipStart = beatToNumber(clip.start)
-      for (const event of parseClipNotes(clip.source, beatToNumber(clip.length))) {
-        notes.push({
-          ...event,
-          beat: clipStart + event.beat,
-        })
-      }
-    }
-  }
-  return notes.sort((left, right) => left.beat - right.beat)
-}
-
-const tempoPoints = (project: DawProject) => {
-  const points = project.globalTrack.tempoChanges
-    .map(({ beat, bpm }) => ({ beat: beatToNumber(beat), bpm }))
-    .filter(({ beat, bpm }) => beat >= 0 && bpm > 0)
-    .sort((left, right) => left.beat - right.beat)
-  if (!points.length || points[0]!.beat > 0) points.unshift({ beat: 0, bpm: 120 })
-  return points
-}
-
-/** Integrate the piecewise-constant tempo map from beat zero. */
-export const projectBeatToSeconds = (project: DawProject, beat: number): number => {
-  const points = tempoPoints(project)
-  let seconds = 0
-  let cursor = 0
-  let bpm = points[0]!.bpm
-  for (const point of points) {
-    if (point.beat <= cursor) {
-      bpm = point.bpm
-      continue
-    }
-    if (point.beat >= beat) break
-    seconds += ((point.beat - cursor) * 60) / bpm
-    cursor = point.beat
-    bpm = point.bpm
-  }
-  return seconds + ((beat - cursor) * 60) / bpm
-}
-
-/** Invert the tempo map so the Web Audio clock can drive the beat playhead. */
-export const projectSecondsToBeat = (project: DawProject, seconds: number): number => {
-  const points = tempoPoints(project)
-  let elapsed = 0
-  let beat = 0
-  let bpm = points[0]!.bpm
-  for (const point of points) {
-    if (point.beat <= beat) {
-      bpm = point.bpm
-      continue
-    }
-    const segment = ((point.beat - beat) * 60) / bpm
-    if (elapsed + segment >= seconds) return beat + ((seconds - elapsed) * bpm) / 60
-    elapsed += segment
-    beat = point.beat
-    bpm = point.bpm
-  }
-  return beat + ((seconds - elapsed) * bpm) / 60
-}
+type PatchSynth = PlayableSynthPatch
 
 /** One disposable Web Audio playback session backed by sw-seq and default.swpatch. */
 export class DawAudioEngine extends EventTarget {
