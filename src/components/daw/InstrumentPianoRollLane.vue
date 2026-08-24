@@ -81,10 +81,11 @@ const pianoRoll = computed(() => {
   const guides = Array.from({ length: lastOctave - firstOctave + 1 }, (_, index) => {
     const cents = (firstOctave + index) * 1200
     return { cents, top: pitchTop(cents) }
-  })
+  }).filter(({ cents }) => cents !== 0)
 
   return {
     guides,
+    globalZeroTop: pitchTop(0),
     notesByClip: Object.fromEntries(
       displayClips.map(({ clip, notes, registerOffset }) => {
         const clipDuration = beatToNumber(clip.length)
@@ -173,10 +174,14 @@ const moveDrag = (event: PointerEvent) => {
           }}{{ clipPreview(clip.id).registerOffset }} cents</span
         >
         <span
+          class="pitch-guide global-reference"
+          data-cents="0"
+          :style="{ top: pianoRoll.globalZeroTop }"
+        />
+        <span
           v-for="guide in pianoRoll.guides"
           :key="guide.cents"
           class="pitch-guide"
-          :class="{ 'global-reference': guide.cents === 0 }"
           :data-cents="guide.cents"
           :style="{ top: guide.top }"
         />
@@ -239,9 +244,7 @@ const moveDrag = (event: PointerEvent) => {
 }
 .pitch-guide.global-reference {
   z-index: 1;
-  border-top-width: 3px;
-  border-top-style: solid;
-  border-top-color: #ff3535;
+  border-top: 3px solid #ff3535;
 }
 .register-label {
   position: absolute;

@@ -225,9 +225,19 @@ describe('DawView', () => {
       (secondC.element as HTMLElement).style.top,
     )
 
-    const guides = previews[0]!.findAll('.pitch-guide')
+    const guides = previews[0]!.findAll('.pitch-guide:not(.global-reference)')
     expect(guides.every((guide) => Number(guide.attributes('data-cents')) % 1200 === 0)).toBe(true)
     expect(previews[0]!.get('.pitch-guide[data-cents="0"]').classes()).toContain('global-reference')
+  })
+
+  it('renders the zero-cent guide as solid for the default chord clip', async () => {
+    const wrapper = mount(DawView)
+    await wrapper.getComponent(InstrumentPianoRollLane).trigger('dblclick', { clientX: 64 })
+
+    const preview = wrapper.get('[aria-label="Piano roll preview"]')
+    const zeroGuides = preview.findAll('.pitch-guide[data-cents="0"]')
+    expect(zeroGuides).toHaveLength(1)
+    expect(zeroGuides[0]!.classes()).toContain('global-reference')
   })
 
   it('folds disparate clip registers into view and labels their octave offset', () => {
