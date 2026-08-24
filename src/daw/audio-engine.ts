@@ -94,7 +94,7 @@ export const projectSecondsToBeat = (project: DawProject, seconds: number): numb
 export class DawAudioEngine extends EventTarget {
   readonly context: AudioContext
   private transport: Transport | undefined
-  private readonly output: GainNode
+  private output: GainNode
   private readonly synths: PatchSynth[] = []
   private pitchSignals: ConstantSourceNode[] = []
   private activeProject: DawProject | undefined
@@ -189,7 +189,14 @@ export class DawAudioEngine extends EventTarget {
     this.activeProject = undefined
     if (this.completionTimer) clearTimeout(this.completionTimer)
     this.completionTimer = undefined
+    // Parametric note-offs have already been committed by sw-seq and are deliberately
+    // one-shot. Mute and retire the session bus instead of trying to release them twice.
+    this.output.gain.cancelScheduledValues(this.context.currentTime)
+    this.output.gain.setValueAtTime(0, this.context.currentTime)
+    this.output.disconnect()
     this.releasePlaybackResources()
+    this.output = new GainNode(this.context, { gain: 0.35 })
+    this.output.connect(this.context.destination)
   }
 
   dispose(): void {

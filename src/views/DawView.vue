@@ -32,6 +32,7 @@ const selectedClip = computed(() => lane.value.clips.find(({ id }) => id === sel
 
 const finishPlayback = () => {
   playing.value = false
+  playhead.value = 0
   if (playTimer) clearInterval(playTimer)
   playTimer = undefined
 }
