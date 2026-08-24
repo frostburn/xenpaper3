@@ -78,4 +78,62 @@ describe('DawView', () => {
     expect(wrapper.get('button.clip').classes()).toContain('selected')
     expect(beatToNumber(beat(1, 4))).toBe(0.25)
   })
+
+  it('does not create overlapping clips when an existing clip is double-clicked', async () => {
+    const wrapper = mount(DawView)
+    const lane = wrapper.getComponent(InstrumentPianoRollLane)
+    await lane.trigger('dblclick', { clientX: 64 })
+    await wrapper.get('button.clip').trigger('dblclick', { clientX: 64 })
+
+    expect(wrapper.findAll('button.clip')).toHaveLength(1)
+  })
+
+  it('keeps the visual grid aligned with zoom and scroll', async () => {
+    const wrapper = mount(DawView)
+    const controls = wrapper.findAll<HTMLInputElement>('.timeline-controls input')
+    await controls[0]!.setValue('96')
+    await controls[1]!.setValue('32')
+
+    const style = wrapper.get('[aria-label="Instrument piano roll"]').attributes('style')
+    expect(style).toContain('--beat-width: 96px')
+    expect(style).toContain('--grid-offset: -32px')
+  })
+
+  it('edits global controls, waveform, and the clip preview mode', async () => {
+    const wrapper = mount(DawView)
+    await wrapper.get('[aria-label="Tempo in BPM"]').setValue('144')
+    await wrapper.get('[aria-label="Time signature numerator"]').setValue('7')
+    await wrapper.get('[aria-label="Time signature denominator"]').setValue('8')
+    await wrapper.get('[aria-label="Waveform"]').setValue('triangle')
+
+    expect((wrapper.get('[aria-label="Tempo in BPM"]').element as HTMLInputElement).value).toBe(
+      '144',
+    )
+    expect((wrapper.get('[aria-label="Waveform"]').element as HTMLSelectElement).value).toBe(
+      'triangle',
+    )
+
+    await wrapper.getComponent(InstrumentPianoRollLane).trigger('dblclick', { clientX: 64 })
+    expect(wrapper.find('[aria-label="Piano roll preview"]').exists()).toBe(true)
+    await wrapper.get('[aria-label="Clip display"]').setValue('source')
+    expect(wrapper.get('button.clip pre').text()).toContain('[0,4,7]===')
+  })
+
+  it('moves clips on the snapped grid and wires play and stop', async () => {
+    const wrapper = mount(DawView)
+    const lane = wrapper.getComponent(InstrumentPianoRollLane)
+    await lane.trigger('dblclick', { clientX: 64 })
+    const clip = wrapper.get('button.clip')
+    clip.element.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, clientX: 70 }))
+    lane.element.dispatchEvent(new MouseEvent('pointermove', { bubbles: true, clientX: 139 }))
+    lane.element.dispatchEvent(new MouseEvent('pointerup', { bubbles: true }))
+    await wrapper.vm.$nextTick()
+    expect(clip.attributes('style')).toContain('left: 128px')
+
+    await wrapper.get('[aria-label="Play"]').trigger('click')
+    expect(wrapper.get('[aria-label="Play"]').attributes('aria-pressed')).toBe('true')
+    await wrapper.get('[aria-label="Stop"]').trigger('click')
+    expect(wrapper.get('output').text()).toBe('Beat 0.00')
+    wrapper.unmount()
+  })
 })
