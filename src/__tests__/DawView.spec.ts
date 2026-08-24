@@ -6,6 +6,7 @@ import InstrumentPianoRollLane from '../components/daw/InstrumentPianoRollLane.v
 import { beat, beatToNumber, createDefaultProject, pointerXToBeat, snapBeat } from '../daw/project'
 import {
   parseProjectNotes,
+  parseClipNotes,
   projectBeatToSeconds,
   projectSecondsToBeat,
   sourceClipLength,
@@ -50,6 +51,13 @@ describe('DAW project model', () => {
     expect(notes.map(({ beat: start }) => start)).toEqual([2, 3, 4])
     expect(notes.every(({ duration }) => duration === 1)).toBe(true)
     expect(notes[0]!.cents).not.toBe(notes[1]!.cents)
+  })
+
+  it('parses clip-local notes for piano-roll rendering', () => {
+    expect(parseClipNotes('C D E', 2)).toMatchObject([
+      { beat: 0, duration: 1 },
+      { beat: 1, duration: 1 },
+    ])
   })
 
   it('derives clip length from source and keeps zero-duration source visible for a bar', () => {
@@ -183,6 +191,19 @@ describe('DawView', () => {
     await wrapper.get('textarea[aria-label="Xenpaper clip source"]').setValue('C D')
 
     expect(wrapper.get('button.clip').attributes('style')).toContain('width: 128px')
+  })
+
+  it('renders piano-roll notes parsed from the edited clip source', async () => {
+    const wrapper = mount(DawView)
+    await wrapper.getComponent(InstrumentPianoRollLane).trigger('dblclick', { clientX: 64 })
+    await wrapper.get('textarea[aria-label="Xenpaper clip source"]').setValue('C D E')
+
+    const notes = wrapper.findAll('[aria-label="Piano roll preview"] i')
+    expect(notes).toHaveLength(3)
+    expect(notes.map((note) => note.attributes('data-beat'))).toEqual(['0', '1', '2'])
+    expect(notes[0]!.attributes('style')).toContain('left: 0%')
+    expect(notes[1]!.attributes('style')).toContain('left: 33.333')
+    expect(notes[0]!.attributes('data-cents')).not.toBe(notes[1]!.attributes('data-cents'))
   })
 
   it('moves clips on the snapped grid and wires play and stop', async () => {

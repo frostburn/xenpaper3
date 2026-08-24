@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
+import { parseClipNotes } from '../../daw/audio-engine'
 import {
   beatToNumber,
   pointerXToBeat,
@@ -23,6 +24,33 @@ const emit = defineEmits<{
 
 const dragging = ref<{ clip: SourceClip; pointerOffset: number }>()
 const laneElement = ref<HTMLElement>()
+
+const pianoRolls = computed(() =>
+  Object.fromEntries(
+    props.lane.clips.map((clip) => {
+      const clipDuration = beatToNumber(clip.length)
+      try {
+        const notes = parseClipNotes(clip.source, clipDuration)
+        const pitches = notes.map(({ cents }) => cents)
+        const lowest = Math.min(...pitches)
+        const highest = Math.max(...pitches)
+        const pitchSpan = highest - lowest
+        return [
+          clip.id,
+          notes.map((note) => ({
+            ...note,
+            left: `${(note.beat / clipDuration) * 100}%`,
+            width: `${(note.duration / clipDuration) * 100}%`,
+            top: `${pitchSpan ? 8 + ((highest - note.cents) / pitchSpan) * 76 : 46}%`,
+          })),
+        ]
+      } catch {
+        // Invalid source is expected while the user is editing; show an empty preview.
+        return [clip.id, []]
+      }
+    }),
+  ),
+)
 
 const pointerBeat = (event: MouseEvent) =>
   pointerXToBeat(
@@ -86,9 +114,12 @@ const moveDrag = (event: PointerEvent) => {
       <pre v-if="displayMode === 'source'">{{ clip.source }}</pre>
       <span v-else class="piano-roll" aria-label="Piano roll preview">
         <i
-          v-for="(note, index) in [1, 3, 5, 2, 6]"
+          v-for="(note, index) in pianoRolls[clip.id]"
           :key="index"
-          :style="{ top: `${note * 12}%`, left: `${index * 19}%` }"
+          :data-beat="note.beat"
+          :data-duration="note.duration"
+          :data-cents="note.cents"
+          :style="{ top: note.top, left: note.left, width: note.width }"
         />
       </span>
     </button>
@@ -135,8 +166,8 @@ const moveDrag = (event: PointerEvent) => {
 }
 .piano-roll i {
   position: absolute;
-  width: 25%;
   height: 9%;
+  min-width: 2px;
   border-radius: 2px;
   background: #9de3ff;
 }
