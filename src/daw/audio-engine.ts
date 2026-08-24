@@ -1,11 +1,25 @@
-import { expandToBeatEvents, parse } from '../../xenpaper-lang'
+import {
+  evaluateExpression,
+  expandToBeatEvents,
+  parse,
+  type DirectiveExtension,
+} from '../../xenpaper-lang'
 import { createPatch, type SynthPatch } from '../../sw-patch'
 import { Transport } from '../../sw-seq'
 import DEFAULT_PATCH_SOURCE from '../patches/default.swpatch?raw'
-import { beatToNumber, type DawProject } from './project'
+import { beat, beatToNumber, type Beat, type DawProject } from './project'
 
 type PatchSynth = SynthPatch & {
-  on(destination: AudioNode, start: number, pitch: AudioNode, velocity: number): (end: number) => number
+  on(
+    destination: AudioNode,
+    start: number,
+    pitch: AudioNode,
+    velocity: number,
+    attack?: number,
+    decay?: number,
+    sustain?: number,
+    release?: number,
+  ): (end: number) => number
 }
 
 export interface ScheduledLaneNote {
@@ -13,6 +27,50 @@ export interface ScheduledLaneNote {
   readonly duration: number
   readonly cents: number
   readonly velocity: number
+  readonly envelope: EnvelopeSettings
+}
+
+export interface EnvelopeSettings {
+  readonly attack: number
+  readonly decay: number
+  readonly sustain: number
+  readonly release: number
+}
+
+const DEFAULT_ENVELOPE: EnvelopeSettings = Object.freeze({
+  attack: 0.1,
+  decay: 0.2,
+  sustain: 0.7,
+  release: 0.3,
+})
+
+const envelopeExtension: DirectiveExtension = {
+  name: 'patch',
+  initialState: DEFAULT_ENVELOPE,
+  apply(directive, context, previousState) {
+    const envelope = { ...(previousState as EnvelopeSettings) }
+    const diagnostics = []
+    for (const argument of directive.arguments) {
+      if (argument.type !== 'NamedArgument' || !(argument.name in envelope))
+        throw new Error('@patch accepts the named attack, decay, sustain, and release parameters.')
+      const result = evaluateExpression(argument.value, context)
+      diagnostics.push(...result.diagnostics)
+      if (!('value' in result) || result.value.kind !== 'scalar')
+        throw new Error(`Patch parameter ${argument.name} must be scalar.`)
+      envelope[argument.name as keyof EnvelopeSettings] = result.value.value.valueOf()
+    }
+    return { state: Object.freeze(envelope), diagnostics }
+  },
+}
+
+/** Derive a clip's visual span from its evaluated source, using one bar for empty scores. */
+export const sourceClipLength = (source: string, defaultBar = beat(4)): Beat => {
+  const result = expandToBeatEvents(parse(source), { directiveExtensions: [envelopeExtension] })
+  if (!('score' in result) || result.diagnostics.some(({ severity }) => severity === 'error'))
+    return defaultBar
+  const duration = result.score.duration
+  if (!duration.n) return defaultBar
+  return beat(Number(duration.s * duration.n), duration.d)
 }
 
 /** Parse every clip in a lane and place its Xenpaper events on the project timeline. */
@@ -20,7 +78,9 @@ export const parseProjectNotes = (project: DawProject): ScheduledLaneNote[] => {
   const notes: ScheduledLaneNote[] = []
   for (const lane of project.instrumentLanes) {
     for (const clip of lane.clips) {
-      const result = expandToBeatEvents(parse(clip.source))
+      const result = expandToBeatEvents(parse(clip.source), {
+        directiveExtensions: [envelopeExtension],
+      })
       const errors = result.diagnostics.filter(({ severity }) => severity === 'error')
       if (errors.length) throw new Error(errors.map(({ message }) => message).join('\n'))
       if (!('score' in result)) continue
@@ -35,6 +95,7 @@ export const parseProjectNotes = (project: DawProject): ScheduledLaneNote[] => {
           duration: Math.min(event.duration.valueOf(), clipEnd - beat),
           cents: event.pitch.value.valueOf(),
           velocity: event.dynamic.valueOf(),
+          envelope: (event.directiveState.patch as EnvelopeSettings | undefined) ?? DEFAULT_ENVELOPE,
         })
       }
     }
@@ -145,7 +206,17 @@ export class DawAudioEngine extends EventTarget {
             const pitch = new ConstantSourceNode(this.context, { offset: note.cents })
             this.pitchSignals.push(pitch)
             pitch.start(time)
-            const off = synth.on(this.output, time, pitch, note.velocity)
+            const { attack, decay, sustain, release } = note.envelope
+            const off = synth.on(
+              this.output,
+              time,
+              pitch,
+              note.velocity * lane.gain,
+              attack,
+              decay,
+              sustain,
+              release,
+            )
             return (end) => {
               const tail = off(end)
               this.latestCutoff = Math.max(this.latestCutoff, tail)

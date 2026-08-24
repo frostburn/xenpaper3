@@ -2,7 +2,10 @@
 import type { InstrumentLane } from '../../daw/project'
 
 defineProps<{ lane: InstrumentLane }>()
-defineEmits<{ 'update-oscillator': [type: InstrumentLane['oscillatorType']] }>()
+defineEmits<{
+  'update-oscillator': [type: InstrumentLane['oscillatorType']]
+  'update-gain': [gain: number]
+}>()
 </script>
 
 <template>
@@ -25,6 +28,19 @@ defineEmits<{ 'update-oscillator': [type: InstrumentLane['oscillatorType']] }>()
         </option>
       </select>
     </label>
+    <label>
+      Gain
+      <input
+        aria-label="Instrument gain"
+        type="range"
+        min="0"
+        max="1"
+        step="0.01"
+        :value="lane.gain"
+        @input="$emit('update-gain', Number(($event.target as HTMLInputElement).value))"
+      />
+      <output>{{ Math.round(lane.gain * 100) }}%</output>
+    </label>
   </header>
 </template>
 
@@ -32,7 +48,14 @@ defineEmits<{ 'update-oscillator': [type: InstrumentLane['oscillatorType']] }>()
 .instrument-header {
   display: flex;
   justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
   padding: 0.6rem;
   background: #283143;
+}
+.instrument-header label {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
 }
 </style>

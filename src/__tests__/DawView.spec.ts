@@ -8,6 +8,7 @@ import {
   parseProjectNotes,
   projectBeatToSeconds,
   projectSecondsToBeat,
+  sourceClipLength,
 } from '../daw/audio-engine'
 
 describe('DAW project model', () => {
@@ -49,6 +50,29 @@ describe('DAW project model', () => {
     expect(notes.map(({ beat: start }) => start)).toEqual([2, 3, 4])
     expect(notes.every(({ duration }) => duration === 1)).toBe(true)
     expect(notes[0]!.cents).not.toBe(notes[1]!.cents)
+  })
+
+  it('derives clip length from source and keeps zero-duration source visible for a bar', () => {
+    expect(sourceClipLength('C D E')).toEqual(beat(3))
+    expect(sourceClipLength('# only a comment')).toEqual(beat(4))
+    expect(sourceClipLength('@tempo(120)')).toEqual(beat(4))
+  })
+
+  it('carries authored patch envelope parameters into scheduled notes', () => {
+    const project = createDefaultProject()
+    project.instrumentLanes[0]!.clips.push({
+      id: 'envelope',
+      start: beat(0),
+      length: beat(4),
+      source: '@patch(attack: 20ms, decay: 150ms, sustain: 55%, release: 400ms) C',
+    })
+
+    expect(parseProjectNotes(project)[0]!.envelope).toMatchObject({
+      attack: expect.closeTo(0.02),
+      decay: expect.closeTo(0.15),
+      sustain: expect.closeTo(0.55),
+      release: expect.closeTo(0.4),
+    })
   })
 
   it('integrates every tempo segment and converts audio time back to beats', () => {
@@ -137,6 +161,7 @@ describe('DawView', () => {
     await wrapper.get('[aria-label="Time signature numerator"]').setValue('7')
     await wrapper.get('[aria-label="Time signature denominator"]').setValue('8')
     await wrapper.get('[aria-label="Waveform"]').setValue('triangle')
+    await wrapper.get('[aria-label="Instrument gain"]').setValue('0.42')
 
     expect((wrapper.get('[aria-label="Tempo in BPM"]').element as HTMLInputElement).value).toBe(
       '144',
@@ -144,11 +169,20 @@ describe('DawView', () => {
     expect((wrapper.get('[aria-label="Waveform"]').element as HTMLSelectElement).value).toBe(
       'triangle',
     )
+    expect(wrapper.get('.instrument-header output').text()).toBe('42%')
 
     await wrapper.getComponent(InstrumentPianoRollLane).trigger('dblclick', { clientX: 64 })
     expect(wrapper.find('[aria-label="Piano roll preview"]').exists()).toBe(true)
     await wrapper.get('[aria-label="Clip display"]').setValue('source')
     expect(wrapper.get('button.clip pre').text()).toContain('[0,4,7]===')
+  })
+
+  it('resizes a clip when its source duration changes', async () => {
+    const wrapper = mount(DawView)
+    await wrapper.getComponent(InstrumentPianoRollLane).trigger('dblclick', { clientX: 64 })
+    await wrapper.get('textarea[aria-label="Xenpaper clip source"]').setValue('C D')
+
+    expect(wrapper.get('button.clip').attributes('style')).toContain('width: 128px')
   })
 
   it('moves clips on the snapped grid and wires play and stop', async () => {

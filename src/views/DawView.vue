@@ -5,8 +5,9 @@ import GlobalLane from '../components/daw/GlobalLane.vue'
 import InstrumentHeader from '../components/daw/InstrumentHeader.vue'
 import InstrumentPianoRollLane from '../components/daw/InstrumentPianoRollLane.vue'
 import TransportControls from '../components/daw/TransportControls.vue'
-import { DawAudioEngine } from '../daw/audio-engine'
+import { DawAudioEngine, sourceClipLength } from '../daw/audio-engine'
 import {
+  beat,
   beatToNumber,
   createClip,
   createDefaultProject,
@@ -95,6 +96,12 @@ const moveClip = (clip: SourceClip, rawBeat: number) => {
   playhead.value = beatToNumber(clip.start)
 }
 
+const updateClipSource = (clip: SourceClip, source: string) => {
+  clip.source = source
+  const signature = project.value.globalTrack.timeSignatureChanges[0]!
+  clip.length = sourceClipLength(source, beat(signature.numerator * 4, signature.denominator))
+}
+
 onBeforeUnmount(() => {
   if (playTimer) clearInterval(playTimer)
   audioEngine?.dispose()
@@ -133,7 +140,11 @@ onBeforeUnmount(() => {
         }
       "
     />
-    <InstrumentHeader :lane="lane" @update-oscillator="lane.oscillatorType = $event" />
+    <InstrumentHeader
+      :lane="lane"
+      @update-oscillator="lane.oscillatorType = $event"
+      @update-gain="lane.gain = $event"
+    />
     <InstrumentPianoRollLane
       :lane="lane"
       :selected-clip-id="selectedClipId"
@@ -148,7 +159,7 @@ onBeforeUnmount(() => {
     <ClipSourceEditor
       ref="editor"
       :clip="selectedClip"
-      @update-source="selectedClip && (selectedClip.source = $event)"
+      @update-source="selectedClip && updateClipSource(selectedClip, $event)"
     />
   </div>
 </template>
