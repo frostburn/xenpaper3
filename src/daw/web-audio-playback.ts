@@ -152,7 +152,9 @@ export class WebAudioPlaybackSession {
   private readonly handleTransportEnded = (): void => {
     if (this.state !== 'playing') return
     this.state = 'tail'
-    const delay = Math.max(0, (this.latestCutoff - this.context.currentTime) * 1000)
+    // A fractional millisecond timeout is rounded down by some hosts. Rounding up keeps
+    // teardown from racing the scheduled release cutoff.
+    const delay = Math.max(0, Math.ceil((this.latestCutoff - this.context.currentTime) * 1000))
     this.completionTimer = setTimeout(() => {
       this.completionTimer = undefined
       if (this.state !== 'tail') return
@@ -166,10 +168,13 @@ export class WebAudioPlaybackSession {
     this.output.gain.cancelScheduledValues(this.context.currentTime)
     this.output.gain.setValueAtTime(0, this.context.currentTime)
     this.output.disconnect()
-    for (const pitch of this.pitchSignals) pitch.disconnect()
-    this.pitchSignals.length = 0
+    // Patches own the targeted pitch -> AudioParam connections. Dispose them before
+    // disconnecting the sources wholesale: disconnecting a source first makes the
+    // patch's later targeted disconnect throw in browsers.
     for (const synth of this.synths) synth.dispose()
     this.synths.length = 0
+    for (const pitch of this.pitchSignals) pitch.disconnect()
+    this.pitchSignals.length = 0
     this.latestCutoff = 0
   }
 }
