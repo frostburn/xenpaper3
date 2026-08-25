@@ -8,6 +8,9 @@ import {
   parseProjectNotes,
   parseClipNotes,
   notePlaybackWindow,
+  easeGlissando,
+  glissandoPitchAtBeat,
+  glissandoPitchAtElapsedTime,
   projectBeatToSeconds,
   projectSecondsToBeat,
   sourceClipLength,
@@ -34,6 +37,7 @@ describe('DAW project model', () => {
       id: 'instrument-1',
       patchSource: 'default',
       oscillatorType: 'sawtooth',
+      envelope: { attack: 0.1, decay: 0.2, sustain: 0.7, release: 0.3 },
       clips: [],
     })
     expect(JSON.parse(JSON.stringify(project))).toEqual(project)
@@ -88,6 +92,60 @@ describe('DAW project model', () => {
       sustain: expect.closeTo(0.55),
       release: expect.closeTo(0.4),
     })
+  })
+
+  it('uses lane ADSR defaults and keeps clip patch directives as overrides', () => {
+    const project = createDefaultProject()
+    const lane = project.instrumentLanes[0]!
+    lane.envelope = { attack: 0.03, decay: 0.4, sustain: 0.25, release: 0.8 }
+    lane.clips.push({
+      id: 'defaults',
+      start: beat(0),
+      length: beat(2),
+      source: 'C @patch(sustain: 90%) D',
+    })
+
+    const notes = parseProjectNotes(project)
+    expect(notes[0]!.envelope).toEqual(lane.envelope)
+    expect(notes[1]!.envelope).toEqual({ ...lane.envelope, sustain: 0.9 })
+  })
+
+  it('compiles glissando segments and implements all supported easing curves', () => {
+    const note = parseClipNotes('@gliss(ease-in) C @gliss(ease-out) D E')[0]!
+    expect(note.glissando).toMatchObject([
+      { start: 0, duration: 1, easing: 'ease-in' },
+      { start: 1, duration: 1, easing: 'ease-out' },
+    ])
+    expect(note.glissando![0]!.from).toBe(note.cents)
+    expect(note.glissando![0]!.to).not.toBe(note.cents)
+    expect(easeGlissando('linear', 0.5)).toBe(0.5)
+    expect(easeGlissando('ease-in', 0.5)).toBe(0.25)
+    expect(easeGlissando('ease-out', 0.5)).toBe(0.75)
+    expect(easeGlissando('ease-in-out', 0.5)).toBe(0.5)
+    expect(easeGlissando('ease', 0.5)).toBeCloseTo(0.59375)
+  })
+
+  it('holds a completed glide target when playback resumes later in the note', () => {
+    const note = parseClipNotes('@gliss C G')[0]!
+
+    expect(note.duration).toBe(2)
+    expect(glissandoPitchAtBeat(note, 1.5)).toBe(note.glissando![0]!.to)
+  })
+
+  it('samples glissando pitch in project beats across tempo changes', () => {
+    const project = createDefaultProject()
+    project.globalTrack.tempoChanges[0]!.bpm = 60
+    project.globalTrack.tempoChanges.push({ id: 'faster', beat: beat(1), bpm: 120 })
+    const note = parseClipNotes('@gliss C= G?')[0]!
+    const segment = note.glissando![0]!
+    const durationSeconds = projectBeatToSeconds(project, 2)
+
+    // Half of the 1.5-second glide is only beat 0.75, not beat 1, because its
+    // second beat is twice as fast as its first.
+    expect(projectSecondsToBeat(project, durationSeconds / 2)).toBe(0.75)
+    expect(glissandoPitchAtElapsedTime(note, project, 0, durationSeconds, 0.5)).toBeCloseTo(
+      segment.from + (segment.to - segment.from) * 0.375,
+    )
   })
 
   it('integrates every tempo segment and converts audio time back to beats', () => {
@@ -193,6 +251,8 @@ describe('DawView', () => {
     await wrapper.get('[aria-label="Time signature denominator"]').setValue('8')
     await wrapper.get('[aria-label="Waveform"]').setValue('triangle')
     await wrapper.get('[aria-label="Instrument gain"]').setValue('0.42')
+    await wrapper.get('[aria-label="Default attack"]').setValue('0.04')
+    await wrapper.get('[aria-label="Default sustain"]').setValue('0.6')
 
     expect((wrapper.get('[aria-label="Tempo in BPM"]').element as HTMLInputElement).value).toBe(
       '144',
@@ -201,6 +261,12 @@ describe('DawView', () => {
       'triangle',
     )
     expect(wrapper.get('.instrument-header output').text()).toBe('42%')
+    expect((wrapper.get('[aria-label="Default attack"]').element as HTMLInputElement).value).toBe(
+      '0.04',
+    )
+    expect((wrapper.get('[aria-label="Default sustain"]').element as HTMLInputElement).value).toBe(
+      '0.6',
+    )
 
     await wrapper.getComponent(InstrumentPianoRollLane).trigger('dblclick', { clientX: 64 })
     expect(wrapper.find('[aria-label="Piano roll preview"]').exists()).toBe(true)

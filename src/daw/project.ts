@@ -40,6 +40,12 @@ export interface InstrumentLane {
   patchSource: string
   oscillatorType: OscillatorType
   gain: number
+  envelope: {
+    attack: number
+    decay: number
+    sustain: number
+    release: number
+  }
   clips: SourceClip[]
 }
 
@@ -91,6 +97,7 @@ export const createDefaultProject = (): DawProject => ({
       patchSource: DEFAULT_SW_PATCH_SOURCE,
       oscillatorType: 'sawtooth',
       gain: 0.8,
+      envelope: { attack: 0.1, decay: 0.2, sustain: 0.7, release: 0.3 },
       clips: [],
     },
   ],
