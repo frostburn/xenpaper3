@@ -198,7 +198,7 @@ class ExactMonomial {
 const pitchFromRatio = (ratio: ExactMonomial): Monomial => {
   if (!ratio.isPositive)
     throw new RangeError('Pitch conversion requires a positive dimensionless ratio.')
-  return new Monomial(ratio.exponents)
+  return new Monomial([...ratio.exponents].filter(([prime]) => prime > 1))
 }
 
 const pitchValue = (pitch: Monomial): number =>

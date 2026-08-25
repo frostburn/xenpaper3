@@ -113,6 +113,12 @@ describe('Pitch displacement arithmetic', () => {
     expect(Value.equalDivision(7, 12).equals(Value.cents(700))).toBe(true)
   })
 
+  it('discards cancelled sign metadata when converting a positive ratio to pitch', () => {
+    const positive = new Value(-2).mul(-3)
+
+    expect(Value.pitch(positive).equals(Value.pitch(6))).toBe(true)
+  })
+
   it('compares cents and ratios as pitch displacement', () => {
     expect(Value.cents(1200).equals(new Value(2))).toBe(true)
     expect(Value.cents(1201).equals(new Value(2))).toBe(false)
