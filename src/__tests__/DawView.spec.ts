@@ -11,6 +11,7 @@ import {
   easeGlissando,
   glissandoPitchAtBeat,
   glissandoPitchAtElapsedTime,
+  glissandoCurveDuration,
   projectBeatToSeconds,
   projectSecondsToBeat,
   sourceClipLength,
@@ -162,6 +163,17 @@ describe('DAW project model', () => {
     expect(glissandoPitchAtElapsedTime(note, project, 0, durationSeconds, 0.5)).toBeCloseTo(
       segment.from + (segment.to - segment.from) * 0.375,
     )
+  })
+
+  it('keeps adjacent 250 BPM glissando curves clear of their shared boundary', () => {
+    const segmentStart = 14.024
+    const segmentDuration = (3 * 60) / 250
+    const sharedBoundary = 14.744
+
+    // Chromium treats a curve ending exactly at another event's timestamp as an
+    // overlap, even though both times display as the same shared boundary.
+    expect(segmentStart + segmentDuration).toBe(sharedBoundary)
+    expect(segmentStart + glissandoCurveDuration(segmentDuration)).toBeLessThan(sharedBoundary)
   })
 
   it('integrates every tempo segment and converts audio time back to beats', () => {

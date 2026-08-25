@@ -70,6 +70,10 @@ export const glissandoPitchAtElapsedTime = (
   return glissandoPitchAtBeat(note, beat)
 }
 
+/** Shorten automation enough that a command at its nominal end cannot overlap it. */
+export const glissandoCurveDuration = (duration: number): number =>
+  duration - Math.min(1e-6, duration / 2)
+
 const scheduleGlissando = (
   pitch: ConstantSourceNode,
   note: ReturnType<typeof parseProjectNotes>[number],
@@ -104,7 +108,11 @@ const scheduleGlissando = (
       )
     })
     pitch.offset.setValueAtTime(startValue, when)
-    pitch.offset.setValueCurveAtTime(curve, when, duration)
+    // Leave a tiny gap before the next segment's setValueAtTime call. Web Audio
+    // forbids that call from overlapping an active value curve, and Chromium treats
+    // the curve's endpoint as inclusive (notably three beats at 250 BPM, where the
+    // curve ending at 14.744 collides with an event starting at 14.744).
+    pitch.offset.setValueCurveAtTime(curve, when, glissandoCurveDuration(duration))
   }
 }
 
