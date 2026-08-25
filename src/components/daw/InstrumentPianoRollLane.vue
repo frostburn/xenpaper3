@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { parseClipNotes } from '../../daw/score'
+import { easeGlissando } from '../../daw/easing'
 import {
   beatToNumber,
   pointerXToBeat,
@@ -27,6 +28,11 @@ const emit = defineEmits<{
 const dragging = ref<{ clip: SourceClip; pointerOffset: number }>()
 const laneElement = ref<HTMLElement>()
 
+const notePitches = (note: ReturnType<typeof parseClipNotes>[number]) => [
+  note.cents,
+  ...(note.glissando?.flatMap(({ from, to }) => [from, to]) ?? []),
+]
+
 const pianoRoll = computed(() => {
   const parsedClips = props.lane.clips.map((clip) => {
     try {
@@ -42,7 +48,7 @@ const pianoRoll = computed(() => {
   const clipCenters = parsedClips
     .filter(({ notes }) => notes.length)
     .map(({ notes }) => {
-      const pitches = notes.map(({ cents }) => cents)
+      const pitches = notes.flatMap(notePitches)
       return (Math.min(...pitches) + Math.max(...pitches)) / 2
     })
     .sort((left, right) => left - right)
@@ -54,7 +60,7 @@ const pianoRoll = computed(() => {
     : 0
   const displayClips = parsedClips.map(({ clip, notes }) => {
     if (!notes.length) return { clip, notes, registerOffset: 0 }
-    const pitches = notes.map(({ cents }) => cents)
+    const pitches = notes.flatMap(notePitches)
     const clipCenter = (Math.min(...pitches) + Math.max(...pitches)) / 2
     const distance = clipCenter - laneCenter
     // Fold disparate registers into the representative lane range by whole octaves.
@@ -63,7 +69,7 @@ const pianoRoll = computed(() => {
     return { clip, notes, registerOffset }
   })
   const pitches = displayClips.flatMap(({ notes, registerOffset }) =>
-    notes.map(({ cents }) => cents - registerOffset),
+    notes.flatMap(notePitches).map((cents) => cents - registerOffset),
   )
   // Keep zero visible as the pitch reference and guarantee enough room around tightly
   // clustered material. Outlying clips still expand this single lane-wide scale.
@@ -77,6 +83,8 @@ const pianoRoll = computed(() => {
   const upperBound = highestPitch + padding + missingSpan / 2
   const pitchSpan = upperBound - lowerBound
   const pitchTop = (cents: number) => `${((upperBound - cents) / pitchSpan) * 100}%`
+  const point = (beat: number, cents: number, clipDuration: number) =>
+    `${(beat / clipDuration) * 100},${((upperBound - cents) / pitchSpan) * 100}`
 
   const firstOctave = Math.ceil(lowerBound / 1200)
   const lastOctave = Math.floor(upperBound / 1200)
@@ -97,12 +105,44 @@ const pianoRoll = computed(() => {
               cents: displayCents + registerOffset,
               top: pitchTop(displayCents),
             })),
-            notes: notes.map((note) => ({
-              ...note,
-              left: `${(note.beat / clipDuration) * 100}%`,
-              width: `${(note.duration / clipDuration) * 100}%`,
-              top: pitchTop(note.cents - registerOffset),
-            })),
+            notes: notes.map((note) => {
+              const glissandoPath = note.glissando
+                ? (() => {
+                    const points = [point(note.beat, note.cents - registerOffset, clipDuration)]
+                    let heldPitch = note.cents
+                    for (const segment of note.glissando) {
+                      const startBeat = note.beat + segment.start
+                      if (startBeat > note.beat) {
+                        points.push(point(startBeat, heldPitch - registerOffset, clipDuration))
+                      }
+                      for (let sample = 1; sample <= 16; sample += 1) {
+                        const t = sample / 16
+                        const pitch =
+                          segment.from +
+                          (segment.to - segment.from) * easeGlissando(segment.easing, t)
+                        points.push(
+                          point(
+                            startBeat + segment.duration * t,
+                            pitch - registerOffset,
+                            clipDuration,
+                          ),
+                        )
+                      }
+                      heldPitch = segment.to
+                    }
+                    const endBeat = note.beat + note.duration
+                    points.push(point(endBeat, heldPitch - registerOffset, clipDuration))
+                    return `M ${points.join(' L ')}`
+                  })()
+                : undefined
+              return {
+                ...note,
+                left: `${(note.beat / clipDuration) * 100}%`,
+                width: `${(note.duration / clipDuration) * 100}%`,
+                top: pitchTop(note.cents - registerOffset),
+                glissandoPath,
+              }
+            }),
           },
         ]
       }),
@@ -198,8 +238,25 @@ const onKeyDown = (event: KeyboardEvent) => {
           :data-cents="guide.cents"
           :style="{ top: guide.top }"
         />
+        <svg
+          class="bendy-notes"
+          viewBox="0 0 100 100"
+          preserveAspectRatio="none"
+          aria-hidden="true"
+        >
+          <path
+            v-for="(note, index) in clipPreview(clip.id).notes.filter((note) => note.glissandoPath)"
+            :key="index"
+            class="bendy-note"
+            :data-beat="note.beat"
+            :data-duration="note.duration"
+            :data-cents="note.cents"
+            :d="note.glissandoPath"
+          />
+        </svg>
         <i
           v-for="(note, index) in clipPreview(clip.id).notes"
+          v-show="!note.glissandoPath"
           :key="index"
           :data-beat="note.beat"
           :data-duration="note.duration"
@@ -278,6 +335,22 @@ const onKeyDown = (event: KeyboardEvent) => {
   min-width: 2px;
   border-radius: 2px;
   background: #9de3ff;
+}
+.bendy-notes {
+  position: absolute;
+  z-index: 2;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+.bendy-note {
+  fill: none;
+  stroke: #9de3ff;
+  stroke-width: 6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
 }
 .clip.selected {
   border-color: #8ce6ff;

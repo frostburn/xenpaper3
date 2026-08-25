@@ -4,12 +4,14 @@ import DEFAULT_PATCH_SOURCE from '../patches/default.swpatch?raw'
 import type { DawProject } from './project'
 import { parseProjectNotes, type ScheduledLaneNote } from './score'
 import { projectBeatToSeconds, projectSecondsToBeat } from './timeline'
+import { easeGlissando } from './easing'
 
 // Compatibility exports for non-UI consumers; implementations live in their
 // domain modules so rendering never depends on the Web Audio engine.
 export { parseClipNotes, parseProjectNotes, sourceClipLength } from './score'
 export type { EnvelopeSettings, ScheduledLaneNote } from './score'
 export { projectBeatToSeconds, projectSecondsToBeat } from './timeline'
+export { easeGlissando, type GlissandoEasing } from './easing'
 
 type PatchSynth = PlayableSynthPatch
 
@@ -21,23 +23,6 @@ export function notePlaybackWindow(
   const endBeat = noteBeat + noteDuration
   if (endBeat <= fromBeat) return undefined
   return { startBeat: Math.max(noteBeat, fromBeat), endBeat }
-}
-
-export type GlissandoEasing = 'linear' | 'ease' | 'ease-in' | 'ease-out' | 'ease-in-out'
-
-export const easeGlissando = (easing: string, t: number): number => {
-  switch (easing) {
-    case 'ease-in':
-      return t ** 2
-    case 'ease-out':
-      return 1 - (1 - t) ** 2
-    case 'ease-in-out':
-      return (3 - 2 * t) * t ** 2
-    case 'ease':
-      return 0.25 * t * (3 + 6 * t - 5 * t * t)
-    default:
-      return t
-  }
 }
 
 /** Resolve the pitch held by a note at a project beat, including completed glide segments. */
