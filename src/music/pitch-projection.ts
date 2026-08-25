@@ -1,5 +1,5 @@
 import { valueToCents } from 'xen-dev-utils/conversion'
-import { Monomial } from '../../xenpaper-lang/monomial'
+import { Monomial } from '../../xenpaper-lang/core'
 
 /** A downstream interpretation of an exact Xenpaper pitch coordinate. */
 export interface PitchProjection<Result> {

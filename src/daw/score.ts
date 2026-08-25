@@ -1,7 +1,6 @@
 import {
   compile,
   evaluateExpression,
-  type Diagnostic,
   type DirectiveExtension,
   type GridPitchAutomation,
 } from '../../xenpaper-lang/core'
@@ -63,28 +62,14 @@ const projectAutomation = (
   automation: GridPitchAutomation | undefined,
 ): readonly PitchGlideSegment[] | undefined => {
   if (!automation) return undefined
-  if (!automation.segments) {
-    return [
-      {
-        start: 0,
-        duration: automation.duration.valueOf(),
-        from: monomialToCents(automation.from.sounding),
-        to: monomialToCents(automation.to.sounding),
-        easing: automation.curve,
-      },
-    ]
-  }
-  return automation.segments.map((segment) => ({
-    start: segment.start.valueOf(),
+  return (automation.segments ?? [automation]).map((segment) => ({
+    start: 'start' in segment ? segment.start.valueOf() : 0,
     duration: segment.duration.valueOf(),
     from: monomialToCents(segment.from.sounding),
     to: monomialToCents(segment.to.sounding),
     easing: segment.curve,
   }))
 }
-
-const errorsOf = (diagnostics: readonly Diagnostic[]) =>
-  diagnostics.filter(({ severity }) => severity === 'error')
 
 /** Compile one clip, then project its exact grid into the DAW's numeric display/audio model. */
 export const parseClipNotes = (
@@ -94,9 +79,8 @@ export const parseClipNotes = (
 ): ScheduledLaneNote[] => {
   const extension = { ...envelopeExtension, initialState: Object.freeze({ ...defaultEnvelope }) }
   const result = compile(source, { directiveExtensions: [extension] })
-  const errors = errorsOf(result.diagnostics)
-  if (errors.length) throw new Error(errors.map(({ message }) => message).join('\n'))
-  if (!('grid' in result)) return []
+  if (!('grid' in result))
+    throw new Error(result.diagnostics.map(({ message }) => message).join('\n'))
 
   return result.grid.events
     .filter((event) => event.kind === 'note')
@@ -114,7 +98,7 @@ export const parseClipNotes = (
 /** Derive a clip's visual span from its exact score grid, using one bar for invalid/empty source. */
 export const sourceClipLength = (source: string, defaultBar = beat(4)): Beat => {
   const result = compile(source, { directiveExtensions: [envelopeExtension] })
-  if (!('grid' in result) || errorsOf(result.diagnostics).length) return defaultBar
+  if (!('grid' in result)) return defaultBar
   const duration = result.grid.span
   if (!duration.n) return defaultBar
   return beat(Number(duration.s * duration.n), duration.d)
