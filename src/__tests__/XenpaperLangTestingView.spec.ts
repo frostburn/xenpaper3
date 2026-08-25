@@ -66,6 +66,7 @@ describe('XenpaperLangTestingView', () => {
   })
 
   it('renders a separate highlighted copy and exposes its token ranges for debugging', async () => {
+    const log = vi.spyOn(console, 'log').mockImplementation(() => undefined)
     const wrapper = mount(XenpaperLangTestingView)
     await wrapper.get('textarea').setValue('@tempo(120) C# # fast')
 
@@ -77,6 +78,7 @@ describe('XenpaperLangTestingView', () => {
     expect(highlighted.findAll('[data-highlight="punctuation"]').length).toBeGreaterThan(0)
     expect(wrapper.get('.highlight-debugger').text()).toContain('0–11')
     expect(wrapper.get('.highlight-debugger').text()).toContain('punctuation')
+    log.mockRestore()
   })
 
   it('populates the staff from the parsed source', async () => {
