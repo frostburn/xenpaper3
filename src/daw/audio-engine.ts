@@ -1,10 +1,6 @@
 import type { DawProject } from './project'
 import { createPlaybackPlan, type PlaybackPlan } from './playback-plan'
-import {
-  parseProjectScoreNotes,
-  type PitchGlideSegment,
-  type ScheduledLaneNote,
-} from './score'
+import { parseProjectScoreNotes, type PitchGlideSegment, type ScheduledLaneNote } from './score'
 import { xenpaperPitchToPatchDetune } from './web-audio-automation'
 import { WebAudioPlaybackSession } from './web-audio-playback'
 
@@ -24,23 +20,9 @@ export type {
   PlaybackNote,
   PlaybackPlan,
 } from './playback-plan'
-export {
-  parseClipNotes,
-  parseLaneNotes,
-  parseProjectScoreNotes,
-  sourceClipLength,
-} from './score'
-export type {
-  EnvelopeSettings,
-  PitchGlideSegment,
-  ScheduledLaneNote,
-} from './score'
-export {
-  createTempoMap,
-  projectBeatToSeconds,
-  projectSecondsToBeat,
-  TempoMap,
-} from './timeline'
+export { parseClipNotes, parseLaneNotes, parseProjectScoreNotes, sourceClipLength } from './score'
+export type { EnvelopeSettings, PitchGlideSegment, ScheduledLaneNote } from './score'
+export { createTempoMap, projectBeatToSeconds, projectSecondsToBeat, TempoMap } from './timeline'
 export { easeGlissando, type GlissandoEasing } from './easing'
 export {
   applyPitchAutomation,

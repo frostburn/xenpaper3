@@ -6,13 +6,7 @@ import {
   type GridPitchAutomation,
 } from '../../xenpaper-lang/core'
 import { monomialToCents } from '../music/pitch-projection'
-import {
-  beat,
-  beatToNumber,
-  type Beat,
-  type DawProject,
-  type InstrumentLane,
-} from './project'
+import { beat, beatToNumber, type Beat, type DawProject, type InstrumentLane } from './project'
 
 export interface EnvelopeSettings {
   readonly attack: number

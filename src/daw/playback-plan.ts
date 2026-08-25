@@ -1,10 +1,6 @@
 import { easeGlissando } from './easing'
 import type { DawProject, OscillatorType } from './project'
-import {
-  parseLaneNotes,
-  type EnvelopeSettings,
-  type ScheduledLaneNote,
-} from './score'
+import { parseLaneNotes, type EnvelopeSettings, type ScheduledLaneNote } from './score'
 import { TempoMap } from './timeline'
 
 const GLISSANDO_SAMPLES_PER_SECOND = 120

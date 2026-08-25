@@ -48,10 +48,10 @@ available for syntax tools and compatibility consumers.
 has no ambient cursor:
 
 ```ts
-const phrase = call.then(response)       // append and advance once
-const chord = soprano.overlay(bass)      // same origin, maximum span
-const ostinato = cell.repeat(8)          // tile an evaluated fragment
-const pickup = phrase.delay(1 / 4)       // exact leading silence
+const phrase = call.append(response) // append and advance once
+const chord = soprano.overlay(bass) // same origin, maximum span
+const ostinato = cell.repeat(8) // tile an evaluated fragment
+const pickup = phrase.delay(1 / 4) // exact leading silence
 ```
 
 These operations provide the transaction boundary for downstream composition

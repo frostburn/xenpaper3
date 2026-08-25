@@ -21,7 +21,6 @@ export function createFrequencyProjection(
   if (!Number.isFinite(referenceFrequency) || referenceFrequency <= 0)
     throw new RangeError('Reference frequency must be finite and positive.')
   return Object.freeze({
-    project: (pitch: Monomial) =>
-      referenceFrequency * pitch.sub(referencePitch).ratioValue(),
+    project: (pitch: Monomial) => referenceFrequency * pitch.sub(referencePitch).ratioValue(),
   })
 }

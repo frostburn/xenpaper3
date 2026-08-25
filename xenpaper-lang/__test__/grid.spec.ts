@@ -13,7 +13,7 @@ describe('Transactional score grids', () => {
   it('sequences local fragments by committing each span once', () => {
     const left = new ScoreGrid<TestEvent>(2, [event(0, 'left')])
     const right = new ScoreGrid<TestEvent>(3, [event(1, 'right')])
-    const combined = left.then(right)
+    const combined = left.append(right)
 
     expect(combined.span.equals(5)).toBe(true)
     expect(combined.events.map(({ start }) => start.valueOf())).toEqual([0, 3])

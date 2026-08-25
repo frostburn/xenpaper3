@@ -1,16 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import { Fraction } from 'xen-dev-utils/fraction'
 import { Monomial } from '../../xenpaper-lang/core'
-import {
-  createFrequencyProjection,
-  monomialToCents,
-} from '../music/pitch-projection'
+import { createFrequencyProjection, monomialToCents } from '../music/pitch-projection'
 
 describe('Pitch projections', () => {
   it('keeps cents outside the exact monomial type', () => {
-    expect(monomialToCents(Monomial.fromRatio(new Fraction(3, 2)))).toBeCloseTo(
-      701.955000865,
-    )
+    expect(monomialToCents(Monomial.fromRatio(new Fraction(3, 2)))).toBeCloseTo(701.955000865)
   })
 
   it('attaches a frequency calibration explicitly', () => {

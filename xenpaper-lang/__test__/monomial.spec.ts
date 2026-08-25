@@ -65,7 +65,7 @@ describe('Exact monomial coordinates', () => {
 
   it('rejects invalid axes and non-positive ratios', () => {
     expect(() => new Monomial([[4, 1]])).toThrow('positive primes')
-    expect(() => Monomial.fromRatio(0)).toThrow()
-    expect(() => Monomial.fromRatio(-1)).toThrow()
+    expect(() => Monomial.fromRatio(0)).toThrow('non-zero')
+    expect(() => Monomial.fromRatio(-1)).toThrow('positive')
   })
 })

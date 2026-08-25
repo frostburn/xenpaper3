@@ -78,19 +78,23 @@ export class Monomial implements ReadonlyMap<number, Fraction> {
     return this.components.has(prime)
   }
 
-  *entries(): IterableIterator<[number, Fraction]> {
-    for (const [prime, exponent] of this.components) yield [prime, new Fraction(exponent)]
+  entries(): MapIterator<[number, Fraction]> {
+    return new Map(
+      [...this.components].map(([prime, exponent]) => [prime, new Fraction(exponent)]),
+    ).entries()
   }
 
-  keys(): IterableIterator<number> {
+  keys(): MapIterator<number> {
     return this.components.keys()
   }
 
-  *values(): IterableIterator<Fraction> {
-    for (const exponent of this.components.values()) yield new Fraction(exponent)
+  values(): MapIterator<Fraction> {
+    return new Map(
+      [...this.components].map(([prime, exponent]) => [prime, new Fraction(exponent)]),
+    ).values()
   }
 
-  [Symbol.iterator](): IterableIterator<[number, Fraction]> {
+  [Symbol.iterator](): MapIterator<[number, Fraction]> {
     return this.entries()
   }
 
@@ -176,9 +180,7 @@ export class Monomial implements ReadonlyMap<number, Fraction> {
   }
 
   toMap(): ReadonlyMap<number, Fraction> {
-    return new Map(
-      [...this.components].map(([prime, exponent]) => [prime, new Fraction(exponent)]),
-    )
+    return new Map([...this.components].map(([prime, exponent]) => [prime, new Fraction(exponent)]))
   }
 
   toJSON(): readonly { readonly prime: number; readonly exponent: string }[] {

@@ -38,8 +38,7 @@ export class ScoreGrid<Event extends GridTimedEvent> {
           index,
         }))
         .sort(
-          (left, right) =>
-            left.event.start.compare(right.event.start) || left.index - right.index,
+          (left, right) => left.event.start.compare(right.event.start) || left.index - right.index,
         )
         .map(({ event }) => event),
     )
@@ -52,7 +51,7 @@ export class ScoreGrid<Event extends GridTimedEvent> {
   static sequence<Event extends GridTimedEvent>(
     ...fragments: readonly ScoreGrid<Event>[]
   ): ScoreGrid<Event> {
-    return ScoreGrid.empty<Event>().then(...fragments)
+    return ScoreGrid.empty<Event>().append(...fragments)
   }
 
   static parallel<Event extends GridTimedEvent>(
@@ -77,7 +76,7 @@ export class ScoreGrid<Event extends GridTimedEvent> {
   }
 
   /** Append fragments transactionally, advancing by each fragment's full span once. */
-  then(...fragments: readonly ScoreGrid<Event>[]): ScoreGrid<Event> {
+  append(...fragments: readonly ScoreGrid<Event>[]): ScoreGrid<Event> {
     let cursor = copyFraction(this.span)
     const events = [...this.events]
     for (const fragment of fragments) {
