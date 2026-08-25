@@ -59,6 +59,19 @@ describe('Xenpaper exact-grid compilation', () => {
     expect(note.pitch.formula?.has(3)).toBe(true)
   })
 
+  it('projects absolute pitches at their sounding coordinate after a root change', () => {
+    const result = compile('{root = D} C 1/1 D')
+    expect('grid' in result).toBe(true)
+    if (!('grid' in result)) return
+
+    const notes = result.grid.events.filter((entry) => entry.kind === 'note')
+    expect(notes.map(({ pitch }) => pitch.sounding.toFraction()?.toFraction())).toEqual([
+      '9/8',
+      '9/8',
+      '81/64',
+    ])
+  })
+
   it('turns parser failures into ordinary diagnostics', () => {
     const result = compile('(')
 

@@ -53,7 +53,14 @@ const convertPitch = (
   diagnostics: Diagnostic[],
   origins: readonly SourceOrigin[],
 ): GridPitch | undefined => {
-  const value = pitch.kind === 'absolutePitch' ? pitch.rootOffset : pitch.value
+  // Played absolute pitches carry their sounding coordinate in `value`, while
+  // root-pitch metadata only has the notation/root coordinate.
+  const value =
+    pitch.kind === 'absolutePitch'
+      ? 'value' in pitch
+        ? (pitch as AbsolutePitchValue & { readonly value: Value }).value
+        : pitch.rootOffset
+      : pitch.value
   const sounding = pitchMonomial(value)
   if (!sounding) {
     diagnostics.push(inexactPitchDiagnostic(origins))
