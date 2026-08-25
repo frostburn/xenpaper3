@@ -25,9 +25,6 @@ export function notePlaybackWindow(
 
 export type GlissandoEasing = 'linear' | 'ease' | 'ease-in' | 'ease-out' | 'ease-in-out'
 
-/** Convert Xenpaper's C-based cents to the A-based cents expected by SW Patch. */
-export const swPatchPitch = (cents: number): number => cents - 900
-
 export const easeGlissando = (easing: string, t: number): number => {
   switch (easing) {
     case 'ease-in':
@@ -80,10 +77,7 @@ const scheduleGlissando = (
   playbackStartBeat: number,
   playbackStartTime: number,
 ) => {
-  pitch.offset.setValueAtTime(
-    swPatchPitch(glissandoPitchAtBeat(note, playbackStartBeat)),
-    playbackStartTime,
-  )
+  pitch.offset.setValueAtTime(glissandoPitchAtBeat(note, playbackStartBeat), playbackStartTime)
   for (const segment of note.glissando ?? []) {
     const segmentStartBeat = note.beat + segment.start
     const segmentEndBeat = segmentStartBeat + segment.duration
@@ -101,17 +95,15 @@ const scheduleGlissando = (
       projectBeatToSeconds(project, audibleStartBeat)
     const samples = Math.max(2, Math.ceil(duration * 120))
     const curve = Float32Array.from({ length: samples }, (_, index) => {
-      return swPatchPitch(
-        glissandoPitchAtElapsedTime(
-          note,
-          project,
-          audibleStartBeat,
-          duration,
-          index / (samples - 1),
-        ),
+      return glissandoPitchAtElapsedTime(
+        note,
+        project,
+        audibleStartBeat,
+        duration,
+        index / (samples - 1),
       )
     })
-    pitch.offset.setValueAtTime(swPatchPitch(startValue), when)
+    pitch.offset.setValueAtTime(startValue, when)
     pitch.offset.setValueCurveAtTime(curve, when, duration)
   }
 }
@@ -169,7 +161,7 @@ export class DawAudioEngine extends EventTarget {
           when: start,
           duration: end - start,
           noteOn: (time) => {
-            const pitch = new ConstantSourceNode(this.context, { offset: swPatchPitch(note.cents) })
+            const pitch = new ConstantSourceNode(this.context, { offset: note.cents })
             this.pitchSignals.push(pitch)
             pitch.start(time)
             scheduleGlissando(pitch, note, project, playbackWindow.startBeat, time)

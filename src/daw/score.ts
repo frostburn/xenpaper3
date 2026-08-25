@@ -37,6 +37,9 @@ const DEFAULT_ENVELOPE: EnvelopeSettings = Object.freeze({
   release: 0.3,
 })
 
+/** SW Patch measures pitch from A, 900 cents above Xenpaper's C reference. */
+const SW_PATCH_PITCH_OFFSET = -900
+
 const envelopeExtension: DirectiveExtension = {
   name: 'patch',
   initialState: DEFAULT_ENVELOPE,
@@ -114,6 +117,12 @@ export const parseProjectNotes = (project: DawProject): ScheduledLaneNote[] => {
       return parseClipNotes(clip.source, beatToNumber(clip.length), lane.envelope).map((event) => ({
         ...event,
         beat: clipStart + event.beat,
+        cents: event.cents + SW_PATCH_PITCH_OFFSET,
+        glissando: event.glissando?.map((segment) => ({
+          ...segment,
+          from: segment.from + SW_PATCH_PITCH_OFFSET,
+          to: segment.to + SW_PATCH_PITCH_OFFSET,
+        })),
       }))
     }),
   )

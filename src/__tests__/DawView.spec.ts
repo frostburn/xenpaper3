@@ -14,7 +14,6 @@ import {
   projectBeatToSeconds,
   projectSecondsToBeat,
   sourceClipLength,
-  swPatchPitch,
 } from '../daw/audio-engine'
 
 describe('DAW project model', () => {
@@ -22,12 +21,6 @@ describe('DAW project model', () => {
     expect(notePlaybackWindow(0, 4, 2)).toEqual({ startBeat: 2, endBeat: 4 })
     expect(notePlaybackWindow(3, 1, 2)).toEqual({ startBeat: 3, endBeat: 4 })
     expect(notePlaybackWindow(0, 2, 2)).toBeUndefined()
-  })
-
-  it('converts Xenpaper C-based cents to SW Patch A-based cents', () => {
-    expect(swPatchPitch(0)).toBe(-900)
-    expect(swPatchPitch(900)).toBe(0)
-    expect(swPatchPitch(1200)).toBe(300)
   })
 
   it('creates the production-ready project defaults', () => {
@@ -73,9 +66,25 @@ describe('DAW project model', () => {
 
   it('parses clip-local notes for piano-roll rendering', () => {
     expect(parseClipNotes('C D E', 2)).toMatchObject([
-      { beat: 0, duration: 1 },
+      { beat: 0, duration: 1, cents: 0 },
       { beat: 1, duration: 1 },
     ])
+  })
+
+  it('converts scheduled pitches and glissandi to SW Patch A-based cents', () => {
+    const project = createDefaultProject()
+    project.instrumentLanes[0]!.clips.push({
+      id: 'gliss',
+      start: beat(0),
+      length: beat(2),
+      source: '@gliss C A',
+    })
+    const clipNotes = parseClipNotes('@gliss C A')
+    const notes = parseProjectNotes(project)
+
+    expect(notes[0]!.cents).toBe(clipNotes[0]!.cents - 900)
+    expect(notes[0]!.glissando![0]!.from).toBe(clipNotes[0]!.glissando![0]!.from - 900)
+    expect(notes[0]!.glissando![0]!.to).toBe(clipNotes[0]!.glissando![0]!.to - 900)
   })
 
   it('derives clip length from source and keeps zero-duration source visible for a bar', () => {
