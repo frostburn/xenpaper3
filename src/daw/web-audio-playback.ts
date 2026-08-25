@@ -128,7 +128,9 @@ export class WebAudioPlaybackSession {
             return (end) => {
               let cutoff: number
               try {
-                cutoff = off(end)
+                // SW Patch represents unit-bearing return values as number-coercible
+                // quantities. Normalize the Instant at this JavaScript/Web Audio boundary.
+                cutoff = Number(off(end))
               } catch (error) {
                 pitch.stop(end)
                 throw error

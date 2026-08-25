@@ -199,6 +199,22 @@ describe('Web Audio playback session', () => {
     expect(MockGainNode.instances[0]!.disconnected).toBe(true)
   })
 
+  it('normalizes a unit-bearing patch cutoff before validating and scheduling it', () => {
+    const context = new MockAudioContext()
+    const cutoff = { valueOf: () => 1.7 }
+    const session = new WebAudioPlaybackSession(
+      context as unknown as AudioContext,
+      createPlan(),
+      {
+        patchFactory: () =>
+          ({ on: () => () => cutoff, dispose: () => {} }) as unknown as PlayableSynthPatch,
+      },
+    )
+
+    expect(() => session.start()).not.toThrow()
+    expect(context.sources[0]!.stops).toEqual([1.7])
+  })
+
   it('waits for the release tail before reporting natural completion', () => {
     vi.useFakeTimers()
     const context = new MockAudioContext()
