@@ -1,9 +1,11 @@
 import {
+  compile,
   evaluateExpression,
-  expandToBeatEvents,
-  parse,
+  type Diagnostic,
   type DirectiveExtension,
-} from '../../xenpaper-lang'
+  type GridPitchAutomation,
+} from '../../xenpaper-lang/core'
+import { monomialToCents } from '../music/pitch-projection'
 import {
   beat,
   beatToNumber,
@@ -22,7 +24,7 @@ export interface EnvelopeSettings {
 export interface ScheduledLaneNote {
   readonly beat: number
   readonly duration: number
-  /** Authored pitch in cents relative to Xenpaper's C reference. */
+  /** Cents are an explicit DAW projection of Xenpaper's exact monomial coordinate. */
   readonly cents: number
   readonly velocity: number
   readonly envelope: EnvelopeSettings
@@ -63,52 +65,63 @@ const envelopeExtension: DirectiveExtension = {
   },
 }
 
-/** Compile one clip into notes whose positions are relative to the clip start. */
+const projectAutomation = (
+  automation: GridPitchAutomation | undefined,
+): readonly PitchGlideSegment[] | undefined => {
+  if (!automation) return undefined
+  if (!automation.segments) {
+    return [
+      {
+        start: 0,
+        duration: automation.duration.valueOf(),
+        from: monomialToCents(automation.from.sounding),
+        to: monomialToCents(automation.to.sounding),
+        easing: automation.curve,
+      },
+    ]
+  }
+  return automation.segments.map((segment) => ({
+    start: segment.start.valueOf(),
+    duration: segment.duration.valueOf(),
+    from: monomialToCents(segment.from.sounding),
+    to: monomialToCents(segment.to.sounding),
+    easing: segment.curve,
+  }))
+}
+
+const errorsOf = (diagnostics: readonly Diagnostic[]) =>
+  diagnostics.filter(({ severity }) => severity === 'error')
+
+/** Compile one clip, then project its exact grid into the DAW's numeric display/audio model. */
 export const parseClipNotes = (
   source: string,
   duration = Number.POSITIVE_INFINITY,
   defaultEnvelope: EnvelopeSettings = DEFAULT_ENVELOPE,
 ): ScheduledLaneNote[] => {
   const extension = { ...envelopeExtension, initialState: Object.freeze({ ...defaultEnvelope }) }
-  const result = expandToBeatEvents(parse(source), { directiveExtensions: [extension] })
-  const errors = result.diagnostics.filter(({ severity }) => severity === 'error')
+  const result = compile(source, { directiveExtensions: [extension] })
+  const errors = errorsOf(result.diagnostics)
   if (errors.length) throw new Error(errors.map(({ message }) => message).join('\n'))
-  if (!('score' in result)) return []
+  if (!('grid' in result)) return []
 
-  return result.score.events
+  return result.grid.events
     .filter((event) => event.kind === 'note')
     .filter((event) => event.start.valueOf() < duration)
     .map((event) => ({
       beat: event.start.valueOf(),
       duration: Math.min(event.duration.valueOf(), duration - event.start.valueOf()),
-      cents: event.pitch.value.valueOf(),
+      cents: monomialToCents(event.pitch.sounding),
       velocity: event.dynamic.valueOf(),
-      envelope: (event.directiveState.patch as EnvelopeSettings | undefined) ?? DEFAULT_ENVELOPE,
-      glissando: event.automation
-        ? (
-            event.automation.segments ?? [
-              {
-                ...event.automation,
-                start: { valueOf: () => 0 },
-              },
-            ]
-          ).map((segment) => ({
-            start: segment.start.valueOf(),
-            duration: segment.duration.valueOf(),
-            from: segment.from.value.valueOf(),
-            to: segment.to.value.valueOf(),
-            easing: segment.curve,
-          }))
-        : undefined,
+      envelope: (event.extensions.patch as EnvelopeSettings | undefined) ?? DEFAULT_ENVELOPE,
+      glissando: projectAutomation(event.automation),
     }))
 }
 
-/** Derive a clip's visual span from its score, using one bar for empty scores. */
+/** Derive a clip's visual span from its exact score grid, using one bar for invalid/empty source. */
 export const sourceClipLength = (source: string, defaultBar = beat(4)): Beat => {
-  const result = expandToBeatEvents(parse(source), { directiveExtensions: [envelopeExtension] })
-  if (!('score' in result) || result.diagnostics.some(({ severity }) => severity === 'error'))
-    return defaultBar
-  const duration = result.score.duration
+  const result = compile(source, { directiveExtensions: [envelopeExtension] })
+  if (!('grid' in result) || errorsOf(result.diagnostics).length) return defaultBar
+  const duration = result.grid.span
   if (!duration.n) return defaultBar
   return beat(Number(duration.s * duration.n), duration.d)
 }

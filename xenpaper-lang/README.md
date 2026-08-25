@@ -1,68 +1,100 @@
 # xenpaper-lang
 
-`xenpaper-lang` is the parser and renderer-independent runtime for Xenpaper 3's
-microtonal score language. It is currently part of this repository rather than
-a separately published package.
+`xenpaper-lang` is Xenpaper 3's renderer- and device-independent score language.
+Its primary output is an **exact score grid**: rational beat positions paired
+with sparse rational prime-exponent pitch coordinates. It is currently part of
+this repository rather than a separately published package.
 
-## Processing a score
+## Compile to the exact grid
 
-The public exports are collected in [`index.ts`](index.ts). A typical consumer
-parses source and then expands it to exact beat-timed events:
+Use `compile()` for application code. Syntax and semantic failures are returned
+as diagnostics; successful compilation produces a `ScoreGrid<GridEvent>`.
 
 ```ts
-import { expandToBeatEvents, parse } from './xenpaper-lang'
+import { compile } from './xenpaper-lang/core'
 
-const program = parse(String.raw`{31edo} C E^5 G`)
-const result = expandToBeatEvents(program)
-
-if ('score' in result) {
-  console.log(result.score.duration, result.score.events)
-} else {
+const result = compile(String.raw`{31edo} C E^5 G`)
+if (!('grid' in result)) {
   console.error(result.diagnostics)
+} else {
+  for (const event of result.grid.events) {
+    if (event.kind !== 'note') continue
+    console.log(event.start, event.duration, event.pitch.sounding)
+  }
 }
 ```
 
-`parse()` is the generated Peggy parser and throws a Peggy syntax error for
-invalid source. Runtime stages return diagnostics for semantic errors.
-Staff notation and audio scheduling are separate projections of the parsed
-source. `evaluateScoreShape()` produces an abstract, exact-duration notation
-tree; dynamics remain zero-duration annotations and velocity never changes a
-notation attack. `constructStaffNotationShape()` converts that tree to
-renderer-independent staff data.
+The grid deliberately has no cents scale, concert-pitch calibration, MIDI note,
+staff position, oscillator, or wall-clock time. A note instead carries:
 
-Independently, `expandToBeatEvents()` expands repeats and evaluates playback
-semantics directly into notes and structural markers at exact beat positions.
-It applies prevailing dynamics and one-shot velocities only in this audio
-pipeline. `expandRepeats()` remains available separately for tooling that needs
-to inspect expanded source occurrences and their expansion paths.
+- `pitch.sounding`: its exact coordinate after the active prime mapping;
+- `pitch.formula`: its untempered/source identity when one exists;
+- `pitch.notation`: a root-relative exact coordinate when notation needs one;
+- spelling, source origins, and immutable extension snapshots as metadata.
 
-The lower-level literal, expression, pitch, FJS, directive, and notation helpers
-are exported for focused tooling and tests. There is not yet a single
-`compile(source)` convenience API; consumers must call `parse()` themselves.
+For example, a nominal in 31-EDO can retain its Pythagorean source formula while
+its sounding coordinate is an exact rational power of 2. Temperament therefore
+changes a projection without erasing musical identity.
 
-Arithmetic expressions provide `pitch(ratio)` to convert a positive scalar
-ratio to a pitch displacement, `ratio(offset)` for the inverse conversion, and
-`sqrt(quantity)` for a square root. `sqrt()` retains an exact monomial when the
-value model is closed under the operation and halves the quantity's dimensions.
+`compileProgram()` accepts an already parsed AST. The pure data model lives in
+`grid.ts`; the adapter from the established evaluator lives separately in
+`runtime/compile-grid.ts`. `core.ts` is the narrow application entry point. The
+older `parse()`, `evaluateProgramShape()`, and `expandToBeatEvents()` APIs remain
+available for syntax tools and compatibility consumers.
 
-Key signatures may include a diatonic mode after the tonic, such as
-`{key = D minor}`. The supported names are Lydian, Ionian, Mixolydian, Dorian,
-Aeolian, Phrygian, and Locrian; `major` aliases Ionian and `minor` aliases
-Aeolian. Mode names are case-insensitive, and a key without a mode remains
-Ionian.
+## Transactional score composition
+
+`ScoreGrid` is an immutable fragment with an exact `span` and timed events. It
+has no ambient cursor:
+
+```ts
+const phrase = call.then(response)       // append and advance once
+const chord = soprano.overlay(bass)      // same origin, maximum span
+const ostinato = cell.repeat(8)          // tile an evaluated fragment
+const pickup = phrase.delay(1 / 4)       // exact leading silence
+```
+
+These operations provide the transaction boundary for downstream composition
+and the intended lowering target for language-level functions and repeats. A
+callee constructs a local fragment; its caller decides whether to append,
+overlay, delay, transform, or discard it. This avoids leaking either the
+caller's cursor into the callee or the callee's internal cursor back into its
+caller. The current parser repeat syntax still passes through the compatibility
+repeat expander before the final grid is constructed.
+
+## Monomial coordinates
+
+`Monomial` is the public exact pitch-coordinate type. It is an immutable sparse
+map from positive primes to rational exponents. Coordinate addition multiplies
+ratios, subtraction divides them, and rational scaling raises them to a power.
+
+```ts
+import { Fraction } from 'xen-dev-utils/fraction'
+import { Monomial } from './xenpaper-lang/core'
+
+const fifth = Monomial.fromRatio(new Fraction(3, 2))
+const fourth = Monomial.fromRatio(new Fraction(4, 3))
+const octave = fifth.add(fourth)
+
+const tritaveStep = Monomial.equalDivision(1, 13, Monomial.fromRatio(3))
+console.assert(tritaveStep.scale(13).equals(Monomial.fromRatio(3)))
+```
+
+A downstream system supplies a logarithmic prime mapping when it needs a real
+number. For example, the browser application defines its cents and frequency
+projections in `src/music/pitch-projection.ts`; Xenpaper itself does not know
+about A4 = 440 Hz or SW Patch's detune origin.
 
 ## Exact values
 
-`Value` deliberately provides a small set of closed exact forms instead of a
-general computer algebra system:
+The expression evaluator still uses `Value` for general arithmetic and
+quantities. It deliberately provides a small set of closed exact forms instead
+of a general computer algebra system:
 
-1. **Multiplicative monomials** represent rational numbers and products of prime
-   factors raised to rational powers. This covers just-intonation ratios, EDO
-   ratios, and large interval stacks.
-2. **Rational dimensional quantities** represent beats, seconds, frequencies,
-   decibels, and arbitrary sparse dimensions.
-3. **Pitch displacements** use an additive canonical form containing rational
-   cents and rational coefficients of `pitch(prime)` terms.
+1. multiplicative monomials for rational numbers and rational prime powers;
+2. rational dimensional quantities such as beats, seconds, frequencies, and
+   decibels;
+3. additive logarithmic pitch displacements.
 
 For example, these identities remain exact:
 
@@ -73,9 +105,25 @@ pitch(2) = 1200 cents
 ratio(13 * (1\13<3>)) = 3
 ```
 
-Operations outside those closed forms, such as `sqrt(2) + sqrt(3)`, fall back to
-a floating-point real magnitude while retaining dimensions. Exact equality does
-not use an epsilon; approximate comparison is explicit.
+Operations outside those closed forms, such as `sqrt(2) + sqrt(3)`, may fall
+back to a floating-point real magnitude while retaining dimensions. Such a
+value can be useful during expression evaluation, but a sounding pitch must be
+made exact before it can enter the core score grid. `compile()` reports
+`XP_INEXACT_GRID_PITCH` instead of silently baking an approximation into the
+score.
+
+## Real-world projections
+
+The exact grid is intentionally extensible rather than feature-complete.
+Second-party runtimes can supply `DirectiveExtension` objects. Each extension
+owns its prevailing state and returns immutable snapshots; every grid note
+exposes those snapshots through `event.extensions`.
+
+This lets applications add ADSR envelopes, instrument choices, controller data,
+lyrics, spatialization, or other concerns without adding them to Xenpaper's
+pitch/rhythm model. Staff notation remains a separate projection through
+`constructStaffNotationShape()`, and audio scheduling remains an application
+projection of exact beats and monomial pitches.
 
 ## Generated parser
 
@@ -89,26 +137,12 @@ npm run compile:xenpaper-lang
 `parser.generated.d.ts` is maintained alongside the grammar and describes the
 syntax tree returned to TypeScript callers.
 
-## Directive extensions
-
-Xenpaper parses named directive arguments without assigning synthesizer or real-time
-meaning to them. Second-party runtimes can supply `DirectiveExtension` objects through
-`ScoreShapeOptions.directiveExtensions`. An extension owns its initial and prevailing
-state, interprets the directive arguments, and returns any source-located diagnostics.
-Extension state follows the same sequencing, repeat, explicit-group, normalized-slot,
-and parallel-branch isolation rules as core prevailing directives.
-
-Every attack and `BeatTimedNoteEvent` contains a `directiveState` snapshot keyed by
-extension name. Extensions should treat their state values as immutable; returning a new
-value for each change ensures already-produced notes cannot be affected later. This lets
-an audio engine implement ADSR, drum patches without sustain, or arbitrary patch
-parameters without adding those concepts to Xenpaper itself.
-
 ## Tests
 
-The unit tests in [`__test__/`](__test__/) cover the grammar, exact values,
-literal and expression evaluation, repeat expansion, score shaping, directives,
-beat events, and staff notation. Run them from the repository root:
+The unit tests in [`__test__/`](__test__/) cover the grammar, monomial grid,
+exact values, literal and expression evaluation, repeat expansion, score
+shaping, directives, compatibility beat events, and staff notation. Run them
+from the repository root:
 
 ```sh
 npm run test:unit -- --run
