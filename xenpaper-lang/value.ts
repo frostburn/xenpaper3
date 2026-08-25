@@ -1,6 +1,7 @@
 import { Fraction, type FractionValue } from 'xen-dev-utils/fraction'
 import { primeFactorize } from 'xen-dev-utils/monzo'
 import { centsToValue, valueToCents } from 'xen-dev-utils/conversion'
+import { Monomial } from './monomial'
 
 type SparseMonzo = ReadonlyMap<number, FractionValue>
 
@@ -12,15 +13,6 @@ function addMonzos(left: SparseMonzo, right: SparseMonzo, subtract = false): Map
     const combined = subtract ? current.sub(exponent) : current.add(exponent)
     if (combined.n) result.set(prime, combined)
     else result.delete(prime)
-  }
-  return result
-}
-
-function scaleMonzo(monzo: SparseMonzo, factor: FractionValue): Map<number, Fraction> {
-  const result = new Map<number, Fraction>()
-  for (const [prime, exponent] of monzo) {
-    const scaled = new Fraction(exponent).mul(factor)
-    if (scaled.n) result.set(prime, scaled)
   }
   return result
 }
@@ -203,57 +195,18 @@ class ExactMonomial {
   static readonly ONE = new ExactMonomial(new Map())
 }
 
-class ExactPitch {
-  readonly logPrimes: SparseMonzo
-
-  constructor(logPrimes: SparseMonzo = new Map()) {
-    const normalized = new Map(logPrimes)
-    for (const [prime, exponent] of normalized) {
-      if (!new Fraction(exponent).n) normalized.delete(prime)
-    }
-    this.logPrimes = normalized
-  }
-
-  static fromCents(cents: FractionValue): ExactPitch {
-    return new ExactPitch(new Map([[2, new Fraction(cents).div(1200)]]))
-  }
-
-  static fromRatio(ratio: ExactMonomial): ExactPitch {
-    if (!ratio.isPositive)
-      throw new RangeError('Pitch conversion requires a positive dimensionless ratio.')
-    return new ExactPitch(ratio.exponents)
-  }
-
-  add(other: ExactPitch): ExactPitch {
-    return new ExactPitch(addMonzos(this.logPrimes, other.logPrimes))
-  }
-  sub(other: ExactPitch): ExactPitch {
-    return new ExactPitch(addMonzos(this.logPrimes, other.logPrimes, true))
-  }
-  scale(factor: FractionValue): ExactPitch {
-    return new ExactPitch(scaleMonzo(this.logPrimes, factor))
-  }
-
-  toRatio(): ExactMonomial {
-    return new ExactMonomial(this.logPrimes)
-  }
-
-  equals(other: ExactPitch): boolean {
-    return monzosEqual(this.logPrimes, other.logPrimes)
-  }
-
-  valueOf(): number {
-    let octaves = 0
-    for (const [prime, exponent] of this.logPrimes) {
-      octaves += (valueToCents(prime) / 1200) * new Fraction(exponent).valueOf()
-    }
-    return 1200 * octaves
-  }
+const pitchFromRatio = (ratio: ExactMonomial): Monomial => {
+  if (!ratio.isPositive)
+    throw new RangeError('Pitch conversion requires a positive dimensionless ratio.')
+  return new Monomial(ratio.exponents)
 }
+
+const pitchValue = (pitch: Monomial): number =>
+  1200 * pitch.project((prime) => valueToCents(prime) / 1200)
 
 type Magnitude =
   | { readonly kind: 'exact'; readonly value: ExactMonomial }
-  | { readonly kind: 'pitch'; readonly value: ExactPitch }
+  | { readonly kind: 'pitch'; readonly value: Monomial }
   | { readonly kind: 'real'; readonly value: number }
 
 export type ValueInput = Value | FractionValue | bigint
@@ -303,7 +256,7 @@ export class Value {
   }
   static cents(value: FractionValue): Value {
     return Value.fromMagnitude(
-      { kind: 'pitch', value: ExactPitch.fromCents(value) },
+      { kind: 'pitch', value: Monomial.fromCents(value) },
       new Dimensions({ pitch: 1 }),
     )
   }
@@ -326,7 +279,7 @@ export class Value {
       throw new TypeError('Pitch conversion requires a dimensionless positive ratio.')
     if (ratio.magnitude.kind === 'exact')
       return Value.fromMagnitude(
-        { kind: 'pitch', value: ExactPitch.fromRatio(ratio.magnitude.value) },
+        { kind: 'pitch', value: pitchFromRatio(ratio.magnitude.value) },
         new Dimensions({ pitch: 1 }),
       )
     if (!(ratio.valueOf() > 0)) throw new RangeError('Pitch conversion requires a positive ratio.')
@@ -338,7 +291,7 @@ export class Value {
       throw new TypeError('Ratio conversion requires a pitch displacement.')
     if (offset.magnitude.kind === 'pitch')
       return Value.fromMagnitude(
-        { kind: 'exact', value: offset.magnitude.value.toRatio() },
+        { kind: 'exact', value: new ExactMonomial(offset.magnitude.value) },
         new Dimensions(),
       )
     return Value.real(centsToValue(offset.valueOf()))
@@ -486,14 +439,14 @@ export class Value {
       return (
         other.dimensions.isDimensionless &&
         other.magnitude.value.sign === 1 &&
-        monzosEqual(this.magnitude.value.logPrimes, other.magnitude.value.exponents)
+        monzosEqual(this.magnitude.value, other.magnitude.value.exponents)
       )
     }
     if (this.magnitude.kind === 'exact' && other.magnitude.kind === 'pitch') {
       return (
         this.dimensions.isDimensionless &&
         this.magnitude.value.sign === 1 &&
-        monzosEqual(this.magnitude.value.exponents, other.magnitude.value.logPrimes)
+        monzosEqual(this.magnitude.value.exponents, other.magnitude.value)
       )
     }
     return false
@@ -531,8 +484,8 @@ export class Value {
       other.dimensions.isDimensionless &&
       other.magnitude.value.isPositive
     ) {
-      if (monzosEqual(this.magnitude.value.logPrimes, other.magnitude.value.exponents)) return 0
-      const difference = this.valueOf() - ExactPitch.fromRatio(other.magnitude.value).valueOf()
+      if (monzosEqual(this.magnitude.value, other.magnitude.value.exponents)) return 0
+      const difference = this.valueOf() - pitchValue(pitchFromRatio(other.magnitude.value))
       return difference < 0 ? -1 : difference > 0 ? 1 : 0
     }
     if (
@@ -541,8 +494,8 @@ export class Value {
       this.magnitude.value.isPositive &&
       other.magnitude.kind === 'pitch'
     ) {
-      if (monzosEqual(this.magnitude.value.exponents, other.magnitude.value.logPrimes)) return 0
-      const difference = ExactPitch.fromRatio(this.magnitude.value).valueOf() - other.valueOf()
+      if (monzosEqual(this.magnitude.value.exponents, other.magnitude.value)) return 0
+      const difference = pitchValue(pitchFromRatio(this.magnitude.value)) - other.valueOf()
       return difference < 0 ? -1 : difference > 0 ? 1 : 0
     }
     this.assertCompatible(other, 'compare')
@@ -566,7 +519,7 @@ export class Value {
     if (this.magnitude.kind === 'real') return undefined
     const source =
       this.magnitude.kind === 'pitch'
-        ? this.magnitude.value.logPrimes
+        ? this.magnitude.value
         : this.magnitude.value.exponents
     return new Map(
       [...source]
@@ -575,7 +528,9 @@ export class Value {
     )
   }
   valueOf(): number {
-    return this.magnitude.value.valueOf()
+    return this.magnitude.kind === 'pitch'
+      ? pitchValue(this.magnitude.value)
+      : this.magnitude.value.valueOf()
   }
   toString(): string {
     return `${this.valueOf()} [${this.dimensions}]`
