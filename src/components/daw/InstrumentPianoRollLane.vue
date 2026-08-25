@@ -28,10 +28,22 @@ const emit = defineEmits<{
 const dragging = ref<{ clip: SourceClip; pointerOffset: number }>()
 const laneElement = ref<HTMLElement>()
 
-const notePitches = (note: ReturnType<typeof parseClipNotes>[number]) => [
-  note.cents,
-  ...(note.glissando?.flatMap(({ from, to }) => [from, to]) ?? []),
-]
+type PreviewNote = ReturnType<typeof parseClipNotes>[number]
+
+const segmentPitch = (segment: NonNullable<PreviewNote['glissando']>[number], t: number) =>
+  segment.from + (segment.to - segment.from) * easeGlissando(segment.easing, t)
+
+/** Pitches reached before a clip-truncated note ends. */
+const notePitches = (note: PreviewNote) => {
+  const pitches = [note.cents]
+  for (const segment of note.glissando ?? []) {
+    if (segment.start >= note.duration) break
+    const progress = Math.min(1, (note.duration - segment.start) / segment.duration)
+    pitches.push(segment.from, segmentPitch(segment, progress))
+    if (progress < 1) break
+  }
+  return pitches
+}
 
 const pianoRoll = computed(() => {
   const parsedClips = props.lane.clips.map((clip) => {
@@ -110,16 +122,19 @@ const pianoRoll = computed(() => {
                 ? (() => {
                     const points = [point(note.beat, note.cents - registerOffset, clipDuration)]
                     let heldPitch = note.cents
+                    const noteEndBeat = note.beat + note.duration
                     for (const segment of note.glissando) {
                       const startBeat = note.beat + segment.start
+                      if (startBeat >= noteEndBeat) break
                       if (startBeat > note.beat) {
                         points.push(point(startBeat, heldPitch - registerOffset, clipDuration))
                       }
-                      for (let sample = 1; sample <= 16; sample += 1) {
-                        const t = sample / 16
-                        const pitch =
-                          segment.from +
-                          (segment.to - segment.from) * easeGlissando(segment.easing, t)
+                      const audibleDuration = Math.min(segment.duration, noteEndBeat - startBeat)
+                      const endProgress = audibleDuration / segment.duration
+                      const samples = Math.max(1, Math.ceil(16 * endProgress))
+                      for (let sample = 1; sample <= samples; sample += 1) {
+                        const t = (sample / samples) * endProgress
+                        const pitch = segmentPitch(segment, t)
                         points.push(
                           point(
                             startBeat + segment.duration * t,
@@ -128,10 +143,10 @@ const pianoRoll = computed(() => {
                           ),
                         )
                       }
-                      heldPitch = segment.to
+                      heldPitch = segmentPitch(segment, endProgress)
+                      if (endProgress < 1) break
                     }
-                    const endBeat = note.beat + note.duration
-                    points.push(point(endBeat, heldPitch - registerOffset, clipDuration))
+                    points.push(point(noteEndBeat, heldPitch - registerOffset, clipDuration))
                     return `M ${points.join(' L ')}`
                   })()
                 : undefined
