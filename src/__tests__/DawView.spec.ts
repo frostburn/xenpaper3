@@ -14,6 +14,7 @@ import {
   projectBeatToSeconds,
   projectSecondsToBeat,
   sourceClipLength,
+  swPatchPitch,
 } from '../daw/audio-engine'
 
 describe('DAW project model', () => {
@@ -21,6 +22,12 @@ describe('DAW project model', () => {
     expect(notePlaybackWindow(0, 4, 2)).toEqual({ startBeat: 2, endBeat: 4 })
     expect(notePlaybackWindow(3, 1, 2)).toEqual({ startBeat: 3, endBeat: 4 })
     expect(notePlaybackWindow(0, 2, 2)).toBeUndefined()
+  })
+
+  it('converts Xenpaper C-based cents to SW Patch A-based cents', () => {
+    expect(swPatchPitch(0)).toBe(-900)
+    expect(swPatchPitch(900)).toBe(0)
+    expect(swPatchPitch(1200)).toBe(300)
   })
 
   it('creates the production-ready project defaults', () => {
