@@ -87,25 +87,33 @@ const convertRootPitch = (
   origins: readonly SourceOrigin[],
 ): GridPitch | undefined => (pitch ? convertPitch(pitch, diagnostics, origins) : undefined)
 
+const convertAutomationBase = (
+  automation: PitchAutomation | PitchAutomationSegment,
+  diagnostics: Diagnostic[],
+  origins: readonly SourceOrigin[],
+): Omit<GridPitchAutomation, 'segments'> | undefined => {
+  const from = convertPitch(automation.from, diagnostics, origins)
+  const to = convertPitch(automation.to, diagnostics, origins)
+  if (!from || !to) return undefined
+  const fromRootPitch = convertRootPitch(automation.fromRootPitch, diagnostics, origins)
+  const toRootPitch = convertRootPitch(automation.toRootPitch, diagnostics, origins)
+  return Object.freeze({
+    curve: automation.curve,
+    from,
+    to,
+    ...(fromRootPitch ? { fromRootPitch } : {}),
+    ...(toRootPitch ? { toRootPitch } : {}),
+    duration: copyFraction(automation.duration),
+  })
+}
+
 const convertAutomationSegment = (
   segment: PitchAutomationSegment,
   diagnostics: Diagnostic[],
   origins: readonly SourceOrigin[],
 ): GridPitchAutomationSegment | undefined => {
-  const from = convertPitch(segment.from, diagnostics, origins)
-  const to = convertPitch(segment.to, diagnostics, origins)
-  if (!from || !to) return undefined
-  const fromRootPitch = convertRootPitch(segment.fromRootPitch, diagnostics, origins)
-  const toRootPitch = convertRootPitch(segment.toRootPitch, diagnostics, origins)
-  return Object.freeze({
-    curve: segment.curve,
-    from,
-    to,
-    ...(fromRootPitch ? { fromRootPitch } : {}),
-    ...(toRootPitch ? { toRootPitch } : {}),
-    start: copyFraction(segment.start),
-    duration: copyFraction(segment.duration),
-  })
+  const automation = convertAutomationBase(segment, diagnostics, origins)
+  return automation && Object.freeze({ ...automation, start: copyFraction(segment.start) })
 }
 
 const convertAutomation = (
@@ -114,23 +122,15 @@ const convertAutomation = (
   origins: readonly SourceOrigin[],
 ): GridPitchAutomation | undefined => {
   if (!automation) return undefined
-  const from = convertPitch(automation.from, diagnostics, origins)
-  const to = convertPitch(automation.to, diagnostics, origins)
-  if (!from || !to) return undefined
-  const fromRootPitch = convertRootPitch(automation.fromRootPitch, diagnostics, origins)
-  const toRootPitch = convertRootPitch(automation.toRootPitch, diagnostics, origins)
+  const converted = convertAutomationBase(automation, diagnostics, origins)
+  if (!converted) return undefined
   const segments = automation.segments?.flatMap((segment) => {
     const converted = convertAutomationSegment(segment, diagnostics, origins)
     return converted ? [converted] : []
   })
 
   return Object.freeze({
-    curve: automation.curve,
-    from,
-    to,
-    ...(fromRootPitch ? { fromRootPitch } : {}),
-    ...(toRootPitch ? { toRootPitch } : {}),
-    duration: copyFraction(automation.duration),
+    ...converted,
     ...(segments ? { segments: Object.freeze(segments) } : {}),
   })
 }
@@ -144,38 +144,28 @@ export function compileProgram(
   if (!('score' in expanded)) return { diagnostics: expanded.diagnostics }
 
   const diagnostics = [...expanded.diagnostics]
-  const events: GridEvent[] = []
-  for (const event of expanded.score.events) {
-    if (event.kind === 'marker') {
-      events.push(
-        Object.freeze({
-          ...event,
-          start: copyFraction(event.start),
-          origins: Object.freeze([...event.origins]),
-        }),
-      )
-      continue
-    }
-
+  const events = expanded.score.events.flatMap((event): GridEvent[] => {
+    if (event.kind === 'marker') return [{ ...event }]
     const pitch = convertPitch(event.pitch, diagnostics, event.origins)
     const rootPitch = convertRootPitch(event.rootPitch, diagnostics, event.origins)
     const automation = convertAutomation(event.automation, diagnostics, event.origins)
-    if (!pitch) continue
-    events.push(
-      Object.freeze({
-        kind: 'note',
-        start: copyFraction(event.start),
-        duration: copyFraction(event.duration),
-        pitch,
-        ...(rootPitch ? { rootPitch } : {}),
-        dynamic: copyFraction(event.dynamic),
-        extensions: Object.freeze({ ...event.directiveState }),
-        ...(automation ? { automation } : {}),
-        ...(event.label === undefined ? {} : { label: event.label }),
-        origins: Object.freeze([...event.origins]),
-      }),
-    )
-  }
+    return pitch
+      ? [
+          {
+            kind: 'note',
+            start: copyFraction(event.start),
+            duration: copyFraction(event.duration),
+            pitch,
+            ...(rootPitch ? { rootPitch } : {}),
+            dynamic: copyFraction(event.dynamic),
+            extensions: Object.freeze({ ...event.directiveState }),
+            ...(automation ? { automation } : {}),
+            ...(event.label === undefined ? {} : { label: event.label }),
+            origins: event.origins,
+          },
+        ]
+      : []
+  })
 
   if (diagnostics.some(({ severity }) => severity === 'error')) return { diagnostics }
   return {
