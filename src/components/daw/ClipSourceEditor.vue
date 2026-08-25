@@ -3,14 +3,19 @@ import { ref } from 'vue'
 import type { SourceClip } from '../../daw/project'
 
 defineProps<{ clip?: SourceClip }>()
-const emit = defineEmits<{ 'update-source': [source: string] }>()
+const emit = defineEmits<{ 'update-source': [source: string]; delete: [] }>()
 const editor = ref<HTMLTextAreaElement>()
 defineExpose({ focus: () => editor.value?.focus() })
 </script>
 
 <template>
   <section class="source-editor">
-    <h2>Clip source</h2>
+    <header>
+      <h2>Clip source</h2>
+      <button v-if="clip" type="button" aria-label="Delete clip" @click="emit('delete')">
+        Delete
+      </button>
+    </header>
     <textarea
       v-if="clip"
       ref="editor"
@@ -24,6 +29,11 @@ defineExpose({ focus: () => editor.value?.focus() })
 </template>
 
 <style scoped>
+.source-editor header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
 .source-editor textarea {
   box-sizing: border-box;
   width: 100%;

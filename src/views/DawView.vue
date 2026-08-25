@@ -171,6 +171,7 @@ onBeforeUnmount(() => {
       ref="editor"
       :clip="selectedClip"
       @update-source="selectedClip && updateClipSource(selectedClip, $event)"
+      @delete="selectedClip && deleteClip(selectedClip)"
     />
   </div>
 </template>
