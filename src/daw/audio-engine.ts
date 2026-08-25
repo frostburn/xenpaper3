@@ -23,6 +23,55 @@ export function notePlaybackWindow(
   return { startBeat: Math.max(noteBeat, fromBeat), endBeat }
 }
 
+export type GlissandoEasing = 'linear' | 'ease' | 'ease-in' | 'ease-out' | 'ease-in-out'
+
+export const easeGlissando = (easing: string, t: number): number => {
+  switch (easing) {
+    case 'ease-in':
+      return t ** 2
+    case 'ease-out':
+      return 1 - (1 - t) ** 2
+    case 'ease-in-out':
+      return (3 - 2 * t) * t ** 2
+    case 'ease':
+      return 0.25 * t * (3 + 6 * t - 5 * t * t)
+    default:
+      return t
+  }
+}
+
+const scheduleGlissando = (
+  pitch: ConstantSourceNode,
+  note: ReturnType<typeof parseProjectNotes>[number],
+  project: DawProject,
+  playbackStartBeat: number,
+  playbackStartTime: number,
+) => {
+  for (const segment of note.glissando ?? []) {
+    const segmentStartBeat = note.beat + segment.start
+    const segmentEndBeat = segmentStartBeat + segment.duration
+    if (segmentEndBeat <= playbackStartBeat) continue
+    const audibleStartBeat = Math.max(segmentStartBeat, playbackStartBeat)
+    const startT = (audibleStartBeat - segmentStartBeat) / segment.duration
+    const startValue =
+      segment.from + (segment.to - segment.from) * easeGlissando(segment.easing, startT)
+    const when =
+      playbackStartTime +
+      projectBeatToSeconds(project, audibleStartBeat) -
+      projectBeatToSeconds(project, playbackStartBeat)
+    const duration =
+      projectBeatToSeconds(project, segmentEndBeat) -
+      projectBeatToSeconds(project, audibleStartBeat)
+    const samples = Math.max(2, Math.ceil(duration * 120))
+    const curve = Float32Array.from({ length: samples }, (_, index) => {
+      const t = startT + (1 - startT) * (index / (samples - 1))
+      return segment.from + (segment.to - segment.from) * easeGlissando(segment.easing, t)
+    })
+    pitch.offset.setValueAtTime(startValue, when)
+    pitch.offset.setValueCurveAtTime(curve, when, duration)
+  }
+}
+
 /** One disposable Web Audio playback session backed by sw-seq and default.swpatch. */
 export class DawAudioEngine extends EventTarget {
   readonly context: AudioContext
@@ -79,6 +128,7 @@ export class DawAudioEngine extends EventTarget {
             const pitch = new ConstantSourceNode(this.context, { offset: note.cents })
             this.pitchSignals.push(pitch)
             pitch.start(time)
+            scheduleGlissando(pitch, note, project, playbackWindow.startBeat, time)
             const { attack, decay, sustain, release } = note.envelope
             const off = synth.on(
               this.output,

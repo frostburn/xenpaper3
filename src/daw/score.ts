@@ -19,6 +19,15 @@ export interface ScheduledLaneNote {
   readonly cents: number
   readonly velocity: number
   readonly envelope: EnvelopeSettings
+  readonly glissando?: readonly PitchGlideSegment[]
+}
+
+export interface PitchGlideSegment {
+  readonly start: number
+  readonly duration: number
+  readonly from: number
+  readonly to: number
+  readonly easing: string
 }
 
 const DEFAULT_ENVELOPE: EnvelopeSettings = Object.freeze({
@@ -51,8 +60,10 @@ const envelopeExtension: DirectiveExtension = {
 export const parseClipNotes = (
   source: string,
   duration = Number.POSITIVE_INFINITY,
+  defaultEnvelope: EnvelopeSettings = DEFAULT_ENVELOPE,
 ): ScheduledLaneNote[] => {
-  const result = expandToBeatEvents(parse(source), { directiveExtensions: [envelopeExtension] })
+  const extension = { ...envelopeExtension, initialState: Object.freeze({ ...defaultEnvelope }) }
+  const result = expandToBeatEvents(parse(source), { directiveExtensions: [extension] })
   const errors = result.diagnostics.filter(({ severity }) => severity === 'error')
   if (errors.length) throw new Error(errors.map(({ message }) => message).join('\n'))
   if (!('score' in result)) return []
@@ -66,6 +77,22 @@ export const parseClipNotes = (
       cents: event.pitch.value.valueOf(),
       velocity: event.dynamic.valueOf(),
       envelope: (event.directiveState.patch as EnvelopeSettings | undefined) ?? DEFAULT_ENVELOPE,
+      glissando: event.automation
+        ? (
+            event.automation.segments ?? [
+              {
+                ...event.automation,
+                start: { valueOf: () => 0 },
+              },
+            ]
+          ).map((segment) => ({
+            start: segment.start.valueOf(),
+            duration: segment.duration.valueOf(),
+            from: segment.from.value.valueOf(),
+            to: segment.to.value.valueOf(),
+            easing: segment.curve,
+          }))
+        : undefined,
     }))
 }
 
@@ -84,7 +111,7 @@ export const parseProjectNotes = (project: DawProject): ScheduledLaneNote[] => {
   const notes = project.instrumentLanes.flatMap((lane) =>
     lane.clips.flatMap((clip) => {
       const clipStart = beatToNumber(clip.start)
-      return parseClipNotes(clip.source, beatToNumber(clip.length)).map((event) => ({
+      return parseClipNotes(clip.source, beatToNumber(clip.length), lane.envelope).map((event) => ({
         ...event,
         beat: clipStart + event.beat,
       }))
