@@ -71,9 +71,12 @@ describe('DAW playback planning', () => {
     })
 
     const curve = createPlaybackPlan(project).lanes[0]!.notes[0]!.pitch.curves[0]!
+    const segment = parseClipNotes('@gliss C G')[0]!.glissando![0]!
 
     expect(curve.duration).toBeCloseTo(0.25)
-    expect(curve.values[curve.values.length - 1]).toBeCloseTo(350)
+    expect(curve.values[curve.values.length - 1]).toBeCloseTo(
+      segment.from + (segment.to - segment.from) / 2,
+    )
     expect(curve.values[curve.values.length - 1]).toBeLessThan(700)
     expect(Object.isFrozen(curve.values)).toBe(true)
   })

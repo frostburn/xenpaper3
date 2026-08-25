@@ -57,6 +57,7 @@ class MockConstantSource extends EventTarget {
   readonly starts: number[] = []
   readonly stops: number[] = []
   disconnected = false
+  targetedConnectionActive = false
 
   start(time = 0): void {
     this.starts.push(time)
@@ -76,7 +77,7 @@ class MockAudioContext {
   readonly sampleRate = 10
   readonly destination = {} as AudioDestinationNode
   readonly sources: MockConstantSource[] = []
-  readonly close = vi.fn(() => Promise.resolve())
+  readonly close = vi.fn<() => Promise<void>>(() => Promise.resolve())
 
   createConstantSource(): ConstantSourceNode {
     const source = new MockConstantSource()
@@ -136,11 +137,11 @@ afterEach(() => {
 describe('Web Audio playback session', () => {
   it('translates one pure plan into a disposable SW Patch voice', () => {
     const context = new MockAudioContext()
-    const noteOff = vi.fn((end: number) => end + 0.5)
+    const noteOff = vi.fn<(end: number) => number>((end) => end + 0.5)
     const on = vi.fn<PlayableSynthPatch['on']>(() => noteOff)
-    const dispose = vi.fn()
-    const patchFactory = vi.fn(
-      () => ({ on, dispose }) as unknown as PlayableSynthPatch,
+    const dispose = vi.fn<() => void>()
+    const patchFactory = vi.fn<() => PlayableSynthPatch>(
+      () => ({ on, dispose }) as PlayableSynthPatch,
     )
     const session = new WebAudioPlaybackSession(
       context as unknown as AudioContext,
@@ -180,7 +181,7 @@ describe('Web Audio playback session', () => {
 
   it('tears down its pitch source when a patch violates the note-off contract', () => {
     const context = new MockAudioContext()
-    const dispose = vi.fn()
+    const dispose = vi.fn<() => void>()
     const session = new WebAudioPlaybackSession(
       context as unknown as AudioContext,
       createPlan(),
@@ -201,8 +202,8 @@ describe('Web Audio playback session', () => {
   it('waits for the release tail before reporting natural completion', () => {
     vi.useFakeTimers()
     const context = new MockAudioContext()
-    const dispose = vi.fn()
-    const onEnded = vi.fn()
+    const dispose = vi.fn<() => void>()
+    const onEnded = vi.fn<() => void>()
     const session = new WebAudioPlaybackSession(
       context as unknown as AudioContext,
       createPlan(),
@@ -222,6 +223,40 @@ describe('Web Audio playback session', () => {
     vi.advanceTimersByTime(1)
     expect(onEnded).toHaveBeenCalledOnce()
     expect(dispose).toHaveBeenCalledOnce()
+  })
+
+  it('lets patches remove targeted pitch connections before disconnecting the source', () => {
+    const context = new MockAudioContext()
+    const session = new WebAudioPlaybackSession(
+      context as unknown as AudioContext,
+      createPlan(),
+      {
+        patchFactory: () =>
+          ({
+            on: (_destination: AudioNode, _start: number, pitch: AudioNode) => {
+              const source = pitch as unknown as MockConstantSource
+              source.targetedConnectionActive = true
+              return (end: number) => end
+            },
+            dispose: () => {
+              const source = context.sources[0]!
+              if (source.disconnected && source.targetedConnectionActive) {
+                throw new DOMException(
+                  'The given AudioParam is not connected.',
+                  'InvalidAccessError',
+                )
+              }
+              source.targetedConnectionActive = false
+            },
+          }) as unknown as PlayableSynthPatch,
+      },
+    )
+
+    session.start()
+
+    expect(() => session.stop()).not.toThrow()
+    expect(context.sources[0]!.targetedConnectionActive).toBe(false)
+    expect(context.sources[0]!.disconnected).toBe(true)
   })
 })
 
