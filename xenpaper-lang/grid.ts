@@ -3,8 +3,11 @@ import { Monomial } from './monomial'
 import type {
   DirectiveExtensionState,
   IntervalSpelling,
+  PitchAutomation,
+  PitchAutomationSegment,
   PitchSpelling,
-  SourceOrigin,
+  BeatTimedMarkerEvent,
+  TimedNoteEvent,
 } from './runtime/types'
 
 const copyFraction = (value: Fraction): Fraction => new Fraction(value.s * value.n, value.d)
@@ -134,45 +137,16 @@ export interface GridPitch {
   readonly justIntonation?: boolean
 }
 
-export interface GridPitchAutomationSegment {
-  readonly curve: string
-  readonly from: GridPitch
-  readonly to: GridPitch
-  readonly fromRootPitch?: GridPitch
-  readonly toRootPitch?: GridPitch
-  readonly start: Fraction
-  readonly duration: Fraction
-}
+export type GridPitchAutomationSegment = PitchAutomationSegment<GridPitch, GridPitch>
+export type GridPitchAutomation = PitchAutomation<GridPitch, GridPitch>
 
-export interface GridPitchAutomation {
-  readonly curve: string
-  readonly from: GridPitch
-  readonly to: GridPitch
-  readonly fromRootPitch?: GridPitch
-  readonly toRootPitch?: GridPitch
-  readonly duration: Fraction
-  readonly segments?: readonly GridPitchAutomationSegment[]
-}
-
-export interface GridNoteEvent extends GridTimedEvent {
-  readonly kind: 'note'
-  readonly duration: Fraction
-  readonly pitch: GridPitch
-  readonly rootPitch?: GridPitch
-  readonly dynamic: Fraction
+export interface GridNoteEvent
+  extends TimedNoteEvent<GridPitch, GridPitch, GridPitchAutomation> {
   /** Immutable snapshots owned by second-party directive extensions. */
   readonly extensions: DirectiveExtensionState
-  readonly automation?: GridPitchAutomation
-  readonly label?: string
-  readonly origins: readonly SourceOrigin[]
 }
 
-export interface GridMarkerEvent extends GridTimedEvent {
-  readonly kind: 'marker'
-  readonly marker: 'barline' | 'annotation' | 'dynamic'
-  readonly label: string
-  readonly origins: readonly SourceOrigin[]
-}
+export type GridMarkerEvent = BeatTimedMarkerEvent
 
 export type GridEvent = GridNoteEvent | GridMarkerEvent
 export type MonomialGrid = ScoreGrid<GridEvent>

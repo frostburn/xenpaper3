@@ -313,25 +313,31 @@ export interface AttackShape extends ShapeBase {
 
 export type DynamicMark = 'ppp' | 'pp' | 'p' | 'mp' | 'mf' | 'f' | 'ff' | 'fff'
 
-export interface PitchAutomation {
+export interface PitchAutomation<
+  Pitch = AttackShape['pitch'],
+  RootPitch = AbsolutePitchValue,
+> {
   readonly curve: string
-  readonly from: AttackShape['pitch']
-  readonly to: AttackShape['pitch']
+  readonly from: Pitch
+  readonly to: Pitch
   /** Notation context of the source and destination pitches. */
-  readonly fromRootPitch?: AbsolutePitchValue
-  readonly toRootPitch?: AbsolutePitchValue
+  readonly fromRootPitch?: RootPitch
+  readonly toRootPitch?: RootPitch
   readonly duration: Fraction
   /** Consecutive glides, including this automation's first segment. */
-  readonly segments?: readonly PitchAutomationSegment[]
+  readonly segments?: readonly PitchAutomationSegment<Pitch, RootPitch>[]
 }
 
-export interface PitchAutomationSegment {
+export interface PitchAutomationSegment<
+  Pitch = AttackShape['pitch'],
+  RootPitch = AbsolutePitchValue,
+> {
   readonly curve: string
-  readonly from: AttackShape['pitch']
-  readonly to: AttackShape['pitch']
+  readonly from: Pitch
+  readonly to: Pitch
   /** Notation context at each endpoint, which may change during the glide. */
-  readonly fromRootPitch?: AbsolutePitchValue
-  readonly toRootPitch?: AbsolutePitchValue
+  readonly fromRootPitch?: RootPitch
+  readonly toRootPitch?: RootPitch
   /** Offset from the beginning of the owning attack. */
   readonly start: Fraction
   readonly duration: Fraction
@@ -429,21 +435,25 @@ export type ScoreShape =
   | SequenceShape
   | ParallelShape
 
-/** A renderer/audio-engine friendly score whose time axis is still exact beats. */
-export interface BeatTimedNoteEvent {
+export interface TimedNoteEvent<Pitch, RootPitch, Automation> {
   readonly kind: 'note'
   readonly start: Fraction
   readonly duration: Fraction
-  readonly pitch: AttackShape['pitch']
-  readonly rootPitch?: AbsolutePitchValue
+  readonly pitch: Pitch
+  readonly rootPitch?: RootPitch
   /** Effective amplitude from either the prevailing dynamic or a one-shot velocity. */
   readonly dynamic: Fraction
-  /** Extension-owned prevailing state captured at this note's attack. */
-  readonly directiveState: DirectiveExtensionState
-  readonly automation?: PitchAutomation
+  readonly automation?: Automation
   /** Faithful authored pitch expression, when one exists. */
   readonly label?: string
   readonly origins: readonly SourceOrigin[]
+}
+
+/** A renderer/audio-engine friendly score whose time axis is still exact beats. */
+export interface BeatTimedNoteEvent
+  extends TimedNoteEvent<AttackShape['pitch'], AbsolutePitchValue, PitchAutomation> {
+  /** Extension-owned prevailing state captured at this note's attack. */
+  readonly directiveState: DirectiveExtensionState
 }
 
 export interface BeatTimedMarkerEvent {
