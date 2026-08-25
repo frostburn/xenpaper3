@@ -176,10 +176,7 @@ export class Transport extends EventTarget {
   }
 
   private scheduleTick(runId: number, time: number, completes: boolean): void {
-    const scheduledTime = Math.max(
-      time,
-      this.context.currentTime + 1 / this.context.sampleRate,
-    )
+    const scheduledTime = Math.max(time, this.context.currentTime + 1 / this.context.sampleRate)
     const callback = () => {
       if (runId !== this.runId || !this.active) return
       if (completes) this.finish(runId)

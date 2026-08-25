@@ -13,9 +13,7 @@ describe('DAW exact-grid adapter', () => {
     expect(exact?.kind).toBe('note')
     if (!exact || exact.kind !== 'note') return
 
-    expect(parseClipNotes('{31edo} E')[0]?.cents).toBeCloseTo(
-      monomialToCents(exact.pitch.sounding),
-    )
+    expect(parseClipNotes('{31edo} E')[0]?.cents).toBeCloseTo(monomialToCents(exact.pitch.sounding))
   })
 
   it('turns incomplete editor syntax into a stable fallback clip span', () => {
