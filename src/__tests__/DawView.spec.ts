@@ -254,8 +254,10 @@ describe('DawView', () => {
     const lane = wrapper.getComponent(InstrumentPianoRollLane)
     await lane.trigger('dblclick', { clientX: 64 })
     const clip = wrapper.get('button.clip')
+    const focus = vi.spyOn(clip.element as HTMLElement, 'focus')
 
     clip.element.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, clientX: 64 }))
+    expect(focus).toHaveBeenCalledWith({ preventScroll: true })
     expect(document.activeElement).toBe(clip.element)
     await clip.trigger('keydown', { key: 'Delete' })
 

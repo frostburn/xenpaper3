@@ -135,7 +135,7 @@ const startDrag = (event: PointerEvent, clip: SourceClip) => {
   const clipElement = event.currentTarget as HTMLElement
   // Preventing the pointer event keeps dragging smooth, but also suppresses the
   // button's native focus behavior. Restore it so keyboard actions target the clip.
-  clipElement.focus()
+  clipElement.focus({ preventScroll: true })
   clipElement.setPointerCapture?.(event.pointerId)
 }
 
