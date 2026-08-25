@@ -66,9 +66,25 @@ describe('DAW project model', () => {
 
   it('parses clip-local notes for piano-roll rendering', () => {
     expect(parseClipNotes('C D E', 2)).toMatchObject([
-      { beat: 0, duration: 1 },
+      { beat: 0, duration: 1, cents: 0 },
       { beat: 1, duration: 1 },
     ])
+  })
+
+  it('converts scheduled pitches and glissandi to SW Patch A-based cents', () => {
+    const project = createDefaultProject()
+    project.instrumentLanes[0]!.clips.push({
+      id: 'gliss',
+      start: beat(0),
+      length: beat(2),
+      source: '@gliss C A',
+    })
+    const clipNotes = parseClipNotes('@gliss C A')
+    const notes = parseProjectNotes(project)
+
+    expect(notes[0]!.cents).toBe(clipNotes[0]!.cents - 900)
+    expect(notes[0]!.glissando![0]!.from).toBe(clipNotes[0]!.glissando![0]!.from - 900)
+    expect(notes[0]!.glissando![0]!.to).toBe(clipNotes[0]!.glissando![0]!.to - 900)
   })
 
   it('derives clip length from source and keeps zero-duration source visible for a bar', () => {
