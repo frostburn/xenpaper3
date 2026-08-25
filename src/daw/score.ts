@@ -4,7 +4,13 @@ import {
   parse,
   type DirectiveExtension,
 } from '../../xenpaper-lang'
-import { beat, beatToNumber, type Beat, type DawProject } from './project'
+import {
+  beat,
+  beatToNumber,
+  type Beat,
+  type DawProject,
+  type InstrumentLane,
+} from './project'
 
 export interface EnvelopeSettings {
   readonly attack: number
@@ -16,6 +22,7 @@ export interface EnvelopeSettings {
 export interface ScheduledLaneNote {
   readonly beat: number
   readonly duration: number
+  /** Authored pitch in cents relative to Xenpaper's C reference. */
   readonly cents: number
   readonly velocity: number
   readonly envelope: EnvelopeSettings
@@ -36,9 +43,6 @@ const DEFAULT_ENVELOPE: EnvelopeSettings = Object.freeze({
   sustain: 0.7,
   release: 0.3,
 })
-
-/** SW Patch measures pitch from A, 900 cents above Xenpaper's C reference. */
-const SW_PATCH_PITCH_OFFSET = -900
 
 const envelopeExtension: DirectiveExtension = {
   name: 'patch',
@@ -109,22 +113,18 @@ export const sourceClipLength = (source: string, defaultBar = beat(4)): Beat => 
   return beat(Number(duration.s * duration.n), duration.d)
 }
 
-/** Compile every clip and place its Xenpaper notes on the project timeline. */
-export const parseProjectNotes = (project: DawProject): ScheduledLaneNote[] => {
-  const notes = project.instrumentLanes.flatMap((lane) =>
-    lane.clips.flatMap((clip) => {
-      const clipStart = beatToNumber(clip.start)
-      return parseClipNotes(clip.source, beatToNumber(clip.length), lane.envelope).map((event) => ({
-        ...event,
-        beat: clipStart + event.beat,
-        cents: event.cents + SW_PATCH_PITCH_OFFSET,
-        glissando: event.glissando?.map((segment) => ({
-          ...segment,
-          from: segment.from + SW_PATCH_PITCH_OFFSET,
-          to: segment.to + SW_PATCH_PITCH_OFFSET,
-        })),
-      }))
-    }),
-  )
+/** Compile a lane once and place its C-relative Xenpaper notes on the project timeline. */
+export const parseLaneNotes = (lane: InstrumentLane): ScheduledLaneNote[] => {
+  const notes = lane.clips.flatMap((clip) => {
+    const clipStart = beatToNumber(clip.start)
+    return parseClipNotes(clip.source, beatToNumber(clip.length), lane.envelope).map((event) => ({
+      ...event,
+      beat: clipStart + event.beat,
+    }))
+  })
   return notes.sort((left, right) => left.beat - right.beat)
 }
+
+/** Compile every lane without applying any synthesizer- or tuning-reference conversion. */
+export const parseProjectScoreNotes = (project: DawProject): ScheduledLaneNote[] =>
+  project.instrumentLanes.flatMap(parseLaneNotes).sort((left, right) => left.beat - right.beat)

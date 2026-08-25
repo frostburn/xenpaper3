@@ -46,6 +46,24 @@ describe('Sample-accurate look-ahead transport', () => {
     expect(calls[0]).toBeCloseTo(transport.lookAhead)
   })
 
+  it('reports the audible clock position rather than the scheduling horizon', () => {
+    const context = new MockAudioContext()
+    const transport = new Transport(context as unknown as AudioContext)
+
+    transport.start(2)
+    expect(transport.position).toBeCloseTo(2)
+
+    context.currentTime = 0.1
+    expect(transport.position).toBeCloseTo(2)
+
+    context.currentTime = 0.4
+    expect(transport.position).toBeCloseTo(2.2)
+
+    transport.stop()
+    context.currentTime = 0.9
+    expect(transport.position).toBeCloseTo(2.2)
+  })
+
   it('ends notes that lead into a looped section', () => {
     const calls: { which: 'on' | 'off'; time: number }[] = []
     const transport = createTransport()
@@ -92,26 +110,22 @@ describe('Sample-accurate look-ahead transport', () => {
     vi.advanceTimersByTime(1)
 
     expect(calls).toEqual(['event'])
-
+    transport.stop()
     vi.useRealTimers()
   })
 
-  it('dispatches ended events to registered listeners', () => {
-    vi.useFakeTimers()
-
+  it('dispatches ended events exactly once when stopped', () => {
     const calls: string[] = []
-    const transport = new Transport(new MockAudioContext() as unknown as AudioContext, {
-      useSetTimeoutFallback: true,
-    })
-    transport.addEventListener('ended', () => calls.push('first'))
-    transport.addEventListener('ended', () => calls.push('second'))
+    const transport = createTransport()
+    transport.addEventListener('ended', () => calls.push('ended'))
 
     transport.start(0)
     transport.stop()
+    const inner = transport as unknown as { onInterval: () => void }
+    inner.onInterval()
+    transport.stop()
 
-    expect(calls).toEqual(['first', 'second'])
-
-    vi.useRealTimers()
+    expect(calls).toEqual(['ended'])
   })
 
   it('wraps start offsets back into the active loop range', () => {
@@ -122,7 +136,7 @@ describe('Sample-accurate look-ahead transport', () => {
     transport.loopEnd = 2
     transport.start(2.5)
 
-    expect(transport.position).toBeCloseTo(1.6)
+    expect(transport.position).toBeCloseTo(1.5)
   })
 
   it('repeats notes that lead out of a looped section', () => {
@@ -156,6 +170,45 @@ describe('Sample-accurate look-ahead transport', () => {
     expect(calls[2]!.time).toBeCloseTo(2.5 + transport.lookAhead)
     expect(calls[3]!.which).toBe('off')
     expect(calls[3]!.time).toBeCloseTo(3.5 + transport.lookAhead)
+  })
+
+  it('does not schedule events beyond a finite end time', () => {
+    const calls: string[] = []
+    const transport = new Transport(new MockAudioContext() as unknown as AudioContext, {
+      interval: 2,
+    })
+    transport.endTime = 0.5
+    transport.scheduleParametric(() => calls.push('inside'), 0.4)
+    transport.scheduleParametric(() => calls.push('outside'), 0.5)
+    transport.scheduleParametric(() => calls.push('far outside'), 1)
+
+    transport.start(0)
+
+    expect(calls).toEqual(['inside'])
+  })
+
+  it('reports natural completion after the last look-ahead event can fire', () => {
+    vi.useFakeTimers()
+    const calls: string[] = []
+    const transport = new Transport(new MockAudioContext() as unknown as AudioContext, {
+      interval: 2,
+      useSetTimeoutFallback: true,
+    })
+    transport.endTime = 0.5
+    transport.scheduleEvent(() => calls.push('event'), 0.4)
+    transport.addEventListener('ended', () => calls.push('ended'))
+
+    transport.start(0)
+    vi.advanceTimersByTime(599)
+    expect(calls).toEqual([])
+    vi.advanceTimersByTime(1)
+    expect(calls).toEqual(['event'])
+    vi.advanceTimersByTime(99)
+    expect(calls).toEqual(['event'])
+    vi.advanceTimersByTime(1)
+    expect(calls).toEqual(['event', 'ended'])
+
+    vi.useRealTimers()
   })
 
   it('schedules notes chronologically within a look-ahead interval', () => {

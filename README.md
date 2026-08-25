@@ -34,6 +34,24 @@ npm run dev
 
 The home page links to the SW Patch and Xenpaper language test pages.
 
+## Playback architecture
+
+The DAW playback path is intentionally split at the browser boundary:
+
+- `src/daw/score.ts` compiles Xenpaper source into authored beats, envelopes, and
+  C-relative pitches. It does not know which synthesizer will play the result.
+- `src/daw/timeline.ts` snapshots and pre-integrates tempo changes.
+- `src/daw/playback-plan.ts` turns mutable editor state into an immutable,
+  browser-independent playback plan.
+- `src/daw/web-audio-automation.ts` owns SW Patch detune conversion and Web Audio
+  automation workarounds.
+- `src/daw/web-audio-playback.ts` owns disposable nodes, patches, transport events,
+  release tails, muting, and cleanup for one playback session.
+- `src/daw/audio-engine.ts` is the small public facade used by Vue.
+
+Keep musical transformations above this boundary and browser quirks below it. A
+new renderer should be able to consume a playback plan without importing Web Audio.
+
 ## Checks
 
 ```sh
