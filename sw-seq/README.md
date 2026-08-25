@@ -13,6 +13,8 @@ from `sw-seq/index.ts` rather than reaching into implementation files.
 
 Audio events are scheduled based on looking slightly ahead of `.currentTime` of an AudioContext. This library only handles loops and cleanup in case of a premature stop. Tempo changes are assumed to be _baked in_ and there's no way to speed up or slow down what has already been scheduled.
 
+`transport.position` follows the audible AudioContext clock (with startup look-ahead, loop wrapping, and end clamping). It does not expose the scheduler's look-ahead cursor, so UI playheads remain independent of the scheduling interval. Calling `stop()` freezes that clock position and dispatches `ended` exactly once.
+
 A parametric note's `noteOn` callback starts its audio graph and returns the callback that releases
 that same graph. The release callback returns the cutoff time at which its audio tail has finished.
 This matches the note handle produced by an SW Patch synth and lets callers stop note-owned control
