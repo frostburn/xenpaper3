@@ -249,6 +249,32 @@ describe('DawView', () => {
     wrapper.unmount()
   })
 
+  it('focuses a clicked clip and deletes it with Delete', async () => {
+    const wrapper = mount(DawView, { attachTo: document.body })
+    const lane = wrapper.getComponent(InstrumentPianoRollLane)
+    await lane.trigger('dblclick', { clientX: 64 })
+    const clip = wrapper.get('button.clip')
+
+    clip.element.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, clientX: 64 }))
+    expect(document.activeElement).toBe(clip.element)
+    await clip.trigger('keydown', { key: 'Delete' })
+
+    expect(wrapper.find('button.clip').exists()).toBe(false)
+    wrapper.unmount()
+  })
+
+  it('deletes the selected clip from the Clip source header', async () => {
+    const wrapper = mount(DawView)
+    const lane = wrapper.getComponent(InstrumentPianoRollLane)
+    await lane.trigger('dblclick', { clientX: 64 })
+
+    await wrapper.get('button[aria-label="Delete clip"]').trigger('click')
+
+    expect(wrapper.find('button.clip').exists()).toBe(false)
+    expect(wrapper.find('button[aria-label="Delete clip"]').exists()).toBe(false)
+    expect(wrapper.text()).toContain('Select or create a clip')
+  })
+
   it('keeps the visual grid aligned with zoom and scroll', async () => {
     const wrapper = mount(DawView)
     const controls = wrapper.findAll<HTMLInputElement>('.timeline-controls input')
