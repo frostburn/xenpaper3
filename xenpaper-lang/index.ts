@@ -1,25 +1,7 @@
-export type { Diagnostic, DiagnosticSeverity } from './diagnostics'
-export { parse } from './parser.generated.js'
-export type * from './parser.generated.js'
-export { Monomial } from './monomial'
-export type { MonomialEntry, MonomialInput } from './monomial'
-export { ScoreGrid } from './grid'
-export { compile, compileProgram } from './runtime/compile-grid'
-export type {
-  GridEvent,
-  GridMarkerEvent,
-  GridNoteEvent,
-  GridPitch,
-  GridPitchAutomation,
-  GridPitchAutomationSegment,
-  GridTimedEvent,
-  MonomialGrid,
-} from './grid'
-export type { GridCompilationResult, GridCompileOptions } from './runtime/compile-grid'
+export * from './core'
 export { expandRepeats } from './runtime/repeat-expansion'
 export { decimalFraction, evaluateLiteral } from './runtime/literals'
 export type { LiteralEvaluationResult, NumericLiteralNode } from './runtime/literals'
-export { evaluateExpression } from './runtime/expressions'
 export { applyFjsInflections, fjsInflection, fjsPrimeComma } from './runtime/fjs'
 export type { FjsFlavor, FjsInflectionInput } from './runtime/fjs'
 export {
@@ -34,7 +16,6 @@ export {
   scalePitchOffset,
   spellPitchDifference,
 } from './runtime/pitches'
-export type { ExpressionEvaluationResult } from './runtime/expressions'
 export {
   DIRECTIVE_REGISTRY,
   DYNAMIC_VELOCITIES,
@@ -50,7 +31,7 @@ export {
   toStaffPitch,
 } from './runtime/staff-notation'
 export type { StaffNotationOptions } from './runtime/staff-notation'
-export type { ScoreShapeEvaluationResult, ScoreShapeOptions } from './runtime/score-shape'
+export type { ScoreShapeEvaluationResult } from './runtime/score-shape'
 export type {
   AttackShape,
   AttackAppearance,
@@ -62,9 +43,6 @@ export type {
   BeatTimedMarkerEvent,
   BeatTimedNoteEvent,
   BeatTimedScore,
-  DirectiveExtension,
-  DirectiveExtensionResult,
-  DirectiveExtensionState,
   ContinueShape,
   ClefShape,
   DynamicShape,
@@ -75,8 +53,6 @@ export type {
   EvaluatedLiteral,
   ExpandedNode,
   ExpandedProgram,
-  ExpansionPath,
-  ExpansionStep,
   RepeatExpansionOptions,
   RepeatExpansionResult,
   ScalarValue,
@@ -84,19 +60,15 @@ export type {
   PitchSpelling,
   IntervalSpelling,
   FjsSpelling,
-  PrimeMapping,
   PrimeMonzo,
-  PitchContext,
   ParallelShape,
   RestShape,
   ScoreShape,
   SequenceShape,
   ShapeBase,
-  SourceOrigin,
   StaffPitch,
   StaffClef,
   StaffNotationShape,
   StaffInflection,
   StaffOperatorInflection,
 } from './runtime/types'
-export { Dimensions, Value } from './value'
