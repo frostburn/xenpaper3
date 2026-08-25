@@ -9,6 +9,8 @@ import {
   parseClipNotes,
   notePlaybackWindow,
   easeGlissando,
+  glissandoPitchAtBeat,
+  glissandoPitchAtElapsedTime,
   projectBeatToSeconds,
   projectSecondsToBeat,
   sourceClipLength,
@@ -121,6 +123,29 @@ describe('DAW project model', () => {
     expect(easeGlissando('ease-out', 0.5)).toBe(0.75)
     expect(easeGlissando('ease-in-out', 0.5)).toBe(0.5)
     expect(easeGlissando('ease', 0.5)).toBeCloseTo(0.59375)
+  })
+
+  it('holds a completed glide target when playback resumes later in the note', () => {
+    const note = parseClipNotes('@gliss C G')[0]!
+
+    expect(note.duration).toBe(2)
+    expect(glissandoPitchAtBeat(note, 1.5)).toBe(note.glissando![0]!.to)
+  })
+
+  it('samples glissando pitch in project beats across tempo changes', () => {
+    const project = createDefaultProject()
+    project.globalTrack.tempoChanges[0]!.bpm = 60
+    project.globalTrack.tempoChanges.push({ id: 'faster', beat: beat(1), bpm: 120 })
+    const note = parseClipNotes('@gliss C= G?')[0]!
+    const segment = note.glissando![0]!
+    const durationSeconds = projectBeatToSeconds(project, 2)
+
+    // Half of the 1.5-second glide is only beat 0.75, not beat 1, because its
+    // second beat is twice as fast as its first.
+    expect(projectSecondsToBeat(project, durationSeconds / 2)).toBe(0.75)
+    expect(glissandoPitchAtElapsedTime(note, project, 0, durationSeconds, 0.5)).toBeCloseTo(
+      segment.from + (segment.to - segment.from) * 0.375,
+    )
   })
 
   it('integrates every tempo segment and converts audio time back to beats', () => {

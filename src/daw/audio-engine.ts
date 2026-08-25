@@ -2,7 +2,7 @@ import { createPatch, type PlayableSynthPatch } from '../../sw-patch'
 import { Transport } from '../../sw-seq'
 import DEFAULT_PATCH_SOURCE from '../patches/default.swpatch?raw'
 import type { DawProject } from './project'
-import { parseProjectNotes } from './score'
+import { parseProjectNotes, type ScheduledLaneNote } from './score'
 import { projectBeatToSeconds, projectSecondsToBeat } from './timeline'
 
 // Compatibility exports for non-UI consumers; implementations live in their
@@ -40,6 +40,36 @@ export const easeGlissando = (easing: string, t: number): number => {
   }
 }
 
+/** Resolve the pitch held by a note at a project beat, including completed glide segments. */
+export const glissandoPitchAtBeat = (note: ScheduledLaneNote, projectBeat: number): number => {
+  let value = note.cents
+  for (const segment of note.glissando ?? []) {
+    const start = note.beat + segment.start
+    const end = start + segment.duration
+    if (projectBeat < start) break
+    if (projectBeat >= end) {
+      value = segment.to
+      continue
+    }
+    const t = (projectBeat - start) / segment.duration
+    return segment.from + (segment.to - segment.from) * easeGlissando(segment.easing, t)
+  }
+  return value
+}
+
+/** Sample a beat-defined glide uniformly in audio time while respecting tempo changes. */
+export const glissandoPitchAtElapsedTime = (
+  note: ScheduledLaneNote,
+  project: DawProject,
+  startBeat: number,
+  durationSeconds: number,
+  elapsedRatio: number,
+): number => {
+  const startSeconds = projectBeatToSeconds(project, startBeat)
+  const beat = projectSecondsToBeat(project, startSeconds + durationSeconds * elapsedRatio)
+  return glissandoPitchAtBeat(note, beat)
+}
+
 const scheduleGlissando = (
   pitch: ConstantSourceNode,
   note: ReturnType<typeof parseProjectNotes>[number],
@@ -47,6 +77,7 @@ const scheduleGlissando = (
   playbackStartBeat: number,
   playbackStartTime: number,
 ) => {
+  pitch.offset.setValueAtTime(glissandoPitchAtBeat(note, playbackStartBeat), playbackStartTime)
   for (const segment of note.glissando ?? []) {
     const segmentStartBeat = note.beat + segment.start
     const segmentEndBeat = segmentStartBeat + segment.duration
@@ -64,8 +95,13 @@ const scheduleGlissando = (
       projectBeatToSeconds(project, audibleStartBeat)
     const samples = Math.max(2, Math.ceil(duration * 120))
     const curve = Float32Array.from({ length: samples }, (_, index) => {
-      const t = startT + (1 - startT) * (index / (samples - 1))
-      return segment.from + (segment.to - segment.from) * easeGlissando(segment.easing, t)
+      return glissandoPitchAtElapsedTime(
+        note,
+        project,
+        audibleStartBeat,
+        duration,
+        index / (samples - 1),
+      )
     })
     pitch.offset.setValueAtTime(startValue, when)
     pitch.offset.setValueCurveAtTime(curve, when, duration)
