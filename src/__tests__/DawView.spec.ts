@@ -351,6 +351,42 @@ describe('DawView', () => {
     expect(notes[0]!.attributes('data-cents')).not.toBe(notes[1]!.attributes('data-cents'))
   })
 
+  it('renders glissandi as eased bendy notes in the piano roll', () => {
+    const project = createDefaultProject()
+    const lane = project.instrumentLanes[0]!
+    lane.clips = [
+      { id: 'glissando', start: beat(0), length: beat(2), source: '@gliss(ease-in) C G' },
+    ]
+    const wrapper = mount(InstrumentPianoRollLane, {
+      props: { lane, pixelsPerBeat: 64, scrollLeft: 0, displayMode: 'piano-roll' },
+    })
+
+    const preview = wrapper.get('[aria-label="Piano roll preview"]')
+    const bendyNote = preview.get('.bendy-note')
+    const path = bendyNote.attributes('d')
+    expect(path).toMatch(/^M /)
+    expect(path!.split(' L ')).toHaveLength(18)
+    expect(bendyNote.attributes('data-beat')).toBe('0')
+    expect(preview.findAll('i').filter((note) => note.isVisible())).toHaveLength(0)
+  })
+
+  it('stops a bendy note at the audible pitch when its glissando is clipped', () => {
+    const project = createDefaultProject()
+    const lane = project.instrumentLanes[0]!
+    lane.clips = [
+      { id: 'clipped-glissando', start: beat(0), length: beat(2), source: "@gliss C=== '''C" },
+    ]
+    const wrapper = mount(InstrumentPianoRollLane, {
+      props: { lane, pixelsPerBeat: 64, scrollLeft: 0, displayMode: 'piano-roll' },
+    })
+
+    const path = wrapper.get('.bendy-note').attributes('d')!
+    const xCoordinates = [...path.matchAll(/(?:M|L) ([^,]+),/g)].map((match) => Number(match[1]))
+    expect(Math.max(...xCoordinates)).toBe(100)
+    expect(xCoordinates[xCoordinates.length - 1]).toBe(100)
+    expect(wrapper.find('.pitch-guide[data-cents="2400"]').exists()).toBe(false)
+  })
+
   it('uses a lane-wide pitch scale and renders octave reference guides', () => {
     const project = createDefaultProject()
     const lane = project.instrumentLanes[0]!
