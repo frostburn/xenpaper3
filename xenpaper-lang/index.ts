@@ -56,6 +56,7 @@ export type {
   DroneShape,
   GrooveShape,
   DynamicMark,
+  FrequencyPitchValue,
   PitchAutomation,
   EvaluatedLiteral,
   ExpandedNode,
