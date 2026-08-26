@@ -1,16 +1,13 @@
 import {
   evaluateExpression,
+  evaluateProgramShape,
   expandToBeatEvents,
   parse,
   type DirectiveExtension,
+  type DirectiveExtensionState,
+  type PitchContext,
 } from '../../xenpaper-lang'
-import {
-  beat,
-  beatToNumber,
-  type Beat,
-  type DawProject,
-  type InstrumentLane,
-} from './project'
+import { beat, beatToNumber, type Beat, type DawProject, type InstrumentLane } from './project'
 
 export interface EnvelopeSettings {
   readonly attack: number
@@ -63,14 +60,40 @@ const envelopeExtension: DirectiveExtension = {
   },
 }
 
+export interface SourceInitialization {
+  readonly pitchContext?: PitchContext
+  readonly directiveState?: DirectiveExtensionState
+}
+
+/** Evaluate a zero-duration source once and retain its prevailing state for child scopes. */
+export const compileSourceInitialization = (
+  source: string,
+  parent: SourceInitialization = {},
+): SourceInitialization => {
+  const result = evaluateProgramShape(parse(source), {
+    directiveExtensions: [envelopeExtension],
+    pitchContext: parent.pitchContext,
+    directiveState: parent.directiveState,
+  })
+  const errors = result.diagnostics.filter(({ severity }) => severity === 'error')
+  if (errors.length) throw new Error(errors.map(({ message }) => message).join('\n'))
+  if (!('shape' in result)) return parent
+  if (result.shape.duration.n)
+    throw new Error('Initialization sources cannot contain duration-bearing expressions.')
+  return { pitchContext: result.pitchContext, directiveState: result.directiveState }
+}
+
 /** Compile one clip into notes whose positions are relative to the clip start. */
 export const parseClipNotes = (
   source: string,
   duration = Number.POSITIVE_INFINITY,
-  defaultEnvelope: EnvelopeSettings = DEFAULT_ENVELOPE,
+  initialization: SourceInitialization = {},
 ): ScheduledLaneNote[] => {
-  const extension = { ...envelopeExtension, initialState: Object.freeze({ ...defaultEnvelope }) }
-  const result = expandToBeatEvents(parse(source), { directiveExtensions: [extension] })
+  const result = expandToBeatEvents(parse(source), {
+    directiveExtensions: [envelopeExtension],
+    pitchContext: initialization.pitchContext,
+    directiveState: initialization.directiveState,
+  })
   const errors = result.diagnostics.filter(({ severity }) => severity === 'error')
   if (errors.length) throw new Error(errors.map(({ message }) => message).join('\n'))
   if (!('score' in result)) return []
@@ -114,17 +137,24 @@ export const sourceClipLength = (source: string, defaultBar = beat(4)): Beat => 
 }
 
 /** Compile a lane once and place its C-relative Xenpaper notes on the project timeline. */
-export const parseLaneNotes = (lane: InstrumentLane): ScheduledLaneNote[] => {
+export const parseLaneNotes = (
+  lane: InstrumentLane,
+  globalInitialization: SourceInitialization = {},
+): ScheduledLaneNote[] => {
+  const laneInitialization = compileSourceInitialization(lane.source, globalInitialization)
   const notes = lane.clips.flatMap((clip) => {
     const clipStart = beatToNumber(clip.start)
-    return parseClipNotes(clip.source, beatToNumber(clip.length), lane.envelope).map((event) => ({
-      ...event,
-      beat: clipStart + event.beat,
-    }))
+    return parseClipNotes(clip.source, beatToNumber(clip.length), laneInitialization).map(
+      (event) => ({ ...event, beat: clipStart + event.beat }),
+    )
   })
   return notes.sort((left, right) => left.beat - right.beat)
 }
 
 /** Compile every lane without applying any synthesizer- or tuning-reference conversion. */
-export const parseProjectScoreNotes = (project: DawProject): ScheduledLaneNote[] =>
-  project.instrumentLanes.flatMap(parseLaneNotes).sort((left, right) => left.beat - right.beat)
+export const parseProjectScoreNotes = (project: DawProject): ScheduledLaneNote[] => {
+  const globalInitialization = compileSourceInitialization(project.globalTrack.source)
+  return project.instrumentLanes
+    .flatMap((lane) => parseLaneNotes(lane, globalInitialization))
+    .sort((left, right) => left.beat - right.beat)
+}

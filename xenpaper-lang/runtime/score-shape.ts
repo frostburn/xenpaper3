@@ -36,7 +36,7 @@ export function evaluateScoreShape(
     return shape
   }
 
-  return { shape: abstractShape(result.shape), diagnostics: result.diagnostics }
+  return { ...result, shape: abstractShape(result.shape) }
 }
 
 /** Build one score shape for a complete program so context changes cross hard boundaries. */

@@ -49,11 +49,17 @@ export interface RepeatExpansionOptions {
 export interface ScoreShapeOptions {
   readonly pulse?: FractionValue
   readonly pitchContext?: PitchContext
+  readonly directiveState?: DirectiveExtensionState
   readonly directiveExtensions?: readonly DirectiveExtension[]
 }
 
 export type ScoreShapeEvaluationResult =
-  | { readonly shape: ScoreShape; readonly diagnostics: readonly Diagnostic[] }
+  | {
+      readonly shape: ScoreShape
+      readonly diagnostics: readonly Diagnostic[]
+      readonly pitchContext?: PitchContext
+      readonly directiveState?: DirectiveExtensionState
+    }
   | { readonly diagnostics: readonly Diagnostic[] }
 
 export interface RepeatExpansionResult {
