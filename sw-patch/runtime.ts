@@ -48,6 +48,23 @@ export interface RuntimeOptions {
 
 type Scope = Map<string, unknown>
 type Dimensions = Readonly<Record<string, number>>
+const UNITS: Readonly<Record<string, readonly [number, Dimensions]>> = {
+  ns: [1e-9, { time: 1 }],
+  us: [1e-6, { time: 1 }],
+  ms: [1e-3, { time: 1 }],
+  s: [1, { time: 1 }],
+  khz: [1e3, { time: -1 }],
+  hz: [1, { time: -1 }],
+  beats: [1, { beat: 1 }],
+  beat: [1, { beat: 1 }],
+  bpm: [1 / 60, { beat: 1, time: -1 }],
+  db: [1, { decibel: 1 }],
+  c: [1, { cent: 1 }],
+  st: [100, { cent: 1 }],
+  semitone: [100, { cent: 1 }],
+  semitones: [100, { cent: 1 }],
+  '%': [0.01, {}],
+}
 type Connectable = {
   connect(target: unknown, output?: number, input?: number): unknown
   disconnect(target?: unknown, output?: number, input?: number): unknown
@@ -91,37 +108,8 @@ export class Quantity {
   }
 
   static unit(value: number, unit: string): Quantity {
-    switch (unit.toLowerCase()) {
-      case 'ns':
-        return new Quantity(value / 1e9, { time: 1 })
-      case 'us':
-        return new Quantity(value / 1e6, { time: 1 })
-      case 'ms':
-        return new Quantity(value / 1e3, { time: 1 })
-      case 's':
-        return new Quantity(value, { time: 1 })
-      case 'khz':
-        return new Quantity(value * 1e3, { time: -1 })
-      case 'hz':
-        return new Quantity(value, { time: -1 })
-      case 'beats':
-      case 'beat':
-        return new Quantity(value, { beat: 1 })
-      case 'bpm':
-        return new Quantity(value / 60, { beat: 1, time: -1 })
-      case 'db':
-        return new Quantity(value, { decibel: 1 })
-      case 'c':
-        return new Quantity(value, { cent: 1 })
-      case 'st':
-      case 'semitone':
-      case 'semitones':
-        return new Quantity(value * 100, { cent: 1 })
-      case '%':
-        return new Quantity(value / 100)
-      default:
-        return new Quantity(value)
-    }
+    const [factor, dimensions] = UNITS[unit.toLowerCase()] ?? [1, {}]
+    return new Quantity(value * factor, dimensions)
   }
 
   static scalar(value: number): Quantity {
