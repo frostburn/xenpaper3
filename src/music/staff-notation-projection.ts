@@ -46,19 +46,37 @@ const rest = (duration: Fraction): StaffNotationShape => ({
   generated: true,
 })
 
+const projectPitchToStaff = (pitch: GridPitch, rootPitch?: GridPitch) =>
+  constructStaffNotation(
+    asEvaluatedPitch(pitch),
+    rootPitch ? { rootPitch: asEvaluatedPitch(rootPitch) as AbsolutePitchValue } : {},
+  )
+
 const projectEvent = (event: MonomialGrid['events'][number]): StaffNotationShape => {
   if (event.kind === 'note') {
     return {
       kind: 'note',
       duration: event.duration,
-      pitch: constructStaffNotation(
-        asEvaluatedPitch(event.pitch),
-        event.rootPitch
-          ? { rootPitch: asEvaluatedPitch(event.rootPitch) as AbsolutePitchValue }
-          : {},
-      ),
+      pitch: projectPitchToStaff(event.pitch, event.rootPitch),
       ...(event.label ? { displayLabel: event.label } : {}),
       ...(event.pitch.justIntonation ? { justIntonation: true } : {}),
+      ...(event.automation
+        ? {
+            glissandi: (
+              event.automation.segments ?? [
+                {
+                  ...event.automation,
+                  start: new Fraction(0),
+                },
+              ]
+            ).map((segment) => ({
+              start: segment.start,
+              duration: segment.duration,
+              from: projectPitchToStaff(segment.from, segment.fromRootPitch ?? event.rootPitch),
+              to: projectPitchToStaff(segment.to, segment.toRootPitch ?? event.rootPitch),
+            })),
+          }
+        : {}),
     }
   }
   if (event.marker === 'barline') {
