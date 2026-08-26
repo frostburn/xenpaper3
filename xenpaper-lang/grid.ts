@@ -63,11 +63,6 @@ export class ScoreGrid<Event extends GridTimedEvent> {
     return ScoreGrid.empty<Event>().overlay(...fragments)
   }
 
-  /** Compatibility name for consumers that think in score duration. */
-  get duration(): Fraction {
-    return this.span
-  }
-
   /** Add exact leading silence. */
   delay(offset: FractionValue): ScoreGrid<Event> {
     const exactOffset = new Fraction(offset)

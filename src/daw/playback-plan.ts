@@ -92,24 +92,6 @@ const glissandoPitchAtSeconds = (
   return glissandoPitchAtBeat(note, beat)
 }
 
-/** Compatibility helper for sampling a beat-defined glide uniformly in audio time. */
-export const glissandoPitchAtElapsedTime = (
-  note: ScheduledLaneNote,
-  project: DawProject,
-  startBeat: number,
-  durationSeconds: number,
-  elapsedRatio: number,
-): number => {
-  const tempoMap = TempoMap.fromProject(project)
-  return glissandoPitchAtSeconds(
-    note,
-    tempoMap,
-    tempoMap.beatToSeconds(startBeat),
-    durationSeconds,
-    elapsedRatio,
-  )
-}
-
 const compilePitchAutomation = (
   note: ScheduledLaneNote,
   tempoMap: TempoMap,

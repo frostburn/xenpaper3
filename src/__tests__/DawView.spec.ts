@@ -4,18 +4,11 @@ import router from '../router'
 import DawView from '../views/DawView.vue'
 import InstrumentPianoRollLane from '../components/daw/InstrumentPianoRollLane.vue'
 import { beat, beatToNumber, createDefaultProject, pointerXToBeat, snapBeat } from '../daw/project'
-import {
-  parseProjectNotes,
-  parseClipNotes,
-  notePlaybackWindow,
-  easeGlissando,
-  glissandoPitchAtBeat,
-  glissandoPitchAtElapsedTime,
-  glissandoCurveDuration,
-  projectBeatToSeconds,
-  projectSecondsToBeat,
-  sourceClipLength,
-} from '../daw/audio-engine'
+import { easeGlissando } from '../daw/easing'
+import { glissandoPitchAtBeat, notePlaybackWindow } from '../daw/playback-plan'
+import { parseClipNotes, parseProjectScoreNotes, sourceClipLength } from '../daw/score'
+import { TempoMap } from '../daw/timeline'
+import { glissandoCurveDuration } from '../daw/web-audio-automation'
 
 describe('DAW project model', () => {
   it('resumes sustained notes at the playhead with their remaining duration', () => {
@@ -58,7 +51,7 @@ describe('DAW project model', () => {
       source: 'C D E',
     })
 
-    const notes = parseProjectNotes(project)
+    const notes = parseProjectScoreNotes(project)
     expect(notes).toHaveLength(3)
     expect(notes.map(({ beat: start }) => start)).toEqual([2, 3, 4])
     expect(notes.every(({ duration }) => duration === 1)).toBe(true)
@@ -72,7 +65,7 @@ describe('DAW project model', () => {
     ])
   })
 
-  it('converts scheduled pitches and glissandi to SW Patch A-based cents', () => {
+  it('keeps scheduled pitches and glissandi in authored C-relative cents', () => {
     const project = createDefaultProject()
     project.instrumentLanes[0]!.clips.push({
       id: 'gliss',
@@ -81,11 +74,11 @@ describe('DAW project model', () => {
       source: '@gliss C A',
     })
     const clipNotes = parseClipNotes('@gliss C A')
-    const notes = parseProjectNotes(project)
+    const notes = parseProjectScoreNotes(project)
 
-    expect(notes[0]!.cents).toBe(clipNotes[0]!.cents - 900)
-    expect(notes[0]!.glissando![0]!.from).toBe(clipNotes[0]!.glissando![0]!.from - 900)
-    expect(notes[0]!.glissando![0]!.to).toBe(clipNotes[0]!.glissando![0]!.to - 900)
+    expect(notes[0]!.cents).toBe(clipNotes[0]!.cents)
+    expect(notes[0]!.glissando![0]!.from).toBe(clipNotes[0]!.glissando![0]!.from)
+    expect(notes[0]!.glissando![0]!.to).toBe(clipNotes[0]!.glissando![0]!.to)
   })
 
   it('derives clip length from source and keeps zero-duration source visible for a bar', () => {
@@ -103,7 +96,7 @@ describe('DAW project model', () => {
       source: '@patch(attack: 20ms, decay: 150ms, sustain: 55%, release: 400ms) C',
     })
 
-    expect(parseProjectNotes(project)[0]!.envelope).toMatchObject({
+    expect(parseProjectScoreNotes(project)[0]!.envelope).toMatchObject({
       attack: expect.closeTo(0.02),
       decay: expect.closeTo(0.15),
       sustain: expect.closeTo(0.55),
@@ -122,7 +115,7 @@ describe('DAW project model', () => {
       source: 'C @patch(sustain: 90%) D',
     })
 
-    const notes = parseProjectNotes(project)
+    const notes = parseProjectScoreNotes(project)
     expect(notes[0]!.envelope).toEqual(lane.envelope)
     expect(notes[1]!.envelope).toEqual({ ...lane.envelope, sustain: 0.9 })
   })
@@ -155,12 +148,13 @@ describe('DAW project model', () => {
     project.globalTrack.tempoChanges.push({ id: 'faster', beat: beat(1), bpm: 120 })
     const note = parseClipNotes('@gliss C= G?')[0]!
     const segment = note.glissando![0]!
-    const durationSeconds = projectBeatToSeconds(project, 2)
+    const tempoMap = TempoMap.fromProject(project)
+    const durationSeconds = tempoMap.beatToSeconds(2)
 
     // Half of the 1.5-second glide is only beat 0.75, not beat 1, because its
     // second beat is twice as fast as its first.
-    expect(projectSecondsToBeat(project, durationSeconds / 2)).toBe(0.75)
-    expect(glissandoPitchAtElapsedTime(note, project, 0, durationSeconds, 0.5)).toBeCloseTo(
+    expect(tempoMap.secondsToBeat(durationSeconds / 2)).toBe(0.75)
+    expect(glissandoPitchAtBeat(note, tempoMap.secondsToBeat(durationSeconds / 2))).toBeCloseTo(
       segment.from + (segment.to - segment.from) * 0.375,
     )
   })
@@ -181,10 +175,11 @@ describe('DAW project model', () => {
     project.globalTrack.tempoChanges.push({ id: 'slow', beat: beat(4), bpm: 60 })
     project.globalTrack.tempoChanges.push({ id: 'fast', beat: beat(6), bpm: 240 })
 
-    expect(projectBeatToSeconds(project, 4)).toBe(2)
-    expect(projectBeatToSeconds(project, 6)).toBe(4)
-    expect(projectBeatToSeconds(project, 8)).toBe(4.5)
-    expect(projectSecondsToBeat(project, 4.5)).toBe(8)
+    const tempoMap = TempoMap.fromProject(project)
+    expect(tempoMap.beatToSeconds(4)).toBe(2)
+    expect(tempoMap.beatToSeconds(6)).toBe(4)
+    expect(tempoMap.beatToSeconds(8)).toBe(4.5)
+    expect(tempoMap.secondsToBeat(4.5)).toBe(8)
   })
 })
 

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import {
-  createPatch,
+  compilePatch,
   registerMathWorklets,
   type NoteOff,
   type PlayableSynthPatch,
@@ -59,7 +59,7 @@ const synthPatches = {
 type SynthPatch = keyof typeof synthPatches
 
 const createSynth = (patch: SynthPatch, oscillatorType: OscillatorType) =>
-  createPatch(synthPatches[patch], ctx, {
+  compilePatch(synthPatches[patch], ctx, {
     config: { oscillatorType },
   } as RuntimeOptions) as PlayableSynthPatch
 
@@ -88,7 +88,7 @@ const selectSynth = (patch: SynthPatch, oscillatorType: OscillatorType) => {
 // evaluated. Do not evaluate either patch until the worklet module is loaded.
 const patchesReady = registerMathWorklets(ctx).then(() => {
   if (!mounted) return false
-  delay = createPatch(PING_PONG_DELAY_PATCH, ctx, {
+  delay = compilePatch(PING_PONG_DELAY_PATCH, ctx, {
     config: { delayTime, feedback, wet },
   }) as unknown as AudioNode
   delay.connect(output)

@@ -87,11 +87,3 @@ export class TempoMap {
 }
 
 export const createTempoMap = (project: DawProject): TempoMap => TempoMap.fromProject(project)
-
-/** Compatibility helper for callers that do not need to retain a tempo-map snapshot. */
-export const projectBeatToSeconds = (project: DawProject, targetBeat: number): number =>
-  TempoMap.fromProject(project).beatToSeconds(targetBeat)
-
-/** Compatibility helper for callers that do not need to retain a tempo-map snapshot. */
-export const projectSecondsToBeat = (project: DawProject, seconds: number): number =>
-  TempoMap.fromProject(project).secondsToBeat(seconds)

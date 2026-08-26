@@ -1,56 +1,6 @@
 import type { DawProject } from './project'
 import { createPlaybackPlan, type PlaybackPlan } from './playback-plan'
-import { parseProjectScoreNotes, type PitchGlideSegment, type ScheduledLaneNote } from './score'
-import { xenpaperPitchToPatchDetune } from './web-audio-automation'
 import { WebAudioPlaybackSession } from './web-audio-playback'
-
-// Compatibility exports for non-UI consumers. Pure musical operations live in
-// score/playback-plan/timeline; browser-specific operations live in web-audio-*.
-export {
-  createPlaybackPlan,
-  glissandoPitchAtBeat,
-  glissandoPitchAtElapsedTime,
-  notePlaybackWindow,
-} from './playback-plan'
-export type {
-  NotePlaybackWindow,
-  PitchAutomationPlan,
-  PitchCurvePlan,
-  PlaybackLane,
-  PlaybackNote,
-  PlaybackPlan,
-} from './playback-plan'
-export { parseClipNotes, parseLaneNotes, parseProjectScoreNotes, sourceClipLength } from './score'
-export type { EnvelopeSettings, PitchGlideSegment, ScheduledLaneNote } from './score'
-export { createTempoMap, projectBeatToSeconds, projectSecondsToBeat, TempoMap } from './timeline'
-export { easeGlissando, type GlissandoEasing } from './easing'
-export {
-  applyPitchAutomation,
-  glissandoCurveDuration,
-  XENPAPER_C_TO_SW_PATCH_DETUNE,
-  xenpaperPitchToPatchDetune,
-} from './web-audio-automation'
-
-const convertGlissando = (segments: readonly PitchGlideSegment[] | undefined) =>
-  segments?.map((segment) => ({
-    ...segment,
-    from: xenpaperPitchToPatchDetune(segment.from),
-    to: xenpaperPitchToPatchDetune(segment.to),
-  }))
-
-/**
- * Legacy projection used by the original audio engine: notes expressed as SW Patch detune.
- * Prefer `parseProjectScoreNotes` or `createPlaybackPlan` in new code.
- */
-export const parseProjectPatchNotes = (project: DawProject): ScheduledLaneNote[] =>
-  parseProjectScoreNotes(project).map((note) => ({
-    ...note,
-    cents: xenpaperPitchToPatchDetune(note.cents),
-    glissando: convertGlissando(note.glissando),
-  }))
-
-/** @deprecated Use `parseProjectScoreNotes` for musical data or `createPlaybackPlan` for audio. */
-export const parseProjectNotes = parseProjectPatchNotes
 
 /** Small owner/facade around immutable playback plans and disposable Web Audio sessions. */
 export class DawAudioEngine extends EventTarget {

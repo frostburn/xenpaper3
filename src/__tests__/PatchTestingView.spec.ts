@@ -20,9 +20,9 @@ class MockAnalyserNodeConstructor {
   )
 }
 
-const { createPatch, effectConnect, registerMathWorklets, synthDisposes, synthOn } = vi.hoisted(
+const { compilePatch, effectConnect, registerMathWorklets, synthDisposes, synthOn } = vi.hoisted(
   () => ({
-    createPatch: vi.fn<(source: string, ...args: unknown[]) => unknown>(),
+    compilePatch: vi.fn<(source: string, ...args: unknown[]) => unknown>(),
     effectConnect: vi.fn<(to: AudioNode) => void>(),
     registerMathWorklets: vi.fn<() => Promise<void>>(),
     synthDisposes: [] as Array<ReturnType<typeof vi.fn>>,
@@ -31,7 +31,7 @@ const { createPatch, effectConnect, registerMathWorklets, synthDisposes, synthOn
 )
 
 vi.mock('../../sw-patch', () => ({
-  createPatch,
+  compilePatch,
   registerMathWorklets,
 }))
 
@@ -85,8 +85,8 @@ beforeEach(() => {
   synthDisposes.length = 0
   synthOn.mockReset()
   effectConnect.mockReset()
-  createPatch.mockReset()
-  createPatch.mockImplementation((source) => {
+  compilePatch.mockReset()
+  compilePatch.mockImplementation((source) => {
     if (source.includes('delayTime')) return { connect: effectConnect }
     const dispose = vi.fn<() => void>()
     synthDisposes.push(dispose)
@@ -117,12 +117,12 @@ describe('PatchTestingView', () => {
     )
 
     const wrapper = mount(PatchTestingView)
-    expect(createPatch).not.toHaveBeenCalled()
+    expect(compilePatch).not.toHaveBeenCalled()
 
     finishRegistration()
     await flushPromises()
 
-    expect(createPatch).toHaveBeenCalledTimes(2)
+    expect(compilePatch).toHaveBeenCalledTimes(2)
     expect(effectConnect).toHaveBeenCalledOnce()
     wrapper.unmount()
   })
@@ -180,7 +180,7 @@ describe('PatchTestingView', () => {
     await wrapper.get('#synth-patch').setValue('default')
     await flushPromises()
     expect(bassOff).toHaveBeenCalledOnce()
-    expect(createPatch).toHaveBeenCalledTimes(3)
+    expect(compilePatch).toHaveBeenCalledTimes(3)
     expect(synthDisposes[0]).not.toHaveBeenCalled()
 
     dispatchKey('keydown', 66)
@@ -207,12 +207,12 @@ describe('PatchTestingView', () => {
     const wrapper = mount(PatchTestingView)
     await flushPromises()
 
-    expect(createPatch.mock.calls[1]?.[2]).toEqual({ config: { oscillatorType: 'sawtooth' } })
+    expect(compilePatch.mock.calls[1]?.[2]).toEqual({ config: { oscillatorType: 'sawtooth' } })
     await wrapper.get('#oscillator-type').setValue('square')
     await flushPromises()
 
     expect(synthDisposes[0]).toHaveBeenCalledOnce()
-    expect(createPatch.mock.calls[2]?.[2]).toEqual({ config: { oscillatorType: 'square' } })
+    expect(compilePatch.mock.calls[2]?.[2]).toEqual({ config: { oscillatorType: 'square' } })
     wrapper.unmount()
   })
 
@@ -229,7 +229,7 @@ describe('PatchTestingView', () => {
 
     expect(optionValues()).toEqual(['triangle', 'sawtooth', 'square', 'parabolic'])
     expect((wrapper.get('#oscillator-type').element as HTMLSelectElement).value).toBe('triangle')
-    expect(createPatch.mock.lastCall?.[2]).toEqual({ config: { oscillatorType: 'triangle' } })
+    expect(compilePatch.mock.lastCall?.[2]).toEqual({ config: { oscillatorType: 'triangle' } })
     wrapper.unmount()
   })
 

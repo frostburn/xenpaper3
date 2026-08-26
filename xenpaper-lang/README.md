@@ -37,10 +37,8 @@ its sounding coordinate is an exact rational power of 2. Temperament therefore
 changes a projection without erasing musical identity.
 
 `compileProgram()` accepts an already parsed AST. The pure data model lives in
-`grid.ts`; the adapter from the established evaluator lives separately in
-`runtime/compile-grid.ts`. `core.ts` is the narrow application entry point. The
-older `parse()`, `evaluateProgramShape()`, and `expandToBeatEvents()` APIs remain
-available for syntax tools and compatibility consumers.
+`grid.ts`; the lowering implementation lives in `runtime/compile-grid.ts`.
+`core.ts` is the narrow application entry point.
 
 ## Transactional score composition
 
@@ -59,8 +57,7 @@ and the intended lowering target for language-level functions and repeats. A
 callee constructs a local fragment; its caller decides whether to append,
 overlay, delay, transform, or discard it. This avoids leaking either the
 caller's cursor into the callee or the callee's internal cursor back into its
-caller. The current parser repeat syntax still passes through the compatibility
-repeat expander before the final grid is constructed.
+caller. Parser repeat syntax is lowered before the final grid is constructed.
 
 ## Monomial coordinates
 
@@ -141,7 +138,7 @@ syntax tree returned to TypeScript callers.
 
 The unit tests in [`__test__/`](__test__/) cover the grammar, monomial grid,
 exact values, literal and expression evaluation, repeat expansion, score
-shaping, directives, compatibility beat events, and staff notation. Run them
+shaping, directives, beat events, and staff notation. Run them
 from the repository root:
 
 ```sh
