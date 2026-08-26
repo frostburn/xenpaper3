@@ -54,9 +54,10 @@ const projectPitchToStaff = (pitch: GridPitch, rootPitch?: GridPitch) =>
 
 const projectEvent = (event: MonomialGrid['events'][number]): StaffNotationShape => {
   if (event.kind === 'note') {
+    const duration = event.notatedDuration ?? event.duration
     return {
       kind: 'note',
-      duration: event.duration,
+      duration,
       ...(event.notatedDuration ? { notatedDuration: event.notatedDuration } : {}),
       pitch: projectPitchToStaff(event.pitch, event.rootPitch),
       ...(event.label ? { displayLabel: event.label } : {}),
