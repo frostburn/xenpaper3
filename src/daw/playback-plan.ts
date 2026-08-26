@@ -1,10 +1,6 @@
 import { easeGlissando } from './easing'
 import type { DawProject, OscillatorType } from './project'
-import {
-  parseLaneNotes,
-  type EnvelopeSettings,
-  type ScheduledLaneNote,
-} from './score'
+import { parseLaneNotes, type EnvelopeSettings, type ScheduledLaneNote } from './score'
 import { TempoMap } from './timeline'
 
 const GLISSANDO_SAMPLES_PER_SECOND = 120
@@ -88,13 +84,8 @@ export const glissandoPitchAtBeat = (note: ScheduledLaneNote, projectBeat: numbe
 const glissandoPitchAtSeconds = (
   note: ScheduledLaneNote,
   tempoMap: TempoMap,
-  startSeconds: number,
-  durationSeconds: number,
-  elapsedRatio: number,
-): number => {
-  const beat = tempoMap.secondsToBeat(startSeconds + durationSeconds * elapsedRatio)
-  return glissandoPitchAtBeat(note, beat)
-}
+  seconds: number,
+): number => glissandoPitchAtBeat(note, tempoMap.secondsToBeat(seconds))
 
 /** Compatibility helper for sampling a beat-defined glide uniformly in audio time. */
 export const glissandoPitchAtElapsedTime = (
@@ -108,9 +99,7 @@ export const glissandoPitchAtElapsedTime = (
   return glissandoPitchAtSeconds(
     note,
     tempoMap,
-    tempoMap.beatToSeconds(startBeat),
-    durationSeconds,
-    elapsedRatio,
+    tempoMap.beatToSeconds(startBeat) + durationSeconds * elapsedRatio,
   )
 }
 
@@ -134,18 +123,13 @@ const compilePitchAutomation = (
     const duration = tempoMap.beatToSeconds(segmentEndBeat) - audibleStartSeconds
     if (duration <= 0) continue
 
-    const progress = (audibleStartBeat - segmentStartBeat) / segment.duration
-    const startValue =
-      segment.from + (segment.to - segment.from) * easeGlissando(segment.easing, progress)
     const sampleCount = Math.max(2, Math.ceil(duration * GLISSANDO_SAMPLES_PER_SECOND))
     const values = Object.freeze(
       Array.from({ length: sampleCount }, (_, index) =>
         glissandoPitchAtSeconds(
           note,
           tempoMap,
-          audibleStartSeconds,
-          duration,
-          index / (sampleCount - 1),
+          audibleStartSeconds + (duration * index) / (sampleCount - 1),
         ),
       ),
     )
@@ -153,7 +137,7 @@ const compilePitchAutomation = (
       Object.freeze({
         offset: audibleStartSeconds - noteStartSeconds,
         duration,
-        startValue,
+        startValue: values[0]!,
         values,
       }),
     )

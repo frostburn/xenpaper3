@@ -59,16 +59,15 @@ export function parseVal(raw: string): {
 } {
   const explicit = /^(\d+)ed(\d+)(?:\/(\d+))?$/i.exec(raw)
   if (explicit) {
+    const divisions = Number(explicit[1])
     const numerator = Number(explicit[2])
     const denominator = Number(explicit[3] ?? 1)
-    if (denominator !== 1)
-      return {
-        divisions: Number(explicit[1]),
-        equave: numerator / denominator,
-        mapping: equalDivisionRatioMapping(Number(explicit[1]), numerator, denominator),
-      }
-    const divisions = Number(explicit[1])
-    return { mapping: valMapping(divisions, numerator), divisions, equave: numerator }
+    const equave = numerator / denominator
+    const mapping =
+      denominator === 1
+        ? valMapping(divisions, numerator)
+        : equalDivisionRatioMapping(divisions, numerator, denominator)
+    return { mapping, divisions, equave }
   }
   const match = /^([a-z]*)(\d+)([a-z]*)$/i.exec(raw)
   if (!match) throw new TypeError(`Unsupported val ${raw}.`)

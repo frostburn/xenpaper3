@@ -42,59 +42,43 @@ const validateTimingOption = (value: number, name: string, minimum: number): voi
 
 /** Look-ahead event scheduler whose public position follows the audible context clock. */
 export class Transport extends EventTarget {
-  readonly context: BaseAudioContext
-  active: boolean
-  loop: boolean
+  active = false
+  loop = false
 
   // Private times and durations are integral sample positions.
   // "Time" refers to context time; "position" refers to event time.
   private interval: number
   private _lookAhead: number
-  private audibleStartTime: number
-  private startPosition: number
-  private lastTickTime: number
-  private schedulePosition: number
-  private stoppedPosition: number
-  private endPos: number
-  private loopStartPos: number
-  private loopEndPos: number
-  private parametricEventsById: Map<number, ParametricEvent>
-  private parametricNotesById: Map<number, ParametricNoteHandle>
-  private eventsById: Map<number, TransportEvent>
-  private nextEventId: number
+  private audibleStartTime = NaN
+  private startPosition = 0
+  private lastTickTime = NaN
+  private schedulePosition = 0
+  private stoppedPosition = 0
+  private endPos = Infinity
+  private loopStartPos = 0
+  private loopEndPos = 0
+  private readonly parametricEventsById = new Map<number, ParametricEvent>()
+  private readonly parametricNotesById = new Map<number, ParametricNoteHandle>()
+  private readonly eventsById = new Map<number, TransportEvent>()
+  private nextEventId = 1
   private useSetTimeoutFallback: boolean
   private tickTimeout: TimeoutHandle | undefined
-  private runId: number
-  private endedDispatched: boolean
+  private runId = 0
+  private endedDispatched = false
 
-  constructor(context: BaseAudioContext, options: TransportOptions = {}) {
+  constructor(
+    readonly context: BaseAudioContext,
+    options: TransportOptions = {},
+  ) {
     super()
 
     const { interval = 0.1, lookAhead = 0.2, useSetTimeoutFallback = false } = options
     validateTimingOption(interval, 'Transport interval', Number.EPSILON)
     validateTimingOption(lookAhead, 'Transport look-ahead', 0)
 
-    this.context = context
     this.interval = Math.max(1, round(interval * context.sampleRate))
     this._lookAhead = Math.max(0, round(lookAhead * context.sampleRate))
-    this.active = false
-    this.loop = false
-    this.audibleStartTime = NaN
-    this.startPosition = 0
-    this.lastTickTime = NaN
-    this.schedulePosition = 0
-    this.stoppedPosition = 0
-    this.endPos = Infinity
-    this.loopStartPos = 0
-    this.loopEndPos = 0
-    this.parametricEventsById = new Map()
-    this.parametricNotesById = new Map()
-    this.eventsById = new Map()
-    this.nextEventId = 1
     this.useSetTimeoutFallback = useSetTimeoutFallback
-    this.tickTimeout = undefined
-    this.runId = 0
-    this.endedDispatched = false
   }
 
   get lookAhead() {
@@ -176,10 +160,7 @@ export class Transport extends EventTarget {
   }
 
   private scheduleTick(runId: number, time: number, completes: boolean): void {
-    const scheduledTime = Math.max(
-      time,
-      this.context.currentTime + 1 / this.context.sampleRate,
-    )
+    const scheduledTime = Math.max(time, this.context.currentTime + 1 / this.context.sampleRate)
     const callback = () => {
       if (runId !== this.runId || !this.active) return
       if (completes) this.finish(runId)
