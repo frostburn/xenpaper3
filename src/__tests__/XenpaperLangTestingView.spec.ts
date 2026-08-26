@@ -27,7 +27,8 @@ describe('XenpaperLangTestingView', () => {
     expect(rows[0]!.text()).toContain('absolute')
     expect(wrapper.findAllComponents({ name: 'MusicalStaff' })).toHaveLength(1)
     expect(wrapper.findAll('.staff-debugger .notehead')).toHaveLength(3)
-    expect(rows[1]!.find('code').text()).toContain('[-3 2>@2.3')
+    expect(rows[1]!.findAll('code')[0]!.text()).toContain('[-3 2>@2.3')
+    expect(rows[1]!.findAll('code')[1]!.text()).toContain('[-3 2>@2.3')
   })
 
   it('logs the complete compilation result', async () => {
@@ -63,4 +64,16 @@ describe('XenpaperLangTestingView', () => {
       'XP_CONTINUE_WITHOUT_ATTACK',
     )
   })
+})
+
+it('projects equal-tempered grids and renders structural barlines', async () => {
+  const wrapper = mount(XenpaperLangTestingView)
+  await wrapper.get('textarea').setValue('{31edo} C | D ||')
+  await wrapper.findAll('button')[0]!.trigger('click')
+
+  expect(wrapper.text()).not.toContain('No grid compiled.')
+  expect(wrapper.find('.staff-debugger .barline--single').exists()).toBe(true)
+  expect(wrapper.find('.staff-debugger .barline--double').exists()).toBe(true)
+  expect(wrapper.find('.staff-debugger').text()).not.toContain('single')
+  expect(wrapper.find('.staff-debugger').text()).not.toContain('double')
 })

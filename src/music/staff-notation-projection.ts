@@ -1,16 +1,24 @@
 import { Fraction } from 'xen-dev-utils/fraction'
 import {
   constructStaffNotation,
+  type AbsolutePitchValue,
+  type BarlineStyle,
+  type DynamicMark,
+  type EvaluatedLiteral,
   type MonomialGrid,
+  type PitchOffsetValue,
   type StaffNotationShape,
 } from '../../xenpaper-lang'
-import { Value } from '../../xenpaper-lang/core'
+import { Value, type GridPitch } from '../../xenpaper-lang/core'
 import { monomialToCents } from './pitch-projection'
-import type { GridPitch } from '../../xenpaper-lang/core'
-import type { AbsolutePitchValue, EvaluatedLiteral, PitchOffsetValue } from '../../xenpaper-lang'
+
+const projectedValue = (pitch: GridPitch['sounding']) =>
+  Value.real(monomialToCents(pitch), { pitch: 1 })
 
 const asEvaluatedPitch = (pitch: GridPitch): EvaluatedLiteral => {
-  const value = Value.cents(monomialToCents(pitch.sounding))
+  // Engraving geometry is deliberately a downstream real-valued projection. In
+  // particular, do not round-trip an arbitrary temperament through exact cents.
+  const value = projectedValue(pitch.sounding)
   if (pitch.kind === 'absolute' && pitch.spelling) {
     return {
       kind: 'absolutePitch',
@@ -23,7 +31,7 @@ const asEvaluatedPitch = (pitch: GridPitch): EvaluatedLiteral => {
   return {
     kind: 'pitchOffset',
     value,
-    ...(pitch.notation ? { notationValue: Value.cents(monomialToCents(pitch.notation)) } : {}),
+    ...(pitch.notation ? { notationValue: projectedValue(pitch.notation) } : {}),
     ...(pitch.formula ? { formula: pitch.formula } : {}),
     ...(pitch.spelling ? { spelling: pitch.spelling } : {}),
     ...(pitch.scaleDegree === undefined ? {} : { scaleDegree: pitch.scaleDegree }),
@@ -38,36 +46,61 @@ const rest = (duration: Fraction): StaffNotationShape => ({
   generated: true,
 })
 
+const projectEvent = (event: MonomialGrid['events'][number]): StaffNotationShape => {
+  if (event.kind === 'note') {
+    return {
+      kind: 'note',
+      duration: event.duration,
+      pitch: constructStaffNotation(
+        asEvaluatedPitch(event.pitch),
+        event.rootPitch
+          ? { rootPitch: asEvaluatedPitch(event.rootPitch) as AbsolutePitchValue }
+          : {},
+      ),
+      ...(event.label ? { displayLabel: event.label } : {}),
+      ...(event.pitch.justIntonation ? { justIntonation: true } : {}),
+    }
+  }
+  if (event.marker === 'barline') {
+    return {
+      kind: 'barline',
+      style: event.label as BarlineStyle,
+      duration: new Fraction(0),
+    }
+  }
+  if (event.marker === 'dynamic') {
+    return {
+      kind: 'dynamic',
+      mark: event.label as DynamicMark,
+      duration: new Fraction(0),
+    }
+  }
+  return { kind: 'annotation', text: event.label, duration: new Fraction(0) }
+}
+
 /** Project an exact score grid into renderer-ready staff notation. */
 export function projectGridToStaffNotation(grid: MonomialGrid): StaffNotationShape {
-  const branches = grid.events.map((event): StaffNotationShape => {
-    const item: StaffNotationShape =
-      event.kind === 'note'
-        ? {
-            kind: 'note',
-            duration: event.duration,
-            pitch: constructStaffNotation(
-              asEvaluatedPitch(event.pitch),
-              event.rootPitch
-                ? { rootPitch: asEvaluatedPitch(event.rootPitch) as AbsolutePitchValue }
-                : {},
-            ),
-            ...(event.label ? { displayLabel: event.label } : {}),
-            ...(event.pitch.justIntonation ? { justIntonation: true } : {}),
-          }
-        : {
-            kind: 'annotation',
-            text: event.label,
-            duration: new Fraction(0),
-          }
-    if (!event.start.n) return item
-    return {
-      kind: 'sequence',
-      duration: event.start.add(item.duration),
-      children: [rest(event.start), item],
-    }
-  })
+  const groups = new Map<string, MonomialGrid['events']>()
+  for (const event of grid.events) {
+    const key = `${event.start.s * event.start.n}/${event.start.d}`
+    groups.set(key, [...(groups.get(key) ?? []), event])
+  }
 
-  if (!branches.length) return rest(grid.span)
-  return { kind: 'parallel', duration: grid.span, branches }
+  const children: StaffNotationShape[] = []
+  let cursor = new Fraction(0)
+  for (const events of groups.values()) {
+    const start = events[0]!.start
+    if (start.compare(cursor) > 0) children.push(rest(start.sub(cursor)))
+    const items = events.map(projectEvent)
+    const duration = items.reduce(
+      (longest, item) => (item.duration.compare(longest) > 0 ? item.duration : longest),
+      new Fraction(0),
+    )
+    children.push(items.length === 1 ? items[0]! : { kind: 'parallel', duration, branches: items })
+    const end = start.add(duration)
+    if (end.compare(cursor) > 0) cursor = end
+  }
+  if (grid.span.compare(cursor) > 0) children.push(rest(grid.span.sub(cursor)))
+  if (!children.length) return rest(grid.span)
+  return { kind: 'sequence', duration: grid.span, children }
 }

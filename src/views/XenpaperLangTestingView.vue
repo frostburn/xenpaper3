@@ -108,7 +108,8 @@ const formatPitch = (pitch: (typeof notes.value)[number]['pitch']) =>
           <tr>
             <th>Start</th>
             <th>Duration</th>
-            <th>Exact sounding pitch</th>
+            <th>Exact sounding</th>
+            <th>Formula</th>
             <th>Kind</th>
           </tr>
         </thead>
@@ -118,6 +119,9 @@ const formatPitch = (pitch: (typeof notes.value)[number]['pitch']) =>
             <td>{{ formatExact(note.duration) }}</td>
             <td>
               <code>{{ formatPitch(note.pitch) }}</code>
+            </td>
+            <td>
+              <code>{{ note.pitch.formula?.toMonzoLiteral() ?? '—' }}</code>
             </td>
             <td>{{ note.pitch.kind }}</td>
           </tr>
