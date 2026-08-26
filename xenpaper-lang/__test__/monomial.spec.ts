@@ -69,3 +69,14 @@ describe('Exact monomial coordinates', () => {
     expect(() => Monomial.fromRatio(-1)).toThrow('positive')
   })
 })
+
+it('formats sparse coordinates as explicit-axis monzo literals', () => {
+  expect(
+    new Monomial([
+      [5, 2],
+      [2, -1],
+      [3, new Fraction(1, 2)],
+    ]).toMonzoLiteral(),
+  ).toBe('[-1 1/2 2>@2.3.5')
+  expect(Monomial.ZERO.toMonzoLiteral()).toBe('[>@')
+})

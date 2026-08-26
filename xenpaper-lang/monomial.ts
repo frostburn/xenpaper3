@@ -167,6 +167,19 @@ export class Monomial implements ReadonlyMap<number, Fraction> {
     return Math.exp(this.project(Math.log))
   }
 
+  /** Format this sparse coordinate as an explicit prime-axis monzo literal. */
+  toMonzoLiteral(): string {
+    const entries = [...this.components].sort(([left], [right]) => left - right)
+    const exponents = entries
+      .map(([, exponent]) => {
+        const numerator = exponent.s * exponent.n
+        return exponent.d === 1 ? `${numerator}` : `${numerator}/${exponent.d}`
+      })
+      .join(' ')
+    const factors = entries.map(([prime]) => prime).join('.')
+    return `[${exponents}>@${factors}`
+  }
+
   /** Recover a rational exactly when every prime exponent is an integer. */
   toFraction(): Fraction | undefined {
     let result = new Fraction(1)

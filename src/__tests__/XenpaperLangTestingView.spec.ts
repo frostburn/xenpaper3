@@ -25,7 +25,9 @@ describe('XenpaperLangTestingView', () => {
     const rows = wrapper.findAll('.grid-debugger tbody tr')
     expect(rows).toHaveLength(3)
     expect(rows[0]!.text()).toContain('absolute')
-    expect(rows[1]!.find('code').text()).toContain('<2:-3 3:2>')
+    expect(wrapper.findAllComponents({ name: 'MusicalStaff' })).toHaveLength(1)
+    expect(wrapper.findAll('.staff-debugger .notehead')).toHaveLength(3)
+    expect(rows[1]!.find('code').text()).toContain('[-3 2>@2.3')
   })
 
   it('logs the complete compilation result', async () => {
