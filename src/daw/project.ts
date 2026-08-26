@@ -53,7 +53,6 @@ export interface DawProject {
 }
 
 export const DEFAULT_CLIP_SOURCE = `# New Xenpaper clip
-@patch(attack: 25ms, decay: 180ms, sustain: 65%, release: 250ms)
 [0,4,7]===
 `
 export const DEFAULT_SW_PATCH_SOURCE = 'default'

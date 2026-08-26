@@ -253,6 +253,7 @@ describe('DawView', () => {
     expect(clip.attributes('style')).toContain('left: 64px')
     const source = wrapper.get<HTMLTextAreaElement>('textarea[aria-label="Xenpaper clip source"]')
     expect(source.element.value).toContain('[0,4,7]')
+    expect(source.element.value).not.toContain('@patch')
     expect(document.activeElement).toBe(source.element)
     wrapper.unmount()
   })
