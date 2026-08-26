@@ -105,6 +105,13 @@ export function flattenScoreSemantics(shape: ScoreShape): BeatEventFlatteningRes
         kind: 'note',
         start: copy(start),
         duration: copy(current.duration),
+        ...(current.notatedDuration || current.automation
+          ? {
+              notatedDuration: copy(
+                current.notatedDuration ?? current.automation?.duration ?? current.duration,
+              ),
+            }
+          : {}),
         pitch: current.pitch,
         rootPitch: current.rootPitch,
         dynamic: copy((current as typeof current & { readonly velocity: Fraction }).velocity),
