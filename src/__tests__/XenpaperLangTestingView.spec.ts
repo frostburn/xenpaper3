@@ -65,6 +65,22 @@ describe('XenpaperLangTestingView', () => {
     log.mockRestore()
   })
 
+  it('evaluates and logs the score shape', async () => {
+    const log = vi.spyOn(console, 'log').mockImplementation(() => undefined)
+    const wrapper = mount(XenpaperLangTestingView)
+    await wrapper.get('textarea').setValue('C E G')
+    await wrapper.findAll('button')[1]!.trigger('click')
+
+    expect(evaluateProgramShape).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'Program',
+        source: 'C E G',
+      }),
+    )
+    expect(log).toHaveBeenCalledWith({ shape: { kind: 'attack' }, diagnostics: [] })
+    log.mockRestore()
+  })
+
   it('renders a separate highlighted copy and exposes its token ranges for debugging', async () => {
     const log = vi.spyOn(console, 'log').mockImplementation(() => undefined)
     const wrapper = mount(XenpaperLangTestingView)
@@ -84,7 +100,7 @@ describe('XenpaperLangTestingView', () => {
   it('populates the staff from the parsed source', async () => {
     const wrapper = mount(XenpaperLangTestingView)
     await wrapper.get('textarea').setValue('C D E')
-    await wrapper.findAll('button')[1]!.trigger('click')
+    await wrapper.findAll('button')[2]!.trigger('click')
 
     expect(parse).toHaveBeenCalledWith('C D E')
     expect(evaluateProgramShape).toHaveBeenCalledWith(
@@ -105,8 +121,8 @@ describe('XenpaperLangTestingView', () => {
   it('logs the current staff notation', async () => {
     const log = vi.spyOn(console, 'log').mockImplementation(() => undefined)
     const wrapper = mount(XenpaperLangTestingView)
-    await wrapper.findAll('button')[1]!.trigger('click')
     await wrapper.findAll('button')[2]!.trigger('click')
+    await wrapper.findAll('button')[3]!.trigger('click')
 
     expect(log).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -125,7 +141,7 @@ describe('XenpaperLangTestingView', () => {
     })
     const wrapper = mount(XenpaperLangTestingView)
     await wrapper.get('textarea').setValue('= C D E F G')
-    await wrapper.findAll('button')[1]!.trigger('click')
+    await wrapper.findAll('button')[2]!.trigger('click')
 
     expect(evaluateProgramShape).not.toHaveBeenCalled()
     expect(wrapper.getComponent({ name: 'PianoRoll' }).props('score')).toBeUndefined()

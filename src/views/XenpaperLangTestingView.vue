@@ -38,9 +38,15 @@ const visibleHighlightTokens = computed(() =>
   highlightedSource.value.filter((token) => token.kind !== 'whitespace'),
 )
 
-const logParsedOutput = () => {
+const logAst = () => {
   const program = updateHighlight()
   if (program) console.log(program)
+}
+
+const logScoreShape = () => {
+  const program = updateHighlight()
+  if (!program) return
+  console.log(evaluateProgramShape(program))
 }
 
 const populateStaff = () => {
@@ -79,7 +85,8 @@ const logStaffNotation = () => {
       <label for="xenpaper-source">Xenpaper source</label>
       <textarea id="xenpaper-source" v-model="source" rows="16" cols="80" />
       <div class="actions">
-        <button type="button" @click="logParsedOutput">Parse and log output</button>
+        <button type="button" @click="logAst">Parse and log AST</button>
+        <button type="button" @click="logScoreShape">Evaluate and log score shape</button>
         <button type="button" @click="populateStaff">Populate visualisers</button>
         <button type="button" @click="logStaffNotation">Log staff notation</button>
       </div>
