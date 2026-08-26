@@ -324,6 +324,17 @@ export function evaluateExpression(
   mapping: PrimeMapping | PitchContext = DEFAULT_PITCH_CONTEXT,
 ): ExpressionEvaluationResult {
   try {
+    if (node.type === 'Identifier') {
+      if (node.name === 'pi') {
+        return {
+          value: result('scalar', Value.real(Math.PI), [
+            { location: node.location, role: 'literal' },
+          ]),
+          diagnostics: [],
+        }
+      }
+      throw new TypeError(`Unknown variable ${node.name}.`)
+    }
     if (node.type === 'DegreeLiteral') {
       const context = 'rootPitch' in mapping ? mapping : createPitchContext(mapping)
       const degree = Number(node.degree)

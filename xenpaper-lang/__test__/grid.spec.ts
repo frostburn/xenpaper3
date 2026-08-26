@@ -78,4 +78,17 @@ describe('Xenpaper exact-grid compilation', () => {
     expect('grid' in result).toBe(false)
     expect(result.diagnostics[0]?.code).toBe('XP_SYNTAX')
   })
+
+  it('projects real-valued ratios into the grid without requiring an escape hatch', () => {
+    const result = compile('[sqrt(2) + sqrt(3), pi]==.')
+    expect('grid' in result).toBe(true)
+    if (!('grid' in result)) return
+    const notes = result.grid.events.filter((entry) => entry.kind === 'note')
+    expect(notes).toHaveLength(2)
+    const note = notes[0]
+    expect(note?.kind).toBe('note')
+    if (!note || note.kind !== 'note') return
+    expect(note.pitch.sounding.ratioValue()).toBeCloseTo(Math.sqrt(2) + Math.sqrt(3))
+    expect(notes[1]!.pitch.sounding.ratioValue()).toBeCloseTo(Math.PI)
+  })
 })

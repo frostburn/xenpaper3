@@ -33,7 +33,7 @@ export type GridCompilationResult =
 const pitchMonomial = (value: Value): Monomial | undefined => {
   if (!value.dimensions.equals({ pitch: 1 })) return undefined
   const exponents = value.primeExponents()
-  return exponents ? new Monomial(exponents) : undefined
+  return exponents ? new Monomial(exponents) : Monomial.fromCents(value.valueOf())
 }
 
 const locationsOf = (origins: readonly SourceOrigin[]): readonly LocationRange[] =>
@@ -43,8 +43,7 @@ const inexactPitchDiagnostic = (origins: readonly SourceOrigin[]): Diagnostic =>
   code: 'XP_INEXACT_GRID_PITCH',
   severity: 'error',
   message:
-    'Exact-grid compilation requires a monomial sounding pitch. ' +
-    'Keep real-valued tuning, calibration, and device conversion in a downstream projection.',
+    'Grid compilation requires a sounding pitch. Keep device conversion in a downstream projection.',
   locations: locationsOf(origins),
 })
 
