@@ -168,6 +168,12 @@ describe('arithmetic expression evaluation', () => {
     expect(sum.value.valueOf()).toBeCloseTo(Math.sqrt(2) + Math.sqrt(3))
   })
 
+  it('provides pi as a real-valued global', () => {
+    const pi = evaluate('pi')
+
+    expect(pi.value.magnitude).toEqual({ kind: 'real', value: Math.PI })
+  })
+
   it('rejects pitch arguments and invalid arity for conversion functions', () => {
     expect(evaluateExpression(expression('ratio(3/2)'))).toMatchObject({
       diagnostics: [{ code: 'XP_TYPE_MISMATCH', message: 'ratio() expects a pitch offset.' }],

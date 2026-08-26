@@ -102,12 +102,16 @@ pitch(2) = 1200 cents
 ratio(13 * (1\13<3>)) = 3
 ```
 
-Operations outside those closed forms, such as `sqrt(2) + sqrt(3)`, may fall
-back to a floating-point real magnitude while retaining dimensions. Such a
-value can be useful during expression evaluation, but a sounding pitch must be
-made exact before it can enter the core score grid. `compile()` reports
-`XP_INEXACT_GRID_PITCH` instead of silently baking an approximation into the
-score.
+Operations outside those closed forms, such as `sqrt(2) + sqrt(3)`, fall back
+to a floating-point real magnitude while retaining dimensions. The global
+`pi` is also available for explicitly real-valued calculations. Xenpaper makes
+best efforts to preserve exact values, but real-valued sounding pitches are
+still accepted: grid compilation projects their floating-point cent value onto
+the power-of-two axis rather than preventing the music from compiling.
+
+```text
+[sqrt(2) + sqrt(3), pi]==.
+```
 
 ## Real-world projections
 
