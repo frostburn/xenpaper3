@@ -4,6 +4,7 @@ import { groupFjsInflections } from './fjs'
 import { normalizeStaffAccidental, spellIntervalFormula } from './pitches'
 import type {
   EvaluatedLiteral,
+  FrequencyPitchValue,
   FjsSpelling,
   PrimeMonzo,
   ScoreShape,
@@ -35,8 +36,11 @@ const GREEK_RANK: Readonly<Record<string, number>> = {
 
 const UPWARD_GREEK_NOMINALS = new Set(['BET', 'Β'])
 
-function formulaOf(value: EvaluatedLiteral): PrimeMonzo | undefined {
+type NotatedPitchValue = EvaluatedLiteral | FrequencyPitchValue
+
+function formulaOf(value: NotatedPitchValue): PrimeMonzo | undefined {
   if (value.kind === 'absolutePitch') return value.formula
+  if (value.kind === 'frequency') return undefined
   if (value.kind === 'pitchOffset')
     return value.formula ?? value.notationValue?.primeExponents() ?? value.value.primeExponents()
   return value.value.primeExponents()
@@ -80,7 +84,7 @@ function spellingChromatic(quality: string, number: number): number | undefined 
   return undefined
 }
 
-function decorations(value: EvaluatedLiteral, chromatic?: number) {
+function decorations(value: NotatedPitchValue, chromatic?: number) {
   if (value.kind === 'absolutePitch' && value.spelling.signature) return { accidentals: [] }
   const written = value.kind === 'absolutePitch' ? value.spelling.accidentals : undefined
   const fjs =
@@ -116,8 +120,9 @@ function decorations(value: EvaluatedLiteral, chromatic?: number) {
   }
 }
 
-function soundingValue(value: EvaluatedLiteral): Value {
+function soundingValue(value: NotatedPitchValue): Value {
   if (value.kind === 'absolutePitch') return value.rootOffset
+  if (value.kind === 'frequency') return value.notationValue
   if (value.kind === 'pitchOffset') return value.notationValue ?? value.value
   if (!value.value.dimensions.isDimensionless || value.value.valueOf() <= 0) {
     throw new TypeError('Staff notation requires a pitch or a positive ratio.')
@@ -170,7 +175,7 @@ function equaveStaffShift(modifiers: readonly string[] | undefined): number {
 }
 
 export function constructStaffNotation(
-  value: EvaluatedLiteral,
+  value: NotatedPitchValue,
   options: StaffNotationOptions = {},
 ): StaffPitch {
   const cents = soundingValue(value).valueOf()

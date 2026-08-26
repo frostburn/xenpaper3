@@ -303,6 +303,10 @@ K L M N j k=`) as SequenceShape
     const result = shape('440Hz')
     if (result.kind !== 'attack') throw new Error('Expected an attack.')
 
+    expect(result.pitch.kind).toBe('frequency')
+    if (result.pitch.kind !== 'frequency') throw new Error('Expected a frequency pitch.')
+    expect(result.pitch.frequency.strictEquals(Value.hertz(440))).toBe(true)
+    expect(result.pitch.frequency.dimensions.equals({ seconds: -1 })).toBe(true)
     expect(result.pitch.notationValue?.valueOf()).toBeCloseTo(900)
     expect(result.pitch.value.valueOf()).toBeCloseTo(900)
   })

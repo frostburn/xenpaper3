@@ -79,7 +79,9 @@ const inspectedNote = computed(() =>
 )
 const noteEnd = (note: (typeof notes.value)[number]) => raw(note.start).add(raw(note.duration))
 const tooltip = (note: (typeof notes.value)[number]) =>
-  note.label ?? note.pitch.spelling?.raw ?? `${cents(note).toFixed(2)}¢`
+  note.label ??
+  (note.pitch.kind === 'frequency' ? undefined : note.pitch.spelling?.raw) ??
+  `${cents(note).toFixed(2)}¢`
 const formatBeat = (value: Fraction) => {
   const fraction = raw(value)
   const whole = Math.floor(fraction.n / fraction.d)

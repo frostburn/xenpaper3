@@ -15,13 +15,11 @@ import type {
   AttackShape,
   AttackAppearance,
   AnnotationShape,
-  AbsolutePitchValue,
   BarlineShape,
   BarlineStyle,
   ContinueShape,
   EvaluatedLiteral,
   ParallelShape,
-  PitchOffsetValue,
   RestShape,
   ScoreShape,
   SequenceShape,
@@ -834,7 +832,7 @@ function playablePitch(
   context: PitchContext,
 ):
   | {
-      readonly pitch: PitchOffsetValue | (AbsolutePitchValue & { readonly value: Value })
+      readonly pitch: AttackShape['pitch']
       readonly justIntonation?: boolean
       readonly diagnostics: readonly Diagnostic[]
     }
@@ -872,12 +870,10 @@ function playablePitch(
     const notationRatio = ratio.div(context.rootFrequency)
     return {
       pitch: {
-        kind: 'pitchOffset',
+        kind: 'frequency',
+        frequency: ratio,
         value: Value.pitch(notationRatio).add(context.rootDisplacement),
         notationValue: Value.pitch(notationRatio),
-        // Frequencies are positioned from their root-relative cents rather than
-        // interpreted as an authored just-intonation formula.
-        formula: new Map(),
         origins: evaluated.value.origins,
       },
       diagnostics: evaluated.diagnostics,

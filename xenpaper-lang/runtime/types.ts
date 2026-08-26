@@ -94,6 +94,18 @@ export interface AbsolutePitchValue {
   }
 }
 
+/** A pitch specified directly as a positive frequency rather than as an offset from the root. */
+export interface FrequencyPitchValue {
+  readonly kind: 'frequency'
+  /** The authored frequency, retaining its inverse-seconds dimension. */
+  readonly frequency: Value
+  /** Sounding displacement from the default root, used by playback renderers. */
+  readonly value: Value
+  /** Root-relative displacement used only to place the pitch in the active notation. */
+  readonly notationValue: Value
+  readonly origins: readonly SourceOrigin[]
+}
+
 export type PrimeMonzo = ReadonlyMap<number, Fraction>
 
 export interface IntervalSpelling {
@@ -288,7 +300,10 @@ export interface ShapeBase {
 
 export interface AttackShape extends ShapeBase {
   readonly kind: 'attack'
-  readonly pitch: PitchOffsetValue | (AbsolutePitchValue & { readonly value: Value })
+  readonly pitch:
+    | PitchOffsetValue
+    | FrequencyPitchValue
+    | (AbsolutePitchValue & { readonly value: Value })
   readonly rootPitch: AbsolutePitchValue
   readonly automation?: PitchAutomation
   /** Grace attacks are engraved small and lead into the following donor note. */
