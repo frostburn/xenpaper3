@@ -161,6 +161,9 @@ export function compileProgram(
             kind: 'note',
             start: copyFraction(event.start),
             duration: copyFraction(event.duration),
+            ...(event.notatedDuration
+              ? { notatedDuration: copyFraction(event.notatedDuration) }
+              : {}),
             pitch,
             ...(rootPitch ? { rootPitch } : {}),
             dynamic: copyFraction(event.dynamic),

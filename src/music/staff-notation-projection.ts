@@ -57,6 +57,7 @@ const projectEvent = (event: MonomialGrid['events'][number]): StaffNotationShape
     return {
       kind: 'note',
       duration: event.duration,
+      ...(event.notatedDuration ? { notatedDuration: event.notatedDuration } : {}),
       pitch: projectPitchToStaff(event.pitch, event.rootPitch),
       ...(event.label ? { displayLabel: event.label } : {}),
       ...(event.pitch.justIntonation ? { justIntonation: true } : {}),

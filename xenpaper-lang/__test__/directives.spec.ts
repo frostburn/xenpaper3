@@ -289,6 +289,13 @@ describe('directive runtime', () => {
     expect(extendedGlide[0]!.automation?.duration.valueOf()).toBe(2)
   })
 
+  it('retains the authored source duration when a glissando target extends its span', () => {
+    const [event] = notes('@gliss 0=== 7')
+
+    expect(event!.duration.valueOf()).toBe(5)
+    expect(event!.notatedDuration?.valueOf()).toBe(4)
+  })
+
   it('chains adjacent gliss directives into one held note', () => {
     const chained = notes('@gliss E @gliss F G')
 

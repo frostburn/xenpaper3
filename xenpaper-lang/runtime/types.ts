@@ -439,6 +439,8 @@ export interface TimedNoteEvent<Pitch, RootPitch, Automation> {
   readonly kind: 'note'
   readonly start: Fraction
   readonly duration: Fraction
+  /** Authored duration of the attack before continuations extend its sounding span. */
+  readonly notatedDuration?: Fraction
   readonly pitch: Pitch
   readonly rootPitch?: RootPitch
   /** Effective amplitude from either the prevailing dynamic or a one-shot velocity. */

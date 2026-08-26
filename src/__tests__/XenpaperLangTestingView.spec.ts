@@ -40,6 +40,17 @@ describe('XenpaperLangTestingView', () => {
     expect(wrapper.findAll('.staff-debugger .glissando-target')).toHaveLength(2)
   })
 
+  it('engraves a continued whole-note glissando with its authored duration', async () => {
+    const wrapper = mount(XenpaperLangTestingView)
+    await wrapper.get('textarea').setValue('@gliss 0=== 7')
+    await wrapper.findAll('button')[0]!.trigger('click')
+
+    expect(wrapper.find('.staff-debugger .notation-error').exists()).toBe(false)
+    expect(wrapper.findAll('.staff-debugger .glissando')).toHaveLength(1)
+    expect(wrapper.findAll('.staff-debugger .notehead')).toHaveLength(2)
+    expect(wrapper.findAll('.staff-debugger .notehead--open')).toHaveLength(1)
+  })
+
   it('logs the complete compilation result', async () => {
     const log = vi.spyOn(console, 'log').mockImplementation(() => undefined)
     const wrapper = mount(XenpaperLangTestingView)
