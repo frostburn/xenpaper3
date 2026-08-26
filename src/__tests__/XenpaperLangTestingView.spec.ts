@@ -31,6 +31,15 @@ describe('XenpaperLangTestingView', () => {
     expect(rows[1]!.findAll('code')[1]!.text()).toContain('[-3 2>@2.3')
   })
 
+  it('renders glissandi compiled into the exact score grid', async () => {
+    const wrapper = mount(XenpaperLangTestingView)
+    await wrapper.get('textarea').setValue('@gliss E @gliss F G')
+    await wrapper.findAll('button')[0]!.trigger('click')
+
+    expect(wrapper.findAll('.staff-debugger .glissando')).toHaveLength(2)
+    expect(wrapper.findAll('.staff-debugger .glissando-target')).toHaveLength(2)
+  })
+
   it('logs the complete compilation result', async () => {
     const log = vi.spyOn(console, 'log').mockImplementation(() => undefined)
     const wrapper = mount(XenpaperLangTestingView)
