@@ -28,6 +28,7 @@ describe('DAW project model', () => {
     const project = createDefaultProject()
 
     expect(project.globalTrack.tempoChanges).toEqual([{ id: 'tempo-1', beat: beat(0), bpm: 120 }])
+    expect(project.globalTrack.source).toContain('Shared tuning')
     expect(project.globalTrack.timeSignatureChanges[0]).toMatchObject({
       id: 'time-signature-1',
       beat: beat(0),
@@ -39,6 +40,7 @@ describe('DAW project model', () => {
       patchSource: 'default',
       oscillatorType: 'sawtooth',
       envelope: { attack: 0.1, decay: 0.2, sustain: 0.7, release: 0.3 },
+      source: expect.stringContaining('Defaults inherited'),
       clips: [],
     })
     expect(JSON.parse(JSON.stringify(project))).toEqual(project)
@@ -125,6 +127,18 @@ describe('DAW project model', () => {
     const notes = parseProjectNotes(project)
     expect(notes[0]!.envelope).toEqual(lane.envelope)
     expect(notes[1]!.envelope).toEqual({ ...lane.envelope, sustain: 0.9 })
+  })
+
+  it('initializes every lane clip from the global and instrument sources', () => {
+    const project = createDefaultProject()
+    const lane = project.instrumentLanes[0]!
+    project.globalTrack.source = '{19edo}'
+    lane.source = '@patch(sustain: 25%)'
+    lane.clips.push({ id: 'initialized', start: beat(0), length: beat(2), source: 'C D' })
+
+    const notes = parseProjectNotes(project)
+    expect(notes[0]!.envelope.sustain).toBe(0.25)
+    expect(notes[1]!.cents).not.toBe(parseClipNotes('{12edo} D')[0]!.cents - 900)
   })
 
   it('compiles glissando segments and implements all supported easing curves', () => {
@@ -309,6 +323,8 @@ describe('DawView', () => {
     await wrapper.get('[aria-label="Instrument gain"]').setValue('0.42')
     await wrapper.get('[aria-label="Default attack"]').setValue('0.04')
     await wrapper.get('[aria-label="Default sustain"]').setValue('0.6')
+    await wrapper.get('[aria-label="Global source"]').setValue('{31edo}')
+    await wrapper.get('[aria-label="Instrument lane source"]').setValue('@patch(sustain: 45%)')
 
     expect((wrapper.get('[aria-label="Tempo in BPM"]').element as HTMLInputElement).value).toBe(
       '144',
@@ -323,6 +339,12 @@ describe('DawView', () => {
     expect((wrapper.get('[aria-label="Default sustain"]').element as HTMLInputElement).value).toBe(
       '0.6',
     )
+    expect((wrapper.get('[aria-label="Global source"]').element as HTMLTextAreaElement).value).toBe(
+      '{31edo}',
+    )
+    expect(
+      (wrapper.get('[aria-label="Instrument lane source"]').element as HTMLTextAreaElement).value,
+    ).toBe('@patch(sustain: 45%)')
 
     await wrapper.getComponent(InstrumentPianoRollLane).trigger('dblclick', { clientX: 64 })
     expect(wrapper.find('[aria-label="Piano roll preview"]').exists()).toBe(true)

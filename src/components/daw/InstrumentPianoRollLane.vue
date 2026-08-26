@@ -12,6 +12,7 @@ import {
 
 const props = defineProps<{
   lane: InstrumentLane
+  globalSource?: string
   selectedClipId?: string
   pixelsPerBeat: number
   scrollLeft: number
@@ -50,7 +51,12 @@ const pianoRoll = computed(() => {
     try {
       return {
         clip,
-        notes: parseClipNotes(clip.source, beatToNumber(clip.length)),
+        notes: parseClipNotes(
+          clip.source,
+          beatToNumber(clip.length),
+          props.lane.envelope,
+          `${props.globalSource ?? ''}\n${props.lane.source}`,
+        ),
       }
     } catch {
       // Invalid source is expected while the user is editing; show an empty preview.

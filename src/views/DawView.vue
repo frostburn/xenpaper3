@@ -141,6 +141,7 @@ onBeforeUnmount(() => {
     </div>
     <GlobalLane
       :track="project.globalTrack"
+      @update-source="project.globalTrack.source = $event"
       @update-tempo="project.globalTrack.tempoChanges[0]!.bpm = $event"
       @update-time-signature="
         (numerator, denominator) => {
@@ -151,12 +152,14 @@ onBeforeUnmount(() => {
     />
     <InstrumentHeader
       :lane="lane"
+      @update-source="lane.source = $event"
       @update-oscillator="lane.oscillatorType = $event"
       @update-gain="lane.gain = $event"
       @update-envelope="(parameter, value) => (lane.envelope[parameter] = value)"
     />
     <InstrumentPianoRollLane
       :lane="lane"
+      :global-source="project.globalTrack.source"
       :selected-clip-id="selectedClipId"
       :pixels-per-beat="pixelsPerBeat"
       :scroll-left="scrollLeft"

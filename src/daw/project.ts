@@ -17,6 +17,7 @@ export interface TimeSignatureChange {
 }
 
 export interface GlobalTrack {
+  source: string
   tempoChanges: TempoChange[]
   timeSignatureChanges: TimeSignatureChange[]
 }
@@ -46,6 +47,7 @@ export interface InstrumentLane {
     sustain: number
     release: number
   }
+  source: string
   clips: SourceClip[]
 }
 
@@ -61,6 +63,10 @@ export const DEFAULT_CLIP_SOURCE = `# New Xenpaper clip
 [0,4,7]===
 `
 export const DEFAULT_SW_PATCH_SOURCE = 'default'
+export const DEFAULT_GLOBAL_SOURCE = `# Shared tuning and score initialization (for example: {12edo})
+`
+export const DEFAULT_INSTRUMENT_SOURCE = `# Defaults inherited by every clip in this lane (for example: @patch(sustain: 70%))
+`
 
 export const beat = (numerator: number, denominator = 1): Beat => {
   if (!Number.isInteger(numerator) || !Number.isInteger(denominator) || denominator <= 0) {
@@ -87,6 +93,7 @@ export const createDefaultProject = (): DawProject => ({
   version: 1,
   title: 'Untitled project',
   globalTrack: {
+    source: DEFAULT_GLOBAL_SOURCE,
     tempoChanges: [{ id: 'tempo-1', beat: beat(0), bpm: 120 }],
     timeSignatureChanges: [{ id: 'time-signature-1', beat: beat(0), numerator: 4, denominator: 4 }],
   },
@@ -98,6 +105,7 @@ export const createDefaultProject = (): DawProject => ({
       oscillatorType: 'sawtooth',
       gain: 0.8,
       envelope: { attack: 0.1, decay: 0.2, sustain: 0.7, release: 0.3 },
+      source: DEFAULT_INSTRUMENT_SOURCE,
       clips: [],
     },
   ],

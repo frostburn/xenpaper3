@@ -3,6 +3,7 @@ import type { GlobalTrack } from '../../daw/project'
 
 defineProps<{ track: GlobalTrack }>()
 defineEmits<{
+  'update-source': [source: string]
   'update-tempo': [bpm: number]
   'update-time-signature': [numerator: number, denominator: number]
 }>()
@@ -10,6 +11,15 @@ defineEmits<{
 
 <template>
   <section class="global-lane" aria-label="Global track">
+    <label class="source-control">
+      Global source
+      <textarea
+        aria-label="Global source"
+        :value="track.source"
+        rows="3"
+        @input="$emit('update-source', ($event.target as HTMLTextAreaElement).value)"
+      />
+    </label>
     <label v-for="tempo in track.tempoChanges" :key="tempo.id">
       ♩
       <input
@@ -61,6 +71,15 @@ defineEmits<{
   gap: 1.5rem;
   padding: 0.5rem;
   background: #202738;
+}
+.source-control {
+  flex: 1;
+  align-items: stretch !important;
+  flex-direction: column;
+}
+.source-control textarea {
+  min-width: 20rem;
+  font-family: monospace;
 }
 .global-lane label {
   display: flex;

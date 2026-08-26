@@ -64,6 +64,22 @@ import TheFooter from './components/TheFooter.vue'
 </template>
 
 <style scoped>
+:global(html),
+:global(body),
+:global(#app) {
+  min-height: 100%;
+}
+:global(body) {
+  margin: 0;
+}
+:global(#app) {
+  display: flex;
+  min-height: 100vh;
+  flex-direction: column;
+}
+:global(#app > main) {
+  flex: 1;
+}
 nav {
   display: flex;
   flex-direction: column;

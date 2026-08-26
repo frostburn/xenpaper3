@@ -4,13 +4,7 @@ import {
   parse,
   type DirectiveExtension,
 } from '../../xenpaper-lang'
-import {
-  beat,
-  beatToNumber,
-  type Beat,
-  type DawProject,
-  type InstrumentLane,
-} from './project'
+import { beat, beatToNumber, type Beat, type DawProject, type InstrumentLane } from './project'
 
 export interface EnvelopeSettings {
   readonly attack: number
@@ -68,9 +62,12 @@ export const parseClipNotes = (
   source: string,
   duration = Number.POSITIVE_INFINITY,
   defaultEnvelope: EnvelopeSettings = DEFAULT_ENVELOPE,
+  initializationSource = '',
 ): ScheduledLaneNote[] => {
   const extension = { ...envelopeExtension, initialState: Object.freeze({ ...defaultEnvelope }) }
-  const result = expandToBeatEvents(parse(source), { directiveExtensions: [extension] })
+  const result = expandToBeatEvents(parse(`${initializationSource}\n${source}`), {
+    directiveExtensions: [extension],
+  })
   const errors = result.diagnostics.filter(({ severity }) => severity === 'error')
   if (errors.length) throw new Error(errors.map(({ message }) => message).join('\n'))
   if (!('score' in result)) return []
@@ -114,17 +111,22 @@ export const sourceClipLength = (source: string, defaultBar = beat(4)): Beat => 
 }
 
 /** Compile a lane once and place its C-relative Xenpaper notes on the project timeline. */
-export const parseLaneNotes = (lane: InstrumentLane): ScheduledLaneNote[] => {
+export const parseLaneNotes = (lane: InstrumentLane, globalSource = ''): ScheduledLaneNote[] => {
+  const initializationSource = `${globalSource}\n${lane.source}`
   const notes = lane.clips.flatMap((clip) => {
     const clipStart = beatToNumber(clip.start)
-    return parseClipNotes(clip.source, beatToNumber(clip.length), lane.envelope).map((event) => ({
-      ...event,
-      beat: clipStart + event.beat,
-    }))
+    return parseClipNotes(
+      clip.source,
+      beatToNumber(clip.length),
+      lane.envelope,
+      initializationSource,
+    ).map((event) => ({ ...event, beat: clipStart + event.beat }))
   })
   return notes.sort((left, right) => left.beat - right.beat)
 }
 
 /** Compile every lane without applying any synthesizer- or tuning-reference conversion. */
 export const parseProjectScoreNotes = (project: DawProject): ScheduledLaneNote[] =>
-  project.instrumentLanes.flatMap(parseLaneNotes).sort((left, right) => left.beat - right.beat)
+  project.instrumentLanes
+    .flatMap((lane) => parseLaneNotes(lane, project.globalTrack.source))
+    .sort((left, right) => left.beat - right.beat)

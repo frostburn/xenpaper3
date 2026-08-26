@@ -167,7 +167,7 @@ export const createPlaybackPlan = (project: DawProject, fromBeat = 0): PlaybackP
 
   for (const lane of project.instrumentLanes) {
     const notes: PlaybackNote[] = []
-    for (const note of parseLaneNotes(lane)) {
+    for (const note of parseLaneNotes(lane, project.globalTrack.source)) {
       const window = notePlaybackWindow(note.beat, note.duration, fromBeat)
       if (!window) continue
       const when = tempoMap.beatToSeconds(window.startBeat)
