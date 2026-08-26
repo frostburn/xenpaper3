@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
-import { parseClipNotes } from '../../daw/score'
+import { compileSourceInitialization, parseClipNotes } from '../../daw/score'
 import { easeGlissando } from '../../daw/easing'
 import {
   beatToNumber,
@@ -47,16 +47,19 @@ const notePitches = (note: PreviewNote) => {
 }
 
 const pianoRoll = computed(() => {
+  let initialization
+  try {
+    const globalInitialization = compileSourceInitialization(props.globalSource ?? '')
+    initialization = compileSourceInitialization(props.lane.source, globalInitialization)
+  } catch {
+    initialization = undefined
+  }
   const parsedClips = props.lane.clips.map((clip) => {
     try {
+      if (!initialization) throw new Error('Invalid initialization source')
       return {
         clip,
-        notes: parseClipNotes(
-          clip.source,
-          beatToNumber(clip.length),
-          props.lane.envelope,
-          `${props.globalSource ?? ''}\n${props.lane.source}`,
-        ),
+        notes: parseClipNotes(clip.source, beatToNumber(clip.length), initialization),
       }
     } catch {
       // Invalid source is expected while the user is editing; show an empty preview.

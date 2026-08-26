@@ -921,9 +921,12 @@ export function evaluateScoreSemantics(
   )
   if (extensions.size !== (options.directiveExtensions ?? []).length)
     throw new RangeError('Directive extension names must be unique.')
-  const initialDirectiveState: DirectiveExtensionState = Object.fromEntries(
-    [...extensions].map(([name, extension]) => [name, extension.initialState]),
-  )
+  const initialDirectiveState: DirectiveExtensionState = {
+    ...Object.fromEntries(
+      [...extensions].map(([name, extension]) => [name, extension.initialState]),
+    ),
+    ...options.directiveState,
+  }
 
   const applyExtension = (
     directive: Extract<Expression, { type: 'Directive' }>,
@@ -1867,5 +1870,12 @@ export function evaluateScoreSemantics(
     return { shape, diagnostics: evaluated.diagnostics }
   }
 
-  return visit(node, options.pitchContext ?? DEFAULT_PITCH_CONTEXT)
+  const initialContext = options.pitchContext ?? DEFAULT_PITCH_CONTEXT
+  const result = visit(node, initialContext)
+  if (!('shape' in result)) return result
+  return {
+    ...result,
+    pitchContext: contextAfter(node, initialContext),
+    directiveState: directiveStateAfter(node, initialDirectiveState, initialContext),
+  }
 }

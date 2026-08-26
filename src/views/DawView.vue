@@ -155,7 +155,6 @@ onBeforeUnmount(() => {
       @update-source="lane.source = $event"
       @update-oscillator="lane.oscillatorType = $event"
       @update-gain="lane.gain = $event"
-      @update-envelope="(parameter, value) => (lane.envelope[parameter] = value)"
     />
     <InstrumentPianoRollLane
       :lane="lane"

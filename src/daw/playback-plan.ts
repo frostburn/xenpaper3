@@ -1,6 +1,11 @@
 import { easeGlissando } from './easing'
 import type { DawProject, OscillatorType } from './project'
-import { parseLaneNotes, type EnvelopeSettings, type ScheduledLaneNote } from './score'
+import {
+  compileSourceInitialization,
+  parseLaneNotes,
+  type EnvelopeSettings,
+  type ScheduledLaneNote,
+} from './score'
 import { TempoMap } from './timeline'
 
 const GLISSANDO_SAMPLES_PER_SECOND = 120
@@ -162,12 +167,13 @@ const assertPlaybackStart = (fromBeat: number): void => {
 export const createPlaybackPlan = (project: DawProject, fromBeat = 0): PlaybackPlan => {
   assertPlaybackStart(fromBeat)
   const tempoMap = TempoMap.fromProject(project)
+  const globalInitialization = compileSourceInitialization(project.globalTrack.source)
   let endBeat = fromBeat
   const lanes: PlaybackLane[] = []
 
   for (const lane of project.instrumentLanes) {
     const notes: PlaybackNote[] = []
-    for (const note of parseLaneNotes(lane, project.globalTrack.source)) {
+    for (const note of parseLaneNotes(lane, globalInitialization)) {
       const window = notePlaybackWindow(note.beat, note.duration, fromBeat)
       if (!window) continue
       const when = tempoMap.beatToSeconds(window.startBeat)

@@ -5,7 +5,6 @@ defineProps<{ lane: InstrumentLane }>()
 defineEmits<{
   'update-oscillator': [type: InstrumentLane['oscillatorType']]
   'update-gain': [gain: number]
-  'update-envelope': [parameter: keyof InstrumentLane['envelope'], value: number]
   'update-source': [source: string]
 }>()
 </script>
@@ -39,26 +38,6 @@ defineEmits<{
         </option>
       </select>
     </label>
-    <fieldset class="envelope-controls">
-      <legend>Default ADSR</legend>
-      <label
-        v-for="parameter in ['attack', 'decay', 'sustain', 'release'] as const"
-        :key="parameter"
-      >
-        {{ parameter[0]!.toUpperCase() }}
-        <input
-          :aria-label="`Default ${parameter}`"
-          type="number"
-          min="0"
-          :max="parameter === 'sustain' ? 1 : undefined"
-          step="0.01"
-          :value="lane.envelope[parameter]"
-          @input="
-            $emit('update-envelope', parameter, Number(($event.target as HTMLInputElement).value))
-          "
-        />
-      </label>
-    </fieldset>
     <label>
       Gain
       <input
@@ -97,18 +76,5 @@ defineEmits<{
 .source-control textarea {
   min-width: 18rem;
   font-family: monospace;
-}
-.envelope-controls {
-  display: flex;
-  gap: 0.4rem;
-  border: 0;
-  padding: 0;
-}
-.envelope-controls legend {
-  position: absolute;
-  clip: rect(0 0 0 0);
-}
-.envelope-controls input {
-  width: 4rem;
 }
 </style>

@@ -39,8 +39,7 @@ describe('DAW project model', () => {
       id: 'instrument-1',
       patchSource: 'default',
       oscillatorType: 'sawtooth',
-      envelope: { attack: 0.1, decay: 0.2, sustain: 0.7, release: 0.3 },
-      source: expect.stringContaining('Defaults inherited'),
+      source: expect.stringContaining('@patch(attack: 100ms'),
       clips: [],
     })
     expect(JSON.parse(JSON.stringify(project))).toEqual(project)
@@ -116,7 +115,7 @@ describe('DAW project model', () => {
   it('uses lane ADSR defaults and keeps clip patch directives as overrides', () => {
     const project = createDefaultProject()
     const lane = project.instrumentLanes[0]!
-    lane.envelope = { attack: 0.03, decay: 0.4, sustain: 0.25, release: 0.8 }
+    lane.source = '@patch(attack: 30ms, decay: 400ms, sustain: 25%, release: 800ms)'
     lane.clips.push({
       id: 'defaults',
       start: beat(0),
@@ -125,8 +124,28 @@ describe('DAW project model', () => {
     })
 
     const notes = parseProjectNotes(project)
-    expect(notes[0]!.envelope).toEqual(lane.envelope)
-    expect(notes[1]!.envelope).toEqual({ ...lane.envelope, sustain: 0.9 })
+    expect(notes[0]!.envelope).toEqual({ attack: 0.03, decay: 0.4, sustain: 0.25, release: 0.8 })
+    expect(notes[1]!.envelope).toEqual({ attack: 0.03, decay: 0.4, sustain: 0.9, release: 0.8 })
+  })
+
+  it('rejects duration-bearing global and lane initialization sources', () => {
+    const project = createDefaultProject()
+    project.instrumentLanes[0]!.clips.push({
+      id: 'clip',
+      start: beat(0),
+      length: beat(1),
+      source: 'D',
+    })
+    project.globalTrack.source = 'C'
+    expect(() => parseProjectNotes(project)).toThrow(
+      'Initialization sources cannot contain duration-bearing expressions.',
+    )
+
+    project.globalTrack.source = ''
+    project.instrumentLanes[0]!.source = '.='
+    expect(() => parseProjectNotes(project)).toThrow(
+      'Initialization sources cannot contain duration-bearing expressions.',
+    )
   })
 
   it('initializes every lane clip from the global and instrument sources', () => {
@@ -321,8 +340,6 @@ describe('DawView', () => {
     await wrapper.get('[aria-label="Time signature denominator"]').setValue('8')
     await wrapper.get('[aria-label="Waveform"]').setValue('triangle')
     await wrapper.get('[aria-label="Instrument gain"]').setValue('0.42')
-    await wrapper.get('[aria-label="Default attack"]').setValue('0.04')
-    await wrapper.get('[aria-label="Default sustain"]').setValue('0.6')
     await wrapper.get('[aria-label="Global source"]').setValue('{31edo}')
     await wrapper.get('[aria-label="Instrument lane source"]').setValue('@patch(sustain: 45%)')
 
@@ -333,12 +350,8 @@ describe('DawView', () => {
       'triangle',
     )
     expect(wrapper.get('.instrument-header output').text()).toBe('42%')
-    expect((wrapper.get('[aria-label="Default attack"]').element as HTMLInputElement).value).toBe(
-      '0.04',
-    )
-    expect((wrapper.get('[aria-label="Default sustain"]').element as HTMLInputElement).value).toBe(
-      '0.6',
-    )
+    expect(wrapper.find('[aria-label="Default attack"]').exists()).toBe(false)
+    expect(wrapper.find('[aria-label="Default sustain"]').exists()).toBe(false)
     expect((wrapper.get('[aria-label="Global source"]').element as HTMLTextAreaElement).value).toBe(
       '{31edo}',
     )
