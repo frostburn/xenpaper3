@@ -133,7 +133,7 @@ export const sourceClipLength = (source: string, defaultBar = beat(4)): Beat => 
     return defaultBar
   const duration = result.score.duration
   if (!duration.n) return defaultBar
-  return beat(Number(duration.s * duration.n), duration.d)
+  return duration
 }
 
 /** Compile a lane once and place its C-relative Xenpaper notes on the project timeline. */

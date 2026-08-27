@@ -1,9 +1,6 @@
-import { gcd } from 'xen-dev-utils'
+import { Fraction } from 'xen-dev-utils'
 
-export interface Beat {
-  numerator: number
-  denominator: number
-}
+export type Beat = Fraction
 
 export interface TempoChange {
   id: string
@@ -68,15 +65,14 @@ export const beat = (numerator: number, denominator = 1): Beat => {
   if (!Number.isInteger(numerator) || !Number.isInteger(denominator) || denominator <= 0) {
     throw new RangeError('Beat values require an integer numerator and positive denominator')
   }
-  const divisor = gcd(numerator, denominator)
-  return { numerator: numerator / divisor, denominator: denominator / divisor }
+  return new Fraction(numerator, denominator)
 }
 
-export const beatToNumber = (value: Beat) => value.numerator / value.denominator
+export const beatToNumber = (value: Beat) => value.valueOf()
 
 export const snapBeat = (value: number, grid: Beat): Beat => {
-  const units = Math.round(value / beatToNumber(grid))
-  return beat(units * grid.numerator, grid.denominator)
+  const units = Math.round(value / grid.valueOf())
+  return grid.mul(units)
 }
 
 export const pointerXToBeat = (pointerX: number, scrollLeft: number, pixelsPerBeat: number) =>
