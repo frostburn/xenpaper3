@@ -829,6 +829,24 @@ FjsInflection
         raw: marker + prime + (flavor ?? ''),
       });
     }
+  / prime:SuperscriptUnsignedInteger flavor:$([cnqthmls])? {
+      return node('FjsInflection', {
+        direction: 'numerator',
+        marker: '^',
+        prime: prime.value,
+        flavor: flavor ?? '',
+        raw: prime.raw + (flavor ?? ''),
+      });
+    }
+  / prime:SubscriptUnsignedInteger flavor:$([cnqthmls])? {
+      return node('FjsInflection', {
+        direction: 'denominator',
+        marker: 'v',
+        prime: prime.value,
+        flavor: flavor ?? '',
+        raw: prime.raw + (flavor ?? ''),
+      });
+    }
 
 EqualDivisionLiteral
   = sign:Sign? body:UnsignedEqualDivisionLiteral {
@@ -946,6 +964,12 @@ UnsignedInteger
 SuperscriptUnsignedInteger
   = raw:$([⁰¹²³⁴⁵⁶⁷⁸⁹]+) {
       const digits = "⁰¹²³⁴⁵⁶⁷⁸⁹";
+      return { raw, value: [...raw].map(character => digits.indexOf(character)).join("") };
+    }
+
+SubscriptUnsignedInteger
+  = raw:$([₀₁₂₃₄₅₆₇₈₉]+) {
+      const digits = "₀₁₂₃₄₅₆₇₈₉";
       return { raw, value: [...raw].map(character => digits.indexOf(character)).join("") };
     }
 
