@@ -28,17 +28,31 @@ const MOS_HALF_ALTERATIONS: Readonly<Record<string, number>> = {
   '♮': 0,
 }
 
+const EQUAVE_SHIFT_BY_MODIFIER: Readonly<Record<string, number>> = {
+  equaveUp: 1,
+  doubleEquaveUp: 2,
+  equaveDown: -1,
+}
+
+const PITCH_MODIFIER_BY_OPERATOR = {
+  "'": 'equaveUp',
+  '"': 'doubleEquaveUp',
+  '`': 'equaveDown',
+  '^': 'up',
+  v: 'down',
+  '/': 'lift',
+  '\\': 'drop',
+} as const
+
+type PitchOperator = keyof typeof PITCH_MODIFIER_BY_OPERATOR
+
+function isPitchOperator(operator: string): operator is PitchOperator {
+  return operator in PITCH_MODIFIER_BY_OPERATOR
+}
+
 function equaveShifts(modifiers: readonly { readonly kind: string }[]): number {
   return modifiers.reduce(
-    (sum, modifier) =>
-      sum +
-      (modifier.kind === 'equaveUp'
-        ? 1
-        : modifier.kind === 'doubleEquaveUp'
-          ? 2
-          : modifier.kind === 'equaveDown'
-            ? -1
-            : 0),
+    (sum, modifier) => sum + (EQUAVE_SHIFT_BY_MODIFIER[modifier.kind] ?? 0),
     0,
   )
 }
@@ -132,14 +146,7 @@ function addOrSubtract(
       const mosContext = mos.context
       const registerSteps = (offset.spelling.modifiers ?? []).reduce(
         (sum, modifier) =>
-          sum +
-          (modifier === 'equaveUp'
-            ? mosContext.nominals.size
-            : modifier === 'doubleEquaveUp'
-              ? 2 * mosContext.nominals.size
-              : modifier === 'equaveDown'
-                ? -mosContext.nominals.size
-                : 0),
+          sum + (EQUAVE_SHIFT_BY_MODIFIER[modifier] ?? 0) * mosContext.nominals.size,
         0,
       )
       let steps = Number(offset.spelling.number.valueOf()) + registerSteps
@@ -388,18 +395,13 @@ export function evaluateExpression(
           diagnostics: operand.diagnostics,
         }
       }
-      if (["'", '"', '`', '^', 'v', '/', '\\'].includes(node.operator)) {
+      if (isPitchOperator(node.operator)) {
         const context = 'rootPitch' in mapping ? mapping : createPitchContext(mapping)
-        const equaveShift =
-          node.operator === "'" ? 1 : node.operator === '"' ? 2 : node.operator === '`' ? -1 : 0
-        const inflection =
-          node.operator === '^'
-            ? requirePitchOperator(context, 'up')
-            : node.operator === 'v'
-              ? requirePitchOperator(context, 'up').neg()
-              : node.operator === '/'
-                ? requirePitchOperator(context, 'lift')
-                : requirePitchOperator(context, 'lift').neg()
+        const modifier = PITCH_MODIFIER_BY_OPERATOR[node.operator]
+        const equaveShift = EQUAVE_SHIFT_BY_MODIFIER[modifier] ?? 0
+        const inflectionKind = node.operator === '^' || node.operator === 'v' ? 'up' : 'lift'
+        let inflection = requirePitchOperator(context, inflectionKind)
+        if (node.operator !== '^' && node.operator !== '/') inflection = inflection.neg()
         // Equave shifts use the scale's degree equave for scalar arithmetic, but
         // written pitches and intervals always move by notational octaves.
         const scalarDisplacement = equaveShift
@@ -432,20 +434,6 @@ export function evaluateExpression(
           }
         }
         if (operand.value.kind === 'absolutePitch') {
-          const modifier =
-            node.operator === "'"
-              ? 'equaveUp'
-              : node.operator === '"'
-                ? 'doubleEquaveUp'
-                : node.operator === '`'
-                  ? 'equaveDown'
-                  : node.operator === '^'
-                    ? 'up'
-                    : node.operator === 'v'
-                      ? 'down'
-                      : node.operator === '/'
-                        ? 'lift'
-                        : 'drop'
           return {
             value: {
               ...operand.value,
@@ -472,22 +460,7 @@ export function evaluateExpression(
               ? {
                   spelling: {
                     ...offset.spelling,
-                    modifiers: [
-                      node.operator === "'"
-                        ? 'equaveUp'
-                        : node.operator === '"'
-                          ? 'doubleEquaveUp'
-                          : node.operator === '`'
-                            ? 'equaveDown'
-                            : node.operator === '^'
-                              ? 'up'
-                              : node.operator === 'v'
-                                ? 'down'
-                                : node.operator === '/'
-                                  ? 'lift'
-                                  : 'drop',
-                      ...(offset.spelling.modifiers ?? []),
-                    ],
+                    modifiers: [modifier, ...(offset.spelling.modifiers ?? [])],
                   },
                 }
               : {}),
