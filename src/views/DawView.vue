@@ -12,9 +12,11 @@ import {
   beatToNumber,
   createClip,
   createDefaultProject,
+  createInstrumentLane,
   snapBeat,
   type Beat,
   type ClipDisplayMode,
+  type InstrumentLane,
   type SourceClip,
 } from '../daw/project'
 
@@ -30,8 +32,13 @@ const playbackError = ref('')
 let playTimer: ReturnType<typeof setInterval> | undefined
 let audioEngine: DawAudioEngine | undefined
 const editor = ref<InstanceType<typeof ClipSourceEditor>>()
-const lane = computed(() => project.value.instrumentLanes[0]!)
-const selectedClip = computed(() => lane.value.clips.find(({ id }) => id === selectedClipId.value))
+const selectedLaneId = ref<string>()
+const selectedLane = computed(() =>
+  project.value.instrumentLanes.find(({ id }) => id === selectedLaneId.value),
+)
+const selectedClip = computed(() =>
+  selectedLane.value?.clips.find(({ id }) => id === selectedClipId.value),
+)
 
 const finishPlayback = () => {
   playing.value = false
@@ -40,18 +47,20 @@ const finishPlayback = () => {
   playTimer = undefined
 }
 
-const insertClip = async (rawBeat: number) => {
+const insertClip = async (lane: InstrumentLane, rawBeat: number) => {
   const start = snapBeat(Math.max(0, rawBeat), grid.value)
-  const clip = createClip(lane.value, start)
-  lane.value.clips.push(clip)
+  const clip = createClip(lane, start)
+  lane.clips.push(clip)
   selectedClipId.value = clip.id
+  selectedLaneId.value = lane.id
   playhead.value = rawBeat
   await nextTick()
   editor.value?.focus()
 }
 
-const selectClip = (clip: SourceClip) => {
+const selectClip = (lane: InstrumentLane, clip: SourceClip) => {
   selectedClipId.value = clip.id
+  selectedLaneId.value = lane.id
   playhead.value = beatToNumber(clip.start)
 }
 
@@ -98,11 +107,31 @@ const moveClip = (clip: SourceClip, rawBeat: number) => {
   playhead.value = beatToNumber(clip.start)
 }
 
-const deleteClip = (clip: SourceClip) => {
-  const index = lane.value.clips.findIndex(({ id }) => id === clip.id)
+const deleteClip = (lane: InstrumentLane, clip: SourceClip) => {
+  const index = lane.clips.findIndex(({ id }) => id === clip.id)
   if (index === -1) return
-  lane.value.clips.splice(index, 1)
-  if (selectedClipId.value === clip.id) selectedClipId.value = undefined
+  lane.clips.splice(index, 1)
+  if (selectedLaneId.value === lane.id && selectedClipId.value === clip.id) {
+    selectedClipId.value = undefined
+    selectedLaneId.value = undefined
+  }
+}
+
+const addInstrumentLane = () =>
+  project.value.instrumentLanes.push(createInstrumentLane(project.value))
+
+const deleteInstrumentLane = (lane: InstrumentLane) => {
+  const index = project.value.instrumentLanes.findIndex(({ id }) => id === lane.id)
+  if (index === -1) return
+  project.value.instrumentLanes.splice(index, 1)
+  if (selectedLaneId.value === lane.id) {
+    selectedClipId.value = undefined
+    selectedLaneId.value = undefined
+  }
+}
+
+const deleteSelectedClip = () => {
+  if (selectedLane.value && selectedClip.value) deleteClip(selectedLane.value, selectedClip.value)
 }
 
 const updateClipSource = (clip: SourceClip, source: string) => {
@@ -150,30 +179,34 @@ onBeforeUnmount(() => {
         }
       "
     />
-    <InstrumentHeader
-      :lane="lane"
-      @update-source="lane.source = $event"
-      @update-oscillator="lane.oscillatorType = $event"
-      @update-gain="lane.gain = $event"
-    />
-    <InstrumentPianoRollLane
-      :lane="lane"
-      :global-source="project.globalTrack.source"
-      :selected-clip-id="selectedClipId"
-      :pixels-per-beat="pixelsPerBeat"
-      :scroll-left="scrollLeft"
-      :display-mode="displayMode"
-      @insert="insertClip"
-      @select="selectClip"
-      @place-playhead="playhead = $event"
-      @move="moveClip"
-      @delete="deleteClip"
-    />
+    <section v-for="lane in project.instrumentLanes" :key="lane.id" class="instrument-lane">
+      <InstrumentHeader
+        :lane="lane"
+        @update-source="lane.source = $event"
+        @update-oscillator="lane.oscillatorType = $event"
+        @update-gain="lane.gain = $event"
+        @delete="deleteInstrumentLane(lane)"
+      />
+      <InstrumentPianoRollLane
+        :lane="lane"
+        :global-source="project.globalTrack.source"
+        :selected-clip-id="selectedLaneId === lane.id ? selectedClipId : undefined"
+        :pixels-per-beat="pixelsPerBeat"
+        :scroll-left="scrollLeft"
+        :display-mode="displayMode"
+        @insert="insertClip(lane, $event)"
+        @select="selectClip(lane, $event)"
+        @place-playhead="playhead = $event"
+        @move="moveClip"
+        @delete="deleteClip(lane, $event)"
+      />
+    </section>
+    <button type="button" class="add-lane" @click="addInstrumentLane">Add instrument lane</button>
     <ClipSourceEditor
       ref="editor"
       :clip="selectedClip"
       @update-source="selectedClip && updateClipSource(selectedClip, $event)"
-      @delete="selectedClip && deleteClip(selectedClip)"
+      @delete="deleteSelectedClip"
     />
   </div>
 </template>
@@ -199,5 +232,18 @@ onBeforeUnmount(() => {
 .playback-error {
   color: #ff9b9b;
   margin: 0 0.75rem;
+}
+.instrument-lane + .instrument-lane {
+  margin-top: 1rem;
+}
+.add-lane {
+  width: 100%;
+  margin: 0.75rem 0;
+  border: 1px dashed #7184a8;
+  border-radius: 0.25rem;
+  padding: 0.65rem;
+  color: #eef3ff;
+  background: #1b2536;
+  cursor: pointer;
 }
 </style>

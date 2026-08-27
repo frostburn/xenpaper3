@@ -6,12 +6,21 @@ defineEmits<{
   'update-oscillator': [type: InstrumentLane['oscillatorType']]
   'update-gain': [gain: number]
   'update-source': [source: string]
+  delete: []
 }>()
 </script>
 
 <template>
   <header class="instrument-header">
     <strong>{{ lane.name }}</strong>
+    <button
+      type="button"
+      class="delete-lane"
+      :aria-label="`Delete ${lane.name}`"
+      @click="$emit('delete')"
+    >
+      Delete lane
+    </button>
     <label class="source-control">
       Lane source
       <textarea
@@ -67,6 +76,14 @@ defineEmits<{
   display: flex;
   align-items: center;
   gap: 0.4rem;
+}
+.delete-lane {
+  color: #ffd8d8;
+  border: 1px solid #a85d67;
+  border-radius: 0.25rem;
+  padding: 0.35rem 0.55rem;
+  background: #4d2730;
+  cursor: pointer;
 }
 .source-control {
   flex: 1;

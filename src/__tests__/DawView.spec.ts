@@ -3,7 +3,14 @@ import { describe, expect, it, vi } from 'vitest'
 import router from '../router'
 import DawView from '../views/DawView.vue'
 import InstrumentPianoRollLane from '../components/daw/InstrumentPianoRollLane.vue'
-import { beat, beatToNumber, createDefaultProject, pointerXToBeat, snapBeat } from '../daw/project'
+import {
+  beat,
+  beatToNumber,
+  createDefaultProject,
+  createInstrumentLane,
+  pointerXToBeat,
+  snapBeat,
+} from '../daw/project'
 import {
   parseProjectNotes,
   parseClipNotes,
@@ -43,6 +50,16 @@ describe('DAW project model', () => {
       clips: [],
     })
     expect(JSON.parse(JSON.stringify(project))).toEqual(project)
+  })
+
+  it('creates an instrument lane with a reusable unique number', () => {
+    const project = createDefaultProject()
+    project.instrumentLanes.push(createInstrumentLane(project))
+    project.instrumentLanes.splice(0, 1)
+
+    const lane = createInstrumentLane(project)
+    expect(lane).toMatchObject({ id: 'instrument-1', name: 'Instrument 1', clips: [] })
+    expect(lane.source).toContain('@patch(attack: 100ms')
   })
 
   it('converts scrolled, zoomed pointer coordinates and snaps exactly', () => {
@@ -231,6 +248,31 @@ describe('DAW routing', () => {
 })
 
 describe('DawView', () => {
+  it('adds and deletes instrument lanes while keeping their clips independent', async () => {
+    const wrapper = mount(DawView)
+
+    await wrapper.get('button.add-lane').trigger('click')
+    expect(wrapper.findAll('.instrument-header')).toHaveLength(2)
+    expect(wrapper.findAll('.instrument-header strong').map((name) => name.text())).toEqual([
+      'Instrument 1',
+      'Instrument 2',
+    ])
+
+    const lanes = wrapper.findAllComponents(InstrumentPianoRollLane)
+    await lanes[1]!.trigger('dblclick', { clientX: 64 })
+    expect(lanes[0]!.find('button.clip').exists()).toBe(false)
+    expect(lanes[1]!.find('button.clip').exists()).toBe(true)
+
+    await wrapper.get('button[aria-label="Delete Instrument 2"]').trigger('click')
+    expect(wrapper.findAll('.instrument-header')).toHaveLength(1)
+    expect(wrapper.find('textarea[aria-label="Xenpaper clip source"]').exists()).toBe(false)
+
+    await wrapper.get('button[aria-label="Delete Instrument 1"]').trigger('click')
+    expect(wrapper.findAll('.instrument-header')).toHaveLength(0)
+    await wrapper.get('button.add-lane').trigger('click')
+    expect(wrapper.get('.instrument-header strong').text()).toBe('Instrument 1')
+  })
+
   it('double-clicks the empty lane to create, select, and edit a snapped clip', async () => {
     const wrapper = mount(DawView, { attachTo: document.body })
     const lane = wrapper.getComponent(InstrumentPianoRollLane)
