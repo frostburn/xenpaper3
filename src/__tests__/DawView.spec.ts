@@ -1,5 +1,6 @@
 import { mount } from '@vue/test-utils'
 import { describe, expect, it, vi } from 'vitest'
+import { Fraction } from 'xen-dev-utils'
 import router from '../router'
 import DawView from '../views/DawView.vue'
 import InstrumentPianoRollLane from '../components/daw/InstrumentPianoRollLane.vue'
@@ -49,7 +50,7 @@ describe('DAW project model', () => {
       source: expect.stringContaining('@patch(attack: 100ms'),
       clips: [],
     })
-    expect(JSON.parse(JSON.stringify(project))).toEqual(project)
+    expect(JSON.parse(JSON.stringify(project), Fraction.reviver)).toEqual(project)
   })
 
   it('creates an instrument lane with a reusable unique number', () => {
@@ -65,6 +66,7 @@ describe('DAW project model', () => {
   it('converts scrolled, zoomed pointer coordinates and snaps exactly', () => {
     expect(pointerXToBeat(96, 32, 64)).toBe(2)
     expect(snapBeat(2.13, beat(1, 4))).toEqual(beat(9, 4))
+    expect(beat(-1, 2).valueOf()).toBe(-0.5)
   })
 
   it('parses Xenpaper clip notes and offsets them onto the project timeline', () => {
