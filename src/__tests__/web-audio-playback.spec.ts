@@ -143,11 +143,9 @@ describe('Web Audio playback session', () => {
     const patchFactory = vi.fn<() => PlayableSynthPatch>(
       () => ({ on, dispose }) as PlayableSynthPatch,
     )
-    const session = new WebAudioPlaybackSession(
-      context as unknown as AudioContext,
-      createPlan(),
-      { patchFactory },
-    )
+    const session = new WebAudioPlaybackSession(context as unknown as AudioContext, createPlan(), {
+      patchFactory,
+    })
 
     session.start()
 
@@ -182,14 +180,10 @@ describe('Web Audio playback session', () => {
   it('tears down its pitch source when a patch violates the note-off contract', () => {
     const context = new MockAudioContext()
     const dispose = vi.fn<() => void>()
-    const session = new WebAudioPlaybackSession(
-      context as unknown as AudioContext,
-      createPlan(),
-      {
-        patchFactory: () =>
-          ({ on: () => () => Number.NaN, dispose }) as unknown as PlayableSynthPatch,
-      },
-    )
+    const session = new WebAudioPlaybackSession(context as unknown as AudioContext, createPlan(), {
+      patchFactory: () =>
+        ({ on: () => () => Number.NaN, dispose }) as unknown as PlayableSynthPatch,
+    })
 
     expect(() => session.start()).toThrow(/finite cutoff/)
 
@@ -202,14 +196,10 @@ describe('Web Audio playback session', () => {
   it('normalizes a unit-bearing patch cutoff before validating and scheduling it', () => {
     const context = new MockAudioContext()
     const cutoff = { valueOf: () => 1.7 }
-    const session = new WebAudioPlaybackSession(
-      context as unknown as AudioContext,
-      createPlan(),
-      {
-        patchFactory: () =>
-          ({ on: () => () => cutoff, dispose: () => {} }) as unknown as PlayableSynthPatch,
-      },
-    )
+    const session = new WebAudioPlaybackSession(context as unknown as AudioContext, createPlan(), {
+      patchFactory: () =>
+        ({ on: () => () => cutoff, dispose: () => {} }) as unknown as PlayableSynthPatch,
+    })
 
     expect(() => session.start()).not.toThrow()
     expect(context.sources[0]!.stops).toEqual([1.7])
@@ -220,15 +210,11 @@ describe('Web Audio playback session', () => {
     const context = new MockAudioContext()
     const dispose = vi.fn<() => void>()
     const onEnded = vi.fn<() => void>()
-    const session = new WebAudioPlaybackSession(
-      context as unknown as AudioContext,
-      createPlan(),
-      {
-        patchFactory: () =>
-          ({ on: () => (end: number) => end + 0.5, dispose }) as unknown as PlayableSynthPatch,
-        onEnded,
-      },
-    )
+    const session = new WebAudioPlaybackSession(context as unknown as AudioContext, createPlan(), {
+      patchFactory: () =>
+        ({ on: () => (end: number) => end + 0.5, dispose }) as unknown as PlayableSynthPatch,
+      onEnded,
+    })
     session.start()
 
     context.currentTime = 1.6
@@ -243,30 +229,23 @@ describe('Web Audio playback session', () => {
 
   it('lets patches remove targeted pitch connections before disconnecting the source', () => {
     const context = new MockAudioContext()
-    const session = new WebAudioPlaybackSession(
-      context as unknown as AudioContext,
-      createPlan(),
-      {
-        patchFactory: () =>
-          ({
-            on: (_destination: AudioNode, _start: number, pitch: AudioNode) => {
-              const source = pitch as unknown as MockConstantSource
-              source.targetedConnectionActive = true
-              return (end: number) => end
-            },
-            dispose: () => {
-              const source = context.sources[0]!
-              if (source.disconnected && source.targetedConnectionActive) {
-                throw new DOMException(
-                  'The given AudioParam is not connected.',
-                  'InvalidAccessError',
-                )
-              }
-              source.targetedConnectionActive = false
-            },
-          }) as unknown as PlayableSynthPatch,
-      },
-    )
+    const session = new WebAudioPlaybackSession(context as unknown as AudioContext, createPlan(), {
+      patchFactory: () =>
+        ({
+          on: (_destination: AudioNode, _start: number, pitch: AudioNode) => {
+            const source = pitch as unknown as MockConstantSource
+            source.targetedConnectionActive = true
+            return (end: number) => end
+          },
+          dispose: () => {
+            const source = context.sources[0]!
+            if (source.disconnected && source.targetedConnectionActive) {
+              throw new DOMException('The given AudioParam is not connected.', 'InvalidAccessError')
+            }
+            source.targetedConnectionActive = false
+          },
+        }) as unknown as PlayableSynthPatch,
+    })
 
     session.start()
 
