@@ -34,22 +34,6 @@ const EQUAVE_SHIFT_BY_MODIFIER: Readonly<Record<string, number>> = {
   equaveDown: -1,
 }
 
-const PITCH_MODIFIER_BY_OPERATOR = {
-  "'": 'equaveUp',
-  '"': 'doubleEquaveUp',
-  '`': 'equaveDown',
-  '^': 'up',
-  v: 'down',
-  '/': 'lift',
-  '\\': 'drop',
-} as const
-
-type PitchOperator = keyof typeof PITCH_MODIFIER_BY_OPERATOR
-
-function isPitchOperator(operator: string): operator is PitchOperator {
-  return operator in PITCH_MODIFIER_BY_OPERATOR
-}
-
 function equaveShifts(modifiers: readonly { readonly kind: string }[]): number {
   return modifiers.reduce(
     (sum, modifier) => sum + (EQUAVE_SHIFT_BY_MODIFIER[modifier.kind] ?? 0),
@@ -383,6 +367,81 @@ export function evaluateExpression(
     if (node.type === 'MosIntervalLiteral')
       return { value: evaluateMosIntervalLiteral(node, mapping), diagnostics: [] }
     if (node.type === 'Group') return evaluateExpression(node.expression, mapping)
+    if (node.type === 'PitchModifierExpression') {
+      const operand = evaluateExpression(node.operand, mapping)
+      if (!('value' in operand)) return operand
+      const context = 'rootPitch' in mapping ? mapping : createPitchContext(mapping)
+      const modifier = node.modifier.kind
+      const equaveShift = EQUAVE_SHIFT_BY_MODIFIER[modifier] ?? 0
+      const inflectionKind = modifier === 'up' || modifier === 'down' ? 'up' : 'lift'
+      let inflection = requirePitchOperator(context, inflectionKind)
+      if (modifier === 'down' || modifier === 'drop') inflection = inflection.neg()
+      // Equave shifts use the scale's degree equave for scalar arithmetic, but
+      // written pitches and intervals always move by notational octaves.
+      const scalarDisplacement = equaveShift
+        ? context.degreeEquave.mul(new Value(equaveShift))
+        : inflection
+      const pitchDisplacement = equaveShift
+        ? Value.pitch(new Value(2).pow(equaveShift))
+        : inflection
+      const operatorOrigin: SourceOrigin = { location: node.modifier.location, role: 'operator' }
+      const origins = [...operand.value.origins, operatorOrigin]
+      const equaveFormula = equaveShift
+        ? Value.ratio(pitchDisplacement).primeExponents()
+        : undefined
+      const shiftedFormula = (formula: ReadonlyMap<number, Fraction>) => {
+        if (!equaveFormula) return formula
+        const shifted = new Map(formula)
+        for (const [prime, exponent] of equaveFormula) {
+          shifted.set(prime, (shifted.get(prime) ?? new Fraction(0)).add(exponent))
+        }
+        return shifted
+      }
+      if (operand.value.kind === 'scalar') {
+        return {
+          value: result(
+            'scalar',
+            operand.value.value.mul(Value.ratio(scalarDisplacement)),
+            origins,
+          ),
+          diagnostics: operand.diagnostics,
+        }
+      }
+      if (operand.value.kind === 'absolutePitch') {
+        return {
+          value: {
+            ...operand.value,
+            origins,
+            rootOffset: operand.value.rootOffset.add(pitchDisplacement),
+            formula: shiftedFormula(operand.value.formula),
+            spelling: {
+              ...operand.value.spelling,
+              modifiers: [modifier, ...(operand.value.spelling.modifiers ?? [])],
+            },
+          },
+          diagnostics: operand.diagnostics,
+        }
+      }
+      const offset =
+        operand.value.kind === 'pitchOffset' ? operand.value : pitchCoercion(operand.value)
+      return {
+        value: {
+          ...offset,
+          origins,
+          value: offset.value.add(pitchDisplacement),
+          ...(offset.formula ? { formula: shiftedFormula(offset.formula) } : {}),
+          ...(offset.spelling
+            ? {
+                spelling: {
+                  ...offset.spelling,
+                  modifiers: [modifier, ...(offset.spelling.modifiers ?? [])],
+                },
+              }
+            : {}),
+        },
+        diagnostics: operand.diagnostics,
+      }
+    }
     if (node.type === 'UnaryExpression') {
       const operand = evaluateExpression(node.operand, mapping)
       if (!('value' in operand)) return operand
@@ -406,79 +465,6 @@ export function evaluateExpression(
               ...operand.value.origins,
               { location: node.location, role: 'operator' as const },
             ],
-          },
-          diagnostics: operand.diagnostics,
-        }
-      }
-      if (isPitchOperator(node.operator)) {
-        const context = 'rootPitch' in mapping ? mapping : createPitchContext(mapping)
-        const modifier = PITCH_MODIFIER_BY_OPERATOR[node.operator]
-        const equaveShift = EQUAVE_SHIFT_BY_MODIFIER[modifier] ?? 0
-        const inflectionKind = node.operator === '^' || node.operator === 'v' ? 'up' : 'lift'
-        let inflection = requirePitchOperator(context, inflectionKind)
-        if (node.operator !== '^' && node.operator !== '/') inflection = inflection.neg()
-        // Equave shifts use the scale's degree equave for scalar arithmetic, but
-        // written pitches and intervals always move by notational octaves.
-        const scalarDisplacement = equaveShift
-          ? context.degreeEquave.mul(new Value(equaveShift))
-          : inflection
-        const pitchDisplacement = equaveShift
-          ? Value.pitch(new Value(2).pow(equaveShift))
-          : inflection
-        const operatorOrigin: SourceOrigin = { location: node.location, role: 'operator' }
-        const origins = [...operand.value.origins, operatorOrigin]
-        const equaveFormula = equaveShift
-          ? Value.ratio(pitchDisplacement).primeExponents()
-          : undefined
-        const shiftedFormula = (formula: ReadonlyMap<number, Fraction>) => {
-          if (!equaveFormula) return formula
-          const shifted = new Map(formula)
-          for (const [prime, exponent] of equaveFormula) {
-            shifted.set(prime, (shifted.get(prime) ?? new Fraction(0)).add(exponent))
-          }
-          return shifted
-        }
-        if (operand.value.kind === 'scalar') {
-          return {
-            value: result(
-              'scalar',
-              operand.value.value.mul(Value.ratio(scalarDisplacement)),
-              origins,
-            ),
-            diagnostics: operand.diagnostics,
-          }
-        }
-        if (operand.value.kind === 'absolutePitch') {
-          return {
-            value: {
-              ...operand.value,
-              origins,
-              rootOffset: operand.value.rootOffset.add(pitchDisplacement),
-              formula: shiftedFormula(operand.value.formula),
-              spelling: {
-                ...operand.value.spelling,
-                modifiers: [modifier, ...(operand.value.spelling.modifiers ?? [])],
-              },
-            },
-            diagnostics: operand.diagnostics,
-          }
-        }
-        const offset =
-          operand.value.kind === 'pitchOffset' ? operand.value : pitchCoercion(operand.value)
-        return {
-          value: {
-            ...offset,
-            origins,
-            value: offset.value.add(pitchDisplacement),
-            ...(offset.formula ? { formula: shiftedFormula(offset.formula) } : {}),
-            ...(offset.spelling
-              ? {
-                  spelling: {
-                    ...offset.spelling,
-                    modifiers: [modifier, ...(offset.spelling.modifiers ?? [])],
-                  },
-                }
-              : {}),
           },
           diagnostics: operand.diagnostics,
         }

@@ -160,7 +160,11 @@ describe('enumerated chords', () => {
       statements: [
         {
           target: { name: 'root' },
-          value: { type: 'UnaryExpression', operator: "'", operand: { degree: '0' } },
+          value: {
+            type: 'PitchModifierExpression',
+            modifier: { kind: 'equaveUp' },
+            operand: { degree: '0' },
+          },
         },
       ],
     })
@@ -293,13 +297,13 @@ describe('Diamond-MOS tokens', () => {
       type: 'Sequence',
       items: [
         {
-          type: 'UnaryExpression',
-          operator: 'v',
+          type: 'PitchModifierExpression',
+          modifier: { kind: 'down' },
           operand: { type: 'PitchLiteral', nominal: { system: 'mos', value: 'K' } },
         },
         {
-          type: 'UnaryExpression',
-          operator: 'v',
+          type: 'PitchModifierExpression',
+          modifier: { kind: 'down' },
           operand: { type: 'PitchLiteral', nominal: { system: 'mos', value: 'ZZ' } },
         },
       ],
@@ -471,16 +475,16 @@ describe('Xenpaper surface grammar', () => {
       'IntervalLiteral',
       'PitchLiteral',
       'PitchLiteral',
-      'UnaryExpression',
-      'UnaryExpression',
-      'UnaryExpression',
+      'PitchModifierExpression',
+      'PitchModifierExpression',
+      'PitchModifierExpression',
       'PitchLiteral',
     ])
     expect(items.slice(0, 5).map((item) => item.raw)).toEqual(['E^5', 'Ebv5', 'P1v5', 'Cv5', 'E_'])
     expect(items.slice(5, 8).map((item) => item.type)).toEqual([
-      'UnaryExpression',
-      'UnaryExpression',
-      'UnaryExpression',
+      'PitchModifierExpression',
+      'PitchModifierExpression',
+      'PitchModifierExpression',
     ])
     expect((items[4].accidentals as SyntaxNode[]).map((accidental) => accidental.value)).toEqual([
       '_',
@@ -514,8 +518,8 @@ describe('Xenpaper surface grammar', () => {
   it('admits equave shifts with negative degrees', () => {
     const expression = parse('"-2').body[0]
 
-    expect(expression.type).toBe('UnaryExpression')
-    expect(expression.operator).toBe('"')
+    expect(expression.type).toBe('PitchModifierExpression')
+    expect(expression.modifier).toMatchObject({ kind: 'doubleEquaveUp', raw: '"' })
     expect((expression.operand as SyntaxNode).type).toBe('DegreeLiteral')
     expect((expression.operand as SyntaxNode).degree).toBe('-2')
   })
@@ -523,8 +527,8 @@ describe('Xenpaper surface grammar', () => {
   it('admits equave shifts with ratios', () => {
     const expression = parse('"3/2').body[0]
 
-    expect(expression.type).toBe('UnaryExpression')
-    expect(expression.operator).toBe('"')
+    expect(expression.type).toBe('PitchModifierExpression')
+    expect(expression.modifier).toMatchObject({ kind: 'doubleEquaveUp', raw: '"' })
     expect((expression.operand as SyntaxNode).type).toBe('RatioLiteral')
   })
 
@@ -669,8 +673,8 @@ describe('Xenpaper surface grammar', () => {
 
   it('parses a hold within a pitch modifier expression', () => {
     expect(parse("'a=").body[0]).toMatchObject({
-      type: 'UnaryExpression',
-      operator: "'",
+      type: 'PitchModifierExpression',
+      modifier: { kind: 'equaveUp' },
       operand: {
         type: 'PostfixExpression',
         expression: { type: 'PitchLiteral', nominal: { value: 'a' } },
@@ -700,19 +704,19 @@ describe('Xenpaper surface grammar', () => {
     expect(((items[5].body as SyntaxNode[])[0] as SyntaxNode).type).toBe('Sequence')
   })
 
-  it('represents pitch operators as unary expressions', () => {
+  it('represents pitch syntax as structured modifier expressions', () => {
     const program = parse("^M2 'P4")
     const items = (program.body[0] as SyntaxNode).items as SyntaxNode[]
 
     expect(items).toMatchObject([
       {
-        type: 'UnaryExpression',
-        operator: '^',
+        type: 'PitchModifierExpression',
+        modifier: { kind: 'up' },
         operand: { type: 'IntervalLiteral', quality: 'M' },
       },
       {
-        type: 'UnaryExpression',
-        operator: "'",
+        type: 'PitchModifierExpression',
+        modifier: { kind: 'equaveUp' },
         operand: { type: 'IntervalLiteral', quality: 'P' },
       },
     ])
@@ -726,16 +730,16 @@ describe('Xenpaper surface grammar', () => {
       ],
     })
     expect(parse('vC').body[0]).toMatchObject({
-      type: 'UnaryExpression',
-      operator: 'v',
+      type: 'PitchModifierExpression',
+      modifier: { kind: 'down' },
       operand: { type: 'PitchLiteral', raw: 'C' },
     })
   })
 
   it('reserves v followed by digits for down-shifted scale degrees', () => {
     expect(parse('v2').body[0]).toMatchObject({
-      type: 'UnaryExpression',
-      operator: 'v',
+      type: 'PitchModifierExpression',
+      modifier: { kind: 'down' },
       operand: { type: 'DegreeLiteral', degree: '2' },
     })
   })
@@ -747,16 +751,16 @@ describe('Xenpaper surface grammar', () => {
 
     expect(items.slice(1).map((item) => item.type)).toEqual([
       'DegreeLiteral',
-      'UnaryExpression',
+      'PitchModifierExpression',
       'DegreeLiteral',
-      'UnaryExpression',
+      'PitchModifierExpression',
       'DegreeLiteral',
-      'UnaryExpression',
+      'PitchModifierExpression',
     ])
-    expect(items.slice(2).filter((item) => item.type === 'UnaryExpression')).toMatchObject([
-      { operator: '^', operand: { type: 'DegreeLiteral', degree: '0' } },
-      { operator: 'v', operand: { type: 'DegreeLiteral', degree: '2' } },
-      { operator: '/', operand: { type: 'DegreeLiteral', degree: '0' } },
+    expect(items.slice(2).filter((item) => item.type === 'PitchModifierExpression')).toMatchObject([
+      { modifier: { kind: 'up' }, operand: { type: 'DegreeLiteral', degree: '0' } },
+      { modifier: { kind: 'down' }, operand: { type: 'DegreeLiteral', degree: '2' } },
+      { modifier: { kind: 'lift' }, operand: { type: 'DegreeLiteral', degree: '0' } },
     ])
   })
 
@@ -767,7 +771,11 @@ describe('Xenpaper surface grammar', () => {
     expect(expression.type).toBe('Sequence')
     expect(items).toMatchObject([
       { type: 'PitchLiteral' },
-      { type: 'UnaryExpression', operator: '^', operand: { type: 'PitchLiteral', raw: 'D' } },
+      {
+        type: 'PitchModifierExpression',
+        modifier: { kind: 'up' },
+        operand: { type: 'PitchLiteral', raw: 'D' },
+      },
     ])
   })
 
