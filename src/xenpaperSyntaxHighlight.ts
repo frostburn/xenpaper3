@@ -106,6 +106,7 @@ const kindsByNodeType: Partial<Record<string, XenpaperHighlightKind>> = {
   CallExpression: 'identifier',
   BinaryExpression: 'operator',
   UnaryExpression: 'operator',
+  PitchModifier: 'operator',
   PostfixExpression: 'operator',
   TailElimination: 'operator',
   DetachedContinue: 'operator',

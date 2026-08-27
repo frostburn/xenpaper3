@@ -44,7 +44,7 @@ function mapScoreConstruction(
   node: Expression,
   mapLeaf: (leaf: Expression) => Expression,
 ): Expression | undefined {
-  if (node.type === 'UnaryExpression') {
+  if (node.type === 'UnaryExpression' || node.type === 'PitchModifierExpression') {
     return mapScoreConstruction(node.operand, (leaf) => ({ ...node, operand: mapLeaf(leaf) }))
   }
   const mapItem = (item: Expression): Expression => {
@@ -262,7 +262,7 @@ function broadcastScalarOperation(node: Expression, context: PitchContext): Expr
     const expression = broadcastScalarOperation(node.expression, context)
     return expression ? { ...node, expression } : undefined
   }
-  if (node.type === 'UnaryExpression') {
+  if (node.type === 'UnaryExpression' || node.type === 'PitchModifierExpression') {
     const operand = broadcastScalarOperation(node.operand, context)
     if (operand) return { ...node, operand }
     return mapScoreConstruction(node.operand, (item) => ({ ...node, operand: item }))
@@ -405,7 +405,7 @@ function expandEnumeratedChord(
       diagnostics: expanded.diagnostics,
     }
   }
-  if (node.type === 'UnaryExpression') {
+  if (node.type === 'UnaryExpression' || node.type === 'PitchModifierExpression') {
     const expanded = expandEnumeratedChord(node.operand, context)
     if (expanded.expressions.length === 1 && expanded.expressions[0] === node.operand) {
       return { expressions: [node], diagnostics: expanded.diagnostics }
@@ -720,6 +720,8 @@ function contextAnnotation(
         if (value.type === 'Identifier') return value.name
         if (value.type === 'UnaryExpression')
           return `${value.operator}${expressionText(value.operand)}`
+        if (value.type === 'PitchModifierExpression')
+          return `${value.modifier.raw}${expressionText(value.operand)}`
         if (value.type === 'BinaryExpression')
           return `${expressionText(value.left)} ${value.operator} ${expressionText(value.right)}`
         if (value.type === 'Group') return `(${expressionText(value.expression)})`

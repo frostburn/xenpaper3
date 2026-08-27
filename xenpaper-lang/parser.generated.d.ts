@@ -49,6 +49,7 @@ export type Expression =
   | Parallel
   | PitchContextChange
   | PitchLiteral
+  | PitchModifierExpression
   | PostfixExpression
   | QuantityLiteral
   | RealLiteral
@@ -401,6 +402,12 @@ export interface PitchModifier extends Node {
   type: 'PitchModifier'
   kind: string
   raw: string
+}
+
+export interface PitchModifierExpression extends Node {
+  type: 'PitchModifierExpression'
+  modifier: PitchModifier
+  operand: Expression
 }
 
 export interface PitchNominal extends Node {

@@ -172,7 +172,7 @@ PowerExpression
 UnaryExpression
   = PostfixExpression
   / modifier:PitchModifier Spacing operand:(ScaleDegreeLiteral / UnaryExpression) {
-      return unary(modifier.raw, operand);
+      return node('PitchModifierExpression', { modifier, operand });
     }
   / operator:UnaryOperator Spacing operand:UnaryExpression {
       return unary(operator, operand);

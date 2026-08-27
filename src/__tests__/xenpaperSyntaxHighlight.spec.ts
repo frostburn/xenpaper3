@@ -75,4 +75,25 @@ describe('highlightXenpaper', () => {
       expect.arrayContaining([expect.objectContaining({ kind: 'comment', text: '# note' })]),
     )
   })
+
+  it('highlights structured pitch modifiers as operators', () => {
+    const tokens = highlightXenpaper(parse("'C vK /2"))
+
+    expect(
+      tokens
+        .filter(({ nodeType }) => nodeType === 'PitchModifier')
+        .map(({ kind, text }) => ({ kind, text })),
+    ).toEqual([
+      { kind: 'operator', text: "'" },
+      { kind: 'operator', text: 'v' },
+      { kind: 'operator', text: '/' },
+    ])
+    expect(tokens).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ kind: 'pitch-latin', text: 'C' }),
+        expect.objectContaining({ kind: 'pitch-mos', text: 'K' }),
+        expect.objectContaining({ kind: 'pitch', text: '2' }),
+      ]),
+    )
+  })
 })
