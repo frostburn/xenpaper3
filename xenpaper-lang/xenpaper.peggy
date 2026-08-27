@@ -820,15 +820,36 @@ PythagoreanAccidental
   / "_" ![0-9] { return node('Accidental', { value: '_' }); }
 
 FjsInflection
-  = marker:$("^" / "v") prime:UnsignedInteger flavor:$([cnqthmls])? {
+  = marker:$("^" / "v") prime:UnsignedInteger flavor:FjsFlavor {
       return node('FjsInflection', {
         direction: marker === '^' ? 'numerator' : 'denominator',
         marker,
         prime,
-        flavor: flavor ?? '',
-        raw: marker + prime + (flavor ?? ''),
+        flavor,
+        raw: marker + prime + flavor,
       });
     }
+  / prime:SuperscriptUnsignedInteger flavor:FjsFlavor {
+      return node('FjsInflection', {
+        direction: 'numerator',
+        marker: '^',
+        prime: prime.value,
+        flavor,
+        raw: prime.raw + flavor,
+      });
+    }
+  / prime:SubscriptUnsignedInteger flavor:FjsFlavor {
+      return node('FjsInflection', {
+        direction: 'denominator',
+        marker: 'v',
+        prime: prime.value,
+        flavor,
+        raw: prime.raw + flavor,
+      });
+    }
+
+FjsFlavor
+  = $([cnqthmls]?)
 
 EqualDivisionLiteral
   = sign:Sign? body:UnsignedEqualDivisionLiteral {
@@ -946,6 +967,12 @@ UnsignedInteger
 SuperscriptUnsignedInteger
   = raw:$([⁰¹²³⁴⁵⁶⁷⁸⁹]+) {
       const digits = "⁰¹²³⁴⁵⁶⁷⁸⁹";
+      return { raw, value: [...raw].map(character => digits.indexOf(character)).join("") };
+    }
+
+SubscriptUnsignedInteger
+  = raw:$([₀₁₂₃₄₅₆₇₈₉]+) {
+      const digits = "₀₁₂₃₄₅₆₇₈₉";
       return { raw, value: [...raw].map(character => digits.indexOf(character)).join("") };
     }
 

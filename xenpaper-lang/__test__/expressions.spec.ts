@@ -576,6 +576,26 @@ describe('arithmetic expression evaluation', () => {
     expect(evaluate('6 * P8 - 19 * n3').spelling?.raw).toBe('sdd5')
   })
 
+  it('parses superscript and subscript digits as FJS inflections', () => {
+    const augmentedFourth = evaluate('A4⁵₇')
+    expect(augmentedFourth.kind).toBe('pitchOffset')
+    expect(augmentedFourth.value.equals(Value.pitch(new Value(10n, 7n)))).toBe(true)
+    expect(expression('A4⁵₇')).toMatchObject({
+      raw: 'A4⁵₇',
+      inflections: [
+        { direction: 'numerator', marker: '^', prime: '5', raw: '⁵' },
+        { direction: 'denominator', marker: 'v', prime: '7', raw: '₇' },
+      ],
+    })
+
+    const augmentedUnison = evaluate('A1²⁵')
+    expect(augmentedUnison.kind).toBe('pitchOffset')
+    expect(augmentedUnison.value.equals(Value.pitch(new Value(25n, 24n)))).toBe(true)
+    expect(expression('A1²⁵')).toMatchObject({
+      inflections: [{ direction: 'numerator', marker: '^', prime: '25', raw: '²⁵' }],
+    })
+  })
+
   it('groups two-digit products in generated FJS inflections', () => {
     const products = [25n, 35n, 49n, 55n, 65n, 77n, 85n, 91n, 95n]
     const factors = [
