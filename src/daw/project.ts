@@ -83,26 +83,37 @@ export const snapBeat = (value: number, grid: Beat): Beat => {
 export const pointerXToBeat = (pointerX: number, scrollLeft: number, pixelsPerBeat: number) =>
   (pointerX + scrollLeft) / pixelsPerBeat
 
-export const createDefaultProject = (): DawProject => ({
-  version: 1,
-  title: 'Untitled project',
-  globalTrack: {
-    source: DEFAULT_GLOBAL_SOURCE,
-    tempoChanges: [{ id: 'tempo-1', beat: beat(0), bpm: 120 }],
-    timeSignatureChanges: [{ id: 'time-signature-1', beat: beat(0), numerator: 4, denominator: 4 }],
-  },
-  instrumentLanes: [
-    {
-      id: 'instrument-1',
-      name: 'Instrument 1',
-      patchSource: DEFAULT_SW_PATCH_SOURCE,
-      oscillatorType: 'sawtooth',
-      gain: 0.8,
-      source: DEFAULT_INSTRUMENT_SOURCE,
-      clips: [],
+export const createInstrumentLane = (project: DawProject): InstrumentLane => {
+  const usedIds = new Set(project.instrumentLanes.map((lane) => lane.id))
+  let suffix = 1
+  while (usedIds.has(`instrument-${suffix}`)) suffix += 1
+  return {
+    id: `instrument-${suffix}`,
+    name: `Instrument ${suffix}`,
+    patchSource: DEFAULT_SW_PATCH_SOURCE,
+    oscillatorType: 'sawtooth',
+    gain: 0.8,
+    source: DEFAULT_INSTRUMENT_SOURCE,
+    clips: [],
+  }
+}
+
+export const createDefaultProject = (): DawProject => {
+  const project: DawProject = {
+    version: 1,
+    title: 'Untitled project',
+    globalTrack: {
+      source: DEFAULT_GLOBAL_SOURCE,
+      tempoChanges: [{ id: 'tempo-1', beat: beat(0), bpm: 120 }],
+      timeSignatureChanges: [
+        { id: 'time-signature-1', beat: beat(0), numerator: 4, denominator: 4 },
+      ],
     },
-  ],
-})
+    instrumentLanes: [],
+  }
+  project.instrumentLanes.push(createInstrumentLane(project))
+  return project
+}
 
 export const createClip = (lane: InstrumentLane, start: Beat): SourceClip => {
   const usedIds = new Set(lane.clips.map((clip) => clip.id))
