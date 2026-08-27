@@ -960,6 +960,82 @@ describe('SW Patch runtime', () => {
     expect(gain.gain.value).toBe(-10)
   })
 
+  it('exposes the remaining standard Web Audio node constructors', () => {
+    const kinds = [
+      'Analyser',
+      'AudioBufferSource',
+      'Convolver',
+      'DynamicsCompressor',
+      'IIRFilter',
+      'Panner',
+      'StereoPanner',
+    ]
+    for (const kind of kinds) {
+      vi.stubGlobal(
+        `${kind}Node`,
+        vi.fn(function (_context: BaseAudioContext, options: Record<string, unknown>) {
+          return { kind, options }
+        }),
+      )
+    }
+    const patch = createPatch(
+      'fn nodes():\n' +
+        '    ret [AnalyserNode(), AudioBufferSourceNode(loop = true), ConvolverNode(), DynamicsCompressorNode(), IIRFilterNode(feedforward = [1], feedback = [1]), PannerNode(), StereoPannerNode(pan = 0.25)]\n',
+      {} as BaseAudioContext,
+    )
+
+    const nodes = (patch.nodes as PatchFunction)() as Array<{
+      kind: string
+      options: Record<string, unknown>
+    }>
+    expect(nodes.map(({ kind }) => kind)).toEqual(kinds)
+    expect(nodes[1]?.options.loop).toBe(true)
+    expect(nodes.at(-1)?.options.pan).toBe(0.25)
+  })
+
+  it('falls back to AudioContext factory methods when node constructors are unavailable', () => {
+    vi.stubGlobal('GainNode', undefined)
+    vi.stubGlobal('OscillatorNode', undefined)
+    vi.stubGlobal('AudioBufferSourceNode', undefined)
+    vi.stubGlobal('ConvolverNode', undefined)
+    const gain = { gain: { value: 1 } }
+    const oscillator = {
+      frequency: { value: 440 },
+      setPeriodicWave: vi.fn<(wave: PeriodicWave) => void>(),
+    }
+    const bufferSource = { loop: false }
+    const convolver = { normalize: true }
+    const wave = {} as PeriodicWave
+    const context = {
+      createGain: vi.fn<() => typeof gain>(() => gain),
+      createOscillator: vi.fn<() => typeof oscillator>(() => oscillator),
+      createBufferSource: vi.fn<() => typeof bufferSource>(() => bufferSource),
+      createConvolver: vi.fn<() => typeof convolver>(() => convolver),
+      createPeriodicWave: vi.fn<() => PeriodicWave>(() => wave),
+    } as unknown as BaseAudioContext
+    const patch = createPatch(
+      'fn nodes():\n' +
+        '    gain = GainNode(gain = 0.5)\n' +
+        '    osc = OscillatorNode(frequency = 220Hz, periodicWave = [[0, 0], [0, 1]])\n' +
+        '    source = AudioBufferSourceNode(loop = true)\n' +
+        '    convolver = ConvolverNode(disableNormalization = true)\n' +
+        '    ret [gain, osc]\n',
+      context,
+    )
+
+    ;(patch.nodes as PatchFunction)()
+
+    expect(context.createGain).toHaveBeenCalledOnce()
+    expect(gain.gain.value).toBe(0.5)
+    expect(context.createOscillator).toHaveBeenCalledOnce()
+    expect(oscillator.frequency.value).toBe(220)
+    expect(oscillator.setPeriodicWave).toHaveBeenCalledWith(wave)
+    expect(context.createBufferSource).toHaveBeenCalledOnce()
+    expect(bufferSource.loop).toBe(true)
+    expect(context.createConvolver).toHaveBeenCalledOnce()
+    expect(convolver.normalize).toBe(false)
+  })
+
   it('keeps decibels literal for scheduled gain assignments', () => {
     const gain = {
       setValueAtTime: vi.fn<(value: number, time: number) => void>(),

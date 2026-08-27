@@ -62,6 +62,25 @@ type AudioParameter = {
   cancelAndHoldAtTime(time: number): unknown
 }
 
+const NATIVE_NODE_KINDS = [
+  'Analyser',
+  'AudioBufferSource',
+  'BiquadFilter',
+  'ChannelMerger',
+  'ChannelSplitter',
+  'ConstantSource',
+  'Convolver',
+  'Delay',
+  'DynamicsCompressor',
+  'Gain',
+  'IIRFilter',
+  'Oscillator',
+  'Panner',
+  'StereoPanner',
+  'WaveShaper',
+] as const
+type NativeNodeKind = (typeof NATIVE_NODE_KINDS)[number]
+
 const RETURN = Symbol('sw-patch return')
 const BREAK = Symbol('sw-patch break')
 const CONTINUE = Symbol('sw-patch continue')
@@ -673,7 +692,7 @@ export class PatchRuntime {
   /** Convenience wrapper for a started `ConstantSourceNode`. */
   createAndStartAudioSignal(value: unknown) {
     const quantity = Quantity.from(value)
-    const node = new ConstantSourceNode(this.context, { offset: quantity.value })
+    const node = this.makeNode('ConstantSource', [{ offset: quantity.value }]) as ConstantSourceNode
     node.start()
     return node
   }
@@ -708,19 +727,10 @@ export class PatchRuntime {
   }
 
   private installBuiltins(): void {
-    this.root.set('BiquadFilterNode', (...args: unknown[]) => this.makeNode('BiquadFilter', args))
-    this.root.set('ChannelMergerNode', (...args: unknown[]) => this.makeNode('ChannelMerger', args))
-    this.root.set('ChannelSplitterNode', (...args: unknown[]) =>
-      this.makeNode('ChannelSplitter', args),
-    )
-    this.root.set('DelayNode', (...args: unknown[]) => this.makeNode('Delay', args))
-    this.root.set('GainNode', (...args: unknown[]) => this.makeNode('Gain', args))
-    this.root.set('OscillatorNode', (...args: unknown[]) => this.makeNode('Oscillator', args))
-    this.root.set('WaveShaperNode', (...args: unknown[]) => this.makeNode('WaveShaper', args))
+    for (const kind of NATIVE_NODE_KINDS) {
+      this.root.set(`${kind}Node`, (...args: unknown[]) => this.makeNode(kind, args))
+    }
     this.root.set('PeriodicWave', (...args: unknown[]) => this.makePeriodicWave(args))
-    this.root.set('ConstantSourceNode', (...args: unknown[]) =>
-      this.makeNode('ConstantSource', args),
-    )
     this.root.set('AudioSignal', this.createAndStartAudioSignal.bind(this))
     this.root.set('TimeNode', () => this.createUtilitySource('sw-patch-time'))
     this.root.set('PhaserNode', (...args: unknown[]) =>
@@ -882,18 +892,7 @@ export class PatchRuntime {
     return converter
   }
 
-  private makeNode(
-    kind:
-      | 'BiquadFilter'
-      | 'ChannelMerger'
-      | 'ChannelSplitter'
-      | 'Delay'
-      | 'Gain'
-      | 'Oscillator'
-      | 'ConstantSource'
-      | 'WaveShaper',
-    args: unknown[],
-  ): unknown {
+  private makeNode(kind: NativeNodeKind, args: unknown[]): unknown {
     const values = (args[0] ?? {}) as Record<string, unknown>
     const options = Object.fromEntries(
       Object.entries(values).map(([key, value]) => {
@@ -919,13 +918,61 @@ export class PatchRuntime {
     )
     const constructorName = `${kind}Node`
     const NodeConstructor = (globalThis as unknown as Record<string, unknown>)[constructorName]
-    if (typeof NodeConstructor !== 'function') {
+    if (typeof NodeConstructor === 'function') {
+      return new (NodeConstructor as new (
+        context: BaseAudioContext,
+        options: Record<string, unknown>,
+      ) => Record<string, unknown>)(this.context, options)
+    }
+
+    // Safari and older browser versions expose context factory methods but not
+    // the corresponding constructible node classes. Keep patches portable by
+    // translating constructor options onto factory-created nodes.
+    const factoryName = kind === 'AudioBufferSource' ? 'createBufferSource' : `create${kind}`
+    const factory = (this.context as unknown as Record<string, unknown>)[factoryName]
+    if (typeof factory !== 'function') {
       throw new Error(`Web Audio does not provide ${constructorName}`)
     }
-    const node = new (NodeConstructor as new (
-      context: BaseAudioContext,
-      options: Record<string, unknown>,
-    ) => Record<string, unknown>)(this.context, options)
+    const factoryArguments: unknown[] = []
+    if (kind === 'ChannelMerger') factoryArguments.push(options.numberOfInputs ?? 6)
+    if (kind === 'ChannelSplitter') factoryArguments.push(options.numberOfOutputs ?? 6)
+    if (kind === 'Delay') factoryArguments.push(options.maxDelayTime ?? 1)
+    if (kind === 'IIRFilter') {
+      if (!Array.isArray(options.feedforward) || !Array.isArray(options.feedback)) {
+        throw new Error('IIRFilterNode expects feedforward and feedback arrays')
+      }
+      factoryArguments.push(options.feedforward, options.feedback)
+    }
+    const node = (factory as (...args: unknown[]) => Record<string, unknown>).call(
+      this.context,
+      ...factoryArguments,
+    )
+    const factoryOnly = new Set([
+      'numberOfInputs',
+      'numberOfOutputs',
+      'maxDelayTime',
+      'feedforward',
+      'feedback',
+    ])
+    for (const [key, value] of Object.entries(options)) {
+      if (factoryOnly.has(key)) continue
+      if (kind === 'Convolver' && key === 'disableNormalization') {
+        node.normalize = !value
+        continue
+      }
+      const target = node[key]
+      if (target && typeof target === 'object' && 'value' in target) {
+        ;(target as { value: unknown }).value = value
+      } else if (
+        kind === 'Oscillator' &&
+        key === 'periodicWave' &&
+        typeof node.setPeriodicWave === 'function'
+      ) {
+        ;(node.setPeriodicWave as (wave: unknown) => void).call(node, value)
+      } else {
+        node[key] = value
+      }
+    }
     return node
   }
 
