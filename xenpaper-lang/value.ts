@@ -385,6 +385,46 @@ export class Value {
     return this.add(other.neg())
   }
 
+  /** Mathematical modulo for any pair of values that can be compared and subtracted. */
+  mmod(input: ValueInput): Value {
+    const other = coerceValue(input)
+    const leftRational = this.exactRational()
+    const rightRational = other.exactRational()
+    if (leftRational && rightRational) {
+      if (!rightRational.n) throw new RangeError('Division by zero.')
+      return new Value(leftRational.mmod(rightRational))
+    }
+
+    const zero = other.sub(other)
+    const divisor = other.compare(zero) < 0 ? zero.sub(other) : other
+    if (!divisor.compare(zero)) throw new RangeError('Division by zero.')
+    const negative = this.compare(zero) < 0
+    let remainder = negative ? zero.sub(this) : this
+
+    while (remainder.compare(divisor) >= 0) {
+      let chunk = divisor
+      while (true) {
+        const doubled = chunk.sub(zero.sub(chunk))
+        if (doubled.compare(chunk) <= 0 || doubled.compare(remainder) > 0) break
+        chunk = doubled
+      }
+      const reduced = remainder.sub(chunk)
+      if (reduced.compare(remainder) >= 0) {
+        throw new RangeError('Unable to calculate modulo without losing precision.')
+      }
+      remainder = reduced
+    }
+    return negative && remainder.compare(zero) ? divisor.sub(remainder) : remainder
+  }
+
+  /** Geometrically reduce an exact ratio by another exact ratio. */
+  reduce(input: ValueInput): Value {
+    const left = this.exactRational()
+    const right = coerceValue(input).exactRational()
+    if (!left || !right) throw new TypeError('Geometric reduction requires exact rational values.')
+    return new Value(left.geoMod(right))
+  }
+
   neg(): Value {
     if (this.magnitude.kind === 'pitch')
       return Value.fromMagnitude(

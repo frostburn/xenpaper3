@@ -286,14 +286,27 @@ function modulo(
   right: EvaluatedLiteral,
   node: Expression,
 ): EvaluatedLiteral {
-  if (left.kind !== 'scalar' || right.kind !== 'scalar') {
-    throw new TypeError('Modulo requires scalar operands.')
+  if (left.kind === 'absolutePitch' || right.kind === 'absolutePitch') {
+    throw new TypeError('Modulo does not support absolute pitches.')
   }
-  const lhs = left.value.exactRational()
-  const rhs = right.value.exactRational()
-  if (!lhs || !rhs) throw new TypeError('Modulo requires exact dimensionless rational operands.')
-  if (!rhs.n) throw new RangeError('Division by zero.')
-  return result('scalar', new Value(lhs.mmod(rhs)), operatorOrigins(left, right, node))
+  const value = left.value.mmod(right.value)
+  if (left.kind === 'pitchOffset' || right.kind === 'pitchOffset') {
+    const difference = addOrSubtract(left, right, true, node)
+    if (difference.kind === 'pitchOffset' && difference.value.equals(value)) return difference
+    return result('pitchOffset', value, operatorOrigins(left, right, node))
+  }
+  return result('scalar', value, operatorOrigins(left, right, node))
+}
+
+function geometricModulo(
+  left: EvaluatedLiteral,
+  right: EvaluatedLiteral,
+  node: Expression,
+): EvaluatedLiteral {
+  if (left.kind !== 'scalar' || right.kind !== 'scalar') {
+    throw new TypeError('Geometric modulo requires ratio operands.')
+  }
+  return result('scalar', left.value.reduce(right.value), operatorOrigins(left, right, node))
 }
 
 function binary(
@@ -314,6 +327,8 @@ function binary(
       return multiplyOrDivide(left, right, true, node)
     case 'mod':
       return modulo(left, right, node)
+    case 'rd':
+      return geometricModulo(left, right, node)
     case '**': {
       if (left.kind !== 'scalar' || right.kind !== 'scalar') {
         throw new TypeError('Exponentiation requires scalar operands.')

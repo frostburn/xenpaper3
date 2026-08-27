@@ -82,6 +82,20 @@ describe('arithmetic expression evaluation', () => {
     expect(evaluate('-5 mod 3').value.equals(1)).toBe(true)
   })
 
+  it('supports modulo for any values that can be subtracted and compared', () => {
+    expect(evaluate('sqrt(3) mod sqrt(2)').value.equals(evaluate('sqrt(3) - sqrt(2)').value)).toBe(
+      true,
+    )
+    const pitch = evaluate('P8 mod P5')
+    expect(pitch.kind).toBe('pitchOffset')
+    expect(pitch.value.equals(evaluate('P4').value)).toBe(true)
+    expect(pitch.spelling).toMatchObject({ quality: 'P', number: 4n })
+  })
+
+  it('supports geometric ratio modulo with rd', () => {
+    expect(evaluate('2 rd 3/2').value.equals(new Fraction(4, 3))).toBe(true)
+  })
+
   it('scales pitch offsets only by rational scalars', () => {
     expect(evaluate('2 * 350c').value.equals(Value.cents(700))).toBe(true)
     expect(evaluate('700c / 2').value.equals(Value.cents(350))).toBe(true)

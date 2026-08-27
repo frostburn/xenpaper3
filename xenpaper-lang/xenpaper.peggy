@@ -158,6 +158,7 @@ MultiplicativeOperator
   = "*" { return "*"; }
   / "div"i !IdentifierContinue { return "div"; }
   / "mod"i !IdentifierContinue { return "mod"; }
+  / "rd"i !IdentifierContinue { return "rd"; }
 
 PowerExpression
   = left:UnaryExpression

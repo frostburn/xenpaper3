@@ -43,6 +43,17 @@ describe('Xenpaper value arithmetic', () => {
     expect(majorThird.div(syntonicComma).equals(new Value(new Fraction(5, 4)))).toBe(true)
   })
 
+  it('calculates mathematical and geometric modulo', () => {
+    expect(new Value(1_000_000_000).mmod(3).equals(1)).toBe(true)
+    expect(new Value(2).reduce(new Fraction(3, 2)).equals(new Fraction(4, 3))).toBe(true)
+  })
+
+  it('makes progress when calculating modulo with real values', () => {
+    const remainder = Value.real(1).mmod(Value.real(2 ** -100))
+    expect(remainder.valueOf()).toBeGreaterThanOrEqual(0)
+    expect(remainder.valueOf()).toBeLessThan(2 ** -100)
+  })
+
   it('cancels huge exact interval stacks', () => {
     const archytas = new Value(new Fraction(64, 63))
     const unity = archytas
