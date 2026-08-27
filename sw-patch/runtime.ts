@@ -954,7 +954,20 @@ export class PatchRuntime {
       'feedforward',
       'feedback',
     ])
-    for (const [key, value] of Object.entries(options)) {
+    let optionEntries = Object.entries(options)
+    if (
+      kind === 'Analyser' &&
+      options.minDecibels !== undefined &&
+      options.maxDecibels !== undefined
+    ) {
+      const minFirst = Number(options.minDecibels) < Number(node.maxDecibels)
+      const limitNames = minFirst ? ['minDecibels', 'maxDecibels'] : ['maxDecibels', 'minDecibels']
+      optionEntries = [
+        ...limitNames.map((key) => [key, options[key]] as [string, unknown]),
+        ...optionEntries.filter(([key]) => key !== 'minDecibels' && key !== 'maxDecibels'),
+      ]
+    }
+    for (const [key, value] of optionEntries) {
       if (factoryOnly.has(key)) continue
       if (kind === 'Convolver' && key === 'disableNormalization') {
         node.normalize = !value

@@ -1036,6 +1036,43 @@ describe('SW Patch runtime', () => {
     expect(convolver.normalize).toBe(false)
   })
 
+  it('applies fallback analyser limits in a valid order', () => {
+    vi.stubGlobal('AnalyserNode', undefined)
+    const assignments: string[] = []
+    const analyser = {
+      _minDecibels: -100,
+      _maxDecibels: -30,
+      get minDecibels() {
+        return this._minDecibels
+      },
+      set minDecibels(value: number) {
+        if (value >= this._maxDecibels) throw new DOMException('', 'IndexSizeError')
+        assignments.push('min')
+        this._minDecibels = value
+      },
+      get maxDecibels() {
+        return this._maxDecibels
+      },
+      set maxDecibels(value: number) {
+        if (value <= this._minDecibels) throw new DOMException('', 'IndexSizeError')
+        assignments.push('max')
+        this._maxDecibels = value
+      },
+    }
+    const context = {
+      createAnalyser: vi.fn<() => typeof analyser>(() => analyser),
+    } as unknown as BaseAudioContext
+    const patch = createPatch(
+      'fn analyser():\n    ret AnalyserNode(minDecibels = -20, maxDecibels = -10)\n',
+      context,
+    )
+
+    expect((patch.analyser as PatchFunction)()).toBe(analyser)
+    expect(assignments).toEqual(['max', 'min'])
+    expect(analyser.minDecibels).toBe(-20)
+    expect(analyser.maxDecibels).toBe(-10)
+  })
+
   it('keeps decibels literal for scheduled gain assignments', () => {
     const gain = {
       setValueAtTime: vi.fn<(value: number, time: number) => void>(),
