@@ -289,34 +289,13 @@ function modulo(
   if (left.kind === 'absolutePitch' || right.kind === 'absolutePitch') {
     throw new TypeError('Modulo does not support absolute pitches.')
   }
-  const subtract = (
-    lhs: ScalarValue | PitchOffsetValue,
-    rhs: ScalarValue | PitchOffsetValue,
-  ): ScalarValue | PitchOffsetValue => {
-    const difference = addOrSubtract(lhs, rhs, true, node)
-    if (difference.kind === 'absolutePitch')
-      throw new TypeError('Modulo operands are incompatible.')
-    return difference
+  const value = left.value.mmod(right.value)
+  if (left.kind === 'pitchOffset' || right.kind === 'pitchOffset') {
+    const difference = addOrSubtract(left, right, true, node)
+    if (difference.kind === 'pitchOffset' && difference.value.equals(value)) return difference
+    return result('pitchOffset', value, operatorOrigins(left, right, node))
   }
-
-  // Define modulo solely in terms of comparison and subtraction. This keeps it
-  // useful for exact radicals, quantities, and pitch offsets without requiring
-  // the operands to support division.
-  const zeroValue = right.value.sub(right.value)
-  const zero =
-    right.kind === 'scalar' ? result('scalar', zeroValue, []) : result('pitchOffset', zeroValue, [])
-  if (!right.value.compare(zeroValue)) throw new RangeError('Division by zero.')
-  const divisor = right.value.compare(zeroValue) < 0 ? subtract(zero, right) : right
-  const negativeDivisor = subtract(zero, divisor)
-  let remainder = left
-
-  while (remainder.value.compare(zeroValue) < 0) {
-    remainder = subtract(remainder, negativeDivisor)
-  }
-  while (remainder.value.compare(divisor.value) >= 0) {
-    remainder = subtract(remainder, divisor)
-  }
-  return { ...remainder, origins: operatorOrigins(left, right, node) }
+  return result('scalar', value, operatorOrigins(left, right, node))
 }
 
 function geometricModulo(
@@ -327,10 +306,7 @@ function geometricModulo(
   if (left.kind !== 'scalar' || right.kind !== 'scalar') {
     throw new TypeError('Geometric modulo requires ratio operands.')
   }
-  const lhs = left.value.exactRational()
-  const rhs = right.value.exactRational()
-  if (!lhs || !rhs) throw new TypeError('Geometric modulo requires exact rational operands.')
-  return result('scalar', new Value(lhs.geoMod(rhs)), operatorOrigins(left, right, node))
+  return result('scalar', left.value.reduce(right.value), operatorOrigins(left, right, node))
 }
 
 function binary(
