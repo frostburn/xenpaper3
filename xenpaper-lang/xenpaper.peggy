@@ -820,33 +820,36 @@ PythagoreanAccidental
   / "_" ![0-9] { return node('Accidental', { value: '_' }); }
 
 FjsInflection
-  = marker:$("^" / "v") prime:UnsignedInteger flavor:$([cnqthmls])? {
+  = marker:$("^" / "v") prime:UnsignedInteger flavor:FjsFlavor {
       return node('FjsInflection', {
         direction: marker === '^' ? 'numerator' : 'denominator',
         marker,
         prime,
-        flavor: flavor ?? '',
-        raw: marker + prime + (flavor ?? ''),
+        flavor,
+        raw: marker + prime + flavor,
       });
     }
-  / prime:SuperscriptUnsignedInteger flavor:$([cnqthmls])? {
+  / prime:SuperscriptUnsignedInteger flavor:FjsFlavor {
       return node('FjsInflection', {
         direction: 'numerator',
         marker: '^',
         prime: prime.value,
-        flavor: flavor ?? '',
-        raw: prime.raw + (flavor ?? ''),
+        flavor,
+        raw: prime.raw + flavor,
       });
     }
-  / prime:SubscriptUnsignedInteger flavor:$([cnqthmls])? {
+  / prime:SubscriptUnsignedInteger flavor:FjsFlavor {
       return node('FjsInflection', {
         direction: 'denominator',
         marker: 'v',
         prime: prime.value,
-        flavor: flavor ?? '',
-        raw: prime.raw + (flavor ?? ''),
+        flavor,
+        raw: prime.raw + flavor,
       });
     }
+
+FjsFlavor
+  = $([cnqthmls]?)
 
 EqualDivisionLiteral
   = sign:Sign? body:UnsignedEqualDivisionLiteral {
