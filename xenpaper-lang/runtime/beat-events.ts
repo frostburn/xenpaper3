@@ -27,68 +27,71 @@ interface BeatEventFlatteningResult {
 
 const copy = (value: Fraction) => new Fraction(value.n, value.d)
 
+type Groove = {
+  origin: Fraction
+  cycle: Fraction
+  points: { nominal: Fraction; actual: Fraction; dynamic: Fraction; articulation: Fraction }[]
+}
+
+type MutableNoteEvent = Omit<
+  BeatTimedNoteEvent,
+  'start' | 'duration' | 'dynamic' | 'automation' | 'origins'
+> & {
+  start: Fraction
+  duration: Fraction
+  dynamic: Fraction
+  directiveState: BeatTimedNoteEvent['directiveState']
+  automation?: BeatTimedNoteEvent['automation']
+  origins: readonly BeatTimedNoteEvent['origins'][number][]
+  groove?: Groove
+  articulation: Fraction
+}
+
+type FlatteningState = {
+  active: MutableNoteEvent[]
+  activeStart?: Fraction
+  activeSpan?: Fraction
+  groove?: Groove
+  drone?: MutableNoteEvent[]
+}
+
+function interpolateGroove(
+  groove: Groove,
+  value: Fraction,
+  key: 'actual' | 'dynamic' | 'articulation',
+) {
+  const relative = value.sub(groove.origin)
+  const cycleIndex = Math.floor(relative.div(groove.cycle).valueOf())
+  const local = relative.sub(groove.cycle.mul(cycleIndex))
+  const points = groove.points
+  let left = points[0]!
+  let right = { ...points[0]!, nominal: groove.cycle, actual: groove.cycle }
+  for (let index = 1; index < points.length; index++) {
+    if (local.compare(points[index]!.nominal) <= 0) {
+      right = points[index]!
+      break
+    }
+    left = points[index]!
+  }
+  const span = right.nominal.sub(left.nominal)
+  const ratio = span.n ? local.sub(left.nominal).div(span) : new Fraction(0)
+  const interpolated = left[key].add(right[key].sub(left[key]).mul(ratio))
+  return key === 'actual'
+    ? groove.origin.add(groove.cycle.mul(cycleIndex)).add(interpolated)
+    : interpolated
+}
+
+function stopDrone(state: FlatteningState, end: Fraction) {
+  for (const event of state.drone ?? []) event.duration = end.sub(event.start)
+  state.drone = undefined
+}
+
 /** Flatten evaluated playback semantics without converting exact beat positions to seconds. */
 export function flattenScoreSemantics(shape: ScoreShape): BeatEventFlatteningResult {
   const events: BeatTimedEvent[] = []
   const diagnostics: Diagnostic[] = []
-  type MutableNoteEvent = Omit<
-    BeatTimedNoteEvent,
-    'start' | 'duration' | 'dynamic' | 'automation' | 'origins'
-  > & {
-    start: Fraction
-    duration: Fraction
-    dynamic: Fraction
-    directiveState: BeatTimedNoteEvent['directiveState']
-    automation?: BeatTimedNoteEvent['automation']
-    origins: readonly BeatTimedNoteEvent['origins'][number][]
-    groove?: Groove
-    articulation: Fraction
-  }
-  type State = {
-    active: MutableNoteEvent[]
-    activeStart?: Fraction
-    activeSpan?: Fraction
-    groove?: Groove
-    drone?: MutableNoteEvent[]
-  }
   const completedAutomations = new WeakSet<MutableNoteEvent>()
-  type Groove = {
-    origin: Fraction
-    cycle: Fraction
-    points: { nominal: Fraction; actual: Fraction; dynamic: Fraction; articulation: Fraction }[]
-  }
-  const interpolate = (
-    groove: Groove,
-    value: Fraction,
-    key: 'actual' | 'dynamic' | 'articulation',
-  ) => {
-    const relative = value.sub(groove.origin)
-    const cycleIndex = Math.floor(relative.div(groove.cycle).valueOf())
-    const local = relative.sub(groove.cycle.mul(cycleIndex))
-    const points = groove.points
-    let left = points[0]!
-    let right = { ...points[0]!, nominal: groove.cycle, actual: groove.cycle }
-    for (let index = 1; index < points.length; index++) {
-      if (local.compare(points[index]!.nominal) <= 0) {
-        right = points[index]!
-        break
-      }
-      left = points[index]!
-    }
-    const span = right.nominal.sub(left.nominal)
-    const ratio = span.n ? local.sub(left.nominal).div(span) : new Fraction(0)
-    const interpolated = left[key].add(right[key].sub(left[key]).mul(ratio))
-    return key === 'actual'
-      ? groove.origin.add(groove.cycle.mul(cycleIndex)).add(interpolated)
-      : interpolated
-  }
-
-  const stopDrone = (state: State, end: Fraction) => {
-    for (const event of state.drone ?? []) event.duration = end.sub(event.start)
-    state.drone = undefined
-  }
-
-  const visit = (current: ScoreShape, start: Fraction, state: State): Fraction => {
+  const visit = (current: ScoreShape, start: Fraction, state: FlatteningState): Fraction => {
     if (!current.isolatedDirectiveScope) return visitCurrent(current, start, state)
     const isolatedState = { ...state }
     const end = visitCurrent(current, start, isolatedState)
@@ -99,7 +102,7 @@ export function flattenScoreSemantics(shape: ScoreShape): BeatEventFlatteningRes
     return end
   }
 
-  const visitCurrent = (current: ScoreShape, start: Fraction, state: State): Fraction => {
+  const visitCurrent = (current: ScoreShape, start: Fraction, state: FlatteningState): Fraction => {
     if (current.kind === 'attack') {
       const event: MutableNoteEvent = {
         kind: 'note',
@@ -234,7 +237,9 @@ export function flattenScoreSemantics(shape: ScoreShape): BeatEventFlatteningRes
       return start.add(current.duration)
     } else {
       const firstEvent = events.length
-      const states = current.branches.map((): State => ({ active: [], groove: state.groove }))
+      const states = current.branches.map(
+        (): FlatteningState => ({ active: [], groove: state.groove }),
+      )
       current.branches.forEach((branch, index) => visit(branch, start, states[index]!))
       const end = start.add(current.duration)
       for (const branchState of states) stopDrone(branchState, end)
@@ -252,7 +257,7 @@ export function flattenScoreSemantics(shape: ScoreShape): BeatEventFlatteningRes
     return start.add(current.duration)
   }
 
-  const rootState: State = { active: [] }
+  const rootState: FlatteningState = { active: [] }
   const end = visit(shape, new Fraction(0), rootState)
   stopDrone(rootState, end)
   for (const event of events) {
@@ -261,15 +266,15 @@ export function flattenScoreSemantics(shape: ScoreShape): BeatEventFlatteningRes
     const nominalStart = mutable.start
     const nominalEnd = nominalStart.add(mutable.duration)
     if (mutable.groove) {
-      const warpedStart = interpolate(mutable.groove, nominalStart, 'actual')
-      const warpedEnd = interpolate(mutable.groove, nominalEnd, 'actual')
+      const warpedStart = interpolateGroove(mutable.groove, nominalStart, 'actual')
+      const warpedEnd = interpolateGroove(mutable.groove, nominalEnd, 'actual')
       mutable.start = warpedStart
       mutable.duration = warpedEnd
         .sub(warpedStart)
         .mul(mutable.articulation)
-        .mul(interpolate(mutable.groove, nominalStart, 'articulation'))
+        .mul(interpolateGroove(mutable.groove, nominalStart, 'articulation'))
       mutable.dynamic = mutable.dynamic.mul(
-        interpolate(mutable.groove, nominalStart, 'dynamic').div(DYNAMIC_VELOCITIES.mf),
+        interpolateGroove(mutable.groove, nominalStart, 'dynamic').div(DYNAMIC_VELOCITIES.mf),
       )
     } else mutable.duration = mutable.duration.mul(mutable.articulation)
     delete mutable.groove
