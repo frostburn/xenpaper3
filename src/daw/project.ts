@@ -1,3 +1,5 @@
+import { gcd } from 'xen-dev-utils'
+
 export interface Beat {
   numerator: number
   denominator: number
@@ -66,12 +68,9 @@ export const beat = (numerator: number, denominator = 1): Beat => {
   if (!Number.isInteger(numerator) || !Number.isInteger(denominator) || denominator <= 0) {
     throw new RangeError('Beat values require an integer numerator and positive denominator')
   }
-  const divisor = greatestCommonDivisor(Math.abs(numerator), denominator)
+  const divisor = gcd(numerator, denominator)
   return { numerator: numerator / divisor, denominator: denominator / divisor }
 }
-
-const greatestCommonDivisor = (left: number, right: number): number =>
-  right === 0 ? left || 1 : greatestCommonDivisor(right, left % right)
 
 export const beatToNumber = (value: Beat) => value.numerator / value.denominator
 
