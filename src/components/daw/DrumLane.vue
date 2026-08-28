@@ -192,7 +192,13 @@ const moveDrag = (event: PointerEvent) => {
   z-index: 2;
   padding-left: 0.25rem;
   text-align: left;
-  color: #cfbadb;
+  color: white;
+  font-weight: 700;
+  text-shadow:
+    -1px -1px 0 #281732,
+    1px -1px 0 #281732,
+    -1px 1px 0 #281732,
+    1px 1px 0 #281732;
   border-bottom: 1px solid #654b74;
   pointer-events: none;
 }
