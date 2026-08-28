@@ -124,14 +124,15 @@ node API. `TimeNode()` outputs elapsed seconds after `start()`, `PhaserNode()`
 outputs an unfiltered sawtooth phase from zero up to one and exposes an
 automatable `frequency` parameter and an OscillatorNode-style `detune`
 parameter measured in cents. Like `OscillatorNode`, its default frequency is
-440 Hz. `RandomNode()` produces a new
-`Math.random()` value for every sample. Each accepts an optional AudioContext
+440 Hz. `NoiseNode()` produces independent white-noise samples in the range
+from -1 through +1, while `RandomNode()` retains its zero-to-one range. Each
+accepts an optional AudioContext
 timestamp in `start()` and `stop()`:
 
 ```swpatch
 t = TimeNode()
 phase = PhaserNode(frequency = 2Hz, detune = 100c)
-noise = RandomNode()
+noise = NoiseNode()
 t.start(start)
 phase.start(start)
 noise.start(start)

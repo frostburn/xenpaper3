@@ -464,7 +464,10 @@ describe('DawView', () => {
       'value',
       expect.stringContaining('[bd,hh hh] [hh hh] [sd,hh hh] [hh hh]'),
     )
-    expect(lane.findAll('[aria-label="Drum pattern preview"] i')).toHaveLength(10)
+    const notes = lane.findAll('[aria-label="Drum pattern preview"] i')
+    expect(notes).toHaveLength(10)
+    expect(notes.every((note) => note.text() === '')).toBe(true)
+    expect(lane.findAll('.drum-row-label').map((label) => label.text())).toEqual(['sd', 'hh', 'bd'])
   })
 
   it('resizes a clip when its source duration changes', async () => {

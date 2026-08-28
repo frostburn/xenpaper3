@@ -18,7 +18,7 @@ fn bd(destination: AudioNode, start: Instant, velocity: Level):
 
 fn sd(destination: AudioNode, start: Instant, velocity: Level):
     osc = OscillatorNode(type = 'triangle', frequency = 333Hz)
-    noise = RandomNode()
+    noise = NoiseNode()
     filter = BiquadFilterNode(type = 'highpass', frequency = 1200Hz)
     env = GainNode(gain = 0)
 
@@ -40,7 +40,7 @@ fn sd(destination: AudioNode, start: Instant, velocity: Level):
         ret cutOff
 
 fn hh(destination: AudioNode, start: Instant, velocity: Level):
-    noise = RandomNode()
+    noise = NoiseNode()
     filter = BiquadFilterNode(type = 'highpass', frequency = 7000Hz)
     env = GainNode(gain = 0)
 
