@@ -42,12 +42,7 @@ const eventsByClip = computed(() =>
         const initialization = compileSourceInitialization(props.lane.source, globalInitialization)
         return [
           clip.id,
-          parseDrumClipNotes(
-            clip.source,
-            samples.value,
-            beatToNumber(clip.length),
-            initialization,
-          ),
+          parseDrumClipNotes(clip.source, samples.value, beatToNumber(clip.length), initialization),
         ]
       } catch {
         return [clip.id, []]

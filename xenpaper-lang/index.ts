@@ -26,7 +26,11 @@ export {
   GLISS_CURVES,
   resolveDirective,
 } from './runtime/directives'
-export { evaluateProgramShape, evaluateScoreShape } from './runtime/score-shape'
+export {
+  evaluateProgramSemantics,
+  evaluateProgramShape,
+  evaluateScoreShape,
+} from './runtime/score-shape'
 export { expandToBeatEvents } from './runtime/beat-events'
 export type { BeatEventExpansionOptions, BeatEventExpansionResult } from './runtime/beat-events'
 export {

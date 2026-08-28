@@ -14,33 +14,19 @@ export function evaluateScoreShape(
   node: Expression,
   options: ScoreShapeOptions = {},
 ): ScoreShapeEvaluationResult {
-  const result = evaluateScoreSemantics(node, options)
-  if (!('shape' in result)) return result
-
-  const abstractShape = (shape: ScoreShape): ScoreShape => {
-    if (shape.kind === 'attack') {
-      const {
-        dynamic: _dynamic,
-        velocity: _velocity,
-        velocityExplicit: _explicit,
-        ...attack
-      } = shape as ScoreShape & {
-        dynamic?: unknown
-        velocity?: unknown
-        velocityExplicit?: unknown
-      }
-      return attack as ScoreShape
-    }
-    if (shape.kind === 'sequence') return { ...shape, children: shape.children.map(abstractShape) }
-    if (shape.kind === 'parallel') return { ...shape, branches: shape.branches.map(abstractShape) }
-    return shape
-  }
-
-  return { ...result, shape: abstractShape(result.shape) }
+  return abstractResult(evaluateScoreSemantics(node, options))
 }
 
 /** Build one score shape for a complete program so context changes cross hard boundaries. */
 export function evaluateProgramShape(
+  program: Program,
+  options: ScoreShapeOptions = {},
+): ScoreShapeEvaluationResult {
+  return abstractResult(evaluateProgramSemantics(program, options))
+}
+
+/** Build one playback-preserving score shape for a complete program. */
+export function evaluateProgramSemantics(
   program: Program,
   options: ScoreShapeOptions = {},
 ): ScoreShapeEvaluationResult {
@@ -49,5 +35,26 @@ export function evaluateProgramShape(
     items: program.body,
     location: program.location,
   } as Expression
-  return evaluateScoreShape(sequence, options)
+  return evaluateScoreSemantics(sequence, options)
+}
+
+const abstractResult = (result: ScoreShapeEvaluationResult): ScoreShapeEvaluationResult => {
+  if (!('shape' in result)) return result
+  const abstract = abstractShape(result.shape)
+  return { ...result, shape: abstract }
+}
+
+const abstractShape = (shape: ScoreShape): ScoreShape => {
+  if (shape.kind === 'attack') {
+    const {
+      dynamic: _dynamic,
+      velocity: _velocity,
+      velocityExplicit: _explicit,
+      ...attack
+    } = shape as ScoreShape & { dynamic?: unknown; velocity?: unknown; velocityExplicit?: unknown }
+    return attack as ScoreShape
+  }
+  if (shape.kind === 'sequence') return { ...shape, children: shape.children.map(abstractShape) }
+  if (shape.kind === 'parallel') return { ...shape, branches: shape.branches.map(abstractShape) }
+  return shape
 }

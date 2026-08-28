@@ -1,12 +1,13 @@
 import {
   evaluateExpression,
-  evaluateProgramShape,
+  evaluateProgramSemantics,
   expandToBeatEvents,
   parse,
   type DirectiveExtension,
   type DirectiveExtensionState,
   type PitchContext,
   type Program,
+  type ScoreShape,
   type BeatTimedNoteEvent,
 } from '../../xenpaper-lang'
 import { drumNames } from '../../sw-patch'
@@ -94,8 +95,8 @@ const envelopeExtension: DirectiveExtension = {
 export interface SourceInitialization {
   readonly pitchContext?: PitchContext
   readonly directiveState?: DirectiveExtensionState
-  /** Zero-duration source layers replayed before a clip to preserve built-in directive scope. */
-  readonly sources?: readonly string[]
+  /** Pre-evaluated state annotations applied before a clip without reparsing initialization source. */
+  readonly shape?: ScoreShape
 }
 
 /** Evaluate a zero-duration source once and retain its prevailing state for child scopes. */
@@ -103,7 +104,7 @@ export const compileSourceInitialization = (
   source: string,
   parent: SourceInitialization = {},
 ): SourceInitialization => {
-  const result = evaluateProgramShape(parse(source), {
+  const result = evaluateProgramSemantics(parse(source), {
     directiveExtensions: [envelopeExtension],
     pitchContext: parent.pitchContext,
     directiveState: parent.directiveState,
@@ -116,12 +117,16 @@ export const compileSourceInitialization = (
   return {
     pitchContext: result.pitchContext,
     directiveState: result.directiveState,
-    sources: Object.freeze([...(parent.sources ?? []), source]),
+    shape: parent.shape
+      ? {
+          kind: 'sequence',
+          duration: result.shape.duration,
+          origins: [...parent.shape.origins, ...result.shape.origins],
+          children: [parent.shape, result.shape],
+        }
+      : result.shape,
   }
 }
-
-const initializedProgram = (source: string, initialization: SourceInitialization): Program =>
-  parse([...(initialization.sources ?? []), source].join('\n'))
 
 /** Compile one clip into notes whose positions are relative to the clip start. */
 export const parseClipNotes = (
@@ -129,11 +134,11 @@ export const parseClipNotes = (
   duration = Number.POSITIVE_INFINITY,
   initialization: SourceInitialization = {},
 ): ScheduledLaneNote[] => {
-  const hasSourceLayers = Boolean(initialization.sources?.length)
-  const result = expandToBeatEvents(initializedProgram(source, initialization), {
+  const result = expandToBeatEvents(parse(source), {
     directiveExtensions: [envelopeExtension],
-    pitchContext: hasSourceLayers ? undefined : initialization.pitchContext,
-    directiveState: hasSourceLayers ? undefined : initialization.directiveState,
+    pitchContext: initialization.pitchContext,
+    directiveState: initialization.directiveState,
+    initializationShape: initialization.shape,
   })
   const errors = result.diagnostics.filter(({ severity }) => severity === 'error')
   if (errors.length) throw new Error(errors.map(({ message }) => message).join('\n'))
@@ -174,14 +179,12 @@ export const parseDrumClipNotes = (
   duration = Number.POSITIVE_INFINITY,
   initialization: SourceInitialization = {},
 ): ScheduledLaneNote[] => {
-  const program = lowerDrumSamples(
-    parse([...(initialization.sources ?? []), source].join('\n'), { drumSamples: samples }),
-  )
-  const hasSourceLayers = Boolean(initialization.sources?.length)
+  const program = lowerDrumSamples(parse(source, { drumSamples: samples }))
   const result = expandToBeatEvents(program, {
     directiveExtensions: [envelopeExtension],
-    pitchContext: hasSourceLayers ? undefined : initialization.pitchContext,
-    directiveState: hasSourceLayers ? undefined : initialization.directiveState,
+    pitchContext: initialization.pitchContext,
+    directiveState: initialization.directiveState,
+    initializationShape: initialization.shape,
   })
   const errors = result.diagnostics.filter(({ severity }) => severity === 'error')
   if (errors.length) throw new Error(errors.map(({ message }) => message).join('\n'))
