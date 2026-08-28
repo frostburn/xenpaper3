@@ -210,8 +210,8 @@ PrimaryExpression
   / MonzoLiteral
   / MosIntervalLiteral
   / IntervalLiteral
-  / &{ return options.language !== "drums"; } MosPitchLiteral
-  / &{ return options.language !== "drums"; } PitchLiteral
+  / &{ return options.language !== "drums"; } pitch:MosPitchLiteral { return pitch; }
+  / &{ return options.language !== "drums"; } pitch:PitchLiteral { return pitch; }
   / EqualDivisionLiteral
   / QuantityLiteral
   / RatioLiteral
@@ -223,8 +223,10 @@ PrimaryExpression
   // The pitched language keeps its existing identifier semantics, while the
   // drum language treats the same token as a sample name. Everything above
   // this rule can therefore be shared by both languages.
-  / &{ return options.language === "drums"; } DrumSampleLiteral
-  / &{ return options.language !== "drums"; } IdentifierExpression
+  / &{ return options.language === "drums"; } sample:DrumSampleLiteral { return sample; }
+  / &{ return options.language !== "drums"; } identifier:IdentifierExpression {
+      return identifier;
+    }
 
 DrumSampleLiteral
   = sample:Identifier {
