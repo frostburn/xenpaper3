@@ -1,0 +1,57 @@
+fn bd(destination: AudioNode, start: Instant, velocity: Level):
+    osc = OscillatorNode(type = 'sine', frequency = 75Hz)
+    env = GainNode(gain = 0)
+
+    until osc:ended:
+        osc -> env -> destination
+
+    osc.start(start)
+    @(start) env.gain = velocity
+    @(start) osc.detune = 0c
+    @(start + 100ms) osc.detune = -500c
+    @(start + 180ms; exponential) env.gain = 0.0001
+
+    ret once fn off(end: Instant):
+        cutOff = end + 20ms
+        osc.stop(cutOff)
+        ret cutOff
+
+fn sd(destination: AudioNode, start: Instant, velocity: Level):
+    osc = OscillatorNode(type = 'triangle', frequency = 333Hz)
+    noise = RandomNode()
+    filter = BiquadFilterNode(type = 'highpass', frequency = 1200Hz)
+    env = GainNode(gain = 0)
+
+    until noise:ended:
+        noise -> filter -> env -> destination
+        osc * 0.5 -> filter
+
+    osc.start(start)
+    noise.start(start)
+    @(start) env.gain = velocity
+    @(start) osc.detune = 0c
+    @(start + 100ms) osc.detune = -100c
+    @(start + 140ms; exponential) env.gain = 0.0001
+
+    ret once fn off(end: Instant):
+        cutOff = end + 20ms
+        osc.stop(cutOff)
+        noise.stop(cutOff)
+        ret cutOff
+
+fn hh(destination: AudioNode, start: Instant, velocity: Level):
+    noise = RandomNode()
+    filter = BiquadFilterNode(type = 'highpass', frequency = 7000Hz)
+    env = GainNode(gain = 0)
+
+    until noise:ended:
+        noise -> filter -> env -> destination
+
+    noise.start(start)
+    @(start) env.gain = velocity
+    @(start + 50ms; exponential) env.gain = 0.0001
+
+    ret once fn off(end: Instant):
+        cutOff = end + 10ms
+        noise.stop(cutOff)
+        ret cutOff

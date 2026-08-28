@@ -3,6 +3,7 @@ import { createPlaybackPlan, type PlaybackPlan } from './playback-plan'
 import { parseProjectScoreNotes, type PitchGlideSegment, type ScheduledLaneNote } from './score'
 import { xenpaperPitchToPatchDetune } from './web-audio-automation'
 import { WebAudioPlaybackSession } from './web-audio-playback'
+import { registerMathWorklets } from '../../sw-patch'
 
 // Compatibility exports for non-UI consumers. Pure musical operations live in
 // score/playback-plan/timeline; browser-specific operations live in web-audio-*.
@@ -20,7 +21,13 @@ export type {
   PlaybackNote,
   PlaybackPlan,
 } from './playback-plan'
-export { parseClipNotes, parseLaneNotes, parseProjectScoreNotes, sourceClipLength } from './score'
+export {
+  parseClipNotes,
+  parseDrumClipNotes,
+  parseLaneNotes,
+  parseProjectScoreNotes,
+  sourceClipLength,
+} from './score'
 export type { EnvelopeSettings, PitchGlideSegment, ScheduledLaneNote } from './score'
 export { createTempoMap, projectBeatToSeconds, projectSecondsToBeat, TempoMap } from './timeline'
 export { easeGlissando, type GlissandoEasing } from './easing'
@@ -66,11 +73,15 @@ export class DawAudioEngine extends EventTarget {
     this.context = context ?? new AudioContext({ latencyHint: 'interactive' })
   }
 
-  play(project: DawProject, fromBeat = 0): void {
+  async play(project: DawProject, fromBeat = 0): Promise<void> {
     if (this.disposed) throw new Error('Cannot play a disposed audio engine.')
 
     // Compile first: invalid edits do not tear down a currently audible session.
     const plan = createPlaybackPlan(project, fromBeat)
+    // Drum voices instantiate RandomNode worklets when their scheduled hit begins.
+    // Finish module registration before creating or starting the playback session.
+    if (plan.lanes.some(({ kind }) => kind === 'drum')) await registerMathWorklets(this.context)
+    if (this.disposed) throw new Error('Cannot play a disposed audio engine.')
     this.stop()
 
     const session = new WebAudioPlaybackSession(this.context, plan, {

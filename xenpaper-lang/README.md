@@ -1,5 +1,20 @@
 # xenpaper-lang
 
+## Shared rhythm grammars
+
+The pitched and sample languages share document sequencing, parallel branches,
+normalized groups, repeats, rests, continuations, postfix marks, and directives.
+Callers enumerate sample names when parsing, so the grammars split only for those
+bare event leaves. Without that option, `bd` retains its pitched meaning as B
+half-flat.
+
+```ts
+import { parse } from './index.js'
+
+parse('bd') // B half-flat
+parse('|:@x2 [bd sd] :|, hh', { drumSamples: ['bd', 'sd', 'hh'] })
+```
+
 `xenpaper-lang` is the parser and renderer-independent runtime for Xenpaper 3's
 microtonal score language. It is currently part of this repository rather than
 a separately published package.
@@ -44,6 +59,7 @@ Arithmetic expressions provide `pitch(ratio)` to convert a positive scalar
 ratio to a pitch displacement, `ratio(offset)` for the inverse conversion, and
 `sqrt(quantity)` for a square root. `sqrt()` retains an exact monomial when the
 value model is closed under the operation and halves the quantity's dimensions.
+The built-in identifier `pi` evaluates to the dimensionless real constant π.
 
 Key signatures may include a diatonic mode after the tonic, such as
 `{key = D minor}`. The supported names are Lydian, Ionian, Mixolydian, Dorian,

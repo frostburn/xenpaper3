@@ -33,6 +33,7 @@ export type Expression =
   | DegreeLiteral
   | Directive
   | DetachedContinue
+  | DrumSampleLiteral
   | EqualDivisionLiteral
   | EnumeratedChord
   | Group
@@ -64,6 +65,12 @@ export type Expression =
 export interface Barline extends Node {
   type: 'Barline'
   raw: '|'
+}
+
+export interface DrumSampleLiteral extends Node {
+  type: 'DrumSampleLiteral'
+  sample: string
+  raw: string
 }
 
 export interface BinaryExpression extends Node {
@@ -416,5 +423,10 @@ export interface PitchNominal extends Node {
   value: string
 }
 
+export interface XenpaperParserOptions extends ParserOptions {
+  /** Bare identifiers to parse as drum/sample leaves instead of pitches or identifiers. */
+  drumSamples?: readonly string[]
+}
+
 export declare const StartRules: ['Start']
-export declare function parse(input: string, options?: ParserOptions): Program
+export declare function parse(input: string, options?: XenpaperParserOptions): Program

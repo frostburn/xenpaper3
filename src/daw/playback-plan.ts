@@ -39,11 +39,13 @@ export interface PlaybackNote {
   readonly velocity: number
   readonly envelope: EnvelopeSettings
   readonly pitch: PitchAutomationPlan
+  readonly sample?: string
 }
 
 export interface PlaybackLane {
   readonly id: string
   readonly name: string
+  readonly kind?: 'instrument' | 'drum'
   readonly patchSource: string
   readonly oscillatorType: OscillatorType
   readonly gain: number
@@ -188,6 +190,7 @@ export const createPlaybackPlan = (project: DawProject, fromBeat = 0): PlaybackP
           velocity: note.velocity,
           envelope: Object.freeze({ ...note.envelope }),
           pitch: compilePitchAutomation(note, tempoMap, window.startBeat, window.endBeat),
+          sample: note.sample,
         }),
       )
     }
@@ -196,6 +199,7 @@ export const createPlaybackPlan = (project: DawProject, fromBeat = 0): PlaybackP
       Object.freeze({
         id: lane.id,
         name: lane.name,
+        kind: lane.kind ?? 'instrument',
         patchSource: lane.patchSource,
         oscillatorType: lane.oscillatorType,
         gain: lane.gain,

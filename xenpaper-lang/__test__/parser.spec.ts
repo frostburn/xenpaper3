@@ -2,6 +2,54 @@ import { describe, expect, it } from 'vitest'
 import { parse } from '../parser.generated.js'
 
 describe('grammar boundary roles', () => {
+  it('shares rhythm while interpreting enumerated drum words as sample leaves', () => {
+    expect(parse('bd').body[0]).toMatchObject({
+      type: 'PitchLiteral',
+      nominal: { system: 'latin', value: 'b' },
+      accidentals: [{ value: 'd' }],
+    })
+    expect(
+      parse('|:@x2 [bd sd] :|, hh?', { drumSamples: ['bd', 'sd', 'hh'] }).body[0],
+    ).toMatchObject({
+      type: 'Parallel',
+      branches: [
+        {
+          type: 'Repeat',
+          body: [
+            {
+              type: 'NormalizeToSlot',
+              expression: {
+                type: 'Sequence',
+                items: [
+                  { type: 'DrumSampleLiteral', sample: 'bd' },
+                  { type: 'DrumSampleLiteral', sample: 'sd' },
+                ],
+              },
+            },
+          ],
+        },
+        {
+          type: 'PostfixExpression',
+          expression: { type: 'DrumSampleLiteral', sample: 'hh' },
+        },
+      ],
+    })
+    expect(parse('pi sqrt(2)', { drumSamples: ['bd'] }).body[0]).toMatchObject({
+      type: 'Sequence',
+      items: [
+        { type: 'Identifier', name: 'pi' },
+        { type: 'CallExpression', callee: 'sqrt', arguments: [{ type: 'IntegerLiteral' }] },
+      ],
+    })
+    expect(parse('pi sqrt(2)').body[0]).toMatchObject({
+      type: 'Sequence',
+      items: [
+        { type: 'Identifier', name: 'pi' },
+        { type: 'CallExpression', callee: 'sqrt' },
+      ],
+    })
+  })
+
   it('keeps signed degrees as sequence items while allowing explicit scalar arithmetic', () => {
     expect(parse('-1 -2 0 +1').body[0]).toMatchObject({
       type: 'Sequence',

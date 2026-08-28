@@ -366,6 +366,14 @@ export function evaluateExpression(
       return { value: evaluateIntervalLiteral(node, mapping), diagnostics: [] }
     if (node.type === 'MosIntervalLiteral')
       return { value: evaluateMosIntervalLiteral(node, mapping), diagnostics: [] }
+    if (node.type === 'Identifier' && node.name === 'pi') {
+      return {
+        value: result('scalar', Value.real(Math.PI), [
+          { location: node.location, role: 'literal' },
+        ]),
+        diagnostics: [],
+      }
+    }
     if (node.type === 'Group') return evaluateExpression(node.expression, mapping)
     if (node.type === 'PitchModifierExpression') {
       const operand = evaluateExpression(node.operand, mapping)

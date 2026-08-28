@@ -210,8 +210,8 @@ PrimaryExpression
   / MonzoLiteral
   / MosIntervalLiteral
   / IntervalLiteral
-  / MosPitchLiteral
-  / PitchLiteral
+  / !DrumSampleLiteral pitch:MosPitchLiteral { return pitch; }
+  / !DrumSampleLiteral pitch:PitchLiteral { return pitch; }
   / EqualDivisionLiteral
   / QuantityLiteral
   / RatioLiteral
@@ -219,7 +219,16 @@ PrimaryExpression
   / DecimalLiteral
   / IntegerLiteral
   / CallExpression
+  // Callers enumerate the bare words that are sample leaves. This keeps
+  // identifiers and calls available in every context while allowing names
+  // such as `bd` to take precedence over pitch spellings when requested.
+  / DrumSampleLiteral
   / IdentifierExpression
+
+DrumSampleLiteral
+  = sample:Identifier &{ return options.drumSamples?.includes(sample) ?? false; } {
+      return node('DrumSampleLiteral', { sample, raw: text() });
+    }
 
 // Colon chords are ratios relative to their first enumerand.  The leading
 // slash takes reciprocals before that normalization, which is equivalent to

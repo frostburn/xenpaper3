@@ -13,6 +13,8 @@ export type PatchFunction = (...arguments_: unknown[]) => unknown
 
 export interface SynthPatch {
   [name: string]: unknown
+  /** Resolves after the AudioWorklet processors used by utility nodes are installed. */
+  readonly ready: Promise<void>
   /** Tears down implicit nodes and connections owned by this patch. */
   dispose(): void
 }
@@ -31,6 +33,19 @@ export interface PlayableSynthPatch extends SynthPatch {
     destination: AudioNode,
     start: number,
     pitch: AudioNode,
+    velocity: number,
+    ...parameters: unknown[]
+  ): NoteOff
+}
+
+/** Conventional interface for a patch whose public functions are drum voices. */
+export interface PlayableDrumkitPatch extends SynthPatch {
+  /** Top-level function names discovered from the live patch source. */
+  readonly drumNames: readonly string[]
+  hit(
+    name: string,
+    destination: AudioNode,
+    start: number,
     velocity: number,
     ...parameters: unknown[]
   ): NoteOff
@@ -640,6 +655,60 @@ export function createPatch(
   return new PatchRuntime(context, options).evaluate(parse(source))
 }
 
+const DRUM_PARAMETERS = [
+  ['destination', 'AudioNode'],
+  ['start', 'Instant'],
+  ['velocity', 'Level'],
+] as const
+
+const isDrumFunction = (statement: Statement): statement is FunctionDeclaration =>
+  statement.type === 'FunctionDeclaration' &&
+  !statement.returned &&
+  DRUM_PARAMETERS.every(([name, annotation], index) => {
+    const parameter = statement.parameters[index]
+    return (
+      parameter?.name === name &&
+      parameter.annotation.type === 'TypeName' &&
+      parameter.annotation.name === annotation
+    )
+  })
+
+/** Lists conventionally typed top-level drum functions in a live patch. */
+export function drumNames(source: string): readonly string[] {
+  return Object.freeze(
+    parse(source).body.flatMap((statement) => (isDrumFunction(statement) ? [statement.name] : [])),
+  )
+}
+
+/** Compiles a collection of named drum functions into a validated drumkit facade. */
+export function createDrumkit(
+  source: string,
+  context: BaseAudioContext,
+  options: RuntimeOptions = {},
+): PlayableDrumkitPatch {
+  const patch = createPatch(source, context, options)
+  const names = drumNames(source)
+  return Object.assign(patch, {
+    drumNames: names,
+    hit(
+      name: string,
+      destination: AudioNode,
+      start: number,
+      velocity: number,
+      ...parameters: unknown[]
+    ): NoteOff {
+      if (!names.includes(name)) throw new RangeError(`Unknown drum sample "${name}".`)
+      const voice = patch[name]
+      if (typeof voice !== 'function') throw new TypeError(`Drum "${name}" is not callable.`)
+      const off = voice(destination, start, velocity, ...parameters)
+      if (typeof off !== 'function') {
+        throw new TypeError(`Drum "${name}" must return a note-off function.`)
+      }
+      return off as NoteOff
+    },
+  }) as PlayableDrumkitPatch
+}
+
 /** Alias emphasizing that source is compiled into a callable patch object. */
 export const compilePatch = createPatch
 
@@ -679,6 +748,7 @@ export class PatchRuntime {
   evaluate(program: Program): SynthPatch {
     this.topLevelBindings.clear()
     const patch: SynthPatch = {
+      ready: this.workletsReady,
       dispose: () => {
         this.dispose()
       },
