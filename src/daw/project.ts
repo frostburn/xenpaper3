@@ -57,7 +57,7 @@ export const DEFAULT_CLIP_SOURCE = `# New Xenpaper clip
 [0,4,7]===
 `
 export const DEFAULT_DRUM_CLIP_SOURCE = `# Basic 4/4 beat
-[bd,hh] hh [sd,hh] hh
+[bd,hh hh] [hh hh] [sd,hh hh] [hh hh]
 `
 export const DEFAULT_SW_PATCH_SOURCE = 'default'
 export const DEFAULT_GLOBAL_SOURCE = `# Shared tuning and score initialization (for example: {12edo})

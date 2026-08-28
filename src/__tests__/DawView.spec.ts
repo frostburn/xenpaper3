@@ -75,16 +75,20 @@ describe('DAW project model', () => {
     const samples = drumSamplesForLane(lane)
 
     expect(lane).toMatchObject({ id: 'drum-1', kind: 'drum', patchSource: 'drumkit' })
-    expect(clip.source).toContain('[bd,hh] hh [sd,hh] hh')
+    expect(clip.source).toContain('[bd,hh hh] [hh hh] [sd,hh hh] [hh hh]')
     expect(
       parseDrumClipNotes(clip.source, samples).map(({ beat, sample }) => [beat, sample]),
     ).toEqual([
       [0, 'bd'],
       [0, 'hh'],
+      [0.5, 'hh'],
       [1, 'hh'],
+      [1.5, 'hh'],
       [2, 'sd'],
       [2, 'hh'],
+      [2.5, 'hh'],
       [3, 'hh'],
+      [3.5, 'hh'],
     ])
   })
 
@@ -444,9 +448,9 @@ describe('DawView', () => {
     await lane.get('[aria-label="Drum lane"]').trigger('dblclick', { clientX: 64 })
     expect(wrapper.get('[aria-label="Xenpaper clip source"]').element).toHaveProperty(
       'value',
-      expect.stringContaining('[bd,hh] hh [sd,hh] hh'),
+      expect.stringContaining('[bd,hh hh] [hh hh] [sd,hh hh] [hh hh]'),
     )
-    expect(lane.findAll('[aria-label="Drum pattern preview"] i')).toHaveLength(6)
+    expect(lane.findAll('[aria-label="Drum pattern preview"] i')).toHaveLength(10)
   })
 
   it('resizes a clip when its source duration changes', async () => {
