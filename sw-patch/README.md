@@ -55,6 +55,29 @@ pitch.stop(cutOff)
 synth.dispose()
 ```
 
+## Drumkits
+
+A live drumkit is an SW Patch whose top-level functions are its sample names.
+Drum functions begin with the conventional parameters `destination: AudioNode`,
+`start: Instant`, and `velocity: Level`; additional voice parameters may follow.
+`drumNames()` discovers those names without creating audio nodes, so the same
+list can be passed to Xenpaper's `parse(..., { drumSamples })`. `createDrumkit()`
+compiles the source and exposes a common `hit(name, destination, start, velocity)`
+dispatcher while leaving each named function directly callable for live-patch
+tools.
+
+```ts
+import { createDrumkit, drumNames } from './sw-patch'
+import { parse } from './xenpaper-lang'
+import source from './src/patches/drumkit.swpatch?raw'
+
+const drums = drumNames(source) // ['bd', 'sd', 'hh']
+const score = parse('[bd sd] hh hh', { drumSamples: drums })
+const kit = createDrumkit(source, audioContext)
+const off = kit.hit('bd', audioContext.destination, audioContext.currentTime, 0.8)
+off(audioContext.currentTime + 0.25)
+```
+
 `registerMathWorklets()` installs SW Patch's inversion, conversion, and
 standard `Math` `AudioWorkletProcessor`s from a blob URL. All processors
 share a stoppable sample-by-sample superclass. Registration is

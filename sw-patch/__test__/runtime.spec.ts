@@ -3,12 +3,15 @@ import {
   PatchRuntime,
   Quantity,
   atodb,
+  createDrumkit,
   createPatch,
   dbtoa,
+  drumNames,
   registerMathWorklets,
   type PatchFunction,
 } from '../runtime.js'
 import type { Program } from '../parser.generated.js'
+import DRUMKIT_SOURCE from '../../src/patches/drumkit.swpatch?raw'
 
 function location() {
   const point = { offset: 0, line: 1, column: 1 }
@@ -16,6 +19,28 @@ function location() {
 }
 
 describe('SW Patch runtime', () => {
+  it('discovers and validates live drumkit functions', () => {
+    const source =
+      'fn bd(destination: AudioNode, start: Instant, velocity: Level):\n' +
+      '    ret fn off(end: Instant):\n' +
+      '        ret end\n' +
+      'fn sd(destination: AudioNode, start: Instant, velocity: Level):\n' +
+      '    ret fn off(end: Instant):\n' +
+      '        ret end\n' +
+      'fn helper(value: Number):\n' +
+      '    ret value\n'
+
+    expect(drumNames(source)).toEqual(['bd', 'sd'])
+    const kit = createDrumkit(source, {} as BaseAudioContext)
+    expect(kit.drumNames).toEqual(['bd', 'sd'])
+    expect(() => kit.hit('hh', {} as AudioNode, 0, 1)).toThrow('Unknown drum sample "hh".')
+    kit.dispose()
+  })
+
+  it('exposes the bundled drumkit voices', () => {
+    expect(drumNames(DRUMKIT_SOURCE)).toEqual(['bd', 'sd', 'hh'])
+  })
+
   it('evaluates augmented assignments and not expressions with Python-style precedence', () => {
     const patch = createPatch(
       'fn calculate():\n' +
