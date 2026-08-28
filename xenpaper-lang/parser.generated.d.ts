@@ -423,5 +423,10 @@ export interface PitchNominal extends Node {
   value: string
 }
 
+export interface XenpaperParserOptions extends ParserOptions {
+  /** Bare identifiers to parse as drum/sample leaves instead of pitches or identifiers. */
+  drumSamples?: readonly string[]
+}
+
 export declare const StartRules: ['Start']
-export declare function parse(input: string, options?: ParserOptions): Program
+export declare function parse(input: string, options?: XenpaperParserOptions): Program

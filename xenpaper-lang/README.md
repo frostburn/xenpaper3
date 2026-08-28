@@ -2,18 +2,17 @@
 
 ## Shared rhythm grammars
 
-`parse` is the pitched Xenpaper grammar. `parseDrums` selects the sample grammar,
-which shares document sequencing, parallel branches, normalized groups, repeats,
-rests, continuations, postfix marks, and directives with Xenpaper. The grammars
-split only at their bare event leaf: the pitched grammar reads `bd` as the Latin
-pitch B half-flat, while the sample grammar returns a `DrumSampleLiteral` whose
-sample is `bd`.
+The pitched and sample languages share document sequencing, parallel branches,
+normalized groups, repeats, rests, continuations, postfix marks, and directives.
+Callers enumerate sample names when parsing, so the grammars split only for those
+bare event leaves. Without that option, `bd` retains its pitched meaning as B
+half-flat.
 
 ```ts
-import { parse, parseDrums } from './index.js'
+import { parse } from './index.js'
 
 parse('bd') // B half-flat
-parseDrums('|:@x2 [bd sd] :|, hh') // bass/snare/hi-hat sample names
+parse('|:@x2 [bd sd] :|, hh', { drumSamples: ['bd', 'sd', 'hh'] })
 ```
 
 `xenpaper-lang` is the parser and renderer-independent runtime for Xenpaper 3's
@@ -60,6 +59,7 @@ Arithmetic expressions provide `pitch(ratio)` to convert a positive scalar
 ratio to a pitch displacement, `ratio(offset)` for the inverse conversion, and
 `sqrt(quantity)` for a square root. `sqrt()` retains an exact monomial when the
 value model is closed under the operation and halves the quantity's dimensions.
+The built-in identifier `pi` evaluates to the dimensionless real constant π.
 
 Key signatures may include a diatonic mode after the tonic, such as
 `{key = D minor}`. The supported names are Lydian, Ionian, Mixolydian, Dorian,

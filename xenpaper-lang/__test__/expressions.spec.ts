@@ -129,6 +129,11 @@ describe('arithmetic expression evaluation', () => {
     expect(duration.value.equals(Value.seconds(2))).toBe(true)
   })
 
+  it('evaluates pi as a built-in scalar identifier', () => {
+    expect(evaluate('pi').value.valueOf()).toBe(Math.PI)
+    expect(evaluate('sqrt(pi)').value.valueOf()).toBe(Math.sqrt(Math.PI))
+  })
+
   it('applies pitch operators uniformly without coercing scalars to pitches', () => {
     expect(evaluate("'sqrt(2)").value.equals(evaluate('sqrt(8)').value)).toBe(true)
     const up = evaluate('^3/2')

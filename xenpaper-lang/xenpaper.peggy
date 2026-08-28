@@ -210,8 +210,8 @@ PrimaryExpression
   / MonzoLiteral
   / MosIntervalLiteral
   / IntervalLiteral
-  / &{ return options.language !== "drums"; } pitch:MosPitchLiteral { return pitch; }
-  / &{ return options.language !== "drums"; } pitch:PitchLiteral { return pitch; }
+  / !DrumSampleLiteral pitch:MosPitchLiteral { return pitch; }
+  / !DrumSampleLiteral pitch:PitchLiteral { return pitch; }
   / EqualDivisionLiteral
   / QuantityLiteral
   / RatioLiteral
@@ -219,17 +219,14 @@ PrimaryExpression
   / DecimalLiteral
   / IntegerLiteral
   / CallExpression
-  // Bare words are the domain-specific leaf at the shared rhythm boundary.
-  // The pitched language keeps its existing identifier semantics, while the
-  // drum language treats the same token as a sample name. Everything above
-  // this rule can therefore be shared by both languages.
-  / &{ return options.language === "drums"; } sample:DrumSampleLiteral { return sample; }
-  / &{ return options.language !== "drums"; } identifier:IdentifierExpression {
-      return identifier;
-    }
+  // Callers enumerate the bare words that are sample leaves. This keeps
+  // identifiers and calls available in every context while allowing names
+  // such as `bd` to take precedence over pitch spellings when requested.
+  / DrumSampleLiteral
+  / IdentifierExpression
 
 DrumSampleLiteral
-  = sample:Identifier {
+  = sample:Identifier &{ return options.drumSamples?.includes(sample) ?? false; } {
       return node('DrumSampleLiteral', { sample, raw: text() });
     }
 

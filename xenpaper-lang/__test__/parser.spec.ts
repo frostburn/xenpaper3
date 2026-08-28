@@ -1,15 +1,16 @@
 import { describe, expect, it } from 'vitest'
-import { parseDrums } from '..'
 import { parse } from '../parser.generated.js'
 
 describe('grammar boundary roles', () => {
-  it('shares rhythm while interpreting bare drum words as sample leaves', () => {
+  it('shares rhythm while interpreting enumerated drum words as sample leaves', () => {
     expect(parse('bd').body[0]).toMatchObject({
       type: 'PitchLiteral',
       nominal: { system: 'latin', value: 'b' },
       accidentals: [{ value: 'd' }],
     })
-    expect(parseDrums('|:@x2 [bd sd] :|, hh?').body[0]).toMatchObject({
+    expect(
+      parse('|:@x2 [bd sd] :|, hh?', { drumSamples: ['bd', 'sd', 'hh'] }).body[0],
+    ).toMatchObject({
       type: 'Parallel',
       branches: [
         {
@@ -31,6 +32,20 @@ describe('grammar boundary roles', () => {
           type: 'PostfixExpression',
           expression: { type: 'DrumSampleLiteral', sample: 'hh' },
         },
+      ],
+    })
+    expect(parse('pi sqrt(2)', { drumSamples: ['bd'] }).body[0]).toMatchObject({
+      type: 'Sequence',
+      items: [
+        { type: 'Identifier', name: 'pi' },
+        { type: 'CallExpression', callee: 'sqrt', arguments: [{ type: 'IntegerLiteral' }] },
+      ],
+    })
+    expect(parse('pi sqrt(2)').body[0]).toMatchObject({
+      type: 'Sequence',
+      items: [
+        { type: 'Identifier', name: 'pi' },
+        { type: 'CallExpression', callee: 'sqrt' },
       ],
     })
   })
