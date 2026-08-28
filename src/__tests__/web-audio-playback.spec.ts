@@ -140,7 +140,7 @@ describe('Web Audio playback session', () => {
     const hit = vi.fn<PlayableDrumkitPatch['hit']>(() => (end) => end + 0.1)
     const dispose = vi.fn<() => void>()
     const drumkitFactory = vi.fn(
-      () => ({ drumNames: ['bd'], hit, dispose }) as PlayableDrumkitPatch,
+      () => ({ drumNames: ['bd'], hit, dispose, ready: Promise.resolve() }) as PlayableDrumkitPatch,
     )
     const pitchedPlan = createPlan()
     const plan: PlaybackPlan = {
@@ -174,7 +174,7 @@ describe('Web Audio playback session', () => {
     const on = vi.fn<PlayableSynthPatch['on']>(() => noteOff)
     const dispose = vi.fn<() => void>()
     const patchFactory = vi.fn<() => PlayableSynthPatch>(
-      () => ({ on, dispose }) as PlayableSynthPatch,
+      () => ({ on, dispose, ready: Promise.resolve() }) as PlayableSynthPatch,
     )
     const session = new WebAudioPlaybackSession(context as unknown as AudioContext, createPlan(), {
       patchFactory,

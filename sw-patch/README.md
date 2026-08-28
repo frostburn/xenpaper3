@@ -74,6 +74,7 @@ import source from './src/patches/drumkit.swpatch?raw'
 const drums = drumNames(source) // ['bd', 'sd', 'hh']
 const score = parse('[bd sd] hh hh', { drumSamples: drums })
 const kit = createDrumkit(source, audioContext)
+await kit.ready
 const off = kit.hit('bd', audioContext.destination, audioContext.currentTime, 0.8)
 off(audioContext.currentTime + 0.25)
 ```

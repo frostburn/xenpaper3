@@ -13,6 +13,8 @@ export type PatchFunction = (...arguments_: unknown[]) => unknown
 
 export interface SynthPatch {
   [name: string]: unknown
+  /** Resolves after the AudioWorklet processors used by utility nodes are installed. */
+  readonly ready: Promise<void>
   /** Tears down implicit nodes and connections owned by this patch. */
   dispose(): void
 }
@@ -746,6 +748,7 @@ export class PatchRuntime {
   evaluate(program: Program): SynthPatch {
     this.topLevelBindings.clear()
     const patch: SynthPatch = {
+      ready: this.workletsReady,
       dispose: () => {
         this.dispose()
       },

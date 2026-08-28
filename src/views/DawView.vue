@@ -85,7 +85,7 @@ const togglePlayback = async () => {
     audioEngine ??= new DawAudioEngine()
     audioEngine.addEventListener('ended', finishPlayback)
     if (audioEngine.context.state === 'suspended') await audioEngine.context.resume()
-    audioEngine.play(project.value, playhead.value)
+    await audioEngine.play(project.value, playhead.value)
     playing.value = true
     playTimer = setInterval(() => {
       playhead.value = audioEngine?.positionBeats ?? playhead.value

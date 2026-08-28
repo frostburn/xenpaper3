@@ -203,6 +203,29 @@ describe('SW Patch runtime', () => {
     expect(revokeObjectURL).toHaveBeenCalledWith('blob:math-worklets')
   })
 
+  it('exposes worklet initialization readiness on compiled patches', async () => {
+    let finishRegistration: (() => void) | undefined
+    const addModule = vi.fn(
+      () =>
+        new Promise<void>((resolve) => {
+          finishRegistration = resolve
+        }),
+    )
+    vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:patch-worklets')
+    vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => {})
+    const context = { audioWorklet: { addModule } } as unknown as BaseAudioContext
+    const patch = createPatch('fn noop():\n    ret null\n', context)
+    let ready = false
+    void patch.ready.then(() => (ready = true))
+
+    await Promise.resolve()
+    expect(ready).toBe(false)
+    finishRegistration?.()
+    await patch.ready
+    expect(ready).toBe(true)
+    patch.dispose()
+  })
+
   it('provides native-style utility signal sources', () => {
     const worklets: MockAudioWorkletNode[] = []
     class MockAudioWorkletNode extends EventTarget {
