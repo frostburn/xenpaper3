@@ -1,5 +1,11 @@
 export type { Diagnostic, DiagnosticSeverity } from './diagnostics'
-export { parse } from './parser.generated.js'
+import { parse as parseGenerated } from './parser.generated.js'
+
+export const parse = parseGenerated
+
+/** Parse the sample language using the rhythm shared with pitched Xenpaper. */
+export const parseDrums = (source: string) =>
+  parseGenerated(source, { language: 'drums' } as Parameters<typeof parseGenerated>[1])
 export type * from './parser.generated.js'
 export { expandRepeats } from './runtime/repeat-expansion'
 export { decimalFraction, evaluateLiteral } from './runtime/literals'

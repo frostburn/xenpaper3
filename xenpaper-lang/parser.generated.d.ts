@@ -33,6 +33,7 @@ export type Expression =
   | DegreeLiteral
   | Directive
   | DetachedContinue
+  | DrumSampleLiteral
   | EqualDivisionLiteral
   | EnumeratedChord
   | Group
@@ -64,6 +65,12 @@ export type Expression =
 export interface Barline extends Node {
   type: 'Barline'
   raw: '|'
+}
+
+export interface DrumSampleLiteral extends Node {
+  type: 'DrumSampleLiteral'
+  sample: string
+  raw: string
 }
 
 export interface BinaryExpression extends Node {

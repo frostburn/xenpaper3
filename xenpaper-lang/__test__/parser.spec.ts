@@ -1,7 +1,40 @@
 import { describe, expect, it } from 'vitest'
+import { parseDrums } from '..'
 import { parse } from '../parser.generated.js'
 
 describe('grammar boundary roles', () => {
+  it('shares rhythm while interpreting bare drum words as sample leaves', () => {
+    expect(parse('bd').body[0]).toMatchObject({
+      type: 'PitchLiteral',
+      nominal: { system: 'latin', value: 'b' },
+      accidentals: [{ value: 'd' }],
+    })
+    expect(parseDrums('|:@x2 [bd sd] :|, hh?').body[0]).toMatchObject({
+      type: 'Parallel',
+      branches: [
+        {
+          type: 'Repeat',
+          body: [
+            {
+              type: 'NormalizeToSlot',
+              expression: {
+                type: 'Sequence',
+                items: [
+                  { type: 'DrumSampleLiteral', sample: 'bd' },
+                  { type: 'DrumSampleLiteral', sample: 'sd' },
+                ],
+              },
+            },
+          ],
+        },
+        {
+          type: 'PostfixExpression',
+          expression: { type: 'DrumSampleLiteral', sample: 'hh' },
+        },
+      ],
+    })
+  })
+
   it('keeps signed degrees as sequence items while allowing explicit scalar arithmetic', () => {
     expect(parse('-1 -2 0 +1').body[0]).toMatchObject({
       type: 'Sequence',

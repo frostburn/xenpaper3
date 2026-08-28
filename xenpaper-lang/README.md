@@ -1,5 +1,21 @@
 # xenpaper-lang
 
+## Shared rhythm grammars
+
+`parse` is the pitched Xenpaper grammar. `parseDrums` selects the sample grammar,
+which shares document sequencing, parallel branches, normalized groups, repeats,
+rests, continuations, postfix marks, and directives with Xenpaper. The grammars
+split only at their bare event leaf: the pitched grammar reads `bd` as the Latin
+pitch B half-flat, while the sample grammar returns a `DrumSampleLiteral` whose
+sample is `bd`.
+
+```ts
+import { parse, parseDrums } from './index.js'
+
+parse('bd') // B half-flat
+parseDrums('|:@x2 [bd sd] :|, hh') // bass/snare/hi-hat sample names
+```
+
 `xenpaper-lang` is the parser and renderer-independent runtime for Xenpaper 3's
 microtonal score language. It is currently part of this repository rather than
 a separately published package.

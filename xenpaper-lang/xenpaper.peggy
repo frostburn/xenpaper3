@@ -210,8 +210,8 @@ PrimaryExpression
   / MonzoLiteral
   / MosIntervalLiteral
   / IntervalLiteral
-  / MosPitchLiteral
-  / PitchLiteral
+  / &{ return options.language !== "drums"; } MosPitchLiteral
+  / &{ return options.language !== "drums"; } PitchLiteral
   / EqualDivisionLiteral
   / QuantityLiteral
   / RatioLiteral
@@ -219,7 +219,17 @@ PrimaryExpression
   / DecimalLiteral
   / IntegerLiteral
   / CallExpression
-  / IdentifierExpression
+  // Bare words are the domain-specific leaf at the shared rhythm boundary.
+  // The pitched language keeps its existing identifier semantics, while the
+  // drum language treats the same token as a sample name. Everything above
+  // this rule can therefore be shared by both languages.
+  / &{ return options.language === "drums"; } DrumSampleLiteral
+  / &{ return options.language !== "drums"; } IdentifierExpression
+
+DrumSampleLiteral
+  = sample:Identifier {
+      return node('DrumSampleLiteral', { sample, raw: text() });
+    }
 
 // Colon chords are ratios relative to their first enumerand.  The leading
 // slash takes reciprocals before that normalization, which is equivalent to
