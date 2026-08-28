@@ -20,7 +20,13 @@ export type {
   PlaybackNote,
   PlaybackPlan,
 } from './playback-plan'
-export { parseClipNotes, parseLaneNotes, parseProjectScoreNotes, sourceClipLength } from './score'
+export {
+  parseClipNotes,
+  parseDrumClipNotes,
+  parseLaneNotes,
+  parseProjectScoreNotes,
+  sourceClipLength,
+} from './score'
 export type { EnvelopeSettings, PitchGlideSegment, ScheduledLaneNote } from './score'
 export { createTempoMap, projectBeatToSeconds, projectSecondsToBeat, TempoMap } from './timeline'
 export { easeGlissando, type GlissandoEasing } from './easing'

@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import type { PlayableSynthPatch } from '../../sw-patch'
+import type { PlayableDrumkitPatch, PlayableSynthPatch } from '../../sw-patch'
 import { DawAudioEngine } from '../daw/audio-engine'
 import type { PlaybackPlan } from '../daw/playback-plan'
 import { TempoMap } from '../daw/timeline'
@@ -135,6 +135,39 @@ afterEach(() => {
 })
 
 describe('Web Audio playback session', () => {
+  it('dispatches named drum notes without creating pitch signals', () => {
+    const context = new MockAudioContext()
+    const hit = vi.fn<PlayableDrumkitPatch['hit']>(() => (end) => end + 0.1)
+    const dispose = vi.fn<() => void>()
+    const drumkitFactory = vi.fn(
+      () => ({ drumNames: ['bd'], hit, dispose }) as PlayableDrumkitPatch,
+    )
+    const pitchedPlan = createPlan()
+    const plan: PlaybackPlan = {
+      ...pitchedPlan,
+      lanes: [
+        {
+          ...pitchedPlan.lanes[0]!,
+          kind: 'drum',
+          patchSource: 'drumkit',
+          notes: [{ ...pitchedPlan.lanes[0]!.notes[0]!, sample: 'bd' }],
+        },
+      ],
+    }
+    const session = new WebAudioPlaybackSession(context as unknown as AudioContext, plan, {
+      drumkitFactory,
+    })
+
+    session.start()
+
+    expect(drumkitFactory).toHaveBeenCalledOnce()
+    expect(hit).toHaveBeenCalledWith('bd', MockGainNode.instances[0], 0.2, 0.4)
+    // The transport owns one timing source; drum playback adds no pitch source.
+    expect(context.sources).toHaveLength(1)
+    session.stop()
+    expect(dispose).toHaveBeenCalledOnce()
+  })
+
   it('translates one pure plan into a disposable SW Patch voice', () => {
     const context = new MockAudioContext()
     const noteOff = vi.fn<(end: number) => number>((end) => end + 0.5)

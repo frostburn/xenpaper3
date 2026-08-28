@@ -6,7 +6,11 @@ import {
   type DirectiveExtension,
   type DirectiveExtensionState,
   type PitchContext,
+  type Program,
+  type BeatTimedNoteEvent,
 } from '../../xenpaper-lang'
+import { drumNames } from '../../sw-patch'
+import DRUMKIT_PATCH_SOURCE from '../patches/drumkit.swpatch?raw'
 import { beat, beatToNumber, type Beat, type DawProject, type InstrumentLane } from './project'
 
 export interface EnvelopeSettings {
@@ -21,9 +25,36 @@ export interface ScheduledLaneNote {
   readonly duration: number
   /** Authored pitch in cents relative to Xenpaper's C reference. */
   readonly cents: number
+  /** Named SW Patch voice for a drum event; absent for pitched notes. */
+  readonly sample?: string
   readonly velocity: number
   readonly envelope: EnvelopeSettings
   readonly glissando?: readonly PitchGlideSegment[]
+}
+
+const resolvePatchSource = (source: string): string =>
+  source === 'drumkit' ? DRUMKIT_PATCH_SOURCE : source
+
+export const drumSamplesForLane = (lane: InstrumentLane): readonly string[] =>
+  lane.kind === 'drum' ? drumNames(resolvePatchSource(lane.patchSource)) : []
+
+const lowerDrumSamples = (program: Program): Program => {
+  const lower = (value: unknown): unknown => {
+    if (Array.isArray(value)) return value.map(lower)
+    if (!value || typeof value !== 'object') return value
+    const node = value as Record<string, unknown>
+    if (node.type === 'DrumSampleLiteral') {
+      return {
+        type: 'DegreeLiteral',
+        modifiers: [],
+        degree: '0',
+        raw: node.sample,
+        location: node.location,
+      }
+    }
+    return Object.fromEntries(Object.entries(node).map(([key, child]) => [key, lower(child)]))
+  }
+  return lower(program) as Program
 }
 
 export interface PitchGlideSegment {
@@ -126,9 +157,42 @@ export const parseClipNotes = (
     }))
 }
 
+/** Compile a drum clip through the shared score runtime while retaining named voices. */
+export const parseDrumClipNotes = (
+  source: string,
+  samples: readonly string[],
+  duration = Number.POSITIVE_INFINITY,
+): ScheduledLaneNote[] => {
+  const program = lowerDrumSamples(parse(source, { drumSamples: samples }))
+  const result = expandToBeatEvents(program)
+  const errors = result.diagnostics.filter(({ severity }) => severity === 'error')
+  if (errors.length) throw new Error(errors.map(({ message }) => message).join('\n'))
+  if (!('score' in result)) return []
+  return result.score.events
+    .filter(
+      (event): event is BeatTimedNoteEvent =>
+        event.kind === 'note' && event.start.valueOf() < duration,
+    )
+    .map((event) => ({
+      beat: event.start.valueOf(),
+      duration: Math.min(event.duration.valueOf(), duration - event.start.valueOf()),
+      cents: 0,
+      sample: event.label,
+      velocity: event.dynamic.valueOf(),
+      envelope: DEFAULT_ENVELOPE,
+    }))
+}
+
 /** Derive a clip's visual span from its score, using one bar for empty scores. */
-export const sourceClipLength = (source: string, defaultBar = beat(4)): Beat => {
-  const result = expandToBeatEvents(parse(source), { directiveExtensions: [envelopeExtension] })
+export const sourceClipLength = (
+  source: string,
+  defaultBar = beat(4),
+  samples: readonly string[] = [],
+): Beat => {
+  const program = samples.length
+    ? lowerDrumSamples(parse(source, { drumSamples: samples }))
+    : parse(source)
+  const result = expandToBeatEvents(program, { directiveExtensions: [envelopeExtension] })
   if (!('score' in result) || result.diagnostics.some(({ severity }) => severity === 'error'))
     return defaultBar
   const duration = result.score.duration
@@ -141,12 +205,14 @@ export const parseLaneNotes = (
   lane: InstrumentLane,
   globalInitialization: SourceInitialization = {},
 ): ScheduledLaneNote[] => {
+  const samples = drumSamplesForLane(lane)
   const laneInitialization = compileSourceInitialization(lane.source, globalInitialization)
   const notes = lane.clips.flatMap((clip) => {
     const clipStart = beatToNumber(clip.start)
-    return parseClipNotes(clip.source, beatToNumber(clip.length), laneInitialization).map(
-      (event) => ({ ...event, beat: clipStart + event.beat }),
-    )
+    const clipNotes = samples.length
+      ? parseDrumClipNotes(clip.source, samples, beatToNumber(clip.length))
+      : parseClipNotes(clip.source, beatToNumber(clip.length), laneInitialization)
+    return clipNotes.map((event) => ({ ...event, beat: clipStart + event.beat }))
   })
   return notes.sort((left, right) => left.beat - right.beat)
 }

@@ -35,6 +35,8 @@ export interface SourceClip {
 }
 
 export interface InstrumentLane {
+  /** Absent on version-1 projects created before drum lanes; interpreted as instrument. */
+  kind?: 'instrument' | 'drum'
   id: string
   name: string
   patchSource: string
@@ -53,6 +55,9 @@ export interface DawProject {
 
 export const DEFAULT_CLIP_SOURCE = `# New Xenpaper clip
 [0,4,7]===
+`
+export const DEFAULT_DRUM_CLIP_SOURCE = `# Basic 4/4 beat
+[bd,hh] hh [sd,hh] hh
 `
 export const DEFAULT_SW_PATCH_SOURCE = 'default'
 export const DEFAULT_GLOBAL_SOURCE = `# Shared tuning and score initialization (for example: {12edo})
@@ -84,11 +89,28 @@ export const createInstrumentLane = (project: DawProject): InstrumentLane => {
   while (usedIds.has(`instrument-${suffix}`)) suffix += 1
   return {
     id: `instrument-${suffix}`,
+    kind: 'instrument',
     name: `Instrument ${suffix}`,
     patchSource: DEFAULT_SW_PATCH_SOURCE,
     oscillatorType: 'sawtooth',
     gain: 0.8,
     source: DEFAULT_INSTRUMENT_SOURCE,
+    clips: [],
+  }
+}
+
+export const createDrumLane = (project: DawProject): InstrumentLane => {
+  const usedIds = new Set(project.instrumentLanes.map((lane) => lane.id))
+  let suffix = 1
+  while (usedIds.has(`drum-${suffix}`)) suffix += 1
+  return {
+    id: `drum-${suffix}`,
+    kind: 'drum',
+    name: `Drums ${suffix}`,
+    patchSource: 'drumkit',
+    oscillatorType: 'sine',
+    gain: 0.8,
+    source: '',
     clips: [],
   }
 }
@@ -118,6 +140,6 @@ export const createClip = (lane: InstrumentLane, start: Beat): SourceClip => {
     id: `clip-${suffix}`,
     start,
     length: beat(4),
-    source: DEFAULT_CLIP_SOURCE,
+    source: lane.kind === 'drum' ? DEFAULT_DRUM_CLIP_SOURCE : DEFAULT_CLIP_SOURCE,
   }
 }

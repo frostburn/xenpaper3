@@ -1,17 +1,19 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, ref } from 'vue'
 import ClipSourceEditor from '../components/daw/ClipSourceEditor.vue'
+import DrumLane from '../components/daw/DrumLane.vue'
 import GlobalLane from '../components/daw/GlobalLane.vue'
 import InstrumentHeader from '../components/daw/InstrumentHeader.vue'
 import InstrumentPianoRollLane from '../components/daw/InstrumentPianoRollLane.vue'
 import TransportControls from '../components/daw/TransportControls.vue'
 import { DawAudioEngine } from '../daw/audio-engine'
-import { sourceClipLength } from '../daw/score'
+import { drumSamplesForLane, sourceClipLength } from '../daw/score'
 import {
   beat,
   beatToNumber,
   createClip,
   createDefaultProject,
+  createDrumLane,
   createInstrumentLane,
   snapBeat,
   type Beat,
@@ -119,6 +121,7 @@ const deleteClip = (lane: InstrumentLane, clip: SourceClip) => {
 
 const addInstrumentLane = () =>
   project.value.instrumentLanes.push(createInstrumentLane(project.value))
+const addDrumLane = () => project.value.instrumentLanes.push(createDrumLane(project.value))
 
 const deleteInstrumentLane = (lane: InstrumentLane) => {
   const index = project.value.instrumentLanes.findIndex(({ id }) => id === lane.id)
@@ -137,7 +140,11 @@ const deleteSelectedClip = () => {
 const updateClipSource = (clip: SourceClip, source: string) => {
   clip.source = source
   const signature = project.value.globalTrack.timeSignatureChanges[0]!
-  clip.length = sourceClipLength(source, beat(signature.numerator * 4, signature.denominator))
+  clip.length = sourceClipLength(
+    source,
+    beat(signature.numerator * 4, signature.denominator),
+    selectedLane.value ? drumSamplesForLane(selectedLane.value) : [],
+  )
 }
 
 onBeforeUnmount(() => {
@@ -180,16 +187,9 @@ onBeforeUnmount(() => {
       "
     />
     <section v-for="lane in project.instrumentLanes" :key="lane.id" class="instrument-lane">
-      <InstrumentHeader
+      <DrumLane
+        v-if="lane.kind === 'drum'"
         :lane="lane"
-        @update-source="lane.source = $event"
-        @update-oscillator="lane.oscillatorType = $event"
-        @update-gain="lane.gain = $event"
-        @delete="deleteInstrumentLane(lane)"
-      />
-      <InstrumentPianoRollLane
-        :lane="lane"
-        :global-source="project.globalTrack.source"
         :selected-clip-id="selectedLaneId === lane.id ? selectedClipId : undefined"
         :pixels-per-beat="pixelsPerBeat"
         :scroll-left="scrollLeft"
@@ -199,9 +199,38 @@ onBeforeUnmount(() => {
         @place-playhead="playhead = $event"
         @move="moveClip"
         @delete="deleteClip(lane, $event)"
+        @update-gain="lane.gain = $event"
+        @delete-lane="deleteInstrumentLane(lane)"
       />
+      <template v-else>
+        <InstrumentHeader
+          :lane="lane"
+          @update-source="lane.source = $event"
+          @update-oscillator="lane.oscillatorType = $event"
+          @update-gain="lane.gain = $event"
+          @delete="deleteInstrumentLane(lane)"
+        />
+        <InstrumentPianoRollLane
+          :lane="lane"
+          :global-source="project.globalTrack.source"
+          :selected-clip-id="selectedLaneId === lane.id ? selectedClipId : undefined"
+          :pixels-per-beat="pixelsPerBeat"
+          :scroll-left="scrollLeft"
+          :display-mode="displayMode"
+          @insert="insertClip(lane, $event)"
+          @select="selectClip(lane, $event)"
+          @place-playhead="playhead = $event"
+          @move="moveClip"
+          @delete="deleteClip(lane, $event)"
+        />
+      </template>
     </section>
-    <button type="button" class="add-lane" @click="addInstrumentLane">Add instrument lane</button>
+    <div class="add-lanes">
+      <button type="button" class="add-lane" @click="addInstrumentLane">Add instrument lane</button>
+      <button type="button" class="add-lane add-drum-lane" @click="addDrumLane">
+        Add drum lane
+      </button>
+    </div>
     <ClipSourceEditor
       ref="editor"
       :clip="selectedClip"
@@ -237,7 +266,7 @@ onBeforeUnmount(() => {
   margin-top: 1rem;
 }
 .add-lane {
-  width: 100%;
+  flex: 1;
   margin: 0.75rem 0;
   border: 1px dashed #7184a8;
   border-radius: 0.25rem;
@@ -245,5 +274,9 @@ onBeforeUnmount(() => {
   color: #eef3ff;
   background: #1b2536;
   cursor: pointer;
+}
+.add-lanes {
+  display: flex;
+  gap: 0.75rem;
 }
 </style>

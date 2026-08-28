@@ -1,6 +1,13 @@
-import { createPatch, type PlayableSynthPatch, type SynthPatch } from '../../sw-patch'
+import {
+  createDrumkit,
+  createPatch,
+  type PlayableDrumkitPatch,
+  type PlayableSynthPatch,
+  type SynthPatch,
+} from '../../sw-patch'
 import { Transport } from '../../sw-seq'
 import DEFAULT_PATCH_SOURCE from '../patches/default.swpatch?raw'
+import DRUMKIT_PATCH_SOURCE from '../patches/drumkit.swpatch?raw'
 import type { PlaybackLane, PlaybackPlan } from './playback-plan'
 import { applyPitchAutomation } from './web-audio-automation'
 
@@ -13,16 +20,18 @@ type PatchFactory = (
   context: BaseAudioContext,
   options: { config: { oscillatorType: PlaybackLane['oscillatorType'] } },
 ) => SynthPatch
+type DrumkitFactory = typeof createDrumkit
 
 export interface WebAudioPlaybackOptions {
   readonly outputGain?: number
   readonly patchFactory?: PatchFactory
+  readonly drumkitFactory?: DrumkitFactory
   readonly resolvePatchSource?: (source: string) => string
   readonly onEnded?: () => void
 }
 
 const defaultPatchSource = (source: string): string =>
-  source === 'default' ? DEFAULT_PATCH_SOURCE : source
+  source === 'default' ? DEFAULT_PATCH_SOURCE : source === 'drumkit' ? DRUMKIT_PATCH_SOURCE : source
 
 const requirePlayableSynth = (patch: SynthPatch, lane: PlaybackLane): PlayableSynthPatch => {
   if (typeof (patch as Partial<PlayableSynthPatch>).on === 'function')
@@ -39,9 +48,11 @@ export class WebAudioPlaybackSession {
 
   private readonly output: GainNode
   private readonly patchFactory: PatchFactory
+  private readonly drumkitFactory: DrumkitFactory
   private readonly resolvePatchSource: (source: string) => string
   private readonly onEnded?: () => void
   private readonly synths: PlayableSynthPatch[] = []
+  private readonly drumkits: PlayableDrumkitPatch[] = []
   private readonly pitchSignals: ConstantSourceNode[] = []
   private completionTimer: ReturnType<typeof setTimeout> | undefined
   private latestCutoff = 0
@@ -52,6 +63,7 @@ export class WebAudioPlaybackSession {
     this.plan = plan
     this.transport = new Transport(context)
     this.patchFactory = options.patchFactory ?? createPatch
+    this.drumkitFactory = options.drumkitFactory ?? createDrumkit
     this.resolvePatchSource = options.resolvePatchSource ?? defaultPatchSource
     this.onEnded = options.onEnded
     this.output = new GainNode(context, { gain: options.outputGain ?? DEFAULT_OUTPUT_GAIN })
@@ -93,6 +105,31 @@ export class WebAudioPlaybackSession {
 
   private schedulePlan(): void {
     for (const lane of this.plan.lanes) {
+      if (lane.kind === 'drum') {
+        const kit = this.drumkitFactory(this.resolvePatchSource(lane.patchSource), this.context)
+        this.drumkits.push(kit)
+        for (const note of lane.notes) {
+          if (!note.sample) throw new TypeError(`Drum lane "${lane.name}" contains a pitched note`)
+          this.transport.scheduleParametricNote({
+            when: note.when,
+            duration: note.duration,
+            noteOn: (time) => {
+              const off = kit.hit(note.sample!, this.output, time, note.velocity * lane.gain)
+              return (end) => {
+                const cutoff = Number(off(end))
+                if (!Number.isFinite(cutoff) || cutoff < end) {
+                  throw new RangeError(
+                    'A drum patch note-off must return a finite cutoff at or after note end',
+                  )
+                }
+                this.latestCutoff = Math.max(this.latestCutoff, cutoff)
+                return cutoff
+              }
+            },
+          })
+        }
+        continue
+      }
       const patch = this.patchFactory(this.resolvePatchSource(lane.patchSource), this.context, {
         config: { oscillatorType: lane.oscillatorType },
       })
@@ -175,6 +212,8 @@ export class WebAudioPlaybackSession {
     // patch's later targeted disconnect throw in browsers.
     for (const synth of this.synths) synth.dispose()
     this.synths.length = 0
+    for (const drumkit of this.drumkits) drumkit.dispose()
+    this.drumkits.length = 0
     for (const pitch of this.pitchSignals) pitch.disconnect()
     this.pitchSignals.length = 0
     this.latestCutoff = 0

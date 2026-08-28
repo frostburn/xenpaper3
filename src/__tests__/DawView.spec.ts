@@ -4,10 +4,13 @@ import { Fraction } from 'xen-dev-utils'
 import router from '../router'
 import DawView from '../views/DawView.vue'
 import InstrumentPianoRollLane from '../components/daw/InstrumentPianoRollLane.vue'
+import DrumLane from '../components/daw/DrumLane.vue'
 import {
   beat,
   beatToNumber,
   createDefaultProject,
+  createClip,
+  createDrumLane,
   createInstrumentLane,
   pointerXToBeat,
   snapBeat,
@@ -15,6 +18,7 @@ import {
 import {
   parseProjectNotes,
   parseClipNotes,
+  parseDrumClipNotes,
   notePlaybackWindow,
   easeGlissando,
   glissandoPitchAtBeat,
@@ -24,6 +28,7 @@ import {
   projectSecondsToBeat,
   sourceClipLength,
 } from '../daw/audio-engine'
+import { drumSamplesForLane } from '../daw/score'
 
 describe('DAW project model', () => {
   it('resumes sustained notes at the playhead with their remaining duration', () => {
@@ -61,6 +66,26 @@ describe('DAW project model', () => {
     const lane = createInstrumentLane(project)
     expect(lane).toMatchObject({ id: 'instrument-1', name: 'Instrument 1', clips: [] })
     expect(lane.source).toContain('@patch(attack: 100ms')
+  })
+
+  it('creates drum lanes with a basic 4/4 clip and named events', () => {
+    const project = createDefaultProject()
+    const lane = createDrumLane(project)
+    const clip = createClip(lane, beat(0))
+    const samples = drumSamplesForLane(lane)
+
+    expect(lane).toMatchObject({ id: 'drum-1', kind: 'drum', patchSource: 'drumkit' })
+    expect(clip.source).toContain('[bd,hh] hh [sd,hh] hh')
+    expect(
+      parseDrumClipNotes(clip.source, samples).map(({ beat, sample }) => [beat, sample]),
+    ).toEqual([
+      [0, 'bd'],
+      [0, 'hh'],
+      [1, 'hh'],
+      [2, 'sd'],
+      [2, 'hh'],
+      [3, 'hh'],
+    ])
   })
 
   it('converts scrolled, zoomed pointer coordinates and snaps exactly', () => {
@@ -408,6 +433,20 @@ describe('DawView', () => {
     expect(wrapper.find('[aria-label="Piano roll preview"]').exists()).toBe(true)
     await wrapper.get('[aria-label="Clip display"]').setValue('source')
     expect(wrapper.get('button.clip pre').text()).toContain('[0,4,7]===')
+  })
+
+  it('adds a drum lane and creates its default 4/4 clip', async () => {
+    const wrapper = mount(DawView)
+    await wrapper.get('button.add-drum-lane').trigger('click')
+    const lane = wrapper.getComponent(DrumLane)
+    expect(lane.get('[aria-label="Drum lane"]').attributes('aria-label')).toBe('Drum lane')
+
+    await lane.get('[aria-label="Drum lane"]').trigger('dblclick', { clientX: 64 })
+    expect(wrapper.get('[aria-label="Xenpaper clip source"]').element).toHaveProperty(
+      'value',
+      expect.stringContaining('[bd,hh] hh [sd,hh] hh'),
+    )
+    expect(lane.findAll('[aria-label="Drum pattern preview"] i')).toHaveLength(6)
   })
 
   it('resizes a clip when its source duration changes', async () => {
