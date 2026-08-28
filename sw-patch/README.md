@@ -85,6 +85,16 @@ The standard `Math` constants `E`, `LN10`, `LN2`, `LOG10E`, `LOG2E`, `PI`,
 `SQRT1_2`, and `SQRT2` are available as scalars. `random()` returns a random
 scalar between zero (inclusive) and one (exclusive).
 
+Standard Web Audio nodes can be created with their API constructor names:
+`AnalyserNode`, `AudioBufferSourceNode`, `BiquadFilterNode`,
+`ChannelMergerNode`, `ChannelSplitterNode`, `ConstantSourceNode`,
+`ConvolverNode`, `DelayNode`, `DynamicsCompressorNode`, `GainNode`,
+`IIRFilterNode`, `OscillatorNode`, `PannerNode`, `StereoPannerNode`, and
+`WaveShaperNode`. Constructor options use named arguments in patch source.
+When a browser only provides the older `AudioContext.create*()` form, SW Patch
+uses it automatically and applies the same options, including `AudioParam`
+initial values.
+
 SW Patch also provides audio-rate utility sources that follow the native source
 node API. `TimeNode()` outputs elapsed seconds after `start()`, `PhaserNode()`
 outputs an unfiltered sawtooth phase from zero up to one and exposes an
