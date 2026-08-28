@@ -1,6 +1,10 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
-import { drumSamplesForLane, parseDrumClipNotes } from '../../daw/score'
+import {
+  compileSourceInitialization,
+  drumSamplesForLane,
+  parseDrumClipNotes,
+} from '../../daw/score'
 import {
   beatToNumber,
   pointerXToBeat,
@@ -11,6 +15,7 @@ import {
 
 const props = defineProps<{
   lane: InstrumentLane
+  globalSource?: string
   selectedClipId?: string
   pixelsPerBeat: number
   scrollLeft: number
@@ -33,7 +38,17 @@ const eventsByClip = computed(() =>
   Object.fromEntries(
     props.lane.clips.map((clip) => {
       try {
-        return [clip.id, parseDrumClipNotes(clip.source, samples.value, beatToNumber(clip.length))]
+        const globalInitialization = compileSourceInitialization(props.globalSource ?? '')
+        const initialization = compileSourceInitialization(props.lane.source, globalInitialization)
+        return [
+          clip.id,
+          parseDrumClipNotes(
+            clip.source,
+            samples.value,
+            beatToNumber(clip.length),
+            initialization,
+          ),
+        ]
       } catch {
         return [clip.id, []]
       }
