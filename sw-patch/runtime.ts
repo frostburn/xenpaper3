@@ -601,6 +601,9 @@ class SwPatchSoftParabolicProcessor extends SwPatchSoftOscillatorProcessor {
     return (shapedCosine - (shapedCosine ** 2 - shapedBite ** 2) / Math.PI) / shapedBite
   }
 }
+class SwPatchNoiseProcessor extends SwPatchScheduledSourceProcessor {
+  valueAt() { return Math.random() * 2 - 1 }
+}
 class SwPatchRandomProcessor extends SwPatchScheduledSourceProcessor {
   valueAt() { return Math.random() }
 }
@@ -610,6 +613,7 @@ registerProcessor('sw-patch-soft-triangle', SwPatchSoftTriangleProcessor)
 registerProcessor('sw-patch-soft-sawtooth', SwPatchSoftSawtoothProcessor)
 registerProcessor('sw-patch-soft-square', SwPatchSoftSquareProcessor)
 registerProcessor('sw-patch-soft-parabolic', SwPatchSoftParabolicProcessor)
+registerProcessor('sw-patch-noise', SwPatchNoiseProcessor)
 registerProcessor('sw-patch-random', SwPatchRandomProcessor)
 `
 
@@ -818,6 +822,7 @@ export class PatchRuntime {
     this.root.set('SoftParabolicNode', (...args: unknown[]) =>
       this.createUtilitySource('sw-patch-soft-parabolic', args),
     )
+    this.root.set('NoiseNode', () => this.createUtilitySource('sw-patch-noise'))
     this.root.set('RandomNode', () => this.createUtilitySource('sw-patch-random'))
     this.root.set('where', (...values: unknown[]) => this.where(values))
     this.root.set('atodb', (value: unknown) => this.convertMath('sw-patch-atodb', atodb, value))

@@ -254,35 +254,39 @@ describe('SW Patch runtime', () => {
       'fn sources(start: time):\n' +
         '    t = TimeNode()\n' +
         '    phase = PhaserNode(frequency = 2Hz, detune = 100c)\n' +
-        '    noise = RandomNode()\n' +
+        '    noise = NoiseNode()\n' +
+        '    random = RandomNode()\n' +
         '    t.start(start)\n' +
         '    phase.start(start)\n' +
         '    noise.start()\n' +
+        '    random.start()\n' +
         '    ret phase\n',
       context,
     )
 
     const phase = (patch.sources as PatchFunction)(Quantity.unit(6, 's')) as MockAudioWorkletNode
-    expect(worklets.map(({ name }) => name).slice(-3)).toEqual([
+    expect(worklets.map(({ name }) => name).slice(-4)).toEqual([
       'sw-patch-time',
       'sw-patch-phaser',
+      'sw-patch-noise',
       'sw-patch-random',
     ])
     expect(phase.options).toEqual({ numberOfInputs: 0 })
     expect(phase.parameters.get('frequency')?.value).toBe(2)
     expect(phase.parameters.get('detune')?.value).toBe(100)
-    expect(worklets.at(-3)?.port.postMessage).toHaveBeenCalledWith({ type: 'start', when: 6 })
+    expect(worklets.at(-4)?.port.postMessage).toHaveBeenCalledWith({ type: 'start', when: 6 })
+    expect(worklets.at(-2)?.port.postMessage).toHaveBeenCalledWith({ type: 'start', when: 4 })
     expect(worklets.at(-1)?.port.postMessage).toHaveBeenCalledWith({ type: 'start', when: 4 })
 
     const ended = vi.fn<() => void>()
-    worklets.at(-3)?.addEventListener('ended', ended)
-    worklets.at(-3)?.port.onmessage?.({ data: 'ended' } as MessageEvent)
+    worklets.at(-4)?.addEventListener('ended', ended)
+    worklets.at(-4)?.port.onmessage?.({ data: 'ended' } as MessageEvent)
     expect(ended).toHaveBeenCalledOnce()
-    expect(worklets.at(-3)?.port.onmessage).toBeNull()
-    const completedSourceMessages = worklets.at(-3)?.port.postMessage.mock.calls.length
+    expect(worklets.at(-4)?.port.onmessage).toBeNull()
+    const completedSourceMessages = worklets.at(-4)?.port.postMessage.mock.calls.length
 
     patch.dispose()
-    expect(worklets.at(-3)?.port.postMessage).toHaveBeenCalledTimes(completedSourceMessages!)
+    expect(worklets.at(-4)?.port.postMessage).toHaveBeenCalledTimes(completedSourceMessages!)
   })
 
   it('provides every native soft oscillator with an automatable bite', () => {
