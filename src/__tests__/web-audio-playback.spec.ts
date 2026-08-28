@@ -135,6 +135,45 @@ afterEach(() => {
 })
 
 describe('Web Audio playback session', () => {
+  it('uses timeout scheduling instead of Web Audio timing sources in Safari', () => {
+    vi.useFakeTimers()
+    vi.stubGlobal('navigator', {
+      platform: 'MacIntel',
+      maxTouchPoints: 0,
+      userAgent: 'Mozilla/5.0 (Macintosh) AppleWebKit/605.1.15 Version/18.0 Safari/605.1.15',
+    })
+    const context = new MockAudioContext()
+    const session = new WebAudioPlaybackSession(context as unknown as AudioContext, createPlan(), {
+      patchFactory: () =>
+        ({ on: () => (end: number) => end, dispose: () => {} }) as unknown as PlayableSynthPatch,
+    })
+
+    session.start()
+
+    // The only source belongs to the synth voice; the transport itself uses timeouts.
+    expect(context.sources).toHaveLength(1)
+    session.stop()
+  })
+
+  it('keeps Web Audio timing sources in Chrome on macOS', () => {
+    vi.stubGlobal('navigator', {
+      platform: 'MacIntel',
+      maxTouchPoints: 0,
+      userAgent: 'Mozilla/5.0 (Macintosh) AppleWebKit/537.36 Chrome/128.0.0.0 Safari/537.36',
+    })
+    const context = new MockAudioContext()
+    const session = new WebAudioPlaybackSession(context as unknown as AudioContext, createPlan(), {
+      patchFactory: () =>
+        ({ on: () => (end: number) => end, dispose: () => {} }) as unknown as PlayableSynthPatch,
+    })
+
+    session.start()
+
+    // One source belongs to the synth voice and the other is the transport ticker.
+    expect(context.sources).toHaveLength(2)
+    session.stop()
+  })
+
   it('dispatches named drum notes without creating pitch signals', () => {
     const context = new MockAudioContext()
     const hit = vi.fn<PlayableDrumkitPatch['hit']>(() => (end) => end + 0.1)
