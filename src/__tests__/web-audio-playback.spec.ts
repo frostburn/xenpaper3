@@ -135,6 +135,22 @@ afterEach(() => {
 })
 
 describe('Web Audio playback session', () => {
+  it('uses timeout scheduling instead of Web Audio timing sources on Apple platforms', () => {
+    vi.useFakeTimers()
+    vi.stubGlobal('navigator', { platform: 'MacIntel' })
+    const context = new MockAudioContext()
+    const session = new WebAudioPlaybackSession(context as unknown as AudioContext, createPlan(), {
+      patchFactory: () =>
+        ({ on: () => (end: number) => end, dispose: () => {} }) as unknown as PlayableSynthPatch,
+    })
+
+    session.start()
+
+    // The only source belongs to the synth voice; the transport itself uses timeouts.
+    expect(context.sources).toHaveLength(1)
+    session.stop()
+  })
+
   it('dispatches named drum notes without creating pitch signals', () => {
     const context = new MockAudioContext()
     const hit = vi.fn<PlayableDrumkitPatch['hit']>(() => (end) => end + 0.1)
