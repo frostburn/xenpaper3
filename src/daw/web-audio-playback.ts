@@ -6,7 +6,7 @@ import {
   type SynthPatch,
 } from '../../sw-patch'
 import { Transport } from '../../sw-seq'
-import { isApplePlatform } from '../browser'
+import { isAppleWebKit } from '../browser'
 import DEFAULT_PATCH_SOURCE from '../patches/default.swpatch?raw'
 import DRUMKIT_PATCH_SOURCE from '../patches/drumkit.swpatch?raw'
 import type { PlaybackLane, PlaybackPlan } from './playback-plan'
@@ -62,7 +62,7 @@ export class WebAudioPlaybackSession {
   constructor(context: AudioContext, plan: PlaybackPlan, options: WebAudioPlaybackOptions = {}) {
     this.context = context
     this.plan = plan
-    this.transport = new Transport(context, { useSetTimeoutFallback: isApplePlatform() })
+    this.transport = new Transport(context, { useSetTimeoutFallback: isAppleWebKit() })
     this.patchFactory = options.patchFactory ?? createPatch
     this.drumkitFactory = options.drumkitFactory ?? createDrumkit
     this.resolvePatchSource = options.resolvePatchSource ?? defaultPatchSource
