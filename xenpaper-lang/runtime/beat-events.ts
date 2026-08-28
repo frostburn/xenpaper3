@@ -14,7 +14,10 @@ import type {
   ScoreShapeOptions,
 } from './types'
 
-export interface BeatEventExpansionOptions extends ScoreShapeOptions, RepeatExpansionOptions {}
+export interface BeatEventExpansionOptions extends ScoreShapeOptions, RepeatExpansionOptions {
+  /** Pre-evaluated, zero-duration state annotations applied before the program. */
+  initializationShape?: ScoreShape
+}
 
 export type BeatEventExpansionResult =
   | { readonly score: BeatTimedScore; readonly diagnostics: readonly Diagnostic[] }
@@ -304,7 +307,15 @@ export function expandToBeatEvents(
   const evaluated = evaluateScoreSemantics(node as never, options)
   const diagnostics = [...expanded.diagnostics, ...evaluated.diagnostics]
   if (!('shape' in evaluated)) return { diagnostics }
-  const flattened = flattenScoreSemantics(evaluated.shape)
+  const shape = options.initializationShape
+    ? {
+        kind: 'sequence' as const,
+        duration: evaluated.shape.duration,
+        origins: [...options.initializationShape.origins, ...evaluated.shape.origins],
+        children: [options.initializationShape, evaluated.shape],
+      }
+    : evaluated.shape
+  const flattened = flattenScoreSemantics(shape)
   const allDiagnostics = [...diagnostics, ...flattened.diagnostics]
   return allDiagnostics.some((diagnostic) => diagnostic.severity === 'error')
     ? { diagnostics: allDiagnostics }

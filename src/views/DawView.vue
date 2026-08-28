@@ -190,6 +190,7 @@ onBeforeUnmount(() => {
       <DrumLane
         v-if="lane.kind === 'drum'"
         :lane="lane"
+        :global-source="project.globalTrack.source"
         :selected-clip-id="selectedLaneId === lane.id ? selectedClipId : undefined"
         :pixels-per-beat="pixelsPerBeat"
         :scroll-left="scrollLeft"

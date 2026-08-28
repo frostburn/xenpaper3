@@ -208,6 +208,20 @@ describe('DAW project model', () => {
     expect(notes[1]!.cents).not.toBe(parseClipNotes('{12edo} D')[0]!.cents - 900)
   })
 
+  it('propagates a global groove through lane initialization into every clip', () => {
+    const project = createDefaultProject()
+    const instrument = project.instrumentLanes[0]!
+    const drum = createDrumLane(project)
+    project.instrumentLanes.push(drum)
+    project.globalTrack.source = '@groove([0= 0])'
+    instrument.clips.push({ id: 'melody', start: beat(0), length: beat(2), source: '[C D]' })
+    drum.clips.push({ id: 'rhythm', start: beat(0), length: beat(2), source: '[bd sd]' })
+
+    const notes = parseProjectNotes(project)
+    expect(notes.filter(({ sample }) => !sample).map(({ beat }) => beat)).toEqual([0, 2 / 3])
+    expect(notes.filter(({ sample }) => sample).map(({ beat }) => beat)).toEqual([0, 2 / 3])
+  })
+
   it('compiles glissando segments and implements all supported easing curves', () => {
     const note = parseClipNotes('@gliss(ease-in) C @gliss(ease-out) D E')[0]!
     expect(note.glissando).toMatchObject([
