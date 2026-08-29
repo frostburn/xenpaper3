@@ -1067,10 +1067,11 @@ export class PatchRuntime {
   }
 
   private makePeriodicWave(args: unknown[]): PeriodicWave {
-    const [real, imaginary, options] = args
+    const [real, imaginary, mapOptions] = args
     if (!Array.isArray(real) || !Array.isArray(imaginary)) {
       throw new Error('PeriodicWave expects real and imaginary coefficient arrays')
     }
+    const options = mapOptions instanceof Map ? Object.fromEntries(mapOptions) : mapOptions
     return this.context.createPeriodicWave(
       Float32Array.from(real, Number),
       Float32Array.from(imaginary, Number),
@@ -1446,9 +1447,12 @@ export class PatchRuntime {
         return null
       case 'ListLiteral':
         return expression.elements.map((value) => this.expression(value, scope))
-      case 'ObjectLiteral':
-        return Object.fromEntries(
-          expression.entries.map(({ key, value }) => [key, this.expression(value, scope)]),
+      case 'MapLiteral':
+        return new Map(
+          expression.entries.map(({ key, value }) => [
+            this.subscriptKey(key, scope),
+            this.expression(value, scope),
+          ]),
         )
       case 'MemberExpression':
         return (this.expression(expression.object, scope) as Record<string, unknown>)[

@@ -488,27 +488,27 @@ PrimaryExpression
   / BooleanLiteral
   / NullLiteral
   / StringLiteralExpression
-  / ObjectLiteral
+  / MapLiteral
   / ListLiteral
   / IdentifierExpression
   / "(" W value:Expression W ")" { return value; }
 
-ObjectLiteral
-  = "{" W entries:ObjectEntryList? W "}" {
-      return node("ObjectLiteral", { entries: entries ?? [] });
+MapLiteral
+  = "{" W entries:MapEntryList? W "}" {
+      return node("MapLiteral", { entries: entries ?? [] });
     }
 
-ObjectEntryList
-  = head:ObjectEntry tail:(ObjectEntrySeparator @ObjectEntry)* ObjectEntrySeparator? {
+MapEntryList
+  = head:MapEntry tail:(MapEntrySeparator @MapEntry)* MapEntrySeparator? {
       return [head, ...tail];
     }
 
-ObjectEntry
-  = key:Name W ":" W value:Expression {
-      return node("ObjectEntry", { key, value });
+MapEntry
+  = key:Expression W ":" W value:Expression {
+      return node("MapEntry", { key, value });
     }
 
-ObjectEntrySeparator
+MapEntrySeparator
   = W "," W
   / LineBreaks
 

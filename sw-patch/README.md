@@ -164,6 +164,14 @@ Subscript lookup uses `Map` keys rather than JavaScript object properties,
 so it can safely select one using a configured string. Waves are created only
 when first requested from a patch's audio context.
 
+Maps use Python-style literals. Keys are expressions, and numeric quantities are
+matched by their canonical numeric value during construction and subscript access.
+
+```swpatch
+values = {1: 2, 'foo': 'bar'}
+values['foo'] = 'updated'
+```
+
 ```swpatch
 config oscillatorType: string = 'rich'
 osc = OscillatorNode(periodicWave = timbres[oscillatorType])
@@ -179,7 +187,7 @@ To retain the Fourier coefficients' original amplitude, construct the wave
 explicitly:
 
 ```swpatch
-wave = PeriodicWave([0, 0, 0], [0, 1, 0.5], {disableNormalization: true})
+wave = PeriodicWave([0, 0, 0], [0, 1, 0.5], {'disableNormalization': true})
 osc = OscillatorNode(periodicWave = wave)
 ```
 
