@@ -67,6 +67,7 @@
         return node("MemberExpression", {
           object: value,
           property: tail.property,
+          computed: tail.computed,
         });
       }
 
@@ -443,7 +444,10 @@ PostfixExpression
 
 PostfixPart
   = H "." H property:Name {
-      return { kind: "member", property };
+      return { kind: "member", property, computed: false };
+    }
+  / H "[" W property:Expression W "]" {
+      return { kind: "member", property, computed: true };
     }
   / H args:Arguments {
       return { kind: "call", arguments: args };

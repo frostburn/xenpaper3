@@ -4,7 +4,7 @@ import { AperiodicWave } from 'aperiodic-oscillator'
 
 import TIMBRES from './timbres.json'
 
-const BASIC_OSCILLATOR_TYPES = ['sawtooth', 'square', 'sine', 'triangle'] as const
+export const BASIC_OSCILLATOR_TYPES = ['sawtooth', 'square', 'sine', 'triangle'] as const
 
 const PARTIALS_RANGE = [
   1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27,
@@ -35,11 +35,13 @@ const GENERATED_PERIODIC_TIMBRES = [
 
 const LEGACY_CUSTOM_TIMBRES = ['amsine', 'amtriangle', 'fmsine', 'fmtriangle'] as const
 
-const CUSTOM_TIMBRES = [
+export const PERIODIC_TIMBRES = [
   ...JSON_HARMONIC_TIMBRES,
   ...GENERATED_PERIODIC_TIMBRES,
   ...LEGACY_CUSTOM_TIMBRES,
 ] as const
+
+const CUSTOM_TIMBRES = PERIODIC_TIMBRES
 
 const GENERATED_APERIODIC_TIMBRES = [
   'tin',
@@ -361,6 +363,28 @@ const createCustomPeriodicWave = (name: CustomTimbre, context: BaseAudioContext)
     return createGeneratedPeriodicWave(name as GeneratedPeriodicTimbre, context)
   }
   return createLegacyCustomPeriodicWave(name as LegacyCustomTimbre, context)
+}
+
+/** Creates the named periodic waves exposed to an SW Patch for one audio context. */
+export const createPeriodicTimbres = (
+  context: BaseAudioContext,
+): Record<CustomTimbre, PeriodicWave> => {
+  const result = {} as Record<CustomTimbre, PeriodicWave>
+  const cache = new Map<CustomTimbre, PeriodicWave>()
+  for (const name of PERIODIC_TIMBRES) {
+    Object.defineProperty(result, name, {
+      enumerable: true,
+      get: () => {
+        let wave = cache.get(name)
+        if (!wave) {
+          wave = createCustomPeriodicWave(name, context)
+          cache.set(name, wave)
+        }
+        return wave
+      },
+    })
+  }
+  return result
 }
 
 const createPartialsPeriodicWave = (

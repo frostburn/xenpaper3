@@ -1,5 +1,4 @@
-config oscillatorType:
-    'sine' | 'square' | 'sawtooth' | 'triangle' = 'triangle'
+config oscillatorType: string = 'triangle'
 
 fn on(
     destination: AudioNode,
@@ -11,7 +10,10 @@ fn on(
     sustain: Level = 70%,
     release: Duration = 300ms,
 ):
-    osc = OscillatorNode(type = oscillatorType)
+    if oscillatorType == 'sine' or oscillatorType == 'square' or oscillatorType == 'sawtooth' or oscillatorType == 'triangle':
+        osc = OscillatorNode(type = oscillatorType)
+    else:
+        osc = OscillatorNode(periodicWave = timbres[oscillatorType])
     attackEnv = GainNode(gain = 0)
     decayEnv = GainNode(gain = 1)
 

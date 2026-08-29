@@ -256,7 +256,8 @@ export interface UnaryExpression extends Node {
 export interface MemberExpression extends Node {
   type: 'MemberExpression'
   object: Expression
-  property: string
+  property: string | Expression
+  computed?: boolean
 }
 
 export interface CallExpression extends Node {

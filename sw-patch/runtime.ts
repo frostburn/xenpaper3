@@ -1,4 +1,5 @@
 import { parse } from './parser.generated.js'
+import { createPeriodicTimbres } from './timbre.js'
 import type {
   Argument,
   AssignmentStatement,
@@ -805,6 +806,7 @@ export class PatchRuntime {
       this.root.set(`${kind}Node`, (...args: unknown[]) => this.makeNode(kind, args))
     }
     this.root.set('PeriodicWave', (...args: unknown[]) => this.makePeriodicWave(args))
+    this.root.set('timbres', createPeriodicTimbres(this.context))
     this.root.set('AudioSignal', this.createAndStartAudioSignal.bind(this))
     this.root.set('TimeNode', () => this.createUtilitySource('sw-patch-time'))
     this.root.set('PhaserNode', (...args: unknown[]) =>
@@ -1402,12 +1404,13 @@ export class PatchRuntime {
         set: (value) => scope.set(target.name, value),
       }
     if (target.type === 'MemberExpression') {
-      this.assertSafeMember(target.property)
+      const property = this.memberProperty(target, scope)
+      this.assertSafeMember(property)
       const object = this.expression(target.object, scope) as Record<string, unknown>
       return {
-        get: () => object[target.property],
+        get: () => object[property],
         set: (value) => {
-          object[target.property] = value
+          object[property] = value
         },
       }
     }
@@ -1438,9 +1441,8 @@ export class PatchRuntime {
           expression.entries.map(({ key, value }) => [key, this.expression(value, scope)]),
         )
       case 'MemberExpression':
-        this.assertSafeMember(expression.property)
         return (this.expression(expression.object, scope) as Record<string, unknown>)[
-          expression.property
+          this.safeMemberProperty(expression, scope)
         ]
       case 'UnaryExpression':
         return this.unary(expression.operator, this.expression(expression.argument, scope))
@@ -1464,11 +1466,29 @@ export class PatchRuntime {
     if (Object.keys(named).length) positional.push(named)
     if (scheduledAt !== undefined) positional.unshift(scheduledAt)
     if (callee.type === 'MemberExpression') {
-      this.assertSafeMember(callee.property)
+      const property = this.safeMemberProperty(callee, scope)
       const receiver = this.expression(callee.object, scope) as Record<string, unknown>
-      return (receiver[callee.property] as PatchFunction).apply(receiver, positional)
+      return (receiver[property] as PatchFunction).apply(receiver, positional)
     }
     return (this.expression(callee, scope) as PatchFunction)(...positional)
+  }
+
+  private memberProperty(
+    expression: Extract<Expression, { type: 'MemberExpression' }>,
+    scope: Scope,
+  ) {
+    return expression.computed
+      ? String(this.expression(expression.property as Expression, scope))
+      : (expression.property as string)
+  }
+
+  private safeMemberProperty(
+    expression: Extract<Expression, { type: 'MemberExpression' }>,
+    scope: Scope,
+  ) {
+    const property = this.memberProperty(expression, scope)
+    this.assertSafeMember(property)
+    return property
   }
 
   private unary(operator: string, value: unknown): unknown {

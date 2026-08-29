@@ -784,6 +784,32 @@ describe('SW Patch runtime', () => {
     })
   })
 
+  it('looks up computed object members', () => {
+    const value = {}
+    const patch = createPatch(
+      "config key = 'rich'\nfn get():\n    ret values[key]\n",
+      {
+        createPeriodicWave: vi.fn<() => object>(() => ({})),
+      } as unknown as BaseAudioContext,
+      { globals: { values: { rich: value } } },
+    )
+
+    expect((patch.get as () => unknown)()).toBe(value)
+  })
+
+  it('exposes periodic timbres as lazily created waves', () => {
+    const periodicWave = {}
+    const createPeriodicWave = vi.fn<() => object>(() => periodicWave)
+    const OscillatorNode = vi.fn<() => void>(function () {})
+    vi.stubGlobal('OscillatorNode', OscillatorNode)
+    const context = { createPeriodicWave } as unknown as BaseAudioContext
+
+    createPatch("osc = OscillatorNode(periodicWave = timbres['rich'])\n", context)
+
+    expect(createPeriodicWave).toHaveBeenCalledOnce()
+    expect(OscillatorNode).toHaveBeenCalledWith(context, { periodicWave })
+  })
+
   it('rejects malformed periodic-wave arrays', () => {
     const OscillatorNode = vi.fn<() => void>(function () {})
     vi.stubGlobal('OscillatorNode', OscillatorNode)

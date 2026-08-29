@@ -49,6 +49,19 @@ fn on(
 `
 
 describe('SW Patch parser', () => {
+  it('parses computed member lookup', () => {
+    const ast = parse('wave = timbres[oscillatorType]\n')
+
+    expect(ast.body[0]).toMatchObject({
+      value: {
+        type: 'MemberExpression',
+        object: { type: 'Identifier', name: 'timbres' },
+        property: { type: 'Identifier', name: 'oscillatorType' },
+        computed: true,
+      },
+    })
+  })
+
   it('distinguishes until events from member access', () => {
     const ast = parse('until osc:ended:\n    osc -> destination\n')
 
