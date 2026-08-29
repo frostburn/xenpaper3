@@ -76,7 +76,7 @@ export type GeneratedAperiodicTimbre = (typeof GENERATED_APERIODIC_TIMBRES)[numb
 
 export type AperiodicTimbre = JsonTimbre | PlainSpectrumTimbre | GeneratedAperiodicTimbre
 
-const APERIODIC_TIMBRES = [
+export const APERIODIC_TIMBRES = [
   ...Object.keys(TIMBRES.timbres),
   ...Object.keys(TIMBRES.plainSpectra),
   ...GENERATED_APERIODIC_TIMBRES,
@@ -132,7 +132,7 @@ const isBasicOscillatorType = (value: unknown): value is BasicOscillatorType =>
 const isCustomTimbre = (value: unknown): value is CustomTimbre =>
   typeof value === 'string' && CUSTOM_TIMBRES.includes(value as (typeof CUSTOM_TIMBRES)[number])
 
-const isAperiodicTimbre = (value: unknown): value is AperiodicTimbre =>
+export const isAperiodicTimbre = (value: unknown): value is AperiodicTimbre =>
   typeof value === 'string' && APERIODIC_TIMBRES.includes(value as AperiodicTimbre)
 
 // XXX: The check is valid only for SWOscillatorType
@@ -527,6 +527,26 @@ const createAperiodicWave = (name: AperiodicTimbre, context: BaseAudioContext): 
 
   return createGeneratedAperiodicWave(name as GeneratedAperiodicTimbre, context)
 }
+
+/** Creates the named aperiodic waves exposed to an SW Patch for one audio context. */
+export const createAperiodicTimbres = (
+  context: BaseAudioContext,
+): ReadonlyMap<AperiodicTimbre, AperiodicWave> =>
+  new (class extends Map<AperiodicTimbre, AperiodicWave> {
+    override get(name: AperiodicTimbre): AperiodicWave | undefined {
+      if (!APERIODIC_TIMBRES.includes(name)) return undefined
+      let wave = super.get(name)
+      if (!wave) {
+        wave = createAperiodicWave(name, context)
+        this.set(name, wave)
+      }
+      return wave
+    }
+
+    override has(name: AperiodicTimbre): boolean {
+      return APERIODIC_TIMBRES.includes(name)
+    }
+  })()
 
 export function parseSWOscillatorType(
   name: SWOscillatorType,

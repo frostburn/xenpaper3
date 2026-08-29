@@ -1,6 +1,7 @@
 import {
   createDrumkit,
   createPatch,
+  isAperiodicTimbre,
   type PlayableDrumkitPatch,
   type PlayableSynthPatch,
   type SynthPatch,
@@ -19,7 +20,9 @@ type PlaybackState = 'ready' | 'playing' | 'tail' | 'stopped' | 'ended'
 type PatchFactory = (
   source: string,
   context: BaseAudioContext,
-  options: { config: { oscillatorType: PlaybackLane['oscillatorType'] } },
+  options: {
+    config: { oscillatorType: PlaybackLane['oscillatorType']; aperiodic: boolean }
+  },
 ) => SynthPatch
 type DrumkitFactory = typeof createDrumkit
 
@@ -132,7 +135,10 @@ export class WebAudioPlaybackSession {
         continue
       }
       const patch = this.patchFactory(this.resolvePatchSource(lane.patchSource), this.context, {
-        config: { oscillatorType: lane.oscillatorType },
+        config: {
+          oscillatorType: lane.oscillatorType,
+          aperiodic: isAperiodicTimbre(lane.oscillatorType),
+        },
       })
       const synth = requirePlayableSynth(patch, lane)
       this.synths.push(synth)

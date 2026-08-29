@@ -1,5 +1,6 @@
 import { parse } from './parser.generated.js'
-import { createPeriodicTimbres } from './timbre.js'
+import { AperiodicOscillator, UnisonOscillator } from 'aperiodic-oscillator'
+import { createAperiodicTimbres, createPeriodicTimbres } from './timbre.js'
 import type {
   Argument,
   AssignmentStatement,
@@ -807,6 +808,15 @@ export class PatchRuntime {
     }
     this.root.set('PeriodicWave', (...args: unknown[]) => this.makePeriodicWave(args))
     this.root.set('timbres', createPeriodicTimbres(this.context))
+    this.root.set('aperiodicTimbres', createAperiodicTimbres(this.context))
+    // These aperiodic-oscillator implementations may not be compatible with older Safari,
+    // unlike the native nodes above, which can fall back to AudioContext factory methods.
+    this.root.set('UnisonOscillator', (...args: unknown[]) =>
+      this.makeAperiodicOscillator(UnisonOscillator, args),
+    )
+    this.root.set('AperiodicOscillator', (...args: unknown[]) =>
+      this.makeAperiodicOscillator(AperiodicOscillator, args),
+    )
     this.root.set('AudioSignal', this.createAndStartAudioSignal.bind(this))
     this.root.set('TimeNode', () => this.createUtilitySource('sw-patch-time'))
     this.root.set('PhaserNode', (...args: unknown[]) =>
@@ -1064,6 +1074,24 @@ export class PatchRuntime {
       }
     }
     return node
+  }
+
+  private makeAperiodicOscillator(
+    Constructor: new (context: BaseAudioContext, options?: never) => unknown,
+    args: unknown[],
+  ): unknown {
+    const values = (args[0] ?? {}) as Record<string, unknown>
+    const options = Object.fromEntries(
+      Object.entries(values).map(([key, value]) => [
+        key,
+        value instanceof Quantity ? Number(value) : value,
+      ]),
+    )
+    const oscillator = new Constructor(this.context, options as never) as {
+      dispose(): void
+    }
+    this.registerCleanup(() => oscillator.dispose())
+    return oscillator
   }
 
   private makePeriodicWave(args: unknown[]): PeriodicWave {

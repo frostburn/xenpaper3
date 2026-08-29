@@ -159,7 +159,9 @@ The `PeriodicWave(real, imaginary, options)` helper provides the same conversion
 while supplying the patch's audio context implicitly, including support for the
 `disableNormalization` option.
 
-The runtime also exposes the bundled periodic waves through the `timbres` map.
+The runtime exposes bundled periodic waves through the `timbres` map and
+inharmonic waves through `aperiodicTimbres`. `UnisonOscillator` and
+`AperiodicOscillator` are available with an implicit patch audio context.
 Subscript lookup uses `Map` keys rather than JavaScript object properties,
 so it can safely select one using a configured string. Waves are created only
 when first requested from a patch's audio context.
@@ -175,6 +177,11 @@ values['foo'] = 'updated'
 ```swpatch
 config oscillatorType: string = 'rich'
 osc = OscillatorNode(periodicWave = timbres[oscillatorType])
+```
+
+```swpatch
+config oscillatorType: string = 'piano'
+osc = AperiodicOscillator(aperiodicWave = aperiodicTimbres[oscillatorType])
 ```
 
 ```swpatch

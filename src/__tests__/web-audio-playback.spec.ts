@@ -222,7 +222,7 @@ describe('Web Audio playback session', () => {
     session.start()
 
     expect(patchFactory).toHaveBeenCalledWith('custom patch', context, {
-      config: { oscillatorType: 'triangle' },
+      config: { oscillatorType: 'triangle', aperiodic: false },
     })
     expect(on).toHaveBeenCalledOnce()
     const [destination, start, pitch, velocity, ...envelope] = on.mock.calls[0]!

@@ -1,4 +1,5 @@
 config oscillatorType: string = 'triangle'
+config aperiodic: boolean = false
 
 fn on(
     destination: AudioNode,
@@ -10,7 +11,9 @@ fn on(
     sustain: Level = 70%,
     release: Duration = 300ms,
 ):
-    if oscillatorType == 'sine' or oscillatorType == 'square' or oscillatorType == 'sawtooth' or oscillatorType == 'triangle':
+    if aperiodic:
+        osc = AperiodicOscillator(aperiodicWave = aperiodicTimbres[oscillatorType])
+    elif oscillatorType == 'sine' or oscillatorType == 'square' or oscillatorType == 'sawtooth' or oscillatorType == 'triangle':
         osc = OscillatorNode(type = oscillatorType)
     else:
         osc = OscillatorNode(periodicWave = timbres[oscillatorType])
