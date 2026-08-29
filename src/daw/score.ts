@@ -280,11 +280,17 @@ export const sourceClipLength = (
   source: string,
   defaultBar = beat(4),
   samples: readonly string[] = [],
+  initialization: SourceInitialization = {},
 ): Beat => {
   const program = samples.length
     ? lowerDrumSamples(parse(source, { drumSamples: samples }))
     : parse(source)
-  const result = expandToBeatEvents(program, { directiveExtensions: ENVELOPE_EXTENSIONS })
+  const result = expandToBeatEvents(program, {
+    directiveExtensions: ENVELOPE_EXTENSIONS,
+    pitchContext: initialization.pitchContext,
+    directiveState: initialization.directiveState,
+    initializationShape: initialization.shape,
+  })
   if (!('score' in result) || result.diagnostics.some(({ severity }) => severity === 'error'))
     return defaultBar
   const duration = result.score.duration

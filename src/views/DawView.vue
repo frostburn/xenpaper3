@@ -7,7 +7,7 @@ import InstrumentHeader from '../components/daw/InstrumentHeader.vue'
 import InstrumentPianoRollLane from '../components/daw/InstrumentPianoRollLane.vue'
 import TransportControls from '../components/daw/TransportControls.vue'
 import { DawAudioEngine } from '../daw/audio-engine'
-import { drumSamplesForLane, sourceClipLength } from '../daw/score'
+import { compileSourceInitialization, drumSamplesForLane, sourceClipLength } from '../daw/score'
 import {
   beat,
   beatToNumber,
@@ -41,6 +41,15 @@ const selectedLane = computed(() =>
 const selectedClip = computed(() =>
   selectedLane.value?.clips.find(({ id }) => id === selectedClipId.value),
 )
+const selectedInitialization = computed(() => {
+  try {
+    const globalInitialization = compileSourceInitialization(project.value.globalTrack.source)
+    return compileSourceInitialization(selectedLane.value?.source ?? '', globalInitialization)
+  } catch {
+    // Initialization sources are editable. Let clip sizing fall back gracefully while invalid.
+    return undefined
+  }
+})
 
 const finishPlayback = () => {
   playing.value = false
@@ -144,6 +153,7 @@ const updateClipSource = (clip: SourceClip, source: string) => {
     source,
     beat(signature.numerator * 4, signature.denominator),
     selectedLane.value ? drumSamplesForLane(selectedLane.value) : [],
+    selectedInitialization.value,
   )
 }
 
