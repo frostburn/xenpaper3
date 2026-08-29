@@ -1403,17 +1403,18 @@ export class PatchRuntime {
         get: () => this.expression(target, scope),
         set: (value) => scope.set(target.name, value),
       }
+    if (target.type === 'SubscriptExpression') {
+      const object = this.expression(target.object, scope)
+      const map = this.subscriptMap(object)
+      const key = this.subscriptKey(target.key, scope)
+      return {
+        get: () => map.get(key),
+        set: (value) => map.set(key, value),
+      }
+    }
     if (target.type === 'MemberExpression') {
       const object = this.expression(target.object, scope)
-      if (target.computed) {
-        const map = this.computedMap(object)
-        const key = this.computedKey(target.property as Expression, scope)
-        return {
-          get: () => map.get(key),
-          set: (value) => map.set(key, value),
-        }
-      }
-      const property = target.property as string
+      const property = target.property
       this.assertSafeMember(property)
       const record = object as Record<string, unknown>
       return {
@@ -1450,7 +1451,13 @@ export class PatchRuntime {
           expression.entries.map(({ key, value }) => [key, this.expression(value, scope)]),
         )
       case 'MemberExpression':
-        return this.memberValue(expression, scope)
+        return (this.expression(expression.object, scope) as Record<string, unknown>)[
+          this.safeProperty(expression.property)
+        ]
+      case 'SubscriptExpression':
+        return this.subscriptMap(this.expression(expression.object, scope)).get(
+          this.subscriptKey(expression.key, scope),
+        )
       case 'UnaryExpression':
         return this.unary(expression.operator, this.expression(expression.argument, scope))
       case 'BinaryExpression':
@@ -1474,25 +1481,15 @@ export class PatchRuntime {
     if (scheduledAt !== undefined) positional.unshift(scheduledAt)
     if (callee.type === 'MemberExpression') {
       const receiver = this.expression(callee.object, scope)
-      const value = callee.computed
-        ? this.computedMap(receiver).get(this.computedKey(callee.property as Expression, scope))
-        : (receiver as Record<string, unknown>)[this.safeProperty(callee.property as string)]
+      const value = (receiver as Record<string, unknown>)[this.safeProperty(callee.property)]
+      return (value as PatchFunction).apply(receiver, positional)
+    }
+    if (callee.type === 'SubscriptExpression') {
+      const receiver = this.expression(callee.object, scope)
+      const value = this.subscriptMap(receiver).get(this.subscriptKey(callee.key, scope))
       return (value as PatchFunction).apply(receiver, positional)
     }
     return (this.expression(callee, scope) as PatchFunction)(...positional)
-  }
-
-  private memberValue(
-    expression: Extract<Expression, { type: 'MemberExpression' }>,
-    scope: Scope,
-  ): unknown {
-    const receiver = this.expression(expression.object, scope)
-    if (expression.computed) {
-      return this.computedMap(receiver).get(
-        this.computedKey(expression.property as Expression, scope),
-      )
-    }
-    return (receiver as Record<string, unknown>)[this.safeProperty(expression.property as string)]
   }
 
   private safeProperty(property: string): string {
@@ -1500,12 +1497,12 @@ export class PatchRuntime {
     return property
   }
 
-  private computedMap(value: unknown): Map<unknown, unknown> {
-    if (!(value instanceof Map)) throw new TypeError('Computed member access requires a Map')
+  private subscriptMap(value: unknown): Map<unknown, unknown> {
+    if (!(value instanceof Map)) throw new TypeError('Subscript access requires a Map')
     return value
   }
 
-  private computedKey(expression: Expression, scope: Scope): unknown {
+  private subscriptKey(expression: Expression, scope: Scope): unknown {
     const key = this.expression(expression, scope)
     return key instanceof Quantity ? key.value : key
   }

@@ -49,15 +49,14 @@ fn on(
 `
 
 describe('SW Patch parser', () => {
-  it('parses computed member lookup', () => {
+  it('parses subscript lookup separately from member access', () => {
     const ast = parse('wave = timbres[oscillatorType]\n')
 
     expect(ast.body[0]).toMatchObject({
       value: {
-        type: 'MemberExpression',
+        type: 'SubscriptExpression',
         object: { type: 'Identifier', name: 'timbres' },
-        property: { type: 'Identifier', name: 'oscillatorType' },
-        computed: true,
+        key: { type: 'Identifier', name: 'oscillatorType' },
       },
     })
   })

@@ -67,7 +67,13 @@
         return node("MemberExpression", {
           object: value,
           property: tail.property,
-          computed: tail.computed,
+        });
+      }
+
+      if (tail.kind === "subscript") {
+        return node("SubscriptExpression", {
+          object: value,
+          key: tail.key,
         });
       }
 
@@ -304,7 +310,8 @@ PassStatement
 Assignable
   = value:PostfixExpression &{
       return value.type === "Identifier"
-        || value.type === "MemberExpression";
+        || value.type === "MemberExpression"
+        || value.type === "SubscriptExpression";
     } { return value; }
 
 ExpressionStatement
@@ -444,10 +451,10 @@ PostfixExpression
 
 PostfixPart
   = H "." H property:Name {
-      return { kind: "member", property, computed: false };
+      return { kind: "member", property };
     }
-  / H "[" W property:Expression W "]" {
-      return { kind: "member", property, computed: true };
+  / H "[" W key:Expression W "]" {
+      return { kind: "subscript", key };
     }
   / H args:Arguments {
       return { kind: "call", arguments: args };

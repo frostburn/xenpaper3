@@ -160,7 +160,7 @@ while supplying the patch's audio context implicitly, including support for the
 `disableNormalization` option.
 
 The runtime also exposes the bundled periodic waves through the `timbres` map.
-Computed member lookup uses `Map` keys rather than JavaScript object properties,
+Subscript lookup uses `Map` keys rather than JavaScript object properties,
 so it can safely select one using a configured string. Waves are created only
 when first requested from a patch's audio context.
 

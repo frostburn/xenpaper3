@@ -784,7 +784,7 @@ describe('SW Patch runtime', () => {
     })
   })
 
-  it('looks up computed object members', () => {
+  it('looks up Map subscripts', () => {
     const value = {}
     const patch = createPatch(
       "config key = 'rich'\nfn get():\n    ret values[key]\n",
@@ -797,7 +797,7 @@ describe('SW Patch runtime', () => {
     expect((patch.get as () => unknown)()).toBe(value)
   })
 
-  it('requires Maps for computed access without reserving JavaScript property names', () => {
+  it('requires Maps for subscripts without reserving JavaScript property names', () => {
     const values = new Map<unknown, unknown>([['__proto__', 'safe']])
     const patch = createPatch(
       "fn get():\n    values['constructor'] = 42\n    values[1] = 'one'\n    ret [values['__proto__'], values['constructor'], values[1]]\n",
@@ -814,7 +814,7 @@ describe('SW Patch runtime', () => {
       createPatch("value = values['key']\n", {} as BaseAudioContext, {
         globals: { values: { key: 'value' } },
       }),
-    ).toThrow('Computed member access requires a Map')
+    ).toThrow('Subscript access requires a Map')
   })
 
   it('exposes periodic timbres as lazily created waves', () => {
