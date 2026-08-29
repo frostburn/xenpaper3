@@ -809,6 +809,8 @@ export class PatchRuntime {
     this.root.set('PeriodicWave', (...args: unknown[]) => this.makePeriodicWave(args))
     this.root.set('timbres', createPeriodicTimbres(this.context))
     this.root.set('aperiodicTimbres', createAperiodicTimbres(this.context))
+    // These aperiodic-oscillator implementations may not be compatible with older Safari,
+    // unlike the native nodes above, which can fall back to AudioContext factory methods.
     this.root.set('UnisonOscillator', (...args: unknown[]) =>
       this.makeAperiodicOscillator(UnisonOscillator, args),
     )
@@ -1085,7 +1087,11 @@ export class PatchRuntime {
         value instanceof Quantity ? Number(value) : value,
       ]),
     )
-    return new Constructor(this.context, options as never)
+    const oscillator = new Constructor(this.context, options as never) as {
+      dispose(): void
+    }
+    this.registerCleanup(() => oscillator.dispose())
+    return oscillator
   }
 
   private makePeriodicWave(args: unknown[]): PeriodicWave {

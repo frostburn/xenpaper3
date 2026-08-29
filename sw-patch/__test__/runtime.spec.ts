@@ -856,6 +856,28 @@ describe('SW Patch runtime', () => {
     expect(createPeriodicWave).toHaveBeenCalled()
   })
 
+  it('disposes library-backed oscillators with their patch', () => {
+    const disposeOscillator = vi.fn<() => void>()
+    const Constructor = vi.fn<(context: BaseAudioContext, options?: never) => { dispose(): void }>(
+      function () {
+        return { dispose: disposeOscillator }
+      },
+    )
+    const runtime = new PatchRuntime({} as BaseAudioContext)
+    const makeOscillator = (
+      runtime as unknown as {
+        makeAperiodicOscillator(constructor: typeof Constructor, args: unknown[]): unknown
+      }
+    ).makeAperiodicOscillator.bind(runtime)
+
+    makeOscillator(Constructor, [])
+    const patch = runtime.evaluate({ type: 'Program', location: location(), body: [] })
+    patch.dispose()
+    patch.dispose()
+
+    expect(disposeOscillator).toHaveBeenCalledOnce()
+  })
+
   it('rejects malformed periodic-wave arrays', () => {
     const OscillatorNode = vi.fn<() => void>(function () {})
     vi.stubGlobal('OscillatorNode', OscillatorNode)
