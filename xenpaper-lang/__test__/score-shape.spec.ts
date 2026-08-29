@@ -251,6 +251,12 @@ K L M N j k=`) as SequenceShape
     const unhosted = evaluateScoreShape(parse('MOS{5L 2s; L=9/8} ^J').body[0] as Expression)
     expect(unhosted.diagnostics[0]?.message).toContain('no equal-temperament host')
 
+    const unhostedRegisters = shape("MOS{10L 2s; L = 17/16} 'J `J") as SequenceShape
+    const registerCents = unhostedRegisters.children
+      .filter((child) => child.kind === 'attack')
+      .map((attack) => attack.pitch.value.valueOf())
+    expect(registerCents).toEqual([1200, -1200])
+
     const multiperiod = shape('MOS{4L2s} P3ms') as SequenceShape
     const periodAttack = multiperiod.children.find((child) => child.kind === 'attack')
     expect(Math.round(periodAttack!.pitch.value.valueOf())).toBe(600)

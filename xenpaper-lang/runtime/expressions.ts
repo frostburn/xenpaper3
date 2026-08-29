@@ -381,17 +381,20 @@ export function evaluateExpression(
       const context = 'rootPitch' in mapping ? mapping : createPitchContext(mapping)
       const modifier = node.modifier.kind
       const equaveShift = EQUAVE_SHIFT_BY_MODIFIER[modifier] ?? 0
-      const inflectionKind = modifier === 'up' || modifier === 'down' ? 'up' : 'lift'
-      let inflection = requirePitchOperator(context, inflectionKind)
-      if (modifier === 'down' || modifier === 'drop') inflection = inflection.neg()
       // Equave shifts use the scale's degree equave for scalar arithmetic, but
       // written pitches and intervals always move by notational octaves.
-      const scalarDisplacement = equaveShift
-        ? context.degreeEquave.mul(new Value(equaveShift))
-        : inflection
-      const pitchDisplacement = equaveShift
-        ? Value.pitch(new Value(2).pow(equaveShift))
-        : inflection
+      let scalarDisplacement: Value
+      let pitchDisplacement: Value
+      if (equaveShift) {
+        scalarDisplacement = context.degreeEquave.mul(new Value(equaveShift))
+        pitchDisplacement = Value.pitch(new Value(2).pow(equaveShift))
+      } else {
+        const inflectionKind = modifier === 'up' || modifier === 'down' ? 'up' : 'lift'
+        let inflection = requirePitchOperator(context, inflectionKind)
+        if (modifier === 'down' || modifier === 'drop') inflection = inflection.neg()
+        scalarDisplacement = inflection
+        pitchDisplacement = inflection
+      }
       const operatorOrigin: SourceOrigin = { location: node.modifier.location, role: 'operator' }
       const origins = [...operand.value.origins, operatorOrigin]
       const equaveFormula = equaveShift
