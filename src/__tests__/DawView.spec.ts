@@ -150,6 +150,12 @@ describe('DAW project model', () => {
     expect(sourceClipLength('@tempo(120)')).toEqual(beat(4))
   })
 
+  it('derives clip length using pitch context inherited from initialization sources', () => {
+    const initialization = compileSourceInitialization('MOS{5L4s}')
+
+    expect(sourceClipLength('J K L M N O P Q R j', beat(4), [], initialization)).toEqual(beat(10))
+  })
+
   it('carries authored patch envelope parameters into scheduled notes', () => {
     const project = createDefaultProject()
     project.instrumentLanes[0]!.clips.push({
@@ -528,6 +534,18 @@ describe('DawView', () => {
     await wrapper.get('textarea[aria-label="Xenpaper clip source"]').setValue('C D')
 
     expect(wrapper.get('button.clip').attributes('style')).toContain('width: 128px')
+  })
+
+  it('resizes a MOS clip using the global source context', async () => {
+    const wrapper = mount(DawView)
+    await wrapper.get('[aria-label="Global source"]').setValue('MOS{5L4s}')
+    await wrapper.getComponent(InstrumentPianoRollLane).trigger('dblclick', { clientX: 64 })
+    await wrapper
+      .get('textarea[aria-label="Xenpaper clip source"]')
+      .setValue('J K L M N O P Q R j')
+
+    expect(wrapper.get('button.clip').attributes('style')).toContain('width: 640px')
+    expect(wrapper.findAll('[aria-label="Piano roll preview"] i')).toHaveLength(10)
   })
 
   it('renders piano-roll notes parsed from the edited clip source', async () => {

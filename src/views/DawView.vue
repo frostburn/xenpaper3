@@ -7,7 +7,7 @@ import InstrumentHeader from '../components/daw/InstrumentHeader.vue'
 import InstrumentPianoRollLane from '../components/daw/InstrumentPianoRollLane.vue'
 import TransportControls from '../components/daw/TransportControls.vue'
 import { DawAudioEngine } from '../daw/audio-engine'
-import { drumSamplesForLane, sourceClipLength } from '../daw/score'
+import { compileSourceInitialization, drumSamplesForLane, sourceClipLength } from '../daw/score'
 import {
   beat,
   beatToNumber,
@@ -140,10 +140,16 @@ const deleteSelectedClip = () => {
 const updateClipSource = (clip: SourceClip, source: string) => {
   clip.source = source
   const signature = project.value.globalTrack.timeSignatureChanges[0]!
+  const globalInitialization = compileSourceInitialization(project.value.globalTrack.source)
+  const initialization = compileSourceInitialization(
+    selectedLane.value?.source ?? '',
+    globalInitialization,
+  )
   clip.length = sourceClipLength(
     source,
     beat(signature.numerator * 4, signature.denominator),
     selectedLane.value ? drumSamplesForLane(selectedLane.value) : [],
+    initialization,
   )
 }
 
