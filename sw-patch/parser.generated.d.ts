@@ -237,7 +237,6 @@ export type Expression =
   | BooleanLiteral
   | NullLiteral
   | StringLiteral
-  | ObjectLiteral
   | MapLiteral
   | ListLiteral
   | Identifier
@@ -283,17 +282,6 @@ export interface NamedArgument extends Node {
 
 export interface PositionalArgument extends Node {
   type: 'PositionalArgument'
-  value: Expression
-}
-
-export interface ObjectLiteral extends Node {
-  type: 'ObjectLiteral'
-  entries: ObjectEntry[]
-}
-
-export interface ObjectEntry extends Node {
-  type: 'ObjectEntry'
-  key: string
   value: Expression
 }
 

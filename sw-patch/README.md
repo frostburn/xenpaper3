@@ -187,7 +187,7 @@ To retain the Fourier coefficients' original amplitude, construct the wave
 explicitly:
 
 ```swpatch
-wave = PeriodicWave([0, 0, 0], [0, 1, 0.5], {disableNormalization: true})
+wave = PeriodicWave([0, 0, 0], [0, 1, 0.5], {'disableNormalization': true})
 osc = OscillatorNode(periodicWave = wave)
 ```
 

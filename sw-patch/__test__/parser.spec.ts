@@ -50,7 +50,7 @@ fn on(
 
 describe('SW Patch parser', () => {
   it('parses Python-style map literals with expression keys', () => {
-    const ast = parse("values = {1: 2, 'foo': 'bar'}\n")
+    const ast = parse("values = {1: 2, 'foo': 'bar'}\ncomputed = {key: 3}\nempty = {}\n")
 
     expect(ast.body[0]).toMatchObject({
       value: {
@@ -69,6 +69,13 @@ describe('SW Patch parser', () => {
         ],
       },
     })
+    expect(ast.body[1]).toMatchObject({
+      value: {
+        type: 'MapLiteral',
+        entries: [{ key: { type: 'Identifier', name: 'key' } }],
+      },
+    })
+    expect(ast.body[2]).toMatchObject({ value: { type: 'MapLiteral', entries: [] } })
   })
 
   it('parses subscript lookup separately from member access', () => {

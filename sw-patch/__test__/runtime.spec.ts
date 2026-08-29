@@ -868,7 +868,7 @@ describe('SW Patch runtime', () => {
     const context = { createPeriodicWave } as unknown as BaseAudioContext
 
     createPatch(
-      'wave = PeriodicWave([0, 0], [0, 1], {disableNormalization: true})\n' +
+      "wave = PeriodicWave([0, 0], [0, 1], {'disableNormalization': true})\n" +
         'osc = OscillatorNode(periodicWave = wave)\n',
       context,
     )
