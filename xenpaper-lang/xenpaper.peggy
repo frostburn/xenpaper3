@@ -773,14 +773,8 @@ DownPrefixOperandStart
   = "v" / "[" / "(" / [0-9] / MosPitchLiteral / PitchLiteral / IntervalLiteral
 
 MosPitchNominal
-  = "ṽ" {
-      return node('PitchNominal', { system: 'mos', value: 'v' });
-    }
-  / value:$([J-Zj-z][J-Zj-z]) {
-      return node('PitchNominal', { system: 'mos', value });
-    }
-  / value:$([J-Zj-z]) {
-      return node('PitchNominal', { system: 'mos', value });
+  = raw:$([J-Zj-zṽ] [J-Zj-zṽ]?) {
+      return node('PitchNominal', { system: 'mos', value: raw.replaceAll('ṽ', 'v') });
     }
 
 MosAccidental

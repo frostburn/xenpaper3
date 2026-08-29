@@ -824,12 +824,18 @@ describe('Xenpaper surface grammar', () => {
     })
   })
 
-  it('keeps lone v as a MOS pitch and accepts ṽ as its unambiguous alias', () => {
-    expect(parse('v ṽ').body[0]).toMatchObject({
+  it('uses ṽ to disambiguate octave-shifted MOS nominals', () => {
+    expect(parse('v ṽ vv ṽṽ').body[0]).toMatchObject({
       type: 'Sequence',
       items: [
         { type: 'PitchLiteral', nominal: { system: 'mos', value: 'v' }, raw: 'v' },
         { type: 'PitchLiteral', nominal: { system: 'mos', value: 'v' }, raw: 'ṽ' },
+        {
+          type: 'PitchModifierExpression',
+          modifier: { kind: 'down' },
+          operand: { type: 'PitchLiteral', nominal: { system: 'mos', value: 'v' } },
+        },
+        { type: 'PitchLiteral', nominal: { system: 'mos', value: 'vv' }, raw: 'ṽṽ' },
       ],
     })
   })
