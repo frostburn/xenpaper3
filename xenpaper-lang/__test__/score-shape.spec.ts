@@ -264,6 +264,16 @@ K L M N j k=`) as SequenceShape
     const centsEquaveAttacks = centsEquave.children.filter((child) => child.kind === 'attack')
     expect(Math.round(centsEquaveAttacks[1]!.pitch.value.valueOf())).toBe(1700)
   })
+  it("treats ṽ as the unambiguous spelling of 'V", () => {
+    const score = shape("MOS{14L5s} 'V v ṽ") as SequenceShape
+    const pitches = score.children
+      .filter((child) => child.kind === 'attack')
+      .map((attack) => attack.pitch.value.valueOf())
+
+    expect(pitches).toHaveLength(3)
+    expect(pitches[1]).toBeCloseTo(pitches[0]!)
+    expect(pitches[2]).toBeCloseTo(pitches[0]!)
+  })
 
   it('broadcasts unary pitch operators over score constructions', () => {
     const pitches = (source: string) =>
@@ -643,6 +653,20 @@ K L M N j k=`) as SequenceShape
         return branch.pitch.value.valueOf()
       }),
     ).toEqual([0, 225, 675])
+  })
+  it('applies stacked downs and broadcasts down over grouped scores', () => {
+    const result = shape('{12edo} vvC v[0, 5, 7] v(0, 7)') as SequenceShape
+    const attacks = result.children.flatMap((child) =>
+      child.kind === 'attack'
+        ? [child]
+        : child.kind === 'parallel'
+          ? child.branches.filter((branch) => branch.kind === 'attack')
+          : [],
+    )
+
+    expect(attacks.map((attack) => attack.pitch.value.valueOf())).toEqual([
+      -200, -100, 400, 600, -100, 600,
+    ])
   })
   it('uses five EDO steps for the lift and drop operators', () => {
     const result = shape(String.raw`{16edo} [/E, \E]`) as SequenceShape
