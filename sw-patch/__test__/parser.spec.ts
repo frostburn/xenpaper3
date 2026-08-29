@@ -49,6 +49,28 @@ fn on(
 `
 
 describe('SW Patch parser', () => {
+  it('parses Python-style map literals with expression keys', () => {
+    const ast = parse("values = {1: 2, 'foo': 'bar'}\n")
+
+    expect(ast.body[0]).toMatchObject({
+      value: {
+        type: 'MapLiteral',
+        entries: [
+          {
+            type: 'MapEntry',
+            key: { type: 'NumberLiteral', value: '1' },
+            value: { type: 'NumberLiteral', value: '2' },
+          },
+          {
+            type: 'MapEntry',
+            key: { type: 'StringLiteral', value: 'foo' },
+            value: { type: 'StringLiteral', value: 'bar' },
+          },
+        ],
+      },
+    })
+  })
+
   it('parses subscript lookup separately from member access', () => {
     const ast = parse('wave = timbres[oscillatorType]\n')
 

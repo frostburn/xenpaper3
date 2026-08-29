@@ -238,6 +238,7 @@ export type Expression =
   | NullLiteral
   | StringLiteral
   | ObjectLiteral
+  | MapLiteral
   | ListLiteral
   | Identifier
 
@@ -293,6 +294,17 @@ export interface ObjectLiteral extends Node {
 export interface ObjectEntry extends Node {
   type: 'ObjectEntry'
   key: string
+  value: Expression
+}
+
+export interface MapLiteral extends Node {
+  type: 'MapLiteral'
+  entries: MapEntry[]
+}
+
+export interface MapEntry extends Node {
+  type: 'MapEntry'
+  key: Expression
   value: Expression
 }
 

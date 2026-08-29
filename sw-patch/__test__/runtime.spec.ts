@@ -19,6 +19,23 @@ function location() {
 }
 
 describe('SW Patch runtime', () => {
+  it('evaluates map literals with Python-style keys and subscript mutation', () => {
+    const patch = createPatch(
+      'fn mapValues(key: Number):\n' +
+        "    values = {1: 2, 'foo': 'bar', key: 4}\n" +
+        "    values['foo'] = 'updated'\n" +
+        "    ret [values[1], values['foo'], values[key]]\n",
+      {} as BaseAudioContext,
+    )
+
+    const values = (patch.mapValues as PatchFunction)(3) as unknown[]
+    expect(values.map((value) => (value instanceof Quantity ? value.value : value))).toEqual([
+      2,
+      'updated',
+      4,
+    ])
+  })
+
   it('discovers and validates live drumkit functions', () => {
     const source =
       'fn bd(destination: AudioNode, start: Instant, velocity: Level):\n' +

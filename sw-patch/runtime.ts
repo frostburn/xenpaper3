@@ -1446,6 +1446,13 @@ export class PatchRuntime {
         return null
       case 'ListLiteral':
         return expression.elements.map((value) => this.expression(value, scope))
+      case 'MapLiteral':
+        return new Map(
+          expression.entries.map(({ key, value }) => [
+            this.subscriptKey(key, scope),
+            this.expression(value, scope),
+          ]),
+        )
       case 'ObjectLiteral':
         return Object.fromEntries(
           expression.entries.map(({ key, value }) => [key, this.expression(value, scope)]),
