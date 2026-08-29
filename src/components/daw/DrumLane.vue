@@ -34,7 +34,7 @@ const emit = defineEmits<{
 // Rows run top-to-bottom, so reverse alphabetical order puts alphabetical
 // progression from the bottom of the roll upwards.
 const samples = computed(() =>
-  drumSamplesForLane(props.lane).toSorted((left, right) => right.localeCompare(left)),
+  [...drumSamplesForLane(props.lane)].sort((left, right) => right.localeCompare(left)),
 )
 const laneElement = ref<HTMLElement>()
 const dragging = ref<{ clip: SourceClip; pointerOffset: number }>()

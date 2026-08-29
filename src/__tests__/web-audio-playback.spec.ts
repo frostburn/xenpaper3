@@ -178,7 +178,7 @@ describe('Web Audio playback session', () => {
     const context = new MockAudioContext()
     const hit = vi.fn<PlayableDrumkitPatch['hit']>(() => (end) => end + 0.1)
     const dispose = vi.fn<() => void>()
-    const drumkitFactory = vi.fn(
+    const drumkitFactory = vi.fn<(_: string, __: BaseAudioContext) => PlayableDrumkitPatch>(
       () => ({ drumNames: ['bd'], hit, dispose, ready: Promise.resolve() }) as PlayableDrumkitPatch,
     )
     const pitchedPlan = createPlan()
