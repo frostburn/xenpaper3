@@ -1,4 +1,5 @@
 import { parse } from './parser.generated.js'
+import { createPeriodicTimbres } from './timbre.js'
 import type {
   Argument,
   AssignmentStatement,
@@ -805,6 +806,7 @@ export class PatchRuntime {
       this.root.set(`${kind}Node`, (...args: unknown[]) => this.makeNode(kind, args))
     }
     this.root.set('PeriodicWave', (...args: unknown[]) => this.makePeriodicWave(args))
+    this.root.set('timbres', createPeriodicTimbres(this.context))
     this.root.set('AudioSignal', this.createAndStartAudioSignal.bind(this))
     this.root.set('TimeNode', () => this.createUtilitySource('sw-patch-time'))
     this.root.set('PhaserNode', (...args: unknown[]) =>
@@ -1401,13 +1403,24 @@ export class PatchRuntime {
         get: () => this.expression(target, scope),
         set: (value) => scope.set(target.name, value),
       }
-    if (target.type === 'MemberExpression') {
-      this.assertSafeMember(target.property)
-      const object = this.expression(target.object, scope) as Record<string, unknown>
+    if (target.type === 'SubscriptExpression') {
+      const object = this.expression(target.object, scope)
+      const map = this.subscriptMap(object)
+      const key = this.subscriptKey(target.key, scope)
       return {
-        get: () => object[target.property],
+        get: () => map.get(key),
+        set: (value) => map.set(key, value),
+      }
+    }
+    if (target.type === 'MemberExpression') {
+      const object = this.expression(target.object, scope)
+      const property = target.property
+      this.assertSafeMember(property)
+      const record = object as Record<string, unknown>
+      return {
+        get: () => record[property],
         set: (value) => {
-          object[target.property] = value
+          record[property] = value
         },
       }
     }
@@ -1438,10 +1451,13 @@ export class PatchRuntime {
           expression.entries.map(({ key, value }) => [key, this.expression(value, scope)]),
         )
       case 'MemberExpression':
-        this.assertSafeMember(expression.property)
         return (this.expression(expression.object, scope) as Record<string, unknown>)[
-          expression.property
+          this.safeProperty(expression.property)
         ]
+      case 'SubscriptExpression':
+        return this.subscriptMap(this.expression(expression.object, scope)).get(
+          this.subscriptKey(expression.key, scope),
+        )
       case 'UnaryExpression':
         return this.unary(expression.operator, this.expression(expression.argument, scope))
       case 'BinaryExpression':
@@ -1464,11 +1480,31 @@ export class PatchRuntime {
     if (Object.keys(named).length) positional.push(named)
     if (scheduledAt !== undefined) positional.unshift(scheduledAt)
     if (callee.type === 'MemberExpression') {
-      this.assertSafeMember(callee.property)
-      const receiver = this.expression(callee.object, scope) as Record<string, unknown>
-      return (receiver[callee.property] as PatchFunction).apply(receiver, positional)
+      const receiver = this.expression(callee.object, scope)
+      const value = (receiver as Record<string, unknown>)[this.safeProperty(callee.property)]
+      return (value as PatchFunction).apply(receiver, positional)
+    }
+    if (callee.type === 'SubscriptExpression') {
+      const receiver = this.expression(callee.object, scope)
+      const value = this.subscriptMap(receiver).get(this.subscriptKey(callee.key, scope))
+      return (value as PatchFunction).apply(receiver, positional)
     }
     return (this.expression(callee, scope) as PatchFunction)(...positional)
+  }
+
+  private safeProperty(property: string): string {
+    this.assertSafeMember(property)
+    return property
+  }
+
+  private subscriptMap(value: unknown): Map<unknown, unknown> {
+    if (!(value instanceof Map)) throw new TypeError('Subscript access requires a Map')
+    return value
+  }
+
+  private subscriptKey(expression: Expression, scope: Scope): unknown {
+    const key = this.expression(expression, scope)
+    return key instanceof Quantity ? key.value : key
   }
 
   private unary(operator: string, value: unknown): unknown {

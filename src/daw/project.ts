@@ -1,4 +1,5 @@
 import { Fraction } from 'xen-dev-utils'
+import { BASIC_OSCILLATOR_TYPES, PERIODIC_TIMBRES } from '../../sw-patch'
 
 export type Beat = Fraction
 
@@ -21,7 +22,7 @@ export interface GlobalTrack {
   timeSignatureChanges: TimeSignatureChange[]
 }
 
-export const OSCILLATOR_TYPES = ['sine', 'square', 'sawtooth', 'triangle'] as const
+export const OSCILLATOR_TYPES = [...BASIC_OSCILLATOR_TYPES, ...PERIODIC_TIMBRES] as const
 export type OscillatorType = (typeof OSCILLATOR_TYPES)[number]
 
 export const CLIP_DISPLAY_MODES = ['piano-roll', 'source'] as const

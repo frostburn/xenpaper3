@@ -49,6 +49,18 @@ fn on(
 `
 
 describe('SW Patch parser', () => {
+  it('parses subscript lookup separately from member access', () => {
+    const ast = parse('wave = timbres[oscillatorType]\n')
+
+    expect(ast.body[0]).toMatchObject({
+      value: {
+        type: 'SubscriptExpression',
+        object: { type: 'Identifier', name: 'timbres' },
+        key: { type: 'Identifier', name: 'oscillatorType' },
+      },
+    })
+  })
+
   it('distinguishes until events from member access', () => {
     const ast = parse('until osc:ended:\n    osc -> destination\n')
 

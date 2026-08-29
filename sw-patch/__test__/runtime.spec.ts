@@ -784,6 +784,52 @@ describe('SW Patch runtime', () => {
     })
   })
 
+  it('looks up Map subscripts', () => {
+    const value = {}
+    const patch = createPatch(
+      "config key = 'rich'\nfn get():\n    ret values[key]\n",
+      {
+        createPeriodicWave: vi.fn<() => object>(() => ({})),
+      } as unknown as BaseAudioContext,
+      { globals: { values: new Map([['rich', value]]) } },
+    )
+
+    expect((patch.get as () => unknown)()).toBe(value)
+  })
+
+  it('requires Maps for subscripts without reserving JavaScript property names', () => {
+    const values = new Map<unknown, unknown>([['__proto__', 'safe']])
+    const patch = createPatch(
+      "fn get():\n    values['constructor'] = 42\n    values[1] = 'one'\n    ret [values['__proto__'], values['constructor'], values[1]]\n",
+      {} as BaseAudioContext,
+      { globals: { values } },
+    )
+
+    expect((patch.get as () => unknown)()).toEqual([
+      'safe',
+      expect.objectContaining({ value: 42 }),
+      'one',
+    ])
+    expect(() =>
+      createPatch("value = values['key']\n", {} as BaseAudioContext, {
+        globals: { values: { key: 'value' } },
+      }),
+    ).toThrow('Subscript access requires a Map')
+  })
+
+  it('exposes periodic timbres as lazily created waves', () => {
+    const periodicWave = {}
+    const createPeriodicWave = vi.fn<() => object>(() => periodicWave)
+    const OscillatorNode = vi.fn<() => void>(function () {})
+    vi.stubGlobal('OscillatorNode', OscillatorNode)
+    const context = { createPeriodicWave } as unknown as BaseAudioContext
+
+    createPatch("osc = OscillatorNode(periodicWave = timbres['rich'])\n", context)
+
+    expect(createPeriodicWave).toHaveBeenCalledOnce()
+    expect(OscillatorNode).toHaveBeenCalledWith(context, { periodicWave })
+  })
+
   it('rejects malformed periodic-wave arrays', () => {
     const OscillatorNode = vi.fn<() => void>(function () {})
     vi.stubGlobal('OscillatorNode', OscillatorNode)

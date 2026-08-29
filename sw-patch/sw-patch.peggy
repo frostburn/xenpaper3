@@ -70,6 +70,13 @@
         });
       }
 
+      if (tail.kind === "subscript") {
+        return node("SubscriptExpression", {
+          object: value,
+          key: tail.key,
+        });
+      }
+
       return node("CallExpression", {
         callee: value,
         arguments: tail.arguments,
@@ -303,7 +310,8 @@ PassStatement
 Assignable
   = value:PostfixExpression &{
       return value.type === "Identifier"
-        || value.type === "MemberExpression";
+        || value.type === "MemberExpression"
+        || value.type === "SubscriptExpression";
     } { return value; }
 
 ExpressionStatement
@@ -444,6 +452,9 @@ PostfixExpression
 PostfixPart
   = H "." H property:Name {
       return { kind: "member", property };
+    }
+  / H "[" W key:Expression W "]" {
+      return { kind: "subscript", key };
     }
   / H args:Arguments {
       return { kind: "call", arguments: args };

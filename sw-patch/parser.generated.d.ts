@@ -155,7 +155,7 @@ export interface ConnectionLink {
 
 export interface AssignmentStatement extends Node {
   type: 'AssignmentStatement'
-  target: Identifier | MemberExpression
+  target: Identifier | MemberExpression | SubscriptExpression
   operator: '=' | '+=' | '-=' | '*=' | '/=' | '%=' | '**='
   value: Expression
 }
@@ -230,6 +230,7 @@ export type Expression =
   | BinaryExpression
   | UnaryExpression
   | MemberExpression
+  | SubscriptExpression
   | CallExpression
   | UnitLiteral
   | NumberLiteral
@@ -257,6 +258,12 @@ export interface MemberExpression extends Node {
   type: 'MemberExpression'
   object: Expression
   property: string
+}
+
+export interface SubscriptExpression extends Node {
+  type: 'SubscriptExpression'
+  object: Expression
+  key: Expression
 }
 
 export interface CallExpression extends Node {

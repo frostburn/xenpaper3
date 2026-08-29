@@ -159,6 +159,16 @@ The `PeriodicWave(real, imaginary, options)` helper provides the same conversion
 while supplying the patch's audio context implicitly, including support for the
 `disableNormalization` option.
 
+The runtime also exposes the bundled periodic waves through the `timbres` map.
+Subscript lookup uses `Map` keys rather than JavaScript object properties,
+so it can safely select one using a configured string. Waves are created only
+when first requested from a patch's audio context.
+
+```swpatch
+config oscillatorType: string = 'rich'
+osc = OscillatorNode(periodicWave = timbres[oscillatorType])
+```
+
 ```swpatch
 osc = OscillatorNode(periodicWave = [[0, 0, 0], [0, 1, 0.5]])
 shaper = WaveShaperNode(curve = [-1, -50%, 0, 50%, 1], oversample = '4x')
