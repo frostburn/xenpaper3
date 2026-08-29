@@ -792,6 +792,54 @@ describe('Xenpaper surface grammar', () => {
     })
   })
 
+  it('parses down before every unambiguous operand start', () => {
+    expect(parse('vvC vj v[0, 5, 7] v(0, 7)').body[0]).toMatchObject({
+      type: 'Sequence',
+      items: [
+        {
+          type: 'PitchModifierExpression',
+          modifier: { kind: 'down' },
+          operand: {
+            type: 'PitchModifierExpression',
+            modifier: { kind: 'down' },
+            operand: { type: 'PitchLiteral', raw: 'C' },
+          },
+        },
+        {
+          type: 'PitchModifierExpression',
+          modifier: { kind: 'down' },
+          operand: { type: 'PitchLiteral', nominal: { value: 'j' } },
+        },
+        {
+          type: 'PitchModifierExpression',
+          modifier: { kind: 'down' },
+          operand: { type: 'NormalizeToSlot', expression: { type: 'Parallel' } },
+        },
+        {
+          type: 'PitchModifierExpression',
+          modifier: { kind: 'down' },
+          operand: { type: 'Group', expression: { type: 'Parallel' } },
+        },
+      ],
+    })
+  })
+
+  it('uses ṽ to disambiguate octave-shifted MOS nominals', () => {
+    expect(parse('v ṽ vv ṽṽ').body[0]).toMatchObject({
+      type: 'Sequence',
+      items: [
+        { type: 'PitchLiteral', nominal: { system: 'mos', value: 'v' }, raw: 'v' },
+        { type: 'PitchLiteral', nominal: { system: 'mos', value: 'v' }, raw: 'ṽ' },
+        {
+          type: 'PitchModifierExpression',
+          modifier: { kind: 'down' },
+          operand: { type: 'PitchLiteral', nominal: { system: 'mos', value: 'v' } },
+        },
+        { type: 'PitchLiteral', nominal: { system: 'mos', value: 'vv' }, raw: 'ṽṽ' },
+      ],
+    })
+  })
+
   it('prioritizes attached musical inflections over spaced division', () => {
     const program = parse(String.raw`{^ = 1\24; / = 5\25}
 0 ^0 1 v2 2 /0`)

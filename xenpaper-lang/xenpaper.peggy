@@ -604,7 +604,7 @@ ContextPreset
     }
 
 CallExpression
-  = callee:Identifier Spacing "(" Spacing args:CallArgumentList? Spacing ")" {
+  = !("v" Spacing "(") callee:Identifier Spacing "(" Spacing args:CallArgumentList? Spacing ")" {
       return node('CallExpression', { callee, arguments: args ?? [] });
     }
 
@@ -615,7 +615,7 @@ CallArgumentList
     }
 
 IdentifierExpression
-  = !("v" &([0-9] / MosPitchLiteral / PitchLiteral / IntervalLiteral)) name:Identifier {
+  = !("v" &DownPrefixOperandStart) name:Identifier {
       return node('Identifier', { name });
     }
 
@@ -760,19 +760,21 @@ PitchLiteral
     }
 
 MosPitchLiteral
-  = !("v" &([J-Zj-z] !IdentifierContinue))
+  = !("v" &(DownPrefixOperandStart / [J-Zj-z] !IdentifierContinue))
     nominal:MosPitchNominal accidentals:MosAccidental* !FjsInflection !IdentifierContinue {
       return node('PitchLiteral', {
         modifiers: [], nominal, accidentals, inflections: [], raw: text(),
       });
     }
 
+// A lowercase `v` is also a Diamond-MOS nominal. These operand starts take
+// precedence as the down prefix, including MOS pitches and recursively stacked downs.
+DownPrefixOperandStart
+  = "v" / "[" / "(" / [0-9] / MosPitchLiteral / PitchLiteral / IntervalLiteral
+
 MosPitchNominal
-  = value:$([J-Zj-z][J-Zj-z]) {
-      return node('PitchNominal', { system: 'mos', value });
-    }
-  / value:$([J-Zj-z]) {
-      return node('PitchNominal', { system: 'mos', value });
+  = raw:$([J-Zj-zṽ] [J-Zj-zṽ]?) {
+      return node('PitchNominal', { system: 'mos', value: raw.replaceAll('ṽ', 'v') });
     }
 
 MosAccidental
