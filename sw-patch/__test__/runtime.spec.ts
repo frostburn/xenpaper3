@@ -847,6 +847,15 @@ describe('SW Patch runtime', () => {
     expect(OscillatorNode).toHaveBeenCalledWith(context, { periodicWave })
   })
 
+  it('exposes aperiodic timbres as lazily created waves', () => {
+    const createPeriodicWave = vi.fn<() => object>(() => ({}))
+    const context = { createPeriodicWave } as unknown as BaseAudioContext
+
+    createPatch("wave = aperiodicTimbres['piano']\n", context)
+
+    expect(createPeriodicWave).toHaveBeenCalled()
+  })
+
   it('rejects malformed periodic-wave arrays', () => {
     const OscillatorNode = vi.fn<() => void>(function () {})
     vi.stubGlobal('OscillatorNode', OscillatorNode)

@@ -6,6 +6,7 @@ import DawView from '../views/DawView.vue'
 import InstrumentPianoRollLane from '../components/daw/InstrumentPianoRollLane.vue'
 import DrumLane from '../components/daw/DrumLane.vue'
 import {
+  OSCILLATOR_TYPES,
   beat,
   beatToNumber,
   createDefaultProject,
@@ -31,6 +32,12 @@ import {
 import { drumSamplesForLane } from '../daw/score'
 
 describe('DAW project model', () => {
+  it('offers periodic and aperiodic oscillator timbres', () => {
+    expect(OSCILLATOR_TYPES).toContain('rich')
+    expect(OSCILLATOR_TYPES).toContain('piano')
+    expect(OSCILLATOR_TYPES).toContain('steel')
+  })
+
   it('resumes sustained notes at the playhead with their remaining duration', () => {
     expect(notePlaybackWindow(0, 4, 2)).toEqual({ startBeat: 2, endBeat: 4 })
     expect(notePlaybackWindow(3, 1, 2)).toEqual({ startBeat: 3, endBeat: 4 })

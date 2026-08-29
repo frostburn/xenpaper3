@@ -8,8 +8,15 @@ export {
   PatchRuntime,
   registerMathWorklets,
 } from './runtime.js'
-export { BASIC_OSCILLATOR_TYPES, createPeriodicTimbres, PERIODIC_TIMBRES } from './timbre.js'
-export type { BasicOscillatorType, CustomTimbre } from './timbre.js'
+export {
+  APERIODIC_TIMBRES,
+  BASIC_OSCILLATOR_TYPES,
+  createAperiodicTimbres,
+  createPeriodicTimbres,
+  isAperiodicTimbre,
+  PERIODIC_TIMBRES,
+} from './timbre.js'
+export type { AperiodicTimbre, BasicOscillatorType, CustomTimbre } from './timbre.js'
 export type {
   EffectPatch,
   NoteOff,
