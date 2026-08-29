@@ -925,7 +925,10 @@ export function evaluateScoreSemantics(
     throw new RangeError('Directive extension names must be unique.')
   const initialDirectiveState: DirectiveExtensionState = {
     ...Object.fromEntries(
-      [...extensions].map(([name, extension]) => [name, extension.initialState]),
+      [...extensions].map(([name, extension]) => [
+        extension.stateKey?.toLowerCase() ?? name,
+        extension.initialState,
+      ]),
     ),
     ...options.directiveState,
   }
@@ -937,10 +940,11 @@ export function evaluateScoreSemantics(
   ): { state: DirectiveExtensionState; diagnostics: readonly Diagnostic[] } | undefined => {
     const extension = extensions.get(directive.name)
     if (!extension) return undefined
+    const stateKey = extension.stateKey?.toLowerCase() ?? directive.name
     try {
-      const result = extension.apply(directive, context, state[directive.name])
+      const result = extension.apply(directive, context, state[stateKey])
       return {
-        state: { ...state, [directive.name]: result.state },
+        state: { ...state, [stateKey]: result.state },
         diagnostics: result.diagnostics ?? [],
       }
     } catch (error) {

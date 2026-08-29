@@ -5,6 +5,8 @@ import {
   parse,
   type DirectiveExtension,
   type DirectiveExtensionState,
+  type Diagnostic,
+  type Expression,
   type PitchContext,
   type Program,
   type ScoreShape,
@@ -73,24 +75,93 @@ const DEFAULT_ENVELOPE: EnvelopeSettings = Object.freeze({
   release: 0.3,
 })
 
+const ENVELOPE_PARAMETERS = ['attack', 'decay', 'sustain', 'release'] as const
+
+const envelopeDiagnostic = (message: string, locations: Diagnostic['locations']): Diagnostic => ({
+  code: 'XP_DIRECTIVE_EXTENSION',
+  severity: 'error',
+  message,
+  locations,
+})
+
+const evaluateEnvelope = (
+  values: readonly { name: (typeof ENVELOPE_PARAMETERS)[number]; expression: Expression }[],
+  context: PitchContext,
+  previousState: unknown,
+) => {
+  const envelope = { ...(previousState as EnvelopeSettings) }
+  const diagnostics: Diagnostic[] = []
+  for (const { name, expression } of values) {
+    const result = evaluateExpression(expression, context)
+    diagnostics.push(...result.diagnostics)
+    if (!('value' in result)) continue
+    if (result.value.kind !== 'scalar') {
+      diagnostics.push(
+        envelopeDiagnostic(`Envelope parameter ${name} must be scalar.`, [expression.location]),
+      )
+      continue
+    }
+    const dimensions = result.value.value.dimensions
+    const validDimension =
+      name === 'sustain' ? dimensions.isDimensionless : dimensions.equals({ seconds: 1 })
+    if (!validDimension) {
+      diagnostics.push(
+        envelopeDiagnostic(
+          `Envelope parameter ${name} must be ${name === 'sustain' ? 'dimensionless' : 'a time value'}.`,
+          [expression.location],
+        ),
+      )
+      continue
+    }
+    envelope[name] = result.value.value.valueOf()
+  }
+  return { state: Object.freeze(envelope), diagnostics }
+}
+
 const envelopeExtension: DirectiveExtension = {
   name: 'patch',
+  stateKey: 'patch',
   initialState: DEFAULT_ENVELOPE,
   apply(directive, context, previousState) {
-    const envelope = { ...(previousState as EnvelopeSettings) }
-    const diagnostics = []
+    const values = []
     for (const argument of directive.arguments) {
-      if (argument.type !== 'NamedArgument' || !(argument.name in envelope))
+      if (
+        argument.type !== 'NamedArgument' ||
+        !ENVELOPE_PARAMETERS.some((parameter) => parameter === argument.name)
+      )
         throw new Error('@patch accepts the named attack, decay, sustain, and release parameters.')
-      const result = evaluateExpression(argument.value, context)
-      diagnostics.push(...result.diagnostics)
-      if (!('value' in result) || result.value.kind !== 'scalar')
-        throw new Error(`Patch parameter ${argument.name} must be scalar.`)
-      envelope[argument.name as keyof EnvelopeSettings] = result.value.value.valueOf()
+      values.push({
+        name: argument.name as (typeof ENVELOPE_PARAMETERS)[number],
+        expression: argument.value,
+      })
     }
-    return { state: Object.freeze(envelope), diagnostics }
+    return evaluateEnvelope(values, context, previousState)
   },
 }
+
+const adsrExtension: DirectiveExtension = {
+  name: 'adsr',
+  stateKey: 'patch',
+  initialState: DEFAULT_ENVELOPE,
+  apply(directive, context, previousState) {
+    if (directive.arguments.length !== 4)
+      throw new Error(
+        '@adsr requires exactly four positional arguments: attack, decay, sustain, release.',
+      )
+    if (directive.arguments.some((argument) => argument.type === 'NamedArgument'))
+      throw new Error('@adsr accepts positional arguments only: attack, decay, sustain, release.')
+    return evaluateEnvelope(
+      directive.arguments.map((expression, index) => ({
+        name: ENVELOPE_PARAMETERS[index]!,
+        expression,
+      })),
+      context,
+      previousState,
+    )
+  },
+}
+
+const ENVELOPE_EXTENSIONS = [envelopeExtension, adsrExtension]
 
 export interface SourceInitialization {
   readonly pitchContext?: PitchContext
@@ -105,7 +176,7 @@ export const compileSourceInitialization = (
   parent: SourceInitialization = {},
 ): SourceInitialization => {
   const result = evaluateProgramSemantics(parse(source), {
-    directiveExtensions: [envelopeExtension],
+    directiveExtensions: ENVELOPE_EXTENSIONS,
     pitchContext: parent.pitchContext,
     directiveState: parent.directiveState,
   })
@@ -135,7 +206,7 @@ export const parseClipNotes = (
   initialization: SourceInitialization = {},
 ): ScheduledLaneNote[] => {
   const result = expandToBeatEvents(parse(source), {
-    directiveExtensions: [envelopeExtension],
+    directiveExtensions: ENVELOPE_EXTENSIONS,
     pitchContext: initialization.pitchContext,
     directiveState: initialization.directiveState,
     initializationShape: initialization.shape,
@@ -181,7 +252,7 @@ export const parseDrumClipNotes = (
 ): ScheduledLaneNote[] => {
   const program = lowerDrumSamples(parse(source, { drumSamples: samples }))
   const result = expandToBeatEvents(program, {
-    directiveExtensions: [envelopeExtension],
+    directiveExtensions: ENVELOPE_EXTENSIONS,
     pitchContext: initialization.pitchContext,
     directiveState: initialization.directiveState,
     initializationShape: initialization.shape,
@@ -200,7 +271,7 @@ export const parseDrumClipNotes = (
       cents: 0,
       sample: event.label,
       velocity: event.dynamic.valueOf(),
-      envelope: DEFAULT_ENVELOPE,
+      envelope: (event.directiveState.patch as EnvelopeSettings | undefined) ?? DEFAULT_ENVELOPE,
     }))
 }
 
@@ -213,7 +284,7 @@ export const sourceClipLength = (
   const program = samples.length
     ? lowerDrumSamples(parse(source, { drumSamples: samples }))
     : parse(source)
-  const result = expandToBeatEvents(program, { directiveExtensions: [envelopeExtension] })
+  const result = expandToBeatEvents(program, { directiveExtensions: ENVELOPE_EXTENSIONS })
   if (!('score' in result) || result.diagnostics.some(({ severity }) => severity === 'error'))
     return defaultBar
   const duration = result.score.duration
