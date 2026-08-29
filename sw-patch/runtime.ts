@@ -1404,13 +1404,22 @@ export class PatchRuntime {
         set: (value) => scope.set(target.name, value),
       }
     if (target.type === 'MemberExpression') {
-      const property = this.memberProperty(target, scope)
+      const object = this.expression(target.object, scope)
+      if (target.computed) {
+        const map = this.computedMap(object)
+        const key = this.computedKey(target.property as Expression, scope)
+        return {
+          get: () => map.get(key),
+          set: (value) => map.set(key, value),
+        }
+      }
+      const property = target.property as string
       this.assertSafeMember(property)
-      const object = this.expression(target.object, scope) as Record<string, unknown>
+      const record = object as Record<string, unknown>
       return {
-        get: () => object[property],
+        get: () => record[property],
         set: (value) => {
-          object[property] = value
+          record[property] = value
         },
       }
     }
@@ -1441,9 +1450,7 @@ export class PatchRuntime {
           expression.entries.map(({ key, value }) => [key, this.expression(value, scope)]),
         )
       case 'MemberExpression':
-        return (this.expression(expression.object, scope) as Record<string, unknown>)[
-          this.safeMemberProperty(expression, scope)
-        ]
+        return this.memberValue(expression, scope)
       case 'UnaryExpression':
         return this.unary(expression.operator, this.expression(expression.argument, scope))
       case 'BinaryExpression':
@@ -1466,29 +1473,41 @@ export class PatchRuntime {
     if (Object.keys(named).length) positional.push(named)
     if (scheduledAt !== undefined) positional.unshift(scheduledAt)
     if (callee.type === 'MemberExpression') {
-      const property = this.safeMemberProperty(callee, scope)
-      const receiver = this.expression(callee.object, scope) as Record<string, unknown>
-      return (receiver[property] as PatchFunction).apply(receiver, positional)
+      const receiver = this.expression(callee.object, scope)
+      const value = callee.computed
+        ? this.computedMap(receiver).get(this.computedKey(callee.property as Expression, scope))
+        : (receiver as Record<string, unknown>)[this.safeProperty(callee.property as string)]
+      return (value as PatchFunction).apply(receiver, positional)
     }
     return (this.expression(callee, scope) as PatchFunction)(...positional)
   }
 
-  private memberProperty(
+  private memberValue(
     expression: Extract<Expression, { type: 'MemberExpression' }>,
     scope: Scope,
-  ) {
-    return expression.computed
-      ? String(this.expression(expression.property as Expression, scope))
-      : (expression.property as string)
+  ): unknown {
+    const receiver = this.expression(expression.object, scope)
+    if (expression.computed) {
+      return this.computedMap(receiver).get(
+        this.computedKey(expression.property as Expression, scope),
+      )
+    }
+    return (receiver as Record<string, unknown>)[this.safeProperty(expression.property as string)]
   }
 
-  private safeMemberProperty(
-    expression: Extract<Expression, { type: 'MemberExpression' }>,
-    scope: Scope,
-  ) {
-    const property = this.memberProperty(expression, scope)
+  private safeProperty(property: string): string {
     this.assertSafeMember(property)
     return property
+  }
+
+  private computedMap(value: unknown): Map<unknown, unknown> {
+    if (!(value instanceof Map)) throw new TypeError('Computed member access requires a Map')
+    return value
+  }
+
+  private computedKey(expression: Expression, scope: Scope): unknown {
+    const key = this.expression(expression, scope)
+    return key instanceof Quantity ? key.value : key
   }
 
   private unary(operator: string, value: unknown): unknown {

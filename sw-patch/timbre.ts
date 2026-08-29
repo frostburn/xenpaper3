@@ -368,24 +368,22 @@ const createCustomPeriodicWave = (name: CustomTimbre, context: BaseAudioContext)
 /** Creates the named periodic waves exposed to an SW Patch for one audio context. */
 export const createPeriodicTimbres = (
   context: BaseAudioContext,
-): Record<CustomTimbre, PeriodicWave> => {
-  const result = {} as Record<CustomTimbre, PeriodicWave>
-  const cache = new Map<CustomTimbre, PeriodicWave>()
-  for (const name of PERIODIC_TIMBRES) {
-    Object.defineProperty(result, name, {
-      enumerable: true,
-      get: () => {
-        let wave = cache.get(name)
-        if (!wave) {
-          wave = createCustomPeriodicWave(name, context)
-          cache.set(name, wave)
-        }
-        return wave
-      },
-    })
-  }
-  return result
-}
+): ReadonlyMap<CustomTimbre, PeriodicWave> =>
+  new (class extends Map<CustomTimbre, PeriodicWave> {
+    override get(name: CustomTimbre): PeriodicWave | undefined {
+      if (!PERIODIC_TIMBRES.includes(name)) return undefined
+      let wave = super.get(name)
+      if (!wave) {
+        wave = createCustomPeriodicWave(name, context)
+        this.set(name, wave)
+      }
+      return wave
+    }
+
+    override has(name: CustomTimbre): boolean {
+      return PERIODIC_TIMBRES.includes(name)
+    }
+  })()
 
 const createPartialsPeriodicWave = (
   name: BasicOscillatorWithPartials,

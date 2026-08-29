@@ -791,10 +791,30 @@ describe('SW Patch runtime', () => {
       {
         createPeriodicWave: vi.fn<() => object>(() => ({})),
       } as unknown as BaseAudioContext,
-      { globals: { values: { rich: value } } },
+      { globals: { values: new Map([['rich', value]]) } },
     )
 
     expect((patch.get as () => unknown)()).toBe(value)
+  })
+
+  it('requires Maps for computed access without reserving JavaScript property names', () => {
+    const values = new Map<unknown, unknown>([['__proto__', 'safe']])
+    const patch = createPatch(
+      "fn get():\n    values['constructor'] = 42\n    values[1] = 'one'\n    ret [values['__proto__'], values['constructor'], values[1]]\n",
+      {} as BaseAudioContext,
+      { globals: { values } },
+    )
+
+    expect((patch.get as () => unknown)()).toEqual([
+      'safe',
+      expect.objectContaining({ value: 42 }),
+      'one',
+    ])
+    expect(() =>
+      createPatch("value = values['key']\n", {} as BaseAudioContext, {
+        globals: { values: { key: 'value' } },
+      }),
+    ).toThrow('Computed member access requires a Map')
   })
 
   it('exposes periodic timbres as lazily created waves', () => {
