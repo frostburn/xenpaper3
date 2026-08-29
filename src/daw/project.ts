@@ -68,7 +68,7 @@ export const DEFAULT_SW_PATCH_SOURCE = 'default'
 export const DEFAULT_GLOBAL_SOURCE = `# Shared tuning and score initialization (for example: {12edo})
 `
 export const DEFAULT_INSTRUMENT_SOURCE = `# Defaults inherited by every clip in this lane
-@patch(attack: 100ms, decay: 200ms, sustain: 70%, release: 300ms)
+@adsr(100ms, 200ms, 70%, 300ms)
 `
 
 export const beat = (numerator: number, denominator = 1): Beat => {

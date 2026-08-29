@@ -15,6 +15,8 @@ export interface DirectiveExtensionResult {
 /** A second-party prevailing directive interpreted outside Xenpaper's core vocabulary. */
 export interface DirectiveExtension {
   readonly name: string
+  /** State key shared by directive aliases; defaults to the extension name. */
+  readonly stateKey?: string
   readonly initialState?: unknown
   /** Pure state transition; return immutable state so earlier snapshots remain stable. */
   readonly apply: (

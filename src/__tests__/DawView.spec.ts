@@ -29,7 +29,7 @@ import {
   projectSecondsToBeat,
   sourceClipLength,
 } from '../daw/audio-engine'
-import { drumSamplesForLane } from '../daw/score'
+import { compileSourceInitialization, drumSamplesForLane } from '../daw/score'
 
 describe('DAW project model', () => {
   it('offers periodic and aperiodic oscillator timbres', () => {
@@ -59,7 +59,7 @@ describe('DAW project model', () => {
       id: 'instrument-1',
       patchSource: 'default',
       oscillatorType: 'sawtooth',
-      source: expect.stringContaining('@patch(attack: 100ms'),
+      source: expect.stringContaining('@adsr(100ms'),
       clips: [],
     })
     expect(JSON.parse(JSON.stringify(project), Fraction.reviver)).toEqual(project)
@@ -72,7 +72,7 @@ describe('DAW project model', () => {
 
     const lane = createInstrumentLane(project)
     expect(lane).toMatchObject({ id: 'instrument-1', name: 'Instrument 1', clips: [] })
-    expect(lane.source).toContain('@patch(attack: 100ms')
+    expect(lane.source).toContain('@adsr(100ms')
   })
 
   it('creates drum lanes with a basic 4/4 clip and named events', () => {
@@ -165,6 +165,51 @@ describe('DAW project model', () => {
       sustain: expect.closeTo(0.55),
       release: expect.closeTo(0.4),
     })
+  })
+
+  it('supports concise ADSR envelopes and partial patch updates across aliases', () => {
+    const notes = parseClipNotes('@adsr(100ms, 200ms, 70%, 300ms) C @patch(sustain: 45%) D')
+
+    expect(notes[0]!.envelope).toMatchObject({
+      attack: expect.closeTo(0.1),
+      decay: expect.closeTo(0.2),
+      sustain: expect.closeTo(0.7),
+      release: expect.closeTo(0.3),
+    })
+    expect(notes[1]!.envelope).toMatchObject({
+      attack: expect.closeTo(0.1),
+      decay: expect.closeTo(0.2),
+      sustain: expect.closeTo(0.45),
+      release: expect.closeTo(0.3),
+    })
+  })
+
+  it('keeps ADSR changes lexical and supports initialization and drum sources', () => {
+    const scoped = parseClipNotes('C (@adsr(10ms, 20ms, 30%, 40ms) D) E')
+    expect(scoped.find(({ beat: start }) => start === 0)!.envelope.attack).toBe(0.1)
+    expect(scoped.find(({ envelope }) => envelope.attack === 0.01)).toBeDefined()
+    expect(scoped.find(({ beat: start }) => start === 2)!.envelope.attack).toBe(0.1)
+
+    const initialization = compileSourceInitialization('@adsr(20ms, 30ms, 40%, 50ms)')
+    expect(parseClipNotes('C', Infinity, initialization)[0]!.envelope.sustain).toBe(0.4)
+    expect(parseDrumClipNotes('@adsr(20ms, 30ms, 40%, 50ms) bd', ['bd'])[0]!.envelope).toEqual({
+      attack: 0.02,
+      decay: 0.03,
+      sustain: 0.4,
+      release: 0.05,
+    })
+  })
+
+  it('reports clear ADSR shape, scalar, and dimension diagnostics', () => {
+    expect(() => parseClipNotes('@adsr(100ms, 200ms, 70%) C')).toThrow(
+      'exactly four positional arguments',
+    )
+    expect(() =>
+      parseClipNotes('@adsr(attack: 100ms, decay: 200ms, sustain: 70%, release: 300ms) C'),
+    ).toThrow('positional arguments only')
+    expect(() => parseClipNotes('@adsr(C, 200ms, 70%, 300ms) D')).toThrow('must be scalar')
+    expect(() => parseClipNotes('@adsr(100, 200ms, 70%, 300ms) C')).toThrow('must be a time value')
+    expect(() => parseClipNotes('@patch(sustain: 100ms) C')).toThrow('must be dimensionless')
   })
 
   it('uses lane ADSR defaults and keeps clip patch directives as overrides', () => {

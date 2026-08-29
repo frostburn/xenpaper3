@@ -52,6 +52,10 @@ The DAW playback path is intentionally split at the browser boundary:
 Keep musical transformations above this boundary and browser quirks below it. A
 new renderer should be able to consume a playback plan without importing Web Audio.
 
+Instrument envelopes use the concise attack/decay/sustain/release directive
+`@adsr(100ms, 200ms, 70%, 300ms)`. The compatible named form, such as
+`@patch(sustain: 55%)`, remains useful for partial updates to the prevailing envelope.
+
 ## Checks
 
 ```sh
