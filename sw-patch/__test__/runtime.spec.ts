@@ -205,7 +205,7 @@ describe('SW Patch runtime', () => {
 
   it('exposes worklet initialization readiness on compiled patches', async () => {
     let finishRegistration: (() => void) | undefined
-    const addModule = vi.fn(
+    const addModule = vi.fn<(_: string) => Promise<void>>(
       () =>
         new Promise<void>((resolve) => {
           finishRegistration = resolve
