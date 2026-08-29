@@ -200,7 +200,7 @@ describe('Web Audio playback session', () => {
     session.start()
 
     expect(drumkitFactory).toHaveBeenCalledOnce()
-    expect(hit).toHaveBeenCalledWith('bd', MockGainNode.instances[0], 0.2, 0.4)
+    expect(hit).toHaveBeenCalledWith('bd', MockGainNode.instances[0], 0.2, 0.4, 0.1, 0.2, 0.7, 0.3)
     // The transport owns one timing source; drum playback adds no pitch source.
     expect(context.sources).toHaveLength(1)
     session.stop()

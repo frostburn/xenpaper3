@@ -118,7 +118,17 @@ export class WebAudioPlaybackSession {
             when: note.when,
             duration: note.duration,
             noteOn: (time) => {
-              const off = kit.hit(note.sample!, this.output, time, note.velocity * lane.gain)
+              const { attack, decay, sustain, release } = note.envelope
+              const off = kit.hit(
+                note.sample!,
+                this.output,
+                time,
+                note.velocity * lane.gain,
+                attack,
+                decay,
+                sustain,
+                release,
+              )
               return (end) => {
                 const cutoff = Number(off(end))
                 if (!Number.isFinite(cutoff) || cutoff < end) {

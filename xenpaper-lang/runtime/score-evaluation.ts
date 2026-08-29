@@ -923,13 +923,22 @@ export function evaluateScoreSemantics(
   )
   if (extensions.size !== (options.directiveExtensions ?? []).length)
     throw new RangeError('Directive extension names must be unique.')
+  const extensionInitialState: Record<string, unknown> = {}
+  for (const [name, extension] of extensions) {
+    const stateKey = extension.stateKey?.toLowerCase() ?? name
+    if (!(stateKey in extensionInitialState) || extensionInitialState[stateKey] === undefined) {
+      extensionInitialState[stateKey] = extension.initialState
+    } else if (
+      extension.initialState !== undefined &&
+      !Object.is(extensionInitialState[stateKey], extension.initialState)
+    ) {
+      throw new RangeError(
+        `Directive extensions sharing state key "${stateKey}" must share an initializer.`,
+      )
+    }
+  }
   const initialDirectiveState: DirectiveExtensionState = {
-    ...Object.fromEntries(
-      [...extensions].map(([name, extension]) => [
-        extension.stateKey?.toLowerCase() ?? name,
-        extension.initialState,
-      ]),
-    ),
+    ...extensionInitialState,
     ...options.directiveState,
   }
 

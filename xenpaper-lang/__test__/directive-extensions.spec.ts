@@ -161,4 +161,40 @@ describe('second-party directive extensions', () => {
       }),
     )
   })
+
+  it('initializes a shared alias state key once regardless of registration order', () => {
+    const initial = Object.freeze({ value: 1 })
+    const canonical: DirectiveExtension = {
+      name: 'canonical',
+      stateKey: 'shared',
+      initialState: initial,
+      apply: (_directive, _context, previous) => ({ state: previous }),
+    }
+    const alias: DirectiveExtension = {
+      name: 'alias',
+      stateKey: 'shared',
+      apply: (_directive, _context, previous) => ({ state: previous }),
+    }
+
+    for (const extensions of [
+      [canonical, alias],
+      [alias, canonical],
+    ]) {
+      const events = shapeNotes('@alias C', extensions)
+      expect(events[0]!.directiveState.shared).toBe(initial)
+    }
+  })
+
+  it('rejects conflicting initializers for a shared extension state key', () => {
+    const extension = (name: string, initialState: number): DirectiveExtension => ({
+      name,
+      stateKey: 'shared',
+      initialState,
+      apply: (_directive, _context, previous) => ({ state: previous }),
+    })
+
+    expect(() => shapeNotes('C', [extension('one', 1), extension('two', 2)])).toThrow(
+      'must share an initializer',
+    )
+  })
 })
