@@ -41,6 +41,15 @@ const selectedLane = computed(() =>
 const selectedClip = computed(() =>
   selectedLane.value?.clips.find(({ id }) => id === selectedClipId.value),
 )
+const selectedInitialization = computed(() => {
+  try {
+    const globalInitialization = compileSourceInitialization(project.value.globalTrack.source)
+    return compileSourceInitialization(selectedLane.value?.source ?? '', globalInitialization)
+  } catch {
+    // Initialization sources are editable. Let clip sizing fall back gracefully while invalid.
+    return undefined
+  }
+})
 
 const finishPlayback = () => {
   playing.value = false
@@ -140,16 +149,11 @@ const deleteSelectedClip = () => {
 const updateClipSource = (clip: SourceClip, source: string) => {
   clip.source = source
   const signature = project.value.globalTrack.timeSignatureChanges[0]!
-  const globalInitialization = compileSourceInitialization(project.value.globalTrack.source)
-  const initialization = compileSourceInitialization(
-    selectedLane.value?.source ?? '',
-    globalInitialization,
-  )
   clip.length = sourceClipLength(
     source,
     beat(signature.numerator * 4, signature.denominator),
     selectedLane.value ? drumSamplesForLane(selectedLane.value) : [],
-    initialization,
+    selectedInitialization.value,
   )
 }
 

@@ -548,6 +548,15 @@ describe('DawView', () => {
     expect(wrapper.findAll('[aria-label="Piano roll preview"] i')).toHaveLength(10)
   })
 
+  it('falls back safely when resizing with an invalid initialization source', async () => {
+    const wrapper = mount(DawView)
+    await wrapper.get('[aria-label="Global source"]').setValue('MOS{')
+    await wrapper.getComponent(InstrumentPianoRollLane).trigger('dblclick', { clientX: 64 })
+    await wrapper.get('textarea[aria-label="Xenpaper clip source"]').setValue('C D')
+
+    expect(wrapper.get('button.clip').attributes('style')).toContain('width: 128px')
+  })
+
   it('renders piano-roll notes parsed from the edited clip source', async () => {
     const wrapper = mount(DawView)
     await wrapper.getComponent(InstrumentPianoRollLane).trigger('dblclick', { clientX: 64 })

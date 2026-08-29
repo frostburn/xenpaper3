@@ -38,12 +38,18 @@ const samples = computed(() =>
 )
 const laneElement = ref<HTMLElement>()
 const dragging = ref<{ clip: SourceClip; pointerOffset: number }>()
-const eventsByClip = computed(() =>
-  Object.fromEntries(
+const eventsByClip = computed(() => {
+  let initialization
+  try {
+    const globalInitialization = compileSourceInitialization(props.globalSource ?? '')
+    initialization = compileSourceInitialization(props.lane.source, globalInitialization)
+  } catch {
+    initialization = undefined
+  }
+  return Object.fromEntries(
     props.lane.clips.map((clip) => {
       try {
-        const globalInitialization = compileSourceInitialization(props.globalSource ?? '')
-        const initialization = compileSourceInitialization(props.lane.source, globalInitialization)
+        if (!initialization) throw new Error('Invalid initialization source')
         return [
           clip.id,
           parseDrumClipNotes(clip.source, samples.value, beatToNumber(clip.length), initialization),
@@ -52,8 +58,8 @@ const eventsByClip = computed(() =>
         return [clip.id, []]
       }
     }),
-  ),
-)
+  )
+})
 const pointerBeat = (event: MouseEvent) =>
   pointerXToBeat(
     event.clientX - (laneElement.value?.getBoundingClientRect().left ?? 0),
