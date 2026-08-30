@@ -61,7 +61,13 @@ watchEffect(() => {
     }
     const samples = drumSamplesForLane(lane)
     for (const clip of lane.clips) {
-      clip.length = sourceClipLength(clip.source, defaultBar, samples, initialization)
+      try {
+        clip.length = sourceClipLength(clip.source, defaultBar, samples, initialization)
+      } catch {
+        // A clip may contain incomplete syntax while it is being edited. Isolate that
+        // failure so initialization changes still resize every other clip in the project.
+        clip.length = defaultBar
+      }
     }
   }
 })

@@ -563,6 +563,22 @@ describe('DawView', () => {
     expect(wrapper.findAll('[aria-label="Piano roll preview"] i')).toHaveLength(5)
   })
 
+  it('isolates incomplete clip syntax while recalculating other clips', async () => {
+    const wrapper = mount(DawView)
+    await wrapper.get('[aria-label="Global source"]').setValue('MOS{2L 1s}')
+    const lane = wrapper.getComponent(InstrumentPianoRollLane)
+    await lane.trigger('dblclick', { clientX: 64 })
+    await wrapper.get('textarea[aria-label="Xenpaper clip source"]').setValue('C (')
+    await lane.trigger('dblclick', { clientX: 384 })
+    await wrapper.get('textarea[aria-label="Xenpaper clip source"]').setValue('J K L M j')
+
+    await wrapper.get('[aria-label="Global source"]').setValue('MOS{3L 1s}')
+
+    const clips = wrapper.findAll('button.clip')
+    expect(clips[0]!.attributes('style')).toContain('width: 256px')
+    expect(clips[1]!.attributes('style')).toContain('width: 320px')
+  })
+
   it('falls back safely when resizing with an invalid initialization source', async () => {
     const wrapper = mount(DawView)
     await wrapper.get('[aria-label="Global source"]').setValue('MOS{')
