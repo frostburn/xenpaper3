@@ -1,4 +1,11 @@
-import type { Directive, PitchLiteral, Program } from '../parser.generated.js'
+import type {
+  Directive,
+  Expression,
+  FunctionBody,
+  FunctionDeclaration,
+  PitchLiteral,
+  Program,
+} from '../parser.generated.js'
 import type { Diagnostic } from '../diagnostics'
 import type { Value } from '../value'
 import type { LocationRange } from 'peggy'
@@ -53,6 +60,44 @@ export interface ScoreShapeOptions {
   readonly pitchContext?: PitchContext
   readonly directiveState?: DirectiveExtensionState
   readonly directiveExtensions?: readonly DirectiveExtension[]
+}
+
+/** Persistent lexical scope. Variables and callables intentionally occupy separate namespaces. */
+export interface LexicalEnvironment {
+  readonly parent?: LexicalEnvironment
+  readonly variables: ReadonlyMap<string, EvaluatedLiteral>
+  readonly functions: ReadonlyMap<string, FunctionDefinition>
+  /** Names currently being invoked, used to diagnose prohibited recursion. */
+  readonly calls: ReadonlySet<string>
+}
+
+export interface FunctionDefinition {
+  readonly declaration: FunctionDeclaration
+  readonly parameters: readonly string[]
+  readonly body: FunctionBody
+  readonly environment: LexicalEnvironment
+}
+
+export const EMPTY_LEXICAL_ENVIRONMENT: LexicalEnvironment = {
+  variables: new Map(),
+  functions: new Map(),
+  calls: new Set(),
+}
+
+export function extendLexicalEnvironment(
+  environment: LexicalEnvironment,
+  additions: {
+    readonly variables?: ReadonlyMap<string, EvaluatedLiteral>
+    readonly functions?: ReadonlyMap<string, FunctionDefinition>
+    readonly calls?: ReadonlySet<string>
+  },
+): LexicalEnvironment {
+  return {
+    parent: environment,
+    variables: additions.variables ?? new Map(),
+    functions: additions.functions ?? new Map(),
+    calls: additions.calls ?? environment.calls,
+  }
 }
 
 export type ScoreShapeEvaluationResult =

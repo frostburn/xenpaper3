@@ -37,6 +37,7 @@ export type Expression =
   | EqualDivisionLiteral
   | EnumeratedChord
   | Group
+  | FunctionDeclaration
   | HardBoundary
   | Identifier
   | IntegerLiteral
@@ -61,6 +62,7 @@ export type Expression =
   | SignatureDeclaration
   | TailElimination
   | UnaryExpression
+  | VariableDeclaration
 
 export interface Barline extends Node {
   type: 'Barline'
@@ -93,6 +95,32 @@ export interface CallExpression extends Node {
   type: 'CallExpression'
   callee: string
   arguments: Expression[]
+}
+
+/** A zero-duration binding, visible to subsequent items in its lexical sequence. */
+export interface VariableDeclaration extends Node {
+  type: 'VariableDeclaration'
+  name: Identifier
+  value: Expression
+}
+
+/** A non-recursive lexical closure. The node location covers the whole declaration. */
+export interface FunctionDeclaration extends Node {
+  type: 'FunctionDeclaration'
+  name: Identifier
+  parameters: Identifier[]
+  body: FunctionBody
+}
+
+export interface FunctionBody extends Node {
+  type: 'FunctionBody'
+  declarations: Array<VariableDeclaration | FunctionDeclaration>
+  returnStatement: ReturnStatement
+}
+
+export interface ReturnStatement extends Node {
+  type: 'ReturnStatement'
+  value: Expression
 }
 
 export interface ContextAssignment extends Node {

@@ -197,7 +197,9 @@ AttachedPostfixMark
     }
 
 PrimaryExpression
-  = RepeatExpression
+  = VariableDeclaration
+  / FunctionDeclaration
+  / RepeatExpression
   / MosDeclaration
   / PitchContextChange
   / Directive
@@ -210,8 +212,8 @@ PrimaryExpression
   / MonzoLiteral
   / MosIntervalLiteral
   / IntervalLiteral
-  / !DrumSampleLiteral pitch:MosPitchLiteral { return pitch; }
-  / !DrumSampleLiteral pitch:PitchLiteral { return pitch; }
+  / !(DeclarationKeyword !IdentifierContinue) !DrumSampleLiteral pitch:MosPitchLiteral { return pitch; }
+  / !(DeclarationKeyword !IdentifierContinue) !DrumSampleLiteral pitch:PitchLiteral { return pitch; }
   / EqualDivisionLiteral
   / QuantityLiteral
   / RatioLiteral
@@ -608,6 +610,35 @@ CallExpression
       return node('CallExpression', { callee, arguments: args ?? [] });
     }
 
+// Declarations are score items with no duration. Their bindings become visible
+// only to following items in the same lexical sequence. Nested groups and
+// parallel branches receive child scopes. Shadowing is permitted; recursion is
+// deliberately rejected by the evaluator.
+VariableDeclaration
+  = "let" !IdentifierContinue RequiredSpacing name:LocatedIdentifier Spacing "=" Spacing value:AdditiveExpression {
+      return node('VariableDeclaration', { name, value });
+    }
+
+FunctionDeclaration
+  = "fn" !IdentifierContinue RequiredSpacing name:LocatedIdentifier Spacing "(" Spacing
+    parameters:(first:LocatedIdentifier rest:(Spacing "," Spacing parameter:LocatedIdentifier { return parameter; })* { return [first, ...rest]; })? Spacing ")" Spacing body:FunctionBody {
+      return node('FunctionDeclaration', { name, parameters: parameters ?? [], body });
+    }
+
+FunctionBody
+  = "{" Spacing declarations:(declaration:(VariableDeclaration / FunctionDeclaration) Spacing { return declaration; })*
+    returnStatement:ReturnStatement Spacing "}" {
+      return node('FunctionBody', { declarations, returnStatement });
+    }
+
+ReturnStatement
+  = "ret" !IdentifierContinue RequiredSpacing value:AdditiveExpression {
+      return node('ReturnStatement', { value });
+    }
+
+LocatedIdentifier
+  = name:Identifier { return node('Identifier', { name }); }
+
 CallArgumentList
   = first:AdditiveExpression
     rest:(Spacing "," Spacing argument:AdditiveExpression { return argument; })* {
@@ -993,7 +1024,11 @@ Sign
 Identifier
   // A Diamond-MOS nominal followed by an FJS suffix is an invalid pitch, not
   // an identifier followed by an adjacent prefix-modified degree.
-  = !([J-Zj-z] [J-Zj-z]? FjsInflection) name:$([A-Za-z_] IdentifierContinue*) { return name; }
+  = !(DeclarationKeyword !IdentifierContinue)
+    !([J-Zj-z] [J-Zj-z]? FjsInflection) name:$([A-Za-z_] IdentifierContinue*) { return name; }
+
+DeclarationKeyword
+  = "let" / "fn" / "ret"
 
 IdentifierContinue
   = [A-Za-z0-9_]

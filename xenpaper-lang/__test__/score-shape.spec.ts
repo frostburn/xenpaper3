@@ -16,6 +16,22 @@ function shape(source: string, pulse: Fraction | number = 1): ScoreShape {
 }
 
 describe('score-shape timing', () => {
+  it('evaluates zero-duration lexical declarations before musical calls', () => {
+    const score = shape(
+      'let interval = 3/2 fn transpose(note) { let shifted = note * interval ret shifted } transpose(1)',
+    )
+    const attacks: Extract<ScoreShape, { kind: 'attack' }>[] = []
+    const collect = (current: ScoreShape) => {
+      if (current.kind === 'attack') attacks.push(current)
+      else if (current.kind === 'sequence') current.children.forEach(collect)
+      else if (current.kind === 'parallel') current.branches.forEach(collect)
+    }
+    collect(score)
+    expect(score.duration.equals(1)).toBe(true)
+    expect(attacks).toHaveLength(1)
+    expect(attacks[0]!.pitch.value.equals(Value.pitch(new Value(3n, 2n)))).toBe(true)
+  })
+
   it('isolates pitch-context changes in groups, normalized slots, and parallel branches', () => {
     const score = shape(`{12edo}
 0 ({19edo} 6) 7

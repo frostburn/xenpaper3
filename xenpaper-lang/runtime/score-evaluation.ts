@@ -2,7 +2,7 @@ import { Fraction } from 'xen-dev-utils/fraction'
 import type { Expression } from '../parser.generated.js'
 import type { Diagnostic } from '../diagnostics'
 import { Value } from '../value'
-import { evaluateExpression } from './expressions'
+import { evaluateDeclaration, evaluateExpression } from './expressions'
 import { DYNAMIC_VELOCITIES, resolveDirective } from './directives'
 import {
   DEFAULT_PITCH_CONTEXT,
@@ -28,6 +28,7 @@ import type {
   DynamicMark,
   DirectiveExtensionState,
   ScoreShapeOptions,
+  LexicalEnvironment,
   ScoreShapeEvaluationResult,
 } from './types'
 
@@ -832,6 +833,7 @@ function contextShape(
 function playablePitch(
   node: Expression,
   context: PitchContext,
+  environment?: LexicalEnvironment,
 ):
   | {
       readonly pitch: AttackShape['pitch']
@@ -839,7 +841,7 @@ function playablePitch(
       readonly diagnostics: readonly Diagnostic[]
     }
   | { readonly diagnostics: readonly Diagnostic[] } {
-  const evaluated = evaluateExpression(node, context)
+  const evaluated = evaluateExpression(node, context, environment)
   if (!('value' in evaluated)) return evaluated
   if (evaluated.value.kind === 'pitchOffset') {
     return {
@@ -1113,6 +1115,7 @@ export function evaluateScoreSemantics(
     currentArticulation: Fraction = new Fraction(1),
     currentArticulationMarks: readonly string[] = [],
     currentDirectiveState: DirectiveExtensionState = initialDirectiveState,
+    environment?: LexicalEnvironment,
   ): ScoreShapeEvaluationResult => {
     const broadcast = broadcastScalarOperation(current, context)
     if (broadcast)
@@ -1325,6 +1328,7 @@ export function evaluateScoreSemantics(
       let activeArticulation = currentArticulation
       let activeArticulationMarks = [...currentArticulationMarks]
       let activeDirectiveState = currentDirectiveState
+      let activeEnvironment = environment
       let velocity: Fraction | undefined
       let grace: { duration: Fraction; count: number; indices: number[] } | undefined
       let gliss:
@@ -1341,6 +1345,12 @@ export function evaluateScoreSemantics(
         | undefined
       const results: ScoreShapeEvaluationResult[] = []
       for (const item of current.items) {
+        if (item.type === 'VariableDeclaration' || item.type === 'FunctionDeclaration') {
+          const declared = evaluateDeclaration(item, activeContext, activeEnvironment)
+          activeEnvironment = declared.environment
+          results.push({ shape: sequence([], [origin(item)]), diagnostics: declared.diagnostics })
+          continue
+        }
         if (item.type === 'PitchContextChange') {
           try {
             const previousContext = activeContext
@@ -1489,6 +1499,7 @@ export function evaluateScoreSemantics(
           activeArticulation,
           activeArticulationMarks,
           activeDirectiveState,
+          activeEnvironment,
         )
         const index = results.length
         if ('shape' in result && attacks(result.shape).length) {
@@ -1851,7 +1862,7 @@ export function evaluateScoreSemantics(
         return { shape: contextAnnotation(current), diagnostics: [] }
       }
     }
-    const evaluated = playablePitch(current, context)
+    const evaluated = playablePitch(current, context, environment)
     if (!('pitch' in evaluated)) return evaluated
     const broadcastContext = current as Expression & {
       readonly broadcastArticulation?: Fraction

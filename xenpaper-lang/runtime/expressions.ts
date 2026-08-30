@@ -3,8 +3,15 @@ import { Fraction, mmod } from 'xen-dev-utils/fraction'
 import type { Diagnostic } from '../diagnostics'
 import { Value } from '../value'
 import { evaluateLiteral, type NumericLiteralNode } from './literals'
-import type { EvaluatedLiteral, PitchOffsetValue, ScalarValue, SourceOrigin } from './types'
+import type {
+  EvaluatedLiteral,
+  LexicalEnvironment,
+  PitchOffsetValue,
+  ScalarValue,
+  SourceOrigin,
+} from './types'
 import type { PitchContext, PrimeMapping } from './types'
+import { EMPTY_LEXICAL_ENVIRONMENT, extendLexicalEnvironment } from './types'
 import {
   createPitchContext,
   DEFAULT_PITCH_CONTEXT,
@@ -44,6 +51,49 @@ function equaveShifts(modifiers: readonly { readonly kind: string }[]): number {
 export type ExpressionEvaluationResult =
   | { readonly value: EvaluatedLiteral; readonly diagnostics: readonly Diagnostic[] }
   | { readonly diagnostics: readonly Diagnostic[] }
+
+export function evaluateDeclaration(
+  node: Extract<Expression, { type: 'VariableDeclaration' | 'FunctionDeclaration' }>,
+  mapping: PrimeMapping | PitchContext = DEFAULT_PITCH_CONTEXT,
+  environment: LexicalEnvironment = EMPTY_LEXICAL_ENVIRONMENT,
+): { readonly environment: LexicalEnvironment; readonly diagnostics: readonly Diagnostic[] } {
+  if (node.type === 'VariableDeclaration') {
+    const evaluated = evaluateExpression(node.value, mapping, environment)
+    if (!('value' in evaluated)) return { environment, diagnostics: evaluated.diagnostics }
+    return {
+      environment: extendLexicalEnvironment(environment, {
+        variables: new Map([[node.name.name, evaluated.value]]),
+      }),
+      diagnostics: evaluated.diagnostics,
+    }
+  }
+  const names = node.parameters.map((parameter) => parameter.name)
+  const duplicate = names.find((name, index) => names.indexOf(name) !== index)
+  if (duplicate) {
+    return {
+      environment,
+      diagnostics: [
+        {
+          code: 'XP_DUPLICATE_PARAMETER',
+          severity: 'error',
+          message: `Duplicate parameter ${duplicate}.`,
+          locations: node.parameters
+            .filter((parameter) => parameter.name === duplicate)
+            .map((parameter) => parameter.location),
+        },
+      ],
+    }
+  }
+  // Capture before installing the definition: ordinary lexical closures work,
+  // while direct and mutual recursion remain unavailable by policy.
+  const definition = { declaration: node, parameters: names, body: node.body, environment }
+  return {
+    environment: extendLexicalEnvironment(environment, {
+      functions: new Map([[node.name.name, definition]]),
+    }),
+    diagnostics: [],
+  }
+}
 
 function isNumericLiteral(node: Expression): node is NumericLiteralNode {
   return (
@@ -328,8 +378,17 @@ function binary(
 export function evaluateExpression(
   node: Expression,
   mapping: PrimeMapping | PitchContext = DEFAULT_PITCH_CONTEXT,
+  environment: LexicalEnvironment = EMPTY_LEXICAL_ENVIRONMENT,
 ): ExpressionEvaluationResult {
   try {
+    // Pitch-shaped bare words remain pitch AST nodes for compatibility, but a
+    // lexical binding with the same spelling wins during evaluation.
+    if (node.type === 'PitchLiteral' && node.raw === node.nominal.value) {
+      for (let scope: LexicalEnvironment | undefined = environment; scope; scope = scope.parent) {
+        const value = scope.variables.get(node.raw)
+        if (value) return { value, diagnostics: [] }
+      }
+    }
     if (node.type === 'DegreeLiteral') {
       const context = 'rootPitch' in mapping ? mapping : createPitchContext(mapping)
       const degree = Number(node.degree)
@@ -351,7 +410,7 @@ export function evaluateExpression(
     }
     if (isNumericLiteral(node)) {
       if (node.type === 'EqualDivisionLiteral' && node.equave) {
-        const equave = evaluateExpression(node.equave, mapping)
+        const equave = evaluateExpression(node.equave, mapping, environment)
         if (!('value' in equave)) return equave
         if (equave.value.kind !== 'scalar') {
           throw new TypeError('Equal-division equave must be a scalar ratio.')
@@ -366,6 +425,12 @@ export function evaluateExpression(
       return { value: evaluateIntervalLiteral(node, mapping), diagnostics: [] }
     if (node.type === 'MosIntervalLiteral')
       return { value: evaluateMosIntervalLiteral(node, mapping), diagnostics: [] }
+    if (node.type === 'Identifier') {
+      for (let scope: LexicalEnvironment | undefined = environment; scope; scope = scope.parent) {
+        const value = scope.variables.get(node.name)
+        if (value) return { value, diagnostics: [] }
+      }
+    }
     if (node.type === 'Identifier' && node.name === 'pi') {
       return {
         value: result('scalar', Value.real(Math.PI), [
@@ -374,9 +439,20 @@ export function evaluateExpression(
         diagnostics: [],
       }
     }
-    if (node.type === 'Group') return evaluateExpression(node.expression, mapping)
+    if (node.type === 'Identifier')
+      return {
+        diagnostics: [
+          {
+            code: 'XP_UNDEFINED_NAME',
+            severity: 'error',
+            message: `Undefined name ${node.name}.`,
+            locations: [node.location],
+          },
+        ],
+      }
+    if (node.type === 'Group') return evaluateExpression(node.expression, mapping, environment)
     if (node.type === 'PitchModifierExpression') {
-      const operand = evaluateExpression(node.operand, mapping)
+      const operand = evaluateExpression(node.operand, mapping, environment)
       if (!('value' in operand)) return operand
       const context = 'rootPitch' in mapping ? mapping : createPitchContext(mapping)
       const modifier = node.modifier.kind
@@ -454,7 +530,7 @@ export function evaluateExpression(
       }
     }
     if (node.type === 'UnaryExpression') {
-      const operand = evaluateExpression(node.operand, mapping)
+      const operand = evaluateExpression(node.operand, mapping, environment)
       if (!('value' in operand)) return operand
       if (node.operator === '+') return operand
       if (node.operator === '~') {
@@ -522,16 +598,104 @@ export function evaluateExpression(
       }
     }
     if (node.type === 'BinaryExpression') {
-      const left = evaluateExpression(node.left, mapping)
-      const right = evaluateExpression(node.right, mapping)
+      const left = evaluateExpression(node.left, mapping, environment)
+      const right = evaluateExpression(node.right, mapping, environment)
       const diagnostics = [...left.diagnostics, ...right.diagnostics]
       if (!('value' in left) || !('value' in right)) return { diagnostics }
       return { value: binary(node.operator, left.value, right.value, node), diagnostics }
     }
     if (node.type === 'CallExpression') {
+      let definition
+      let variable = false
+      for (let scope: LexicalEnvironment | undefined = environment; scope; scope = scope.parent) {
+        if (!definition) definition = scope.functions.get(node.callee)
+        if (scope.variables.has(node.callee)) variable = true
+        if (definition || variable) break
+      }
+      if (variable && !definition)
+        return {
+          diagnostics: [
+            {
+              code: 'XP_NOT_CALLABLE',
+              severity: 'error',
+              message: `${node.callee} is not a function.`,
+              locations: [node.location],
+            },
+          ],
+        }
+      if (definition) {
+        if (environment.calls.has(node.callee))
+          return {
+            diagnostics: [
+              {
+                code: 'XP_RECURSION',
+                severity: 'error',
+                message: `Recursive call to ${node.callee}() is prohibited.`,
+                locations: [node.location, definition.declaration.name.location],
+              },
+            ],
+          }
+        if (node.arguments.length !== definition.parameters.length)
+          return {
+            diagnostics: [
+              {
+                code: 'XP_ARITY',
+                severity: 'error',
+                message: `${node.callee}() expects ${definition.parameters.length} argument${definition.parameters.length === 1 ? '' : 's'}, but received ${node.arguments.length}.`,
+                locations: [node.location, definition.declaration.location],
+              },
+            ],
+          }
+        const evaluated = node.arguments.map((argument) =>
+          evaluateExpression(argument, mapping, environment),
+        )
+        const diagnostics = evaluated.flatMap((result) => result.diagnostics)
+        if (!evaluated.every((result) => 'value' in result)) return { diagnostics }
+        const variables = new Map(
+          definition.parameters.map((name, index) => [
+            name,
+            (evaluated[index] as { value: EvaluatedLiteral }).value,
+          ]),
+        )
+        const calls = new Set(environment.calls).add(node.callee)
+        const callEnvironment = extendLexicalEnvironment(definition.environment, {
+          variables,
+          functions: new Map([[node.callee, definition]]),
+          calls,
+        })
+        let bodyEnvironment = callEnvironment
+        const declarationDiagnostics: Diagnostic[] = []
+        for (const declaration of definition.body.declarations) {
+          const declared = evaluateDeclaration(declaration, mapping, bodyEnvironment)
+          bodyEnvironment = declared.environment
+          declarationDiagnostics.push(...declared.diagnostics)
+        }
+        if (declarationDiagnostics.some((item) => item.severity === 'error'))
+          return { diagnostics: [...diagnostics, ...declarationDiagnostics] }
+        const body = evaluateExpression(
+          definition.body.returnStatement.value,
+          mapping,
+          bodyEnvironment,
+        )
+        return {
+          ...body,
+          diagnostics: [...diagnostics, ...declarationDiagnostics, ...body.diagnostics],
+        }
+      }
+      if (!['pitch', 'ratio', 'sqrt'].includes(node.callee))
+        return {
+          diagnostics: [
+            {
+              code: 'XP_UNDEFINED_NAME',
+              severity: 'error',
+              message: `Undefined function ${node.callee}().`,
+              locations: [node.location],
+            },
+          ],
+        }
       if (node.arguments.length !== 1) throw new TypeError(`${node.callee}() expects one argument.`)
       const argumentNode = node.arguments[0]!
-      const argument = evaluateExpression(argumentNode, mapping)
+      const argument = evaluateExpression(argumentNode, mapping, environment)
       if (!('value' in argument)) return argument
       if (node.callee === 'pitch') {
         if (argument.value.kind !== 'scalar') throw new TypeError('pitch() expects a scalar ratio.')

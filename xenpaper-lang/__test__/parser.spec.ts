@@ -1,6 +1,36 @@
 import { describe, expect, it } from 'vitest'
 import { parse } from '../parser.generated.js'
 
+describe('lexical declarations', () => {
+  it('retains complete declaration and parameter-name locations', () => {
+    const source = 'fn transpose(note, interval) { ret note + interval } # closure'
+    const declaration = parse(source).body[0]
+    expect(declaration).toMatchObject({
+      type: 'FunctionDeclaration',
+      name: { name: 'transpose' },
+      parameters: [{ name: 'note' }, { name: 'interval' }],
+      body: {
+        type: 'FunctionBody',
+        returnStatement: { type: 'ReturnStatement', value: { operator: '+' } },
+      },
+    })
+    if (declaration.type !== 'FunctionDeclaration') throw new Error('Expected function.')
+    expect(declaration.location.start.offset).toBe(0)
+    expect(declaration.location.end.offset).toBe(source.indexOf(' #'))
+    expect(declaration.parameters.map((parameter) => parameter.location.start.offset)).toEqual([
+      13, 19,
+    ])
+  })
+
+  it('reserves declaration keywords and rejects malformed parameter lists', () => {
+    expect(() => parse('let')).toThrow()
+    expect(() => parse('ret')).toThrow()
+    expect(() => parse('fn f(a,) { ret a }')).toThrow()
+    expect(() => parse('fn f(a) { a }')).toThrow()
+    expect(parse('letter').body[0]).not.toMatchObject({ type: 'VariableDeclaration' })
+  })
+})
+
 describe('grammar boundary roles', () => {
   it('shares rhythm while interpreting enumerated drum words as sample leaves', () => {
     expect(parse('bd').body[0]).toMatchObject({
