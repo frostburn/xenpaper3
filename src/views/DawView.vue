@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, ref } from 'vue'
+import { computed, nextTick, onBeforeUnmount, ref, watchEffect } from 'vue'
 import ClipSourceEditor from '../components/daw/ClipSourceEditor.vue'
 import DrumLane from '../components/daw/DrumLane.vue'
 import GlobalLane from '../components/daw/GlobalLane.vue'
@@ -41,13 +41,28 @@ const selectedLane = computed(() =>
 const selectedClip = computed(() =>
   selectedLane.value?.clips.find(({ id }) => id === selectedClipId.value),
 )
-const selectedInitialization = computed(() => {
+watchEffect(() => {
+  const signature = project.value.globalTrack.timeSignatureChanges[0]!
+  const defaultBar = beat(signature.numerator * 4, signature.denominator)
+  let globalInitialization
   try {
-    const globalInitialization = compileSourceInitialization(project.value.globalTrack.source)
-    return compileSourceInitialization(selectedLane.value?.source ?? '', globalInitialization)
+    globalInitialization = compileSourceInitialization(project.value.globalTrack.source)
   } catch {
-    // Initialization sources are editable. Let clip sizing fall back gracefully while invalid.
-    return undefined
+    // Keep independently valid clips usable while an initialization source is being edited.
+    globalInitialization = undefined
+  }
+
+  for (const lane of project.value.instrumentLanes) {
+    let initialization
+    try {
+      initialization = compileSourceInitialization(lane.source, globalInitialization)
+    } catch {
+      initialization = undefined
+    }
+    const samples = drumSamplesForLane(lane)
+    for (const clip of lane.clips) {
+      clip.length = sourceClipLength(clip.source, defaultBar, samples, initialization)
+    }
   }
 })
 
@@ -148,13 +163,6 @@ const deleteSelectedClip = () => {
 
 const updateClipSource = (clip: SourceClip, source: string) => {
   clip.source = source
-  const signature = project.value.globalTrack.timeSignatureChanges[0]!
-  clip.length = sourceClipLength(
-    source,
-    beat(signature.numerator * 4, signature.denominator),
-    selectedLane.value ? drumSamplesForLane(selectedLane.value) : [],
-    selectedInitialization.value,
-  )
 }
 
 onBeforeUnmount(() => {
