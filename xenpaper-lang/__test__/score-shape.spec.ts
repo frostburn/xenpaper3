@@ -299,6 +299,27 @@ K L M N j k=`) as SequenceShape
     const tritaveAttacks = tritave.children.filter((child) => child.kind === 'attack')
     expect(tritaveAttacks[1]!.pitch.value.equals(Value.pitch(new Value(3)))).toBe(true)
 
+    const tritaveEquaves = shape("MOS{4L 5s <3/1> 4|4} [J, j] [J, 'J] [0, '0]") as SequenceShape
+    const tritaveEquaveCents = tritaveEquaves.children.flatMap((child) =>
+      child.kind === 'parallel'
+        ? child.branches
+            .filter((branch) => branch.kind === 'attack')
+            .map((attack) => attack.pitch.value.valueOf())
+        : [],
+    )
+    expect(tritaveEquaveCents).toEqual([
+      0,
+      1200 * Math.log2(3),
+      0,
+      1200 * Math.log2(3),
+      0,
+      1200 * Math.log2(3),
+    ])
+
+    const latinOctave = shape("MOS{5L4s <3/1>} 'C") as SequenceShape
+    const latinAttack = latinOctave.children.find((child) => child.kind === 'attack')
+    expect(latinAttack?.pitch.value.equals(Value.pitch(new Value(2)))).toBe(true)
+
     const set = shape('MOS{5L2s} MOS{^ = 1\\24} ^J') as SequenceShape
     const setAttack = set.children.find((child) => child.kind === 'attack')
     expect(setAttack?.pitch.value.equals(Value.equalDivision(1, 24, new Value(2)))).toBe(true)
