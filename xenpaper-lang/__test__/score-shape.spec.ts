@@ -34,11 +34,11 @@ describe('score-shape timing', () => {
 
   it('inherits lexical bindings in nested score constructs and directives', () => {
     for (const source of [
-      'let x = 3/2 (x)',
-      'let x = 3/2 [x]',
-      'let x = 3/2 (x,x)',
-      'let x = 3/2 |: x :|',
-      'let x = 3/2 x?',
+      'let interval = 3/2 (interval)',
+      'let interval = 3/2 [interval]',
+      'let interval = 3/2 (interval,interval)',
+      'let interval = 3/2 |: interval :|',
+      'let interval = 3/2 interval?',
     ]) {
       try {
         shape(source)
@@ -47,12 +47,12 @@ describe('score-shape timing', () => {
       }
     }
 
-    const directed = shape('let v = 1/2 @subdivision(v) C')
+    const directed = shape('let subdivision = 1/2 @subdivision(subdivision) C')
     expect(directed.duration.equals(2)).toBe(true)
   })
 
   it('allows a local function to shadow an active caller with the same name', () => {
-    const score = shape('fn f() { fn f() { ret 3/2 } ret f() } f()')
+    const score = shape('fn transform() { fn transform() { ret 3/2 } ret transform() } transform()')
     const attack =
       score.kind === 'sequence' && score.children.find((child) => child.kind === 'attack')
     expect(

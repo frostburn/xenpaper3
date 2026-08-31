@@ -4,7 +4,7 @@ export type * from './parser.generated.js'
 export { expandRepeats } from './runtime/repeat-expansion'
 export { decimalFraction, evaluateLiteral } from './runtime/literals'
 export type { LiteralEvaluationResult, NumericLiteralNode } from './runtime/literals'
-export { evaluateExpression } from './runtime/expressions'
+export { evaluateExpression, PRELUDE } from './runtime/expressions'
 export { applyFjsInflections, fjsInflection, fjsPrimeComma } from './runtime/fjs'
 export type { FjsFlavor, FjsInflectionInput } from './runtime/fjs'
 export {

@@ -76,7 +76,13 @@ transpose(fifth, C) transpose(fifth, D)
 or more local `let` or `fn` declarations followed by exactly one `ret`, whose
 expression is the call's result. Commas separate parameters and a trailing comma
 is not accepted. `let`, `fn`, and `ret` are reserved (case-sensitive) and cannot
-be used as pitches, identifiers, or function names.
+be used as pitches, identifiers, or function names. Names that are valid musical
+pitch spellings are likewise unavailable for declarations: music always wins and
+the meaning of a pitch token never depends on lexical scope.
+
+Every evaluation starts with a prelude written in Xenpaper itself. It currently
+declares `pi` and defines `sqrt(radicand)` as `radicand ** 1/2`; ordinary lexical
+shadowing can replace either name in a narrower scope.
 
 Scope is sequential and lexical: a declaration is visible only after its source
 position. A function captures the environment at its declaration, arguments are

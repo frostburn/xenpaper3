@@ -1,4 +1,4 @@
-import type { Expression } from '../parser.generated.js'
+import { parse, type Expression } from '../parser.generated.js'
 import { Fraction, mmod } from 'xen-dev-utils/fraction'
 import type { Diagnostic } from '../diagnostics'
 import { Value } from '../value'
@@ -52,10 +52,38 @@ export type ExpressionEvaluationResult =
   | { readonly value: EvaluatedLiteral; readonly diagnostics: readonly Diagnostic[] }
   | { readonly diagnostics: readonly Diagnostic[] }
 
+/** Xenpaper declarations installed as the outermost lexical scope by default. */
+export const PRELUDE = `
+let pi = 3.141592653589793r
+fn sqrt(radicand) { ret radicand ** 1/2 }
+`
+
+let cachedPreludeEnvironment: LexicalEnvironment | undefined
+
+function preludeEnvironment(): LexicalEnvironment {
+  if (cachedPreludeEnvironment) return cachedPreludeEnvironment
+  let environment = EMPTY_LEXICAL_ENVIRONMENT
+  const program = parse(PRELUDE)
+  const sequence = program.body[0]
+  const declarations = sequence?.type === 'Sequence' ? sequence.items : program.body
+  for (const declaration of declarations) {
+    if (declaration.type !== 'VariableDeclaration' && declaration.type !== 'FunctionDeclaration') {
+      throw new TypeError('The Xenpaper prelude may only contain declarations.')
+    }
+    const evaluated = evaluateDeclaration(declaration, DEFAULT_PITCH_CONTEXT, environment)
+    if (evaluated.diagnostics.length) {
+      throw new TypeError(`Invalid Xenpaper prelude: ${evaluated.diagnostics[0]!.message}`)
+    }
+    environment = evaluated.environment
+  }
+  cachedPreludeEnvironment = environment
+  return environment
+}
+
 export function evaluateDeclaration(
   node: Extract<Expression, { type: 'VariableDeclaration' | 'FunctionDeclaration' }>,
   mapping: PrimeMapping | PitchContext = DEFAULT_PITCH_CONTEXT,
-  environment: LexicalEnvironment = EMPTY_LEXICAL_ENVIRONMENT,
+  environment: LexicalEnvironment = preludeEnvironment(),
 ): { readonly environment: LexicalEnvironment; readonly diagnostics: readonly Diagnostic[] } {
   if (node.type === 'VariableDeclaration') {
     const evaluated = evaluateExpression(node.value, mapping, environment)
@@ -378,17 +406,9 @@ function binary(
 export function evaluateExpression(
   node: Expression,
   mapping: PrimeMapping | PitchContext = DEFAULT_PITCH_CONTEXT,
-  environment: LexicalEnvironment = EMPTY_LEXICAL_ENVIRONMENT,
+  environment: LexicalEnvironment = preludeEnvironment(),
 ): ExpressionEvaluationResult {
   try {
-    // Pitch-shaped bare words remain pitch AST nodes for compatibility, but a
-    // lexical binding with the same spelling wins during evaluation.
-    if (node.type === 'PitchLiteral' && node.raw === node.nominal.value) {
-      for (let scope: LexicalEnvironment | undefined = environment; scope; scope = scope.parent) {
-        const value = scope.variables.get(node.raw)
-        if (value) return { value, diagnostics: [] }
-      }
-    }
     if (node.type === 'DegreeLiteral') {
       const context = 'rootPitch' in mapping ? mapping : createPitchContext(mapping)
       const degree = Number(node.degree)
@@ -429,14 +449,6 @@ export function evaluateExpression(
       for (let scope: LexicalEnvironment | undefined = environment; scope; scope = scope.parent) {
         const value = scope.variables.get(node.name)
         if (value) return { value, diagnostics: [] }
-      }
-    }
-    if (node.type === 'Identifier' && node.name === 'pi') {
-      return {
-        value: result('scalar', Value.real(Math.PI), [
-          { location: node.location, role: 'literal' },
-        ]),
-        diagnostics: [],
       }
     }
     if (node.type === 'Identifier')
@@ -682,7 +694,7 @@ export function evaluateExpression(
           diagnostics: [...diagnostics, ...declarationDiagnostics, ...body.diagnostics],
         }
       }
-      if (!['pitch', 'ratio', 'sqrt'].includes(node.callee))
+      if (!['pitch', 'ratio'].includes(node.callee))
         return {
           diagnostics: [
             {
@@ -712,18 +724,6 @@ export function evaluateExpression(
           throw new TypeError('ratio() expects a pitch offset.')
         return {
           value: result('scalar', Value.ratio(argument.value.value), argument.value.origins),
-          diagnostics: argument.diagnostics,
-        }
-      }
-      if (node.callee === 'sqrt') {
-        if (argument.value.kind !== 'scalar')
-          throw new TypeError('sqrt() expects a scalar quantity.')
-        return {
-          value: result(
-            'scalar',
-            argument.value.value.pow(new Fraction(1, 2)),
-            argument.value.origins,
-          ),
           diagnostics: argument.diagnostics,
         }
       }

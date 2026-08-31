@@ -31,10 +31,16 @@ describe('lexical declarations', () => {
   })
 
   it('rejects declarations in repeat bodies and alternate endings', () => {
-    expect(() => parse('|: let x = 3/2 x :|')).toThrow(/not allowed inside repeats/)
-    expect(() => parse('|: C |@^1 fn f() { ret 3\/2 } f() ||')).toThrow(
+    expect(() => parse('|: let interval = 3/2 interval :|')).toThrow(/not allowed inside repeats/)
+    expect(() => parse('|: C |@^1 fn transform() { ret 3/2 } transform() ||')).toThrow(
       /not allowed inside repeats/,
     )
+  })
+
+  it('does not allow declarations to claim musical spellings', () => {
+    for (const source of ['let C = 3/2', 'let x = 3/2', 'fn f() { ret 3/2 }']) {
+      expect(() => parse(source)).toThrow()
+    }
   })
 })
 

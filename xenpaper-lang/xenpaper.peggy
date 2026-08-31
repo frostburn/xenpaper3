@@ -658,7 +658,9 @@ ReturnStatement
     }
 
 LocatedIdentifier
-  = name:Identifier { return node('Identifier', { name }); }
+  // Musical spellings are never declaration names: score syntax always wins
+  // over the lexical namespace rather than becoming context-dependent.
+  = !(MosPitchLiteral / PitchLiteral) name:Identifier { return node('Identifier', { name }); }
 
 CallArgumentList
   = first:AdditiveExpression

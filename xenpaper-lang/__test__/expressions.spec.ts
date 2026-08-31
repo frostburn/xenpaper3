@@ -192,10 +192,12 @@ describe('arithmetic expression evaluation', () => {
       diagnostics: [{ code: 'XP_TYPE_MISMATCH', message: 'ratio() expects a pitch offset.' }],
     })
     expect(evaluateExpression(expression('sqrt(700c)'))).toMatchObject({
-      diagnostics: [{ code: 'XP_TYPE_MISMATCH', message: 'sqrt() expects a scalar quantity.' }],
+      diagnostics: [
+        { code: 'XP_TYPE_MISMATCH', message: 'Exponentiation requires scalar operands.' },
+      ],
     })
     expect(evaluateExpression(expression('sqrt(1, 2)'))).toMatchObject({
-      diagnostics: [{ code: 'XP_TYPE_MISMATCH', message: 'sqrt() expects one argument.' }],
+      diagnostics: [{ code: 'XP_ARITY', message: 'sqrt() expects 1 argument, but received 2.' }],
     })
   })
 
