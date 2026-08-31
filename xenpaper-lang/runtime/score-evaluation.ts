@@ -1749,6 +1749,7 @@ export function evaluateScoreSemantics(
           [origin(current)],
         ),
         diagnostics,
+        lexicalEnvironment: activeEnvironment,
       }
     }
     if (current.type === 'Parallel') {
@@ -1916,6 +1917,7 @@ export function evaluateScoreSemantics(
     articulation: new Fraction(1),
     articulationMarks: [],
     directiveState: initialDirectiveState,
+    environment: options.lexicalEnvironment,
     subdivisionBase: pulse,
   })
   const result = visitor.visit(node)
@@ -1924,5 +1926,6 @@ export function evaluateScoreSemantics(
     ...result,
     pitchContext: contextAfter(node, initialContext),
     directiveState: directiveStateAfter(node, initialDirectiveState, initialContext),
+    lexicalEnvironment: result.lexicalEnvironment ?? options.lexicalEnvironment,
   }
 }

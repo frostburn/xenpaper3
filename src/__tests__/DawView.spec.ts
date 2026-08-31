@@ -266,6 +266,18 @@ describe('DAW project model', () => {
     expect(notes[1]!.cents).not.toBe(parseClipNotes('{12edo} D')[0]!.cents - 900)
   })
 
+  it('propagates global function declarations into lane and clip sources', () => {
+    const project = createDefaultProject()
+    const lane = project.instrumentLanes[0]!
+    project.globalTrack.source = 'fn LICC() { ret @2 D E F G E= C D== }'
+    lane.source = 'fn phrase() { ret LICC() }'
+    lane.clips.push({ id: 'function-call', start: beat(0), length: beat(8), source: 'phrase()' })
+
+    const notes = parseProjectNotes(project)
+    expect(notes).toHaveLength(7)
+    expect(notes.map(({ beat }) => beat)).toEqual([0, 0.5, 1, 1.5, 2, 3, 3.5])
+  })
+
   it('propagates a global groove through lane initialization into every clip', () => {
     const project = createDefaultProject()
     const instrument = project.instrumentLanes[0]!
