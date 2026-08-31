@@ -38,6 +38,36 @@ interface PlaybackAttackShape extends AttackShape {
   readonly velocityExplicit?: boolean
 }
 
+interface VisitorScope {
+  readonly context: PitchContext
+  readonly pulse: Fraction
+  readonly dynamic: DynamicMark
+  readonly articulation: Fraction
+  readonly articulationMarks: readonly string[]
+  readonly directiveState: DirectiveExtensionState
+  readonly environment?: LexicalEnvironment
+  readonly subdivisionBase: Fraction
+}
+
+type VisitorEvaluation = (node: Expression, visitor: Visitor) => ScoreShapeEvaluationResult
+
+/** Immutable evaluation cursor that derives child context without long recursive argument lists. */
+class Visitor {
+  constructor(
+    private readonly evaluate: VisitorEvaluation,
+    readonly scope: VisitorScope,
+  ) {}
+
+  spawn(overrides: Partial<VisitorScope> = {}): Visitor {
+    return new Visitor(this.evaluate, { ...this.scope, ...overrides })
+  }
+
+  visit(node: Expression, overrides: Partial<VisitorScope> = {}): ScoreShapeEvaluationResult {
+    const visitor = Object.keys(overrides).length ? this.spawn(overrides) : this
+    return this.evaluate(node, visitor)
+  }
+}
+
 const MAX_REPEAT_EXPANSION_NODES = 100_000
 const MAX_ENUMERATED_CHORD_SIZE = 10_000n
 
@@ -1121,64 +1151,34 @@ export function evaluateScoreSemantics(
     return state
   }
 
-  const visit = (
-    current: Expression,
-    context: PitchContext,
-    currentPulse: Fraction = pulse,
-    currentDynamic: DynamicMark = 'mf',
-    currentArticulation: Fraction = new Fraction(1),
-    currentArticulationMarks: readonly string[] = [],
-    currentDirectiveState: DirectiveExtensionState = initialDirectiveState,
-    environment?: LexicalEnvironment,
-    subdivisionBase: Fraction = currentPulse,
-  ): ScoreShapeEvaluationResult => {
+  const evaluateNode: VisitorEvaluation = (current, visitor) => {
+    const {
+      context,
+      pulse: currentPulse,
+      dynamic: currentDynamic,
+      articulation: currentArticulation,
+      articulationMarks: currentArticulationMarks,
+      directiveState: currentDirectiveState,
+      environment,
+      subdivisionBase,
+    } = visitor.scope
     if (current.type === 'CallExpression') {
       const prepared = prepareFunctionCall(current, context, environment)
       if (prepared) {
         if (!('expression' in prepared)) return prepared
-        const returned = visit(
-          prepared.expression,
-          context,
-          currentPulse,
-          currentDynamic,
-          currentArticulation,
-          currentArticulationMarks,
-          currentDirectiveState,
-          prepared.environment,
-          currentPulse,
-        )
+        const returned = visitor.visit(prepared.expression, {
+          environment: prepared.environment,
+          subdivisionBase: currentPulse,
+        })
         return { ...returned, diagnostics: [...prepared.diagnostics, ...returned.diagnostics] }
       }
     }
     const broadcast = broadcastScalarOperation(current, context, environment)
-    if (broadcast)
-      return visit(
-        broadcast,
-        context,
-        currentPulse,
-        currentDynamic,
-        currentArticulation,
-        currentArticulationMarks,
-        currentDirectiveState,
-        environment,
-        subdivisionBase,
-      )
+    if (broadcast) return visitor.visit(broadcast)
     const expandedChord = expandEnumeratedChord(current, context)
     if (expandedChord.diagnostics.length) return { diagnostics: expandedChord.diagnostics }
     if (expandedChord.expressions.length !== 1 || expandedChord.expressions[0] !== current) {
-      const results = expandedChord.expressions.map((expression) =>
-        visit(
-          expression,
-          context,
-          currentPulse,
-          currentDynamic,
-          currentArticulation,
-          currentArticulationMarks,
-          currentDirectiveState,
-          environment,
-          subdivisionBase,
-        ),
-      )
+      const results = expandedChord.expressions.map((expression) => visitor.visit(expression))
       const diagnostics = results.flatMap((result) => result.diagnostics)
       if (!results.every(hasShape)) return { diagnostics }
       const branches = results.map((result) => result.shape)
@@ -1252,17 +1252,11 @@ export function evaluateScoreSemantics(
           items: [...repeatBody(current, iteration)],
           location: current.location,
         }
-        const result = visit(
-          iterationNode,
-          iterationContext,
-          iterationPulse,
-          currentDynamic,
-          currentArticulation,
-          currentArticulationMarks,
-          activeDirectiveState,
-          environment,
-          subdivisionBase,
-        )
+        const result = visitor.visit(iterationNode, {
+          context: iterationContext,
+          pulse: iterationPulse,
+          directiveState: activeDirectiveState,
+        })
         iterationPulse = pulseAfter(
           iterationNode,
           iterationPulse,
@@ -1327,17 +1321,7 @@ export function evaluateScoreSemantics(
         environment,
       )
       const endingDirectiveState = directiveStateAfter(commonNode, currentDirectiveState, context)
-      const commonResult = visit(
-        commonNode,
-        context,
-        currentPulse,
-        currentDynamic,
-        currentArticulation,
-        currentArticulationMarks,
-        currentDirectiveState,
-        environment,
-        subdivisionBase,
-      )
+      const commonResult = visitor.visit(commonNode)
       diagnostics.push(...commonResult.diagnostics)
       const commonShapes = hasShape(commonResult) ? [commonResult.shape] : []
       const endingShapes = current.endings.map((ending) => {
@@ -1346,17 +1330,13 @@ export function evaluateScoreSemantics(
           items: ending.body,
           location: current.location,
         }
-        const result = visit(
-          endingNode,
-          endingContext,
-          endingPulse,
-          currentDynamic,
-          endingArticulation.ratio,
-          endingArticulation.marks,
-          endingDirectiveState,
-          environment,
-          subdivisionBase,
-        )
+        const result = visitor.visit(endingNode, {
+          context: endingContext,
+          pulse: endingPulse,
+          articulation: endingArticulation.ratio,
+          articulationMarks: endingArticulation.marks,
+          directiveState: endingDirectiveState,
+        })
         diagnostics.push(...result.diagnostics)
         return hasShape(result) ? [result.shape] : []
       })
@@ -1463,16 +1443,16 @@ export function evaluateScoreSemantics(
           }
           let grooveTemplate: ScoreShape | undefined
           if (directive?.kind === 'groove' && directive.argument) {
-            const template = visit(
-              directive.argument,
-              activeContext,
-              activePulse,
-              'mf',
-              new Fraction(1),
-              [],
-              initialDirectiveState,
-              activeEnvironment,
-            )
+            const template = visitor.visit(directive.argument, {
+              context: activeContext,
+              pulse: activePulse,
+              dynamic: 'mf',
+              articulation: new Fraction(1),
+              articulationMarks: [],
+              directiveState: initialDirectiveState,
+              environment: activeEnvironment,
+              subdivisionBase: activePulse,
+            })
             resolved.diagnostics.push(...template.diagnostics)
             if ('shape' in template) {
               if (attacks(template.shape).length < 2 || template.shape.duration.compare(0) <= 0) {
@@ -1487,16 +1467,16 @@ export function evaluateScoreSemantics(
           }
           let droneTemplate: ScoreShape | undefined
           if (directive?.kind === 'drone' && directive.argument) {
-            const template = visit(
-              directive.argument,
-              activeContext,
-              activePulse,
-              activeDynamic,
-              activeArticulation,
-              activeArticulationMarks,
-              activeDirectiveState,
-              activeEnvironment,
-            )
+            const template = visitor.visit(directive.argument, {
+              context: activeContext,
+              pulse: activePulse,
+              dynamic: activeDynamic,
+              articulation: activeArticulation,
+              articulationMarks: activeArticulationMarks,
+              directiveState: activeDirectiveState,
+              environment: activeEnvironment,
+              subdivisionBase: activePulse,
+            })
             resolved.diagnostics.push(...template.diagnostics)
             if ('shape' in template) {
               if (!attacks(template.shape).length) {
@@ -1550,17 +1530,15 @@ export function evaluateScoreSemantics(
           results.push({ shape, diagnostics: resolved.diagnostics })
           continue
         }
-        let result = visit(
-          item,
-          activeContext,
-          activePulse,
-          activeDynamic,
-          activeArticulation,
-          activeArticulationMarks,
-          activeDirectiveState,
-          activeEnvironment,
-          subdivisionBase,
-        )
+        let result = visitor.visit(item, {
+          context: activeContext,
+          pulse: activePulse,
+          dynamic: activeDynamic,
+          articulation: activeArticulation,
+          articulationMarks: activeArticulationMarks,
+          directiveState: activeDirectiveState,
+          environment: activeEnvironment,
+        })
         const index = results.length
         if ('shape' in result && attacks(result.shape).length) {
           if (velocity) {
@@ -1775,17 +1753,7 @@ export function evaluateScoreSemantics(
     }
     if (current.type === 'Parallel') {
       const results = current.branches.map((branch) =>
-        visit(
-          branch,
-          context,
-          currentPulse,
-          currentDynamic,
-          currentArticulation,
-          currentArticulationMarks,
-          currentDirectiveState,
-          environment,
-          currentPulse,
-        ),
+        visitor.visit(branch, { subdivisionBase: currentPulse }),
       )
       const diagnostics = results.flatMap((result) => result.diagnostics)
       if (!results.every(hasShape)) return { diagnostics }
@@ -1803,17 +1771,7 @@ export function evaluateScoreSemantics(
       return { shape, diagnostics }
     }
     if (current.type === 'Group') {
-      const grouped = visit(
-        current.expression,
-        context,
-        currentPulse,
-        currentDynamic,
-        currentArticulation,
-        currentArticulationMarks,
-        currentDirectiveState,
-        environment,
-        currentPulse,
-      )
+      const grouped = visitor.visit(current.expression, { subdivisionBase: currentPulse })
       if (!('shape' in grouped)) return grouped
       return {
         ...grouped,
@@ -1832,17 +1790,7 @@ export function evaluateScoreSemantics(
           diagnostics: [],
         }
       }
-      const evaluated = visit(
-        current.expression,
-        context,
-        currentPulse,
-        currentDynamic,
-        currentArticulation,
-        currentArticulationMarks,
-        currentDirectiveState,
-        environment,
-        currentPulse,
-      )
+      const evaluated = visitor.visit(current.expression, { subdivisionBase: currentPulse })
       if (!('shape' in evaluated)) return evaluated
       if (!evaluated.shape.duration.n) {
         return {
@@ -1880,17 +1828,7 @@ export function evaluateScoreSemantics(
       }
     }
     if (current.type === 'PostfixExpression') {
-      const evaluated = visit(
-        current.expression,
-        context,
-        currentPulse,
-        currentDynamic,
-        currentArticulation,
-        currentArticulationMarks,
-        currentDirectiveState,
-        environment,
-        subdivisionBase,
-      )
+      const evaluated = visitor.visit(current.expression)
       if (!('shape' in evaluated)) return evaluated
       const elimination = current.marks.find((mark) => mark.type === 'TailElimination')
       let base = evaluated.shape
@@ -1971,7 +1909,16 @@ export function evaluateScoreSemantics(
   }
 
   const initialContext = options.pitchContext ?? DEFAULT_PITCH_CONTEXT
-  const result = visit(node, initialContext)
+  const visitor = new Visitor(evaluateNode, {
+    context: initialContext,
+    pulse,
+    dynamic: 'mf',
+    articulation: new Fraction(1),
+    articulationMarks: [],
+    directiveState: initialDirectiveState,
+    subdivisionBase: pulse,
+  })
+  const result = visitor.visit(node)
   if (!('shape' in result)) return result
   return {
     ...result,
