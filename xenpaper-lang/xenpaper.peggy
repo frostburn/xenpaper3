@@ -59,6 +59,16 @@
       default: return 'unknown';
     }
   };
+
+  const containsDeclaration = value => {
+    if (!value || typeof value !== 'object') return false;
+    if (value.type === 'VariableDeclaration' || value.type === 'FunctionDeclaration') return true;
+    return Object.entries(value).some(([key, child]) =>
+      key !== 'location' && (Array.isArray(child)
+        ? child.some(containsDeclaration)
+        : containsDeclaration(child))
+    );
+  };
 }
 
 Start
@@ -212,6 +222,7 @@ PrimaryExpression
   / MonzoLiteral
   / MosIntervalLiteral
   / IntervalLiteral
+  / TightCallExpression
   / !(DeclarationKeyword !IdentifierContinue) !DrumSampleLiteral pitch:MosPitchLiteral { return pitch; }
   / !(DeclarationKeyword !IdentifierContinue) !DrumSampleLiteral pitch:PitchLiteral { return pitch; }
   / EqualDivisionLiteral
@@ -319,6 +330,9 @@ HardBoundary
 
 RepeatExpression
   = "|:" Spacing count:RepeatCount? Spacing body:RepeatBody? result:RepeatEndings {
+      if (containsDeclaration(body) || containsDeclaration(result.endings)) {
+        error('Variable and function declarations are not allowed inside repeats.');
+      }
       return node('Repeat', { count, body: body ?? [], endings: result.endings, terminal: result.terminal });
     }
 
@@ -607,6 +621,13 @@ ContextPreset
 
 CallExpression
   = !("v" Spacing "(") callee:Identifier Spacing "(" Spacing args:CallArgumentList? Spacing ")" {
+      return node('CallExpression', { callee, arguments: args ?? [] });
+    }
+
+// Pitch-shaped function names need an attached opening parenthesis to win over
+// pitch literals without making failed call attempts consume comments as spacing.
+TightCallExpression
+  = !("v" "(") callee:Identifier "(" Spacing args:CallArgumentList? Spacing ")" {
       return node('CallExpression', { callee, arguments: args ?? [] });
     }
 

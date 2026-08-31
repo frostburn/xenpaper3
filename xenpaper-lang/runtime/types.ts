@@ -67,8 +67,8 @@ export interface LexicalEnvironment {
   readonly parent?: LexicalEnvironment
   readonly variables: ReadonlyMap<string, EvaluatedLiteral>
   readonly functions: ReadonlyMap<string, FunctionDefinition>
-  /** Names currently being invoked, used to diagnose prohibited recursion. */
-  readonly calls: ReadonlySet<string>
+  /** Definition identities currently being invoked, used to diagnose prohibited recursion. */
+  readonly calls: ReadonlySet<FunctionDefinition>
 }
 
 export interface FunctionDefinition {
@@ -89,7 +89,7 @@ export function extendLexicalEnvironment(
   additions: {
     readonly variables?: ReadonlyMap<string, EvaluatedLiteral>
     readonly functions?: ReadonlyMap<string, FunctionDefinition>
-    readonly calls?: ReadonlySet<string>
+    readonly calls?: ReadonlySet<FunctionDefinition>
   },
 ): LexicalEnvironment {
   return {

@@ -29,6 +29,13 @@ describe('lexical declarations', () => {
     expect(() => parse('fn f(a) { a }')).toThrow()
     expect(parse('letter').body[0]).not.toMatchObject({ type: 'VariableDeclaration' })
   })
+
+  it('rejects declarations in repeat bodies and alternate endings', () => {
+    expect(() => parse('|: let x = 3/2 x :|')).toThrow(/not allowed inside repeats/)
+    expect(() => parse('|: C |@^1 fn f() { ret 3\/2 } f() ||')).toThrow(
+      /not allowed inside repeats/,
+    )
+  })
 })
 
 describe('grammar boundary roles', () => {

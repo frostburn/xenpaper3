@@ -83,9 +83,10 @@ position. A function captures the environment at its declaration, arguments are
 evaluated exactly once in left-to-right order at the call site, and parameters
 are then bound in a child scope. Later declarations may shadow earlier ones.
 Groups, normalized groups, and each parallel branch isolate their local bindings;
-hard boundaries retain the surrounding sequence's bindings. Repeated material is
-evaluated in source order without mutating a captured environment, so expansion
-does not duplicate bindings outside the repeat's lexical processing.
+hard boundaries retain the surrounding sequence's bindings. Repeats inherit
+bindings declared outside them, but `let` and `fn` declarations are illegal in
+repeat bodies and alternate endings so repeat expansion cannot duplicate or leak
+bindings.
 
 Parameter names must be unique. Functions are intentionally non-recursive (both
 direct and mutual recursion are rejected), keeping score evaluation finite and

@@ -32,6 +32,34 @@ describe('score-shape timing', () => {
     expect(attacks[0]!.pitch.value.equals(Value.pitch(new Value(3n, 2n)))).toBe(true)
   })
 
+  it('inherits lexical bindings in nested score constructs and directives', () => {
+    for (const source of [
+      'let x = 3/2 (x)',
+      'let x = 3/2 [x]',
+      'let x = 3/2 (x,x)',
+      'let x = 3/2 |: x :|',
+      'let x = 3/2 x?',
+    ]) {
+      try {
+        shape(source)
+      } catch (error) {
+        throw new Error(`Failed to inherit bindings in ${source}`, { cause: error })
+      }
+    }
+
+    const directed = shape('let v = 1/2 @subdivision(v) C')
+    expect(directed.duration.equals(2)).toBe(true)
+  })
+
+  it('allows a local function to shadow an active caller with the same name', () => {
+    const score = shape('fn f() { fn f() { ret 3/2 } ret f() } f()')
+    const attack =
+      score.kind === 'sequence' && score.children.find((child) => child.kind === 'attack')
+    expect(
+      attack && attack.kind === 'attack' && attack.pitch.value.equals(Value.pitch(3 / 2)),
+    ).toBe(true)
+  })
+
   it('isolates pitch-context changes in groups, normalized slots, and parallel branches', () => {
     const score = shape(`{12edo}
 0 ({19edo} 6) 7

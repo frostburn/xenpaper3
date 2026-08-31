@@ -624,7 +624,7 @@ export function evaluateExpression(
           ],
         }
       if (definition) {
-        if (environment.calls.has(node.callee))
+        if (environment.calls.has(definition))
           return {
             diagnostics: [
               {
@@ -657,7 +657,7 @@ export function evaluateExpression(
             (evaluated[index] as { value: EvaluatedLiteral }).value,
           ]),
         )
-        const calls = new Set(environment.calls).add(node.callee)
+        const calls = new Set(environment.calls).add(definition)
         const callEnvironment = extendLexicalEnvironment(definition.environment, {
           variables,
           functions: new Map([[node.callee, definition]]),
