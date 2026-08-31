@@ -96,6 +96,11 @@ describe('arithmetic expression evaluation', () => {
     expect(evaluate('2 rd 3/2').value.equals(new Fraction(4, 3))).toBe(true)
   })
 
+  it('supports division in the pitch domain and logarithmic division for ratios', () => {
+    expect(evaluate('M3 / M2').value.equals(2)).toBe(true)
+    expect(evaluate('81/64 /_ 9/8').value.equals(2)).toBe(true)
+  })
+
   it('scales pitch offsets only by rational scalars', () => {
     expect(evaluate('2 * 350c').value.equals(Value.cents(700))).toBe(true)
     expect(evaluate('700c / 2').value.equals(Value.cents(350))).toBe(true)

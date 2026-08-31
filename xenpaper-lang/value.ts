@@ -477,6 +477,50 @@ export class Value {
     return Value.real(this.valueOf() / other.valueOf(), dimensions)
   }
 
+  /** Return the exponent which raises the given base to this ratio or pitch. */
+  log(input: ValueInput): Value {
+    const base = coerceValue(input)
+    const bothRatios = this.dimensions.isDimensionless && base.dimensions.isDimensionless
+    const bothPitches = this.dimensions.equals({ pitch: 1 }) && base.dimensions.equals({ pitch: 1 })
+    if (!bothRatios && !bothPitches) {
+      throw new TypeError('Logarithm requires two ratios or two pitch displacements.')
+    }
+    if (bothRatios && (!(this.valueOf() > 0) || !(base.valueOf() > 0))) {
+      throw new RangeError('Logarithm requires positive ratios.')
+    }
+
+    const targetExponents = this.primeExponents()
+    const baseExponents = base.primeExponents()
+    if (targetExponents && baseExponents) {
+      let solution: Fraction | undefined
+      const primes = new Set([...targetExponents.keys(), ...baseExponents.keys()])
+      for (const prime of primes) {
+        const target = targetExponents.get(prime) ?? new Fraction(0)
+        const divisor = baseExponents.get(prime) ?? new Fraction(0)
+        if (!divisor.n) {
+          if (target.n) {
+            solution = undefined
+            break
+          }
+          continue
+        }
+        const candidate = target.div(divisor)
+        if (solution === undefined) solution = candidate
+        else if (!solution.equals(candidate)) {
+          solution = undefined
+          break
+        }
+      }
+      if (solution !== undefined) return new Value(solution)
+      if (!targetExponents.size && baseExponents.size) return new Value(0)
+    }
+
+    const denominator = bothPitches ? base.valueOf() : Math.log(base.valueOf())
+    const numerator = bothPitches ? this.valueOf() : Math.log(this.valueOf())
+    if (!denominator) throw new RangeError("Logarithm doesn't exist.")
+    return Value.real(numerator / denominator)
+  }
+
   pow(input: ValueInput): Value {
     if (this.magnitude.kind === 'pitch') {
       throw new TypeError('Pitch displacements cannot be exponentiated.')
