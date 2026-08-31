@@ -581,7 +581,9 @@ export function evaluateExpression(
       const operatorOrigin: SourceOrigin = { location: node.modifier.location, role: 'operator' }
       const origins = [...operand.value.origins, operatorOrigin]
       const equaveFormula = equaveShift
-        ? Value.ratio(pitchDisplacement).primeExponents()
+        ? operand.value.kind === 'absolutePitch' && operand.value.spelling.system !== 'mos'
+          ? new Map([[2, new Fraction(equaveShift)]])
+          : Value.ratio(pitchDisplacement).primeExponents()
         : undefined
       const shiftedFormula = (formula: ReadonlyMap<number, Fraction>) => {
         if (!equaveFormula) return formula

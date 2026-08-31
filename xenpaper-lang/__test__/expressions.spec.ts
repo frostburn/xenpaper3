@@ -197,6 +197,7 @@ describe('arithmetic expression evaluation', () => {
     )
       throw new Error('Expected absolute pitches.')
     expect(shifted.value.rootOffset.equals(lowercase.value.rootOffset)).toBe(true)
+    expect(shifted.value.formula).toEqual(lowercase.value.formula)
   })
 
   it('falls back to real arithmetic for sums of unrelated square roots', () => {
