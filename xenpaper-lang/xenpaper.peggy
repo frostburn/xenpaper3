@@ -525,12 +525,19 @@ ContextStatementList
 
 ContextAssignmentStart
   = ("sig"i / "key"i / "root"i) !IdentifierContinue Spacing "="
+  / "'" Spacing "="
   / ContextAssignmentTarget Spacing "="
   / 'root'i !IdentifierContinue Spacing 'as'i !IdentifierContinue
   / ContextAssignmentTarget Spacing 'as'i !IdentifierContinue Spacing 'root'i !IdentifierContinue
 
 ContextStatement
-  = kind:$("sig"i) !IdentifierContinue Spacing "=" Spacing pitches:SignaturePitchList {
+  = operator:$("'") Spacing "=" Spacing value:ContextValue {
+      return node('ContextAssignment', {
+        target: node('ContextOperatorTarget', { operator }),
+        value,
+      });
+    }
+  / kind:$("sig"i) !IdentifierContinue Spacing "=" Spacing pitches:SignaturePitchList {
       return node('SignatureDeclaration', { kind: kind.toLowerCase(), pitches });
     }
   / kind:$("key"i) !IdentifierContinue Spacing "=" Spacing pitch:SignaturePitchLiteral
@@ -725,7 +732,7 @@ MosElement
     udp:(RequiredSpacing value:MosUdpValue { return value; })? {
       return node('SignatureDeclaration', { kind: kind.toLowerCase(), pitches: [pitch], udp: udp ?? null });
     }
-  / target:$("^" / "/" / "L" / "s") Spacing "=" Spacing value:MosSetterValue {
+  / target:$("'" / "^" / "/" / "L" / "s") Spacing "=" Spacing value:MosSetterValue {
       return node('MosStepAssignment', { target, value });
     }
   / large:UnsignedInteger "L" Spacing small:UnsignedInteger "s" {

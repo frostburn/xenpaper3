@@ -502,7 +502,8 @@ export function applyPitchContextChange(
             ? Value.pitch(evaluated.value.value)
             : undefined
       if (!value) throw new TypeError('Pitch operator assignment requires a pitch interval.')
-      if (statement.target.operator === '^') context = { ...context, up: value }
+      if (statement.target.operator === "'") context = { ...context, degreeEquave: value }
+      else if (statement.target.operator === '^') context = { ...context, up: value }
       else if (statement.target.operator === 'v') context = { ...context, up: value.neg() }
       else if (statement.target.operator === '/') context = { ...context, lift: value }
       else context = { ...context, lift: value.neg() }
@@ -719,6 +720,12 @@ function applyMosDeclaration(declaration: MosDeclaration, context: PitchContext)
       equaveGiven = true
       equave = mosSetterValue(element.value, context)
     } else if (element.type === 'MosStepAssignment') {
+      if (element.target === "'") {
+        if (equaveGiven) throw new TypeError('A MOS declaration may only contain one equave.')
+        equaveGiven = true
+        equave = mosSetterValue(element.value, context)
+        continue
+      }
       if (assignments.has(element.target) || integerOperatorAssignments.has(element.target))
         throw new TypeError(`MOS step ${element.target} may only be assigned once.`)
       const integer =

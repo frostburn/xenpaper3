@@ -560,9 +560,15 @@ export function evaluateExpression(
       let pitchDisplacement: Value
       if (equaveShift) {
         scalarDisplacement = context.degreeEquave.mul(new Value(equaveShift))
-        pitchDisplacement =
-          context.mos &&
-          (operand.value.kind !== 'absolutePitch' || operand.value.spelling.system === 'mos')
+        if (operand.value.kind === 'absolutePitch')
+          pitchDisplacement =
+            context.mos && operand.value.spelling.system === 'mos'
+              ? context.mos.equave.mul(new Value(equaveShift))
+              : Value.pitch(new Value(2).pow(equaveShift))
+        else if ('scaleDegree' in operand.value)
+          pitchDisplacement = context.degreeEquave.mul(new Value(equaveShift))
+        else
+          pitchDisplacement = context.mos
             ? context.mos.equave.mul(new Value(equaveShift))
             : Value.pitch(new Value(2).pow(equaveShift))
       } else {

@@ -307,7 +307,7 @@ export interface MosPatternCounts extends Node {
 
 export interface MosStepAssignment extends Node {
   type: 'MosStepAssignment'
-  target: '^' | '/' | 'L' | 's'
+  target: "'" | '^' | '/' | 'L' | 's'
   value: Expression
 }
 
