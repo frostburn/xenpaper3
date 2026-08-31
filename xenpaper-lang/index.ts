@@ -32,6 +32,8 @@ export {
   evaluateScoreShape,
 } from './runtime/score-shape'
 export { expandToBeatEvents } from './runtime/beat-events'
+export { Visitor } from './runtime/visitor'
+export type { VisitorEvaluation } from './runtime/visitor'
 export type { BeatEventExpansionOptions, BeatEventExpansionResult } from './runtime/beat-events'
 export {
   constructStaffNotation,

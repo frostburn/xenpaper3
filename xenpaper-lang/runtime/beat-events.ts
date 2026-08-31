@@ -4,6 +4,7 @@ import type { Diagnostic } from '../diagnostics'
 import { expandRepeats } from './repeat-expansion'
 import { evaluateScoreSemantics } from './score-evaluation'
 import { DYNAMIC_VELOCITIES } from './directives'
+import { Visitor, type VisitorEvaluation } from './visitor'
 import type {
   BeatTimedEvent,
   BeatTimedNoteEvent,
@@ -58,6 +59,11 @@ type FlatteningState = {
   drone?: MutableNoteEvent[]
 }
 
+interface FlatteningScope {
+  readonly start: Fraction
+  readonly state: FlatteningState
+}
+
 function interpolateGroove(
   groove: Groove,
   value: Fraction,
@@ -94,10 +100,12 @@ export function flattenScoreSemantics(shape: ScoreShape): BeatEventFlatteningRes
   const events: BeatTimedEvent[] = []
   const diagnostics: Diagnostic[] = []
   const completedAutomations = new WeakSet<MutableNoteEvent>()
-  const visit = (current: ScoreShape, start: Fraction, state: FlatteningState): Fraction => {
-    if (!current.isolatedDirectiveScope) return visitCurrent(current, start, state)
+  const evaluate: VisitorEvaluation<ScoreShape, FlatteningScope, Fraction> = (current, visitor) => {
+    const { start, state } = visitor.scope
+    if (!current.isolatedDirectiveScope) return visitCurrent(current, visitor)
     const isolatedState = { ...state }
-    const end = visitCurrent(current, start, isolatedState)
+    const isolatedVisitor = visitor.spawn({ state: isolatedState })
+    const end = visitCurrent(current, isolatedVisitor)
     if (isolatedState.drone !== state.drone) stopDrone(isolatedState, end)
     state.active = isolatedState.active
     state.activeStart = isolatedState.activeStart
@@ -105,7 +113,11 @@ export function flattenScoreSemantics(shape: ScoreShape): BeatEventFlatteningRes
     return end
   }
 
-  const visitCurrent = (current: ScoreShape, start: Fraction, state: FlatteningState): Fraction => {
+  const visitCurrent = (
+    current: ScoreShape,
+    visitor: Visitor<ScoreShape, FlatteningScope, Fraction>,
+  ): Fraction => {
+    const { start, state } = visitor.scope
     if (current.kind === 'attack') {
       const event: MutableNoteEvent = {
         kind: 'note',
@@ -229,7 +241,7 @@ export function flattenScoreSemantics(shape: ScoreShape): BeatEventFlatteningRes
     } else if (current.kind === 'sequence') {
       const firstEvent = events.length
       let cursor = start
-      for (const child of current.children) cursor = visit(child, cursor, state)
+      for (const child of current.children) cursor = visitor.visit(child, { start: cursor })
       if (current.normalized) {
         state.active = events
           .slice(firstEvent)
@@ -243,7 +255,7 @@ export function flattenScoreSemantics(shape: ScoreShape): BeatEventFlatteningRes
       const states = current.branches.map(
         (): FlatteningState => ({ active: [], groove: state.groove }),
       )
-      current.branches.forEach((branch, index) => visit(branch, start, states[index]!))
+      current.branches.forEach((branch, index) => visitor.visit(branch, { state: states[index]! }))
       const end = start.add(current.duration)
       for (const branchState of states) stopDrone(branchState, end)
       // A continuation after a parallel distributes over every attack in the
@@ -261,7 +273,8 @@ export function flattenScoreSemantics(shape: ScoreShape): BeatEventFlatteningRes
   }
 
   const rootState: FlatteningState = { active: [] }
-  const end = visit(shape, new Fraction(0), rootState)
+  const visitor = new Visitor(evaluate, { start: new Fraction(0), state: rootState })
+  const end = visitor.visit(shape)
   stopDrone(rootState, end)
   for (const event of events) {
     if (event.kind !== 'note') continue
