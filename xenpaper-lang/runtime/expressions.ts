@@ -564,7 +564,7 @@ export function evaluateExpression(
           pitchDisplacement =
             context.mos && operand.value.spelling.system === 'mos'
               ? context.mos.equave.mul(new Value(equaveShift))
-              : Value.pitch(new Value(2).pow(equaveShift))
+              : context.mapping.mapPrime(2).mul(new Value(equaveShift))
         else if ('scaleDegree' in operand.value)
           pitchDisplacement = context.degreeEquave.mul(new Value(equaveShift))
         else
