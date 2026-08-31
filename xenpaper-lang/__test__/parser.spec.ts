@@ -1,6 +1,65 @@
 import { describe, expect, it } from 'vitest'
 import { parse } from '../parser.generated.js'
 
+describe('lexical declarations', () => {
+  it('retains complete declaration and parameter-name locations', () => {
+    const source = 'fn transpose(note, interval) { ret note + interval } # closure'
+    const declaration = parse(source).body[0]
+    expect(declaration).toMatchObject({
+      type: 'FunctionDeclaration',
+      name: { name: 'transpose' },
+      parameters: [{ name: 'note' }, { name: 'interval' }],
+      body: {
+        type: 'FunctionBody',
+        returnStatement: { type: 'ReturnStatement', value: { operator: '+' } },
+      },
+    })
+    if (declaration.type !== 'FunctionDeclaration') throw new Error('Expected function.')
+    expect(declaration.location.start.offset).toBe(0)
+    expect(declaration.location.end.offset).toBe(source.indexOf(' #'))
+    expect(declaration.parameters.map((parameter) => parameter.location.start.offset)).toEqual([
+      13, 19,
+    ])
+  })
+
+  it('binds ret loosely across complete score sequences', () => {
+    const declaration = parse('fn LICC() { ret @2 D E F G E= C D== }').body[0]
+    expect(declaration).toMatchObject({
+      type: 'FunctionDeclaration',
+      body: { returnStatement: { value: { type: 'Sequence' } } },
+    })
+    if (declaration.type !== 'FunctionDeclaration') throw new Error('Expected function.')
+    const returned = declaration.body.returnStatement.value
+    if (returned.type !== 'Sequence') throw new Error('Expected returned sequence.')
+    expect(returned.items.slice(0, 3)).toMatchObject([
+      { type: 'Directive', name: 'subdivision' },
+      { type: 'PitchLiteral', raw: 'D' },
+      { type: 'PitchLiteral', raw: 'E' },
+    ])
+  })
+
+  it('reserves declaration keywords and rejects malformed parameter lists', () => {
+    expect(() => parse('let')).toThrow()
+    expect(() => parse('ret')).toThrow()
+    expect(() => parse('fn f(a,) { ret a }')).toThrow()
+    expect(() => parse('fn f(a) { a }')).toThrow()
+    expect(parse('letter').body[0]).not.toMatchObject({ type: 'VariableDeclaration' })
+  })
+
+  it('rejects declarations in repeat bodies and alternate endings', () => {
+    expect(() => parse('|: let interval = 3/2 interval :|')).toThrow(/not allowed inside repeats/)
+    expect(() => parse('|: C |@^1 fn transform() { ret 3/2 } transform() ||')).toThrow(
+      /not allowed inside repeats/,
+    )
+  })
+
+  it('does not allow declarations to claim musical spellings', () => {
+    for (const source of ['let C = 3/2', 'let x = 3/2', 'fn f() { ret 3/2 }']) {
+      expect(() => parse(source)).toThrow()
+    }
+  })
+})
+
 describe('grammar boundary roles', () => {
   it('shares rhythm while interpreting enumerated drum words as sample leaves', () => {
     expect(parse('bd').body[0]).toMatchObject({

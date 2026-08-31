@@ -61,6 +61,58 @@ ratio to a pitch displacement, `ratio(offset)` for the inverse conversion, and
 value model is closed under the operation and halves the quantity's dimensions.
 The built-in identifier `pi` evaluates to the dimensionless real constant π.
 
+## Local declarations and functions
+
+Declarations are zero-duration score items:
+
+```text
+let fifth = 3/2
+fn transpose(interval, note) { ret note + interval }
+transpose(fifth, C) transpose(fifth, D)
+```
+
+`let name = expression` evaluates the initializer once. `fn name(parameters) {
+... ret expression }` creates a lexical closure. A function body contains zero
+or more local `let` or `fn` declarations followed by exactly one `ret`, whose
+expression is the call's result. Commas separate parameters and a trailing comma
+is not accepted. `let`, `fn`, and `ret` are reserved (case-sensitive) and cannot
+be used as pitches, identifiers, or function names. Names that are valid musical
+pitch spellings are likewise unavailable for declarations: music always wins and
+the meaning of a pitch token never depends on lexical scope.
+
+Every evaluation starts with a prelude written in Xenpaper itself. It currently
+declares `pi` and defines `sqrt(radicand)` as `radicand ** 1/2`; ordinary lexical
+shadowing can replace either name in a narrower scope.
+
+`ret` has lower precedence than score sequencing and parallel composition, so a
+function may return an entire musical fragment:
+
+```text
+fn LICC() {
+  ret @2 D E F G E= C D==
+}
+LICC()
+```
+
+Calling the function evaluates that returned fragment in the function's lexical
+environment while inheriting the caller's current pitch, timing, and directive
+contexts.
+
+Scope is sequential and lexical: a declaration is visible only after its source
+position. A function captures the environment at its declaration, arguments are
+evaluated exactly once in left-to-right order at the call site, and parameters
+are then bound in a child scope. Later declarations may shadow earlier ones.
+Groups, normalized groups, and each parallel branch isolate their local bindings;
+hard boundaries retain the surrounding sequence's bindings. Repeats inherit
+bindings declared outside them, but `let` and `fn` declarations are illegal in
+repeat bodies and alternate endings so repeat expansion cannot duplicate or leak
+bindings.
+
+Parameter names must be unique. Functions are intentionally non-recursive (both
+direct and mutual recursion are rejected), keeping score evaluation finite and
+making repeat notation the sole mechanism for repetition. Declarations emit no
+attack, rest, annotation, beat, duration, or staff symbol.
+
 Key signatures may include a diatonic mode after the tonic, such as
 `{key = D minor}`. The supported names are Lydian, Ionian, Mixolydian, Dorian,
 Aeolian, Phrygian, and Locrian; `major` aliases Ionian and `minor` aliases

@@ -16,6 +16,67 @@ function shape(source: string, pulse: Fraction | number = 1): ScoreShape {
 }
 
 describe('score-shape timing', () => {
+  it('evaluates zero-duration lexical declarations before musical calls', () => {
+    const score = shape(
+      'let interval = 3/2 fn transpose(note) { let shifted = note * interval ret shifted } transpose(1)',
+    )
+    const attacks: Extract<ScoreShape, { kind: 'attack' }>[] = []
+    const collect = (current: ScoreShape) => {
+      if (current.kind === 'attack') attacks.push(current)
+      else if (current.kind === 'sequence') current.children.forEach(collect)
+      else if (current.kind === 'parallel') current.branches.forEach(collect)
+    }
+    collect(score)
+    expect(score.duration.equals(1)).toBe(true)
+    expect(attacks).toHaveLength(1)
+    expect(attacks[0]!.pitch.value.equals(Value.pitch(new Value(3n, 2n)))).toBe(true)
+  })
+
+  it('inherits lexical bindings in nested score constructs and directives', () => {
+    for (const source of [
+      'let interval = 3/2 (interval)',
+      'let interval = 3/2 [interval]',
+      'let interval = 3/2 (interval,interval)',
+      'let interval = 3/2 |: interval :|',
+      'let interval = 3/2 interval?',
+    ]) {
+      try {
+        shape(source)
+      } catch (error) {
+        throw new Error(`Failed to inherit bindings in ${source}`, { cause: error })
+      }
+    }
+
+    const directed = shape('let subdivision = 1/2 @subdivision(subdivision) C')
+    expect(directed.duration.equals(2)).toBe(true)
+  })
+
+  it('allows a local function to shadow an active caller with the same name', () => {
+    const score = shape('fn transform() { fn transform() { ret 3/2 } ret transform() } transform()')
+    const attack =
+      score.kind === 'sequence' && score.children.find((child) => child.kind === 'attack')
+    expect(
+      attack && attack.kind === 'attack' && attack.pitch.value.equals(Value.pitch(3 / 2)),
+    ).toBe(true)
+  })
+
+  it('returns complete musical sequences from functions', () => {
+    const score = shape(`fn LICC() {
+  ret @2 D E F G E= C D==
+}
+LICC()`)
+    const returnedAttacks: Extract<ScoreShape, { kind: 'attack' }>[] = []
+    const collect = (current: ScoreShape) => {
+      if (current.kind === 'attack') returnedAttacks.push(current)
+      else if (current.kind === 'sequence') current.children.forEach(collect)
+      else if (current.kind === 'parallel') current.branches.forEach(collect)
+    }
+    collect(score)
+
+    expect(returnedAttacks).toHaveLength(7)
+    expect(score.duration.equals(5)).toBe(true)
+  })
+
   it('isolates pitch-context changes in groups, normalized slots, and parallel branches', () => {
     const score = shape(`{12edo}
 0 ({19edo} 6) 7

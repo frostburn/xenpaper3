@@ -2,7 +2,7 @@ import { Fraction } from 'xen-dev-utils/fraction'
 import type { Directive, Expression } from '../parser.generated.js'
 import type { Diagnostic } from '../diagnostics'
 import { evaluateExpression } from './expressions'
-import type { DynamicMark, PitchContext, StaffClef } from './types'
+import type { DynamicMark, LexicalEnvironment, PitchContext, StaffClef } from './types'
 
 export const DYNAMIC_VELOCITIES: Readonly<Record<DynamicMark, Fraction>> = {
   ppp: new Fraction(1, 10),
@@ -62,6 +62,7 @@ export type ResolvedDirective =
 export function resolveDirective(
   node: Directive,
   context: PitchContext,
+  environment?: LexicalEnvironment,
 ): { directive?: ResolvedDirective; diagnostics: Diagnostic[] } {
   const fail = (message: string) => ({
     diagnostics: [
@@ -149,7 +150,7 @@ export function resolveDirective(
     }
     if (node.arguments.length !== 1 || node.arguments[0]?.type === 'NamedArgument')
       return fail('@art requires one non-negative dimensionless exact rational argument.')
-    const evaluated = evaluateExpression(node.arguments[0] as Expression, context)
+    const evaluated = evaluateExpression(node.arguments[0] as Expression, context, environment)
     if (
       !('value' in evaluated) ||
       evaluated.value.kind !== 'scalar' ||
@@ -180,7 +181,7 @@ export function resolveDirective(
   if (registered === 'velocity') {
     if (node.arguments.length !== 1 || node.arguments[0]?.type === 'NamedArgument')
       return fail('@velocity requires one dimensionless scalar argument.')
-    const evaluated = evaluateExpression(node.arguments[0] as Expression, context)
+    const evaluated = evaluateExpression(node.arguments[0] as Expression, context, environment)
     if (
       !('value' in evaluated) ||
       evaluated.value.kind !== 'scalar' ||
@@ -196,7 +197,7 @@ export function resolveDirective(
   }
   if (node.arguments.length !== 1 || node.arguments[0]?.type === 'NamedArgument')
     return fail('Subdivision requires one positive dimensionless exact rational.')
-  const evaluated = evaluateExpression(node.arguments[0] as Expression, context)
+  const evaluated = evaluateExpression(node.arguments[0] as Expression, context, environment)
   if (
     !('value' in evaluated) ||
     evaluated.value.kind !== 'scalar' ||

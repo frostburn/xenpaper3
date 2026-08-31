@@ -59,6 +59,16 @@
       default: return 'unknown';
     }
   };
+
+  const containsDeclaration = value => {
+    if (!value || typeof value !== 'object') return false;
+    if (value.type === 'VariableDeclaration' || value.type === 'FunctionDeclaration') return true;
+    return Object.entries(value).some(([key, child]) =>
+      key !== 'location' && (Array.isArray(child)
+        ? child.some(containsDeclaration)
+        : containsDeclaration(child))
+    );
+  };
 }
 
 Start
@@ -197,7 +207,9 @@ AttachedPostfixMark
     }
 
 PrimaryExpression
-  = RepeatExpression
+  = VariableDeclaration
+  / FunctionDeclaration
+  / RepeatExpression
   / MosDeclaration
   / PitchContextChange
   / Directive
@@ -210,8 +222,9 @@ PrimaryExpression
   / MonzoLiteral
   / MosIntervalLiteral
   / IntervalLiteral
-  / !DrumSampleLiteral pitch:MosPitchLiteral { return pitch; }
-  / !DrumSampleLiteral pitch:PitchLiteral { return pitch; }
+  / TightCallExpression
+  / !(DeclarationKeyword !IdentifierContinue) !DrumSampleLiteral pitch:MosPitchLiteral { return pitch; }
+  / !(DeclarationKeyword !IdentifierContinue) !DrumSampleLiteral pitch:PitchLiteral { return pitch; }
   / EqualDivisionLiteral
   / QuantityLiteral
   / RatioLiteral
@@ -317,6 +330,9 @@ HardBoundary
 
 RepeatExpression
   = "|:" Spacing count:RepeatCount? Spacing body:RepeatBody? result:RepeatEndings {
+      if (containsDeclaration(body) || containsDeclaration(result.endings)) {
+        error('Variable and function declarations are not allowed inside repeats.');
+      }
       return node('Repeat', { count, body: body ?? [], endings: result.endings, terminal: result.terminal });
     }
 
@@ -607,6 +623,46 @@ CallExpression
   = !("v" Spacing "(") callee:Identifier Spacing "(" Spacing args:CallArgumentList? Spacing ")" {
       return node('CallExpression', { callee, arguments: args ?? [] });
     }
+
+// Pitch-shaped function names need an attached opening parenthesis to win over
+// pitch literals without making failed call attempts consume comments as spacing.
+TightCallExpression
+  = !("v" "(") callee:Identifier "(" Spacing args:CallArgumentList? Spacing ")" {
+      return node('CallExpression', { callee, arguments: args ?? [] });
+    }
+
+// Declarations are score items with no duration. Their bindings become visible
+// only to following items in the same lexical sequence. Nested groups and
+// parallel branches receive child scopes. Shadowing is permitted; recursion is
+// deliberately rejected by the evaluator.
+VariableDeclaration
+  = "let" !IdentifierContinue RequiredSpacing name:LocatedIdentifier Spacing "=" Spacing value:AdditiveExpression {
+      return node('VariableDeclaration', { name, value });
+    }
+
+FunctionDeclaration
+  = "fn" !IdentifierContinue RequiredSpacing name:LocatedIdentifier Spacing "(" Spacing
+    parameters:(first:LocatedIdentifier rest:(Spacing "," Spacing parameter:LocatedIdentifier { return parameter; })* { return [first, ...rest]; })? Spacing ")" Spacing body:FunctionBody {
+      return node('FunctionDeclaration', { name, parameters: parameters ?? [], body });
+    }
+
+FunctionBody
+  = "{" Spacing declarations:(declaration:(VariableDeclaration / FunctionDeclaration) Spacing { return declaration; })*
+    returnStatement:ReturnStatement Spacing "}" {
+      return node('FunctionBody', { declarations, returnStatement });
+    }
+
+ReturnStatement
+  // Return binds more loosely than sequencing and parallel composition so a
+  // function can return a complete musical fragment, not only arithmetic.
+  = "ret" !IdentifierContinue RequiredSpacing value:ParallelExpression {
+      return node('ReturnStatement', { value });
+    }
+
+LocatedIdentifier
+  // Musical spellings are never declaration names: score syntax always wins
+  // over the lexical namespace rather than becoming context-dependent.
+  = !(MosPitchLiteral / PitchLiteral) name:Identifier { return node('Identifier', { name }); }
 
 CallArgumentList
   = first:AdditiveExpression
@@ -993,7 +1049,11 @@ Sign
 Identifier
   // A Diamond-MOS nominal followed by an FJS suffix is an invalid pitch, not
   // an identifier followed by an adjacent prefix-modified degree.
-  = !([J-Zj-z] [J-Zj-z]? FjsInflection) name:$([A-Za-z_] IdentifierContinue*) { return name; }
+  = !(DeclarationKeyword !IdentifierContinue)
+    !([J-Zj-z] [J-Zj-z]? FjsInflection) name:$([A-Za-z_] IdentifierContinue*) { return name; }
+
+DeclarationKeyword
+  = "let" / "fn" / "ret"
 
 IdentifierContinue
   = [A-Za-z0-9_]

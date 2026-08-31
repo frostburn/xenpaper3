@@ -2,7 +2,7 @@ import { Fraction } from 'xen-dev-utils/fraction'
 import type { Expression } from '../parser.generated.js'
 import type { Diagnostic } from '../diagnostics'
 import { Value } from '../value'
-import { evaluateExpression } from './expressions'
+import { evaluateDeclaration, evaluateExpression, prepareFunctionCall } from './expressions'
 import { DYNAMIC_VELOCITIES, resolveDirective } from './directives'
 import {
   DEFAULT_PITCH_CONTEXT,
@@ -28,6 +28,7 @@ import type {
   DynamicMark,
   DirectiveExtensionState,
   ScoreShapeOptions,
+  LexicalEnvironment,
   ScoreShapeEvaluationResult,
 } from './types'
 
@@ -127,10 +128,11 @@ type BroadcastScalar = {
 function broadcastScalarOperand(
   node: Expression,
   context: PitchContext,
+  environment?: LexicalEnvironment,
 ): BroadcastScalar | undefined {
-  if (node.type === 'Group') return broadcastScalarOperand(node.expression, context)
+  if (node.type === 'Group') return broadcastScalarOperand(node.expression, context, environment)
   if (node.type === 'PostfixExpression') {
-    const scalar = broadcastScalarOperand(node.expression, context)
+    const scalar = broadcastScalarOperand(node.expression, context, environment)
     if (!scalar) return undefined
     return {
       ...scalar,
@@ -168,14 +170,14 @@ function broadcastScalarOperand(
           if (!named) return undefined
           articulation = named
         } else {
-          const resolved = resolveDirective(item, context).directive
+          const resolved = resolveDirective(item, context, environment).directive
           if (resolved?.kind !== 'articulation') return undefined
           articulation = resolved.ratio
         }
         continue
       }
       if (scalar) return undefined
-      scalar = broadcastScalarOperand(item, context)
+      scalar = broadcastScalarOperand(item, context, environment)
       if (!scalar) return undefined
     }
     return scalar ? { ...scalar, articulation } : undefined
@@ -253,24 +255,28 @@ function zipScoreConstructions(
   return undefined
 }
 
-function broadcastScalarOperation(node: Expression, context: PitchContext): Expression | undefined {
+function broadcastScalarOperation(
+  node: Expression,
+  context: PitchContext,
+  environment?: LexicalEnvironment,
+): Expression | undefined {
   if (node.type === 'Group') {
-    const expression = broadcastScalarOperation(node.expression, context)
+    const expression = broadcastScalarOperation(node.expression, context, environment)
     return expression ? { ...node, expression } : undefined
   }
   if (node.type === 'PostfixExpression') {
-    const expression = broadcastScalarOperation(node.expression, context)
+    const expression = broadcastScalarOperation(node.expression, context, environment)
     return expression ? { ...node, expression } : undefined
   }
   if (node.type === 'UnaryExpression' || node.type === 'PitchModifierExpression') {
-    const operand = broadcastScalarOperation(node.operand, context)
+    const operand = broadcastScalarOperation(node.operand, context, environment)
     if (operand) return { ...node, operand }
     return mapScoreConstruction(node.operand, (item) => ({ ...node, operand: item }))
   }
   if (node.type !== 'BinaryExpression') return undefined
-  const left = broadcastScalarOperation(node.left, context)
+  const left = broadcastScalarOperation(node.left, context, environment)
   if (left) return { ...node, left }
-  const right = broadcastScalarOperation(node.right, context)
+  const right = broadcastScalarOperation(node.right, context, environment)
   if (right) return { ...node, right }
   const zipped = zipScoreConstructions(node.left, node.right, (left, right) => ({
     ...node,
@@ -278,7 +284,7 @@ function broadcastScalarOperation(node: Expression, context: PitchContext): Expr
     right,
   }))
   if (zipped) return zipped
-  const leftScalar = broadcastScalarOperand(node.left, context)
+  const leftScalar = broadcastScalarOperand(node.left, context, environment)
   if (leftScalar) {
     const mapped = mapScoreConstruction(node.right, (right) => ({
       ...node,
@@ -288,7 +294,7 @@ function broadcastScalarOperation(node: Expression, context: PitchContext): Expr
     }))
     if (mapped) return applyBroadcastContinuations(mapped, leftScalar.continuations)
   }
-  const rightScalar = broadcastScalarOperand(node.right, context)
+  const rightScalar = broadcastScalarOperand(node.right, context, environment)
   if (rightScalar) {
     const mapped = mapScoreConstruction(node.left, (left) => ({
       ...node,
@@ -832,6 +838,7 @@ function contextShape(
 function playablePitch(
   node: Expression,
   context: PitchContext,
+  environment?: LexicalEnvironment,
 ):
   | {
       readonly pitch: AttackShape['pitch']
@@ -839,7 +846,7 @@ function playablePitch(
       readonly diagnostics: readonly Diagnostic[]
     }
   | { readonly diagnostics: readonly Diagnostic[] } {
-  const evaluated = evaluateExpression(node, context)
+  const evaluated = evaluateExpression(node, context, environment)
   if (!('value' in evaluated)) return evaluated
   if (evaluated.value.kind === 'pitchOffset') {
     return {
@@ -1004,12 +1011,13 @@ export function evaluateScoreSemantics(
   const subdivisionPulse = (
     current: Extract<Expression, { type: 'Directive' }>,
     context: PitchContext,
+    environment?: LexicalEnvironment,
   ) => {
     if (current.name !== 'subdivision' || current.graceCount) return undefined
     const argument = current.arguments[0]
     const evaluated =
       argument && argument.type !== 'NamedArgument'
-        ? evaluateExpression(argument, context)
+        ? evaluateExpression(argument, context, environment)
         : undefined
     let subdivision: Fraction | undefined
     if (evaluated && 'value' in evaluated) {
@@ -1026,11 +1034,15 @@ export function evaluateScoreSemantics(
     current: Expression,
     currentPulse: Fraction,
     context: PitchContext,
+    environment?: LexicalEnvironment,
   ): Fraction => {
     if (current.type === 'Directive')
-      return subdivisionPulse(current, context)?.pulse ?? currentPulse
+      return subdivisionPulse(current, context, environment)?.pulse ?? currentPulse
     if (current.type === 'Sequence') {
-      return current.items.reduce((active, item) => pulseAfter(item, active, context), currentPulse)
+      return current.items.reduce(
+        (active, item) => pulseAfter(item, active, context, environment),
+        currentPulse,
+      )
     }
     if (current.type === 'Repeat') {
       let active = currentPulse
@@ -1038,7 +1050,7 @@ export function evaluateScoreSemantics(
       if (count === undefined) return active
       for (let iteration = 0; iteration < count; iteration++) {
         active = repeatBody(current, iteration).reduce(
-          (bodyPulse, item) => pulseAfter(item, bodyPulse, context),
+          (bodyPulse, item) => pulseAfter(item, bodyPulse, context, environment),
           active,
         )
       }
@@ -1053,9 +1065,10 @@ export function evaluateScoreSemantics(
     ratio: Fraction,
     marks: readonly string[],
     context: PitchContext,
+    environment?: LexicalEnvironment,
   ): { ratio: Fraction; marks: readonly string[] } => {
     if (current.type === 'Directive') {
-      const resolved = resolveDirective(current, context).directive
+      const resolved = resolveDirective(current, context, environment).directive
       if (resolved?.kind !== 'articulation') return { ratio, marks }
       return {
         ratio: resolved.ratio,
@@ -1064,7 +1077,7 @@ export function evaluateScoreSemantics(
     }
     if (current.type === 'Sequence')
       return current.items.reduce(
-        (active, item) => articulationAfter(item, active.ratio, active.marks, context),
+        (active, item) => articulationAfter(item, active.ratio, active.marks, context, environment),
         { ratio, marks },
       )
     return { ratio, marks }
@@ -1113,8 +1126,26 @@ export function evaluateScoreSemantics(
     currentArticulation: Fraction = new Fraction(1),
     currentArticulationMarks: readonly string[] = [],
     currentDirectiveState: DirectiveExtensionState = initialDirectiveState,
+    environment?: LexicalEnvironment,
   ): ScoreShapeEvaluationResult => {
-    const broadcast = broadcastScalarOperation(current, context)
+    if (current.type === 'CallExpression') {
+      const prepared = prepareFunctionCall(current, context, environment)
+      if (prepared) {
+        if (!('expression' in prepared)) return prepared
+        const returned = visit(
+          prepared.expression,
+          context,
+          currentPulse,
+          currentDynamic,
+          currentArticulation,
+          currentArticulationMarks,
+          currentDirectiveState,
+          prepared.environment,
+        )
+        return { ...returned, diagnostics: [...prepared.diagnostics, ...returned.diagnostics] }
+      }
+    }
+    const broadcast = broadcastScalarOperation(current, context, environment)
     if (broadcast)
       return visit(
         broadcast,
@@ -1124,6 +1155,7 @@ export function evaluateScoreSemantics(
         currentArticulation,
         currentArticulationMarks,
         currentDirectiveState,
+        environment,
       )
     const expandedChord = expandEnumeratedChord(current, context)
     if (expandedChord.diagnostics.length) return { diagnostics: expandedChord.diagnostics }
@@ -1137,6 +1169,7 @@ export function evaluateScoreSemantics(
           currentArticulation,
           currentArticulationMarks,
           currentDirectiveState,
+          environment,
         ),
       )
       const diagnostics = results.flatMap((result) => result.diagnostics)
@@ -1220,8 +1253,9 @@ export function evaluateScoreSemantics(
           currentArticulation,
           currentArticulationMarks,
           activeDirectiveState,
+          environment,
         )
-        iterationPulse = pulseAfter(iterationNode, iterationPulse, iterationContext)
+        iterationPulse = pulseAfter(iterationNode, iterationPulse, iterationContext, environment)
         iterationContext = contextAfter(iterationNode, iterationContext)
         activeDirectiveState = directiveStateAfter(
           iterationNode,
@@ -1264,12 +1298,13 @@ export function evaluateScoreSemantics(
         location: current.location,
       }
       const endingContext = contextAfter(commonNode, context)
-      const endingPulse = pulseAfter(commonNode, currentPulse, context)
+      const endingPulse = pulseAfter(commonNode, currentPulse, context, environment)
       const endingArticulation = articulationAfter(
         commonNode,
         currentArticulation,
         currentArticulationMarks,
         context,
+        environment,
       )
       const endingDirectiveState = directiveStateAfter(commonNode, currentDirectiveState, context)
       const commonResult = visit(
@@ -1280,6 +1315,7 @@ export function evaluateScoreSemantics(
         currentArticulation,
         currentArticulationMarks,
         currentDirectiveState,
+        environment,
       )
       diagnostics.push(...commonResult.diagnostics)
       const commonShapes = hasShape(commonResult) ? [commonResult.shape] : []
@@ -1297,6 +1333,7 @@ export function evaluateScoreSemantics(
           endingArticulation.ratio,
           endingArticulation.marks,
           endingDirectiveState,
+          environment,
         )
         diagnostics.push(...result.diagnostics)
         return hasShape(result) ? [result.shape] : []
@@ -1325,6 +1362,7 @@ export function evaluateScoreSemantics(
       let activeArticulation = currentArticulation
       let activeArticulationMarks = [...currentArticulationMarks]
       let activeDirectiveState = currentDirectiveState
+      let activeEnvironment = environment
       let velocity: Fraction | undefined
       let grace: { duration: Fraction; count: number; indices: number[] } | undefined
       let gliss:
@@ -1341,6 +1379,12 @@ export function evaluateScoreSemantics(
         | undefined
       const results: ScoreShapeEvaluationResult[] = []
       for (const item of current.items) {
+        if (item.type === 'VariableDeclaration' || item.type === 'FunctionDeclaration') {
+          const declared = evaluateDeclaration(item, activeContext, activeEnvironment)
+          activeEnvironment = declared.environment
+          results.push({ shape: sequence([], [origin(item)]), diagnostics: declared.diagnostics })
+          continue
+        }
         if (item.type === 'PitchContextChange') {
           try {
             const previousContext = activeContext
@@ -1373,7 +1417,7 @@ export function evaluateScoreSemantics(
             })
             continue
           }
-          const resolved = resolveDirective(item, activeContext)
+          const resolved = resolveDirective(item, activeContext, activeEnvironment)
           const directive = resolved.directive
           if (directive?.kind === 'subdivision') activePulse = directive.pulse
           else if (directive?.kind === 'dynamic') activeDynamic = directive.mark
@@ -1404,6 +1448,8 @@ export function evaluateScoreSemantics(
               'mf',
               new Fraction(1),
               [],
+              initialDirectiveState,
+              activeEnvironment,
             )
             resolved.diagnostics.push(...template.diagnostics)
             if ('shape' in template) {
@@ -1427,6 +1473,7 @@ export function evaluateScoreSemantics(
               activeArticulation,
               activeArticulationMarks,
               activeDirectiveState,
+              activeEnvironment,
             )
             resolved.diagnostics.push(...template.diagnostics)
             if ('shape' in template) {
@@ -1489,6 +1536,7 @@ export function evaluateScoreSemantics(
           activeArticulation,
           activeArticulationMarks,
           activeDirectiveState,
+          activeEnvironment,
         )
         const index = results.length
         if ('shape' in result && attacks(result.shape).length) {
@@ -1677,7 +1725,7 @@ export function evaluateScoreSemantics(
         }
         activeDirectiveState = directiveStateAfter(item, activeDirectiveState, activeContext)
         activeContext = contextAfter(item, activeContext)
-        activePulse = pulseAfter(item, activePulse, activeContext)
+        activePulse = pulseAfter(item, activePulse, activeContext, activeEnvironment)
       }
       const diagnostics = results.flatMap((result) => result.diagnostics)
       if (grace || gliss)
@@ -1706,6 +1754,7 @@ export function evaluateScoreSemantics(
           currentArticulation,
           currentArticulationMarks,
           currentDirectiveState,
+          environment,
         ),
       )
       const diagnostics = results.flatMap((result) => result.diagnostics)
@@ -1732,6 +1781,7 @@ export function evaluateScoreSemantics(
         currentArticulation,
         currentArticulationMarks,
         currentDirectiveState,
+        environment,
       )
       if (!('shape' in grouped)) return grouped
       return {
@@ -1759,6 +1809,7 @@ export function evaluateScoreSemantics(
         currentArticulation,
         currentArticulationMarks,
         currentDirectiveState,
+        environment,
       )
       if (!('shape' in evaluated)) return evaluated
       if (!evaluated.shape.duration.n) {
@@ -1805,6 +1856,7 @@ export function evaluateScoreSemantics(
         currentArticulation,
         currentArticulationMarks,
         currentDirectiveState,
+        environment,
       )
       if (!('shape' in evaluated)) return evaluated
       const elimination = current.marks.find((mark) => mark.type === 'TailElimination')
@@ -1851,7 +1903,7 @@ export function evaluateScoreSemantics(
         return { shape: contextAnnotation(current), diagnostics: [] }
       }
     }
-    const evaluated = playablePitch(current, context)
+    const evaluated = playablePitch(current, context, environment)
     if (!('pitch' in evaluated)) return evaluated
     const broadcastContext = current as Expression & {
       readonly broadcastArticulation?: Fraction
