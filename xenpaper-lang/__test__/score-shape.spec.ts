@@ -60,6 +60,23 @@ describe('score-shape timing', () => {
     ).toBe(true)
   })
 
+  it('returns complete musical sequences from functions', () => {
+    const score = shape(`fn LICC() {
+  ret @2 D E F G E= C D==
+}
+LICC()`)
+    const returnedAttacks: Extract<ScoreShape, { kind: 'attack' }>[] = []
+    const collect = (current: ScoreShape) => {
+      if (current.kind === 'attack') returnedAttacks.push(current)
+      else if (current.kind === 'sequence') current.children.forEach(collect)
+      else if (current.kind === 'parallel') current.branches.forEach(collect)
+    }
+    collect(score)
+
+    expect(returnedAttacks).toHaveLength(7)
+    expect(score.duration.equals(5)).toBe(true)
+  })
+
   it('isolates pitch-context changes in groups, normalized slots, and parallel branches', () => {
     const score = shape(`{12edo}
 0 ({19edo} 6) 7

@@ -84,6 +84,20 @@ Every evaluation starts with a prelude written in Xenpaper itself. It currently
 declares `pi` and defines `sqrt(radicand)` as `radicand ** 1/2`; ordinary lexical
 shadowing can replace either name in a narrower scope.
 
+`ret` has lower precedence than score sequencing and parallel composition, so a
+function may return an entire musical fragment:
+
+```text
+fn LICC() {
+  ret @2 D E F G E= C D==
+}
+LICC()
+```
+
+Calling the function evaluates that returned fragment in the function's lexical
+environment while inheriting the caller's current pitch, timing, and directive
+contexts.
+
 Scope is sequential and lexical: a declaration is visible only after its source
 position. A function captures the environment at its declaration, arguments are
 evaluated exactly once in left-to-right order at the call site, and parameters

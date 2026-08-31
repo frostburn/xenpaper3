@@ -2,7 +2,7 @@ import { Fraction } from 'xen-dev-utils/fraction'
 import type { Expression } from '../parser.generated.js'
 import type { Diagnostic } from '../diagnostics'
 import { Value } from '../value'
-import { evaluateDeclaration, evaluateExpression } from './expressions'
+import { evaluateDeclaration, evaluateExpression, prepareFunctionCall } from './expressions'
 import { DYNAMIC_VELOCITIES, resolveDirective } from './directives'
 import {
   DEFAULT_PITCH_CONTEXT,
@@ -1128,6 +1128,23 @@ export function evaluateScoreSemantics(
     currentDirectiveState: DirectiveExtensionState = initialDirectiveState,
     environment?: LexicalEnvironment,
   ): ScoreShapeEvaluationResult => {
+    if (current.type === 'CallExpression') {
+      const prepared = prepareFunctionCall(current, context, environment)
+      if (prepared) {
+        if (!('expression' in prepared)) return prepared
+        const returned = visit(
+          prepared.expression,
+          context,
+          currentPulse,
+          currentDynamic,
+          currentArticulation,
+          currentArticulationMarks,
+          currentDirectiveState,
+          prepared.environment,
+        )
+        return { ...returned, diagnostics: [...prepared.diagnostics, ...returned.diagnostics] }
+      }
+    }
     const broadcast = broadcastScalarOperation(current, context, environment)
     if (broadcast)
       return visit(

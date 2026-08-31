@@ -135,6 +135,91 @@ function isNumericLiteral(node: Expression): node is NumericLiteralNode {
   )
 }
 
+export type FunctionCallPreparation =
+  | {
+      readonly expression: Expression
+      readonly environment: LexicalEnvironment
+      readonly diagnostics: readonly Diagnostic[]
+    }
+  | { readonly diagnostics: readonly Diagnostic[] }
+
+/** Prepare a user function once; score and scalar consumers evaluate its returned AST themselves. */
+export function prepareFunctionCall(
+  node: Extract<Expression, { type: 'CallExpression' }>,
+  mapping: PrimeMapping | PitchContext = DEFAULT_PITCH_CONTEXT,
+  environment: LexicalEnvironment = preludeEnvironment(),
+): FunctionCallPreparation | undefined {
+  let definition
+  let variable = false
+  for (let scope: LexicalEnvironment | undefined = environment; scope; scope = scope.parent) {
+    if (!definition) definition = scope.functions.get(node.callee)
+    if (scope.variables.has(node.callee)) variable = true
+    if (definition || variable) break
+  }
+  if (variable && !definition)
+    return {
+      diagnostics: [
+        {
+          code: 'XP_NOT_CALLABLE',
+          severity: 'error',
+          message: `${node.callee} is not a function.`,
+          locations: [node.location],
+        },
+      ],
+    }
+  if (!definition) return undefined
+  if (environment.calls.has(definition))
+    return {
+      diagnostics: [
+        {
+          code: 'XP_RECURSION',
+          severity: 'error',
+          message: `Recursive call to ${node.callee}() is prohibited.`,
+          locations: [node.location, definition.declaration.name.location],
+        },
+      ],
+    }
+  if (node.arguments.length !== definition.parameters.length)
+    return {
+      diagnostics: [
+        {
+          code: 'XP_ARITY',
+          severity: 'error',
+          message: `${node.callee}() expects ${definition.parameters.length} argument${definition.parameters.length === 1 ? '' : 's'}, but received ${node.arguments.length}.`,
+          locations: [node.location, definition.declaration.location],
+        },
+      ],
+    }
+  const evaluated = node.arguments.map((argument) =>
+    evaluateExpression(argument, mapping, environment),
+  )
+  const diagnostics = evaluated.flatMap((result) => result.diagnostics)
+  if (!evaluated.every((result) => 'value' in result)) return { diagnostics }
+  const variables = new Map(
+    definition.parameters.map((name, index) => [
+      name,
+      (evaluated[index] as { value: EvaluatedLiteral }).value,
+    ]),
+  )
+  const calls = new Set(environment.calls).add(definition)
+  let bodyEnvironment = extendLexicalEnvironment(definition.environment, {
+    variables,
+    functions: new Map([[node.callee, definition]]),
+    calls,
+  })
+  for (const declaration of definition.body.declarations) {
+    const declared = evaluateDeclaration(declaration, mapping, bodyEnvironment)
+    bodyEnvironment = declared.environment
+    diagnostics.push(...declared.diagnostics)
+  }
+  if (diagnostics.some((item) => item.severity === 'error')) return { diagnostics }
+  return {
+    expression: definition.body.returnStatement.value,
+    environment: bodyEnvironment,
+    diagnostics,
+  }
+}
+
 function diagnostic(node: Expression, error: unknown): Diagnostic {
   const message = error instanceof Error ? error.message : 'Invalid expression.'
   let code = 'XP_TYPE_MISMATCH'
@@ -617,81 +702,13 @@ export function evaluateExpression(
       return { value: binary(node.operator, left.value, right.value, node), diagnostics }
     }
     if (node.type === 'CallExpression') {
-      let definition
-      let variable = false
-      for (let scope: LexicalEnvironment | undefined = environment; scope; scope = scope.parent) {
-        if (!definition) definition = scope.functions.get(node.callee)
-        if (scope.variables.has(node.callee)) variable = true
-        if (definition || variable) break
-      }
-      if (variable && !definition)
-        return {
-          diagnostics: [
-            {
-              code: 'XP_NOT_CALLABLE',
-              severity: 'error',
-              message: `${node.callee} is not a function.`,
-              locations: [node.location],
-            },
-          ],
-        }
-      if (definition) {
-        if (environment.calls.has(definition))
-          return {
-            diagnostics: [
-              {
-                code: 'XP_RECURSION',
-                severity: 'error',
-                message: `Recursive call to ${node.callee}() is prohibited.`,
-                locations: [node.location, definition.declaration.name.location],
-              },
-            ],
-          }
-        if (node.arguments.length !== definition.parameters.length)
-          return {
-            diagnostics: [
-              {
-                code: 'XP_ARITY',
-                severity: 'error',
-                message: `${node.callee}() expects ${definition.parameters.length} argument${definition.parameters.length === 1 ? '' : 's'}, but received ${node.arguments.length}.`,
-                locations: [node.location, definition.declaration.location],
-              },
-            ],
-          }
-        const evaluated = node.arguments.map((argument) =>
-          evaluateExpression(argument, mapping, environment),
-        )
-        const diagnostics = evaluated.flatMap((result) => result.diagnostics)
-        if (!evaluated.every((result) => 'value' in result)) return { diagnostics }
-        const variables = new Map(
-          definition.parameters.map((name, index) => [
-            name,
-            (evaluated[index] as { value: EvaluatedLiteral }).value,
-          ]),
-        )
-        const calls = new Set(environment.calls).add(definition)
-        const callEnvironment = extendLexicalEnvironment(definition.environment, {
-          variables,
-          functions: new Map([[node.callee, definition]]),
-          calls,
-        })
-        let bodyEnvironment = callEnvironment
-        const declarationDiagnostics: Diagnostic[] = []
-        for (const declaration of definition.body.declarations) {
-          const declared = evaluateDeclaration(declaration, mapping, bodyEnvironment)
-          bodyEnvironment = declared.environment
-          declarationDiagnostics.push(...declared.diagnostics)
-        }
-        if (declarationDiagnostics.some((item) => item.severity === 'error'))
-          return { diagnostics: [...diagnostics, ...declarationDiagnostics] }
-        const body = evaluateExpression(
-          definition.body.returnStatement.value,
-          mapping,
-          bodyEnvironment,
-        )
+      const prepared = prepareFunctionCall(node, mapping, environment)
+      if (prepared) {
+        if (!('expression' in prepared)) return prepared
+        const body = evaluateExpression(prepared.expression, mapping, prepared.environment)
         return {
           ...body,
-          diagnostics: [...diagnostics, ...declarationDiagnostics, ...body.diagnostics],
+          diagnostics: [...prepared.diagnostics, ...body.diagnostics],
         }
       }
       if (!['pitch', 'ratio'].includes(node.callee))

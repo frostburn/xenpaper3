@@ -653,7 +653,9 @@ FunctionBody
     }
 
 ReturnStatement
-  = "ret" !IdentifierContinue RequiredSpacing value:AdditiveExpression {
+  // Return binds more loosely than sequencing and parallel composition so a
+  // function can return a complete musical fragment, not only arithmetic.
+  = "ret" !IdentifierContinue RequiredSpacing value:ParallelExpression {
       return node('ReturnStatement', { value });
     }
 
