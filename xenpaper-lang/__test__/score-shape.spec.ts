@@ -652,6 +652,12 @@ K L M N j k=`) as SequenceShape
         .map((attack) => attack.pitch.value.valueOf()),
     ).toEqual([0, (1200 * Math.log2(3)) / 13, 1200 * Math.log2(3)])
 
+    const explicitTritave = shape("{13ed3} '0") as SequenceShape
+    const shifted = explicitTritave.children.find((child) => child.kind === 'attack')
+    expect(shifted?.kind === 'attack' ? shifted.pitch.value.valueOf() : undefined).toBeCloseTo(
+      1200 * Math.log2(3),
+    )
+
     expect(() => shape('{13ed3} C')).not.toThrow()
     expect(() => shape('{7ed3/2} C')).not.toThrow()
     expect(() => shape('{17oooooooooooo} C')).not.toThrow()
@@ -792,6 +798,26 @@ K L M N j k=`) as SequenceShape
         return branch.pitch.value.valueOf()
       }),
     ).toEqual([200, 300])
+  })
+  it('assigns equaves with the register-shift operator', () => {
+    const standard = shape("{' = 3/2} '0") as SequenceShape
+    const mos = shape("MOS{5L2s} MOS{' = 4/3} [j, '0]") as SequenceShape
+    const attackValues = (score: SequenceShape) =>
+      score.children.flatMap((child) =>
+        child.kind === 'attack'
+          ? [child.pitch.value.valueOf()]
+          : child.kind === 'parallel'
+            ? child.branches.flatMap((branch) =>
+                branch.kind === 'attack' ? [branch.pitch.value.valueOf()] : [],
+              )
+            : [],
+      )
+
+    expect(attackValues(standard)).toEqual([expect.closeTo(1200 * Math.log2(3 / 2))])
+    expect(attackValues(mos)).toEqual([
+      expect.closeTo(1200 * Math.log2(4 / 3)),
+      expect.closeTo(1200 * Math.log2(4 / 3)),
+    ])
   })
   it('flows root reassociation through an ordinary sequence', () => {
     const result = shape('{A as root} A B') as SequenceShape
