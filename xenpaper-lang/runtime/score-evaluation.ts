@@ -50,6 +50,8 @@ interface VisitorScope {
   readonly subdivisionBase: Fraction
 }
 
+type ScoreVisitor = Visitor<Expression, VisitorScope, ScoreShapeEvaluationResult>
+
 const MAX_REPEAT_EXPANSION_NODES = 100_000
 const MAX_ENUMERATED_CHORD_SIZE = 10_000n
 
@@ -990,7 +992,8 @@ export function evaluateScoreSemantics(
     }
   }
 
-  const contextAfter = (current: Expression, context: PitchContext): PitchContext => {
+  const contextAfter = (current: Expression, visitor: ScoreVisitor): PitchContext => {
+    const { context } = visitor.scope
     if (current.type === 'PitchContextChange') {
       try {
         return applyPitchContextChange(current, context)
@@ -999,21 +1002,24 @@ export function evaluateScoreSemantics(
       }
     }
     if (current.type === 'Sequence') {
-      return current.items.reduce((active, item) => contextAfter(item, active), context)
+      let activeVisitor = visitor
+      for (const item of current.items)
+        activeVisitor = activeVisitor.spawn({ context: contextAfter(item, activeVisitor) })
+      return activeVisitor.scope.context
     }
     // Explicit groups and normalized slots inherit the surrounding pitch context, but changes
     // made inside them are lexical and must not escape into the containing sequence.
     if (current.type === 'Group' || current.type === 'NormalizeToSlot') return context
-    if (current.type === 'PostfixExpression') return contextAfter(current.expression, context)
+    if (current.type === 'PostfixExpression') return contextAfter(current.expression, visitor)
     if (current.type === 'Repeat') {
       let active = context
       const count = repeatCount(current)
-      if (count === undefined) return active
+      if (count === undefined) return context
       for (let iteration = 0; iteration < count; iteration++) {
-        active = repeatBody(current, iteration).reduce(
-          (bodyContext, item) => contextAfter(item, bodyContext),
-          active,
-        )
+        for (const item of repeatBody(current, iteration)) {
+          const itemVisitor = visitor.spawn({ context: active })
+          active = contextAfter(item, itemVisitor)
+        }
       }
       return active
     }
@@ -1022,9 +1028,9 @@ export function evaluateScoreSemantics(
 
   const subdivisionPulse = (
     current: Extract<Expression, { type: 'Directive' }>,
-    context: PitchContext,
-    environment?: LexicalEnvironment,
+    visitor: ScoreVisitor,
   ) => {
+    const { context, environment } = visitor.scope
     if (current.name !== 'subdivision' || current.graceCount) return undefined
     const argument = current.arguments[0]
     const evaluated =
@@ -1042,32 +1048,25 @@ export function evaluateScoreSemantics(
       : undefined
   }
 
-  const pulseAfter = (
-    current: Expression,
-    currentPulse: Fraction,
-    context: PitchContext,
-    environment?: LexicalEnvironment,
-    subdivisionBase: Fraction = currentPulse,
-  ): Fraction => {
+  const pulseAfter = (current: Expression, visitor: ScoreVisitor): Fraction => {
+    const { pulse: currentPulse, subdivisionBase } = visitor.scope
     if (current.type === 'Directive')
-      return (
-        subdivisionPulse(current, context, environment)?.pulse.mul(subdivisionBase) ?? currentPulse
-      )
+      return subdivisionPulse(current, visitor)?.pulse.mul(subdivisionBase) ?? currentPulse
     if (current.type === 'Sequence') {
-      return current.items.reduce(
-        (active, item) => pulseAfter(item, active, context, environment, subdivisionBase),
-        currentPulse,
-      )
+      let activeVisitor = visitor
+      for (const item of current.items)
+        activeVisitor = activeVisitor.spawn({ pulse: pulseAfter(item, activeVisitor) })
+      return activeVisitor.scope.pulse
     }
     if (current.type === 'Repeat') {
       let active = currentPulse
       const count = repeatCount(current)
       if (count === undefined) return active
       for (let iteration = 0; iteration < count; iteration++) {
-        active = repeatBody(current, iteration).reduce(
-          (bodyPulse, item) => pulseAfter(item, bodyPulse, context, environment, subdivisionBase),
-          active,
-        )
+        for (const item of repeatBody(current, iteration)) {
+          const itemVisitor = visitor.spawn({ pulse: active })
+          active = pulseAfter(item, itemVisitor)
+        }
       }
       return active
     }
@@ -1077,11 +1076,9 @@ export function evaluateScoreSemantics(
 
   const articulationAfter = (
     current: Expression,
-    ratio: Fraction,
-    marks: readonly string[],
-    context: PitchContext,
-    environment?: LexicalEnvironment,
+    visitor: ScoreVisitor,
   ): { ratio: Fraction; marks: readonly string[] } => {
+    const { articulation: ratio, articulationMarks: marks, context, environment } = visitor.scope
     if (current.type === 'Directive') {
       const resolved = resolveDirective(current, context, environment).directive
       if (resolved?.kind !== 'articulation') return { ratio, marks }
@@ -1090,48 +1087,66 @@ export function evaluateScoreSemantics(
         marks: resolved.shorthand && resolved.mark !== '-' ? [...marks, resolved.mark!] : [],
       }
     }
-    if (current.type === 'Sequence')
-      return current.items.reduce(
-        (active, item) => articulationAfter(item, active.ratio, active.marks, context, environment),
-        { ratio, marks },
-      )
+    if (current.type === 'Sequence') {
+      let activeVisitor = visitor
+      for (const item of current.items) {
+        const active = articulationAfter(item, activeVisitor)
+        activeVisitor = activeVisitor.spawn({
+          articulation: active.ratio,
+          articulationMarks: active.marks,
+        })
+      }
+      return {
+        ratio: activeVisitor.scope.articulation,
+        marks: activeVisitor.scope.articulationMarks,
+      }
+    }
     return { ratio, marks }
   }
 
   const directiveStateAfter = (
     current: Expression,
-    state: DirectiveExtensionState,
-    context: PitchContext,
+    visitor: ScoreVisitor,
   ): DirectiveExtensionState => {
+    const { directiveState: state, context } = visitor.scope
     if (current.type === 'Directive') {
       return applyExtension(current, context, state)?.state ?? state
     }
     if (current.type === 'Sequence') {
-      let activeState = state
-      let activeContext = context
+      let activeVisitor = visitor
       for (const item of current.items) {
-        activeState = directiveStateAfter(item, activeState, activeContext)
-        activeContext = contextAfter(item, activeContext)
+        activeVisitor = activeVisitor.spawn({
+          directiveState: directiveStateAfter(item, activeVisitor),
+          context: contextAfter(item, activeVisitor),
+        })
       }
-      return activeState
+      return activeVisitor.scope.directiveState
     }
     if (current.type === 'PostfixExpression')
-      return directiveStateAfter(current.expression, state, context)
+      return directiveStateAfter(current.expression, visitor)
     if (current.type === 'Repeat') {
-      let active = state
+      let activeVisitor = visitor
       const count = repeatCount(current)
-      if (count === undefined) return active
-      let activeContext = context
+      if (count === undefined) return state
       for (let iteration = 0; iteration < count; iteration++) {
         for (const item of repeatBody(current, iteration)) {
-          active = directiveStateAfter(item, active, activeContext)
-          activeContext = contextAfter(item, activeContext)
+          activeVisitor = activeVisitor.spawn({
+            directiveState: directiveStateAfter(item, activeVisitor),
+            context: contextAfter(item, activeVisitor),
+          })
         }
       }
-      return active
+      return activeVisitor.scope.directiveState
     }
     return state
   }
+
+  const visitorAfter = (current: Expression, visitor: ScoreVisitor): ScoreVisitor =>
+    visitor.spawn({
+      context: contextAfter(current, visitor),
+      pulse: pulseAfter(current, visitor),
+      directiveState: directiveStateAfter(current, visitor),
+    })
 
   const evaluateNode: VisitorEvaluation<Expression, VisitorScope, ScoreShapeEvaluationResult> = (
     current,
@@ -1220,9 +1235,7 @@ export function evaluateScoreSemantics(
           ],
         }
       }
-      let activeContext = context
-      let activePulse = currentPulse
-      let activeDirectiveState = currentDirectiveState
+      let activeVisitor = visitor
       let displayedShapes: ScoreShape[] | undefined
       let displayedAttacks: AttackShape[] = []
       const alternatives: AttackAppearance[][] = []
@@ -1230,31 +1243,13 @@ export function evaluateScoreSemantics(
       // Evaluate the written body once even for x0 so it remains engravable between the markers.
       const iterations = Math.max(1, count)
       for (let iteration = 0; iteration < iterations; iteration++) {
-        let iterationContext = activeContext
-        let iterationPulse = activePulse
         const iterationNode: Expression = {
           type: 'Sequence',
           items: [...repeatBody(current, iteration)],
           location: current.location,
         }
-        const result = visitor.visit(iterationNode, {
-          context: iterationContext,
-          pulse: iterationPulse,
-          directiveState: activeDirectiveState,
-        })
-        iterationPulse = pulseAfter(
-          iterationNode,
-          iterationPulse,
-          iterationContext,
-          environment,
-          subdivisionBase,
-        )
-        iterationContext = contextAfter(iterationNode, iterationContext)
-        activeDirectiveState = directiveStateAfter(
-          iterationNode,
-          activeDirectiveState,
-          iterationContext,
-        )
+        const result = activeVisitor.visit(iterationNode)
+        const nextVisitor = visitorAfter(iterationNode, activeVisitor)
         diagnostics.push(...result.diagnostics)
         if (!hasShape(result)) return { diagnostics }
         const iterationShapes = [result.shape]
@@ -1276,10 +1271,7 @@ export function evaluateScoreSemantics(
             })
           }
         }
-        if (iteration < count) {
-          activeContext = iterationContext
-          activePulse = iterationPulse
-        }
+        if (iteration < count) activeVisitor = nextVisitor
       }
       const displayed = annotateRepeatAppearances(
         sequence(displayedShapes ?? [], [origin(current)]),
@@ -1290,22 +1282,14 @@ export function evaluateScoreSemantics(
         items: current.body,
         location: current.location,
       }
-      const endingContext = contextAfter(commonNode, context)
-      const endingPulse = pulseAfter(
-        commonNode,
-        currentPulse,
-        context,
-        environment,
-        subdivisionBase,
-      )
-      const endingArticulation = articulationAfter(
-        commonNode,
-        currentArticulation,
-        currentArticulationMarks,
-        context,
-        environment,
-      )
-      const endingDirectiveState = directiveStateAfter(commonNode, currentDirectiveState, context)
+      const endingArticulation = articulationAfter(commonNode, visitor)
+      const endingVisitor = visitor.spawn({
+        context: contextAfter(commonNode, visitor),
+        pulse: pulseAfter(commonNode, visitor),
+        articulation: endingArticulation.ratio,
+        articulationMarks: endingArticulation.marks,
+        directiveState: directiveStateAfter(commonNode, visitor),
+      })
       const commonResult = visitor.visit(commonNode)
       diagnostics.push(...commonResult.diagnostics)
       const commonShapes = hasShape(commonResult) ? [commonResult.shape] : []
@@ -1315,13 +1299,7 @@ export function evaluateScoreSemantics(
           items: ending.body,
           location: current.location,
         }
-        const result = visitor.visit(endingNode, {
-          context: endingContext,
-          pulse: endingPulse,
-          articulation: endingArticulation.ratio,
-          articulationMarks: endingArticulation.marks,
-          directiveState: endingDirectiveState,
-        })
+        const result = endingVisitor.visit(endingNode)
         diagnostics.push(...result.diagnostics)
         return hasShape(result) ? [result.shape] : []
       })
@@ -1343,13 +1321,7 @@ export function evaluateScoreSemantics(
       }
     }
     if (current.type === 'Sequence') {
-      let activeContext = context
-      let activePulse = currentPulse
-      let activeDynamic = currentDynamic
-      let activeArticulation = currentArticulation
-      let activeArticulationMarks = [...currentArticulationMarks]
-      let activeDirectiveState = currentDirectiveState
-      let activeEnvironment = environment
+      let activeVisitor = visitor
       let velocity: Fraction | undefined
       let grace: { duration: Fraction; count: number; indices: number[] } | undefined
       let gliss:
@@ -1367,17 +1339,22 @@ export function evaluateScoreSemantics(
       const results: ScoreShapeEvaluationResult[] = []
       for (const item of current.items) {
         if (item.type === 'VariableDeclaration' || item.type === 'FunctionDeclaration') {
-          const declared = evaluateDeclaration(item, activeContext, activeEnvironment)
-          activeEnvironment = declared.environment
+          const declared = evaluateDeclaration(
+            item,
+            activeVisitor.scope.context,
+            activeVisitor.scope.environment,
+          )
+          activeVisitor = activeVisitor.spawn({ environment: declared.environment })
           results.push({ shape: sequence([], [origin(item)]), diagnostics: declared.diagnostics })
           continue
         }
         if (item.type === 'PitchContextChange') {
           try {
-            const previousContext = activeContext
-            activeContext = applyPitchContextChange(item, activeContext)
+            const previousContext = activeVisitor.scope.context
+            const changedContext = applyPitchContextChange(item, previousContext)
+            activeVisitor = activeVisitor.spawn({ context: changedContext })
             results.push({
-              shape: contextShape(item, activeContext, previousContext),
+              shape: contextShape(item, changedContext, previousContext),
               diagnostics: [],
             })
           } catch (error) {
@@ -1395,19 +1372,29 @@ export function evaluateScoreSemantics(
           continue
         }
         if (item.type === 'Directive') {
-          const extended = applyExtension(item, activeContext, activeDirectiveState)
+          const extended = applyExtension(
+            item,
+            activeVisitor.scope.context,
+            activeVisitor.scope.directiveState,
+          )
           if (extended) {
-            activeDirectiveState = extended.state
+            activeVisitor = activeVisitor.spawn({ directiveState: extended.state })
             results.push({
               shape: sequence([], [origin(item, 'directive')]),
               diagnostics: extended.diagnostics,
             })
             continue
           }
-          const resolved = resolveDirective(item, activeContext, activeEnvironment)
+          const resolved = resolveDirective(
+            item,
+            activeVisitor.scope.context,
+            activeVisitor.scope.environment,
+          )
           const directive = resolved.directive
-          if (directive?.kind === 'subdivision') activePulse = subdivisionBase.mul(directive.pulse)
-          else if (directive?.kind === 'dynamic') activeDynamic = directive.mark
+          if (directive?.kind === 'subdivision')
+            activeVisitor = activeVisitor.spawn({ pulse: subdivisionBase.mul(directive.pulse) })
+          else if (directive?.kind === 'dynamic')
+            activeVisitor = activeVisitor.spawn({ dynamic: directive.mark })
           else if (directive?.kind === 'velocity') velocity = directive.velocity
           else if (directive?.kind === 'grace')
             grace = { duration: directive.duration, count: directive.count, indices: [] }
@@ -1420,23 +1407,23 @@ export function evaluateScoreSemantics(
               gliss.nextCurve = directive.curve
             }
           } else if (directive?.kind === 'articulation') {
-            activeArticulation = directive.ratio
-            activeArticulationMarks =
+            const articulationMarks =
               directive.shorthand && directive.mark !== '-'
-                ? [...activeArticulationMarks, directive.mark!]
+                ? [...activeVisitor.scope.articulationMarks, directive.mark!]
                 : []
+            activeVisitor = activeVisitor.spawn({
+              articulation: directive.ratio,
+              articulationMarks,
+            })
           }
           let grooveTemplate: ScoreShape | undefined
           if (directive?.kind === 'groove' && directive.argument) {
-            const template = visitor.visit(directive.argument, {
-              context: activeContext,
-              pulse: activePulse,
+            const template = activeVisitor.visit(directive.argument, {
               dynamic: 'mf',
               articulation: new Fraction(1),
               articulationMarks: [],
               directiveState: initialDirectiveState,
-              environment: activeEnvironment,
-              subdivisionBase: activePulse,
+              subdivisionBase: activeVisitor.scope.pulse,
             })
             resolved.diagnostics.push(...template.diagnostics)
             if ('shape' in template) {
@@ -1452,15 +1439,8 @@ export function evaluateScoreSemantics(
           }
           let droneTemplate: ScoreShape | undefined
           if (directive?.kind === 'drone' && directive.argument) {
-            const template = visitor.visit(directive.argument, {
-              context: activeContext,
-              pulse: activePulse,
-              dynamic: activeDynamic,
-              articulation: activeArticulation,
-              articulationMarks: activeArticulationMarks,
-              directiveState: activeDirectiveState,
-              environment: activeEnvironment,
-              subdivisionBase: activePulse,
+            const template = activeVisitor.visit(directive.argument, {
+              subdivisionBase: activeVisitor.scope.pulse,
             })
             resolved.diagnostics.push(...template.diagnostics)
             if ('shape' in template) {
@@ -1515,15 +1495,7 @@ export function evaluateScoreSemantics(
           results.push({ shape, diagnostics: resolved.diagnostics })
           continue
         }
-        let result = visitor.visit(item, {
-          context: activeContext,
-          pulse: activePulse,
-          dynamic: activeDynamic,
-          articulation: activeArticulation,
-          articulationMarks: activeArticulationMarks,
-          directiveState: activeDirectiveState,
-          environment: activeEnvironment,
-        })
+        let result = activeVisitor.visit(item)
         const index = results.length
         if ('shape' in result && attacks(result.shape).length) {
           if (velocity) {
@@ -1709,15 +1681,7 @@ export function evaluateScoreSemantics(
           }
           if (gliss?.indices.length === 2) gliss = undefined
         }
-        activeDirectiveState = directiveStateAfter(item, activeDirectiveState, activeContext)
-        activeContext = contextAfter(item, activeContext)
-        activePulse = pulseAfter(
-          item,
-          activePulse,
-          activeContext,
-          activeEnvironment,
-          subdivisionBase,
-        )
+        activeVisitor = visitorAfter(item, activeVisitor)
       }
       const diagnostics = results.flatMap((result) => result.diagnostics)
       if (grace || gliss)
@@ -1734,7 +1698,7 @@ export function evaluateScoreSemantics(
           [origin(current)],
         ),
         diagnostics,
-        lexicalEnvironment: activeEnvironment,
+        lexicalEnvironment: activeVisitor.scope.environment,
       }
     }
     if (current.type === 'Parallel') {
@@ -1909,8 +1873,8 @@ export function evaluateScoreSemantics(
   if (!('shape' in result)) return result
   return {
     ...result,
-    pitchContext: contextAfter(node, initialContext),
-    directiveState: directiveStateAfter(node, initialDirectiveState, initialContext),
+    pitchContext: contextAfter(node, visitor),
+    directiveState: directiveStateAfter(node, visitor),
     lexicalEnvironment: result.lexicalEnvironment ?? options.lexicalEnvironment,
   }
 }
