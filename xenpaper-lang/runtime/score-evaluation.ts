@@ -1035,12 +1035,15 @@ export function evaluateScoreSemantics(
     currentPulse: Fraction,
     context: PitchContext,
     environment?: LexicalEnvironment,
+    subdivisionBase: Fraction = currentPulse,
   ): Fraction => {
     if (current.type === 'Directive')
-      return subdivisionPulse(current, context, environment)?.pulse ?? currentPulse
+      return (
+        subdivisionPulse(current, context, environment)?.pulse.mul(subdivisionBase) ?? currentPulse
+      )
     if (current.type === 'Sequence') {
       return current.items.reduce(
-        (active, item) => pulseAfter(item, active, context, environment),
+        (active, item) => pulseAfter(item, active, context, environment, subdivisionBase),
         currentPulse,
       )
     }
@@ -1050,7 +1053,7 @@ export function evaluateScoreSemantics(
       if (count === undefined) return active
       for (let iteration = 0; iteration < count; iteration++) {
         active = repeatBody(current, iteration).reduce(
-          (bodyPulse, item) => pulseAfter(item, bodyPulse, context, environment),
+          (bodyPulse, item) => pulseAfter(item, bodyPulse, context, environment, subdivisionBase),
           active,
         )
       }
@@ -1127,6 +1130,7 @@ export function evaluateScoreSemantics(
     currentArticulationMarks: readonly string[] = [],
     currentDirectiveState: DirectiveExtensionState = initialDirectiveState,
     environment?: LexicalEnvironment,
+    subdivisionBase: Fraction = currentPulse,
   ): ScoreShapeEvaluationResult => {
     if (current.type === 'CallExpression') {
       const prepared = prepareFunctionCall(current, context, environment)
@@ -1141,6 +1145,7 @@ export function evaluateScoreSemantics(
           currentArticulationMarks,
           currentDirectiveState,
           prepared.environment,
+          currentPulse,
         )
         return { ...returned, diagnostics: [...prepared.diagnostics, ...returned.diagnostics] }
       }
@@ -1156,6 +1161,7 @@ export function evaluateScoreSemantics(
         currentArticulationMarks,
         currentDirectiveState,
         environment,
+        subdivisionBase,
       )
     const expandedChord = expandEnumeratedChord(current, context)
     if (expandedChord.diagnostics.length) return { diagnostics: expandedChord.diagnostics }
@@ -1170,6 +1176,7 @@ export function evaluateScoreSemantics(
           currentArticulationMarks,
           currentDirectiveState,
           environment,
+          subdivisionBase,
         ),
       )
       const diagnostics = results.flatMap((result) => result.diagnostics)
@@ -1254,8 +1261,15 @@ export function evaluateScoreSemantics(
           currentArticulationMarks,
           activeDirectiveState,
           environment,
+          subdivisionBase,
         )
-        iterationPulse = pulseAfter(iterationNode, iterationPulse, iterationContext, environment)
+        iterationPulse = pulseAfter(
+          iterationNode,
+          iterationPulse,
+          iterationContext,
+          environment,
+          subdivisionBase,
+        )
         iterationContext = contextAfter(iterationNode, iterationContext)
         activeDirectiveState = directiveStateAfter(
           iterationNode,
@@ -1298,7 +1312,13 @@ export function evaluateScoreSemantics(
         location: current.location,
       }
       const endingContext = contextAfter(commonNode, context)
-      const endingPulse = pulseAfter(commonNode, currentPulse, context, environment)
+      const endingPulse = pulseAfter(
+        commonNode,
+        currentPulse,
+        context,
+        environment,
+        subdivisionBase,
+      )
       const endingArticulation = articulationAfter(
         commonNode,
         currentArticulation,
@@ -1419,7 +1439,7 @@ export function evaluateScoreSemantics(
           }
           const resolved = resolveDirective(item, activeContext, activeEnvironment)
           const directive = resolved.directive
-          if (directive?.kind === 'subdivision') activePulse = directive.pulse
+          if (directive?.kind === 'subdivision') activePulse = subdivisionBase.mul(directive.pulse)
           else if (directive?.kind === 'dynamic') activeDynamic = directive.mark
           else if (directive?.kind === 'velocity') velocity = directive.velocity
           else if (directive?.kind === 'grace')
@@ -1537,6 +1557,7 @@ export function evaluateScoreSemantics(
           activeArticulationMarks,
           activeDirectiveState,
           activeEnvironment,
+          subdivisionBase,
         )
         const index = results.length
         if ('shape' in result && attacks(result.shape).length) {
@@ -1725,7 +1746,13 @@ export function evaluateScoreSemantics(
         }
         activeDirectiveState = directiveStateAfter(item, activeDirectiveState, activeContext)
         activeContext = contextAfter(item, activeContext)
-        activePulse = pulseAfter(item, activePulse, activeContext, activeEnvironment)
+        activePulse = pulseAfter(
+          item,
+          activePulse,
+          activeContext,
+          activeEnvironment,
+          subdivisionBase,
+        )
       }
       const diagnostics = results.flatMap((result) => result.diagnostics)
       if (grace || gliss)
@@ -1755,6 +1782,7 @@ export function evaluateScoreSemantics(
           currentArticulationMarks,
           currentDirectiveState,
           environment,
+          currentPulse,
         ),
       )
       const diagnostics = results.flatMap((result) => result.diagnostics)
@@ -1782,6 +1810,7 @@ export function evaluateScoreSemantics(
         currentArticulationMarks,
         currentDirectiveState,
         environment,
+        currentPulse,
       )
       if (!('shape' in grouped)) return grouped
       return {
@@ -1810,6 +1839,7 @@ export function evaluateScoreSemantics(
         currentArticulationMarks,
         currentDirectiveState,
         environment,
+        currentPulse,
       )
       if (!('shape' in evaluated)) return evaluated
       if (!evaluated.shape.duration.n) {

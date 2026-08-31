@@ -956,6 +956,32 @@ K L M N j k=`) as SequenceShape
     expect(result.duration.equals(4)).toBe(true)
   })
 
+  it('stacks subdivisions inside explicit groups', () => {
+    const result = shape('@2 1 2 3 4 (@3 5 6 7 8)')
+    const durations: number[] = []
+    const collect = (current: ScoreShape) => {
+      if (current.kind === 'attack') durations.push(current.duration.valueOf())
+      else if (current.kind === 'sequence') current.children.forEach(collect)
+      else if (current.kind === 'parallel') current.branches.forEach(collect)
+    }
+    collect(result)
+
+    expect(durations).toEqual([0.5, 0.5, 0.5, 0.5, 1 / 6, 1 / 6, 1 / 6, 1 / 6])
+  })
+
+  it('scales function subdivisions relative to the call site', () => {
+    const result = shape('fn LICC() { ret @2 D E F G } @2 LICC()')
+    const durations: number[] = []
+    const collect = (current: ScoreShape) => {
+      if (current.kind === 'attack') durations.push(current.duration.valueOf())
+      else if (current.kind === 'sequence') current.children.forEach(collect)
+      else if (current.kind === 'parallel') current.branches.forEach(collect)
+    }
+    collect(result)
+
+    expect(durations).toEqual([0.25, 0.25, 0.25, 0.25])
+  })
+
   it('propagates subdivision state through and beyond repeats', () => {
     const result = shape('|: C @2 D :| E') as SequenceShape
     const repeat = result.children[0] as SequenceShape
