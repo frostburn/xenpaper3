@@ -564,7 +564,7 @@ export function evaluateExpression(
           pitchDisplacement =
             context.mos && operand.value.spelling.system === 'mos'
               ? context.mos.equave.mul(new Value(equaveShift))
-              : Value.pitch(new Value(2).pow(equaveShift))
+              : context.mapping.mapPrime(2).mul(new Value(equaveShift))
         else if ('scaleDegree' in operand.value)
           pitchDisplacement = context.degreeEquave.mul(new Value(equaveShift))
         else
@@ -581,7 +581,9 @@ export function evaluateExpression(
       const operatorOrigin: SourceOrigin = { location: node.modifier.location, role: 'operator' }
       const origins = [...operand.value.origins, operatorOrigin]
       const equaveFormula = equaveShift
-        ? Value.ratio(pitchDisplacement).primeExponents()
+        ? operand.value.kind === 'absolutePitch' && operand.value.spelling.system !== 'mos'
+          ? new Map([[2, new Fraction(equaveShift)]])
+          : Value.ratio(pitchDisplacement).primeExponents()
         : undefined
       const shiftedFormula = (formula: ReadonlyMap<number, Fraction>) => {
         if (!equaveFormula) return formula

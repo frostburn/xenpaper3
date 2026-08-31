@@ -180,6 +180,26 @@ describe('arithmetic expression evaluation', () => {
     expect(ratio.value.equals(new Value(9n, 4n))).toBe(true)
   })
 
+  it('maps explicit Latin equave shifts like lowercase nominals', () => {
+    const change = parse('{19ed3}').body[0]
+    if (change.type !== 'PitchContextChange') throw new Error('Expected a pitch context change.')
+    const context = applyPitchContextChange(change, DEFAULT_PITCH_CONTEXT)
+    const shifted = evaluateExpression(expression("'C"), context)
+    const lowercase = evaluateExpression(expression('c'), context)
+
+    expect(shifted.diagnostics).toEqual([])
+    expect(lowercase.diagnostics).toEqual([])
+    if (
+      !('value' in shifted) ||
+      shifted.value.kind !== 'absolutePitch' ||
+      !('value' in lowercase) ||
+      lowercase.value.kind !== 'absolutePitch'
+    )
+      throw new Error('Expected absolute pitches.')
+    expect(shifted.value.rootOffset.equals(lowercase.value.rootOffset)).toBe(true)
+    expect(shifted.value.formula).toEqual(lowercase.value.formula)
+  })
+
   it('falls back to real arithmetic for sums of unrelated square roots', () => {
     const sum = evaluate('sqrt(2) + sqrt(3)')
 
