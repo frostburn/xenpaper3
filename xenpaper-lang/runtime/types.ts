@@ -1,6 +1,5 @@
 import type {
   Directive,
-  Expression,
   FunctionBody,
   FunctionDeclaration,
   PitchLiteral,

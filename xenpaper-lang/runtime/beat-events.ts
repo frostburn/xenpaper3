@@ -101,7 +101,7 @@ export function flattenScoreSemantics(shape: ScoreShape): BeatEventFlatteningRes
   const diagnostics: Diagnostic[] = []
   const completedAutomations = new WeakSet<MutableNoteEvent>()
   const evaluate: VisitorEvaluation<ScoreShape, FlatteningScope, Fraction> = (current, visitor) => {
-    const { start, state } = visitor.scope
+    const { state } = visitor.scope
     if (!current.isolatedDirectiveScope) return visitCurrent(current, visitor)
     const isolatedState = { ...state }
     const isolatedVisitor = visitor.spawn({ state: isolatedState })

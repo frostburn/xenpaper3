@@ -39,10 +39,10 @@ describe('lexical declarations', () => {
   })
 
   it('reserves declaration keywords and rejects malformed parameter lists', () => {
-    expect(() => parse('let')).toThrow()
-    expect(() => parse('ret')).toThrow()
-    expect(() => parse('fn f(a,) { ret a }')).toThrow()
-    expect(() => parse('fn f(a) { a }')).toThrow()
+    expect(() => parse('let')).toThrow(/./)
+    expect(() => parse('ret')).toThrow(/./)
+    expect(() => parse('fn f(a,) { ret a }')).toThrow(/./)
+    expect(() => parse('fn f(a) { a }')).toThrow(/./)
     expect(parse('letter').body[0]).not.toMatchObject({ type: 'VariableDeclaration' })
   })
 
@@ -55,7 +55,7 @@ describe('lexical declarations', () => {
 
   it('does not allow declarations to claim musical spellings', () => {
     for (const source of ['let C = 3/2', 'let x = 3/2', 'fn f() { ret 3/2 }']) {
-      expect(() => parse(source)).toThrow()
+      expect(() => parse(source)).toThrow(/./)
     }
   })
 })
