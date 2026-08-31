@@ -316,6 +316,10 @@ K L M N j k=`) as SequenceShape
       1200 * Math.log2(3),
     ])
 
+    const latinOctave = shape("MOS{5L4s <3/1>} 'C") as SequenceShape
+    const latinAttack = latinOctave.children.find((child) => child.kind === 'attack')
+    expect(latinAttack?.pitch.value.equals(Value.pitch(new Value(2)))).toBe(true)
+
     const set = shape('MOS{5L2s} MOS{^ = 1\\24} ^J') as SequenceShape
     const setAttack = set.children.find((child) => child.kind === 'attack')
     expect(setAttack?.pitch.value.equals(Value.equalDivision(1, 24, new Value(2)))).toBe(true)

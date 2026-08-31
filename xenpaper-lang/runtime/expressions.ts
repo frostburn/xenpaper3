@@ -554,16 +554,17 @@ export function evaluateExpression(
       const context = 'rootPitch' in mapping ? mapping : createPitchContext(mapping)
       const modifier = node.modifier.kind
       const equaveShift = EQUAVE_SHIFT_BY_MODIFIER[modifier] ?? 0
-      // A MOS equave also governs written pitch and interval register shifts.
-      // Outside MOS notation, written registers remain notational octaves even
-      // when a scale declares a different degree equave.
+      // A MOS equave governs MOS pitches and scale-relative values. Latin and
+      // Greek pitches retain their notational octave even while a MOS is active.
       let scalarDisplacement: Value
       let pitchDisplacement: Value
       if (equaveShift) {
         scalarDisplacement = context.degreeEquave.mul(new Value(equaveShift))
-        pitchDisplacement = context.mos
-          ? context.mos.equave.mul(new Value(equaveShift))
-          : Value.pitch(new Value(2).pow(equaveShift))
+        pitchDisplacement =
+          context.mos &&
+          (operand.value.kind !== 'absolutePitch' || operand.value.spelling.system === 'mos')
+            ? context.mos.equave.mul(new Value(equaveShift))
+            : Value.pitch(new Value(2).pow(equaveShift))
       } else {
         const inflectionKind = modifier === 'up' || modifier === 'down' ? 'up' : 'lift'
         let inflection = requirePitchOperator(context, inflectionKind)
