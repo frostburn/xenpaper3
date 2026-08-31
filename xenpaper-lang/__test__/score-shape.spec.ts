@@ -994,6 +994,38 @@ K L M N j k=`) as SequenceShape
     expect(following!.duration.valueOf()).toBe(0.5)
   })
 
+  it('preserves the surrounding subdivision base through repeat postfix marks', () => {
+    const result = shape('@2 |: @3 C :|=')
+    const attacks: Extract<ScoreShape, { kind: 'attack' }>[] = []
+    const collect = (current: ScoreShape) => {
+      if (current.kind === 'attack') attacks.push(current)
+      else if (current.kind === 'sequence') current.children.forEach(collect)
+      else if (current.kind === 'parallel') current.branches.forEach(collect)
+    }
+    collect(result)
+
+    expect(attacks).toHaveLength(1)
+    expect(attacks[0]!.duration.equals(new Fraction(1, 3))).toBe(true)
+  })
+
+  it('renders alternate endings with the same subdivision timing as naive expansion', () => {
+    const repeated = shape('@2 |: @3 C |@^1 D :|@^2 E ||')
+    const expanded = shape('@2 @3 C D @3 C E')
+    const durations = (result: ScoreShape) => {
+      const values: number[] = []
+      const collect = (current: ScoreShape) => {
+        if (current.kind === 'attack') values.push(current.duration.valueOf())
+        else if (current.kind === 'sequence') current.children.forEach(collect)
+        else if (current.kind === 'parallel') current.branches.forEach(collect)
+      }
+      collect(result)
+      return values
+    }
+
+    expect(durations(repeated)).toEqual([1 / 3, 1 / 3, 1 / 3])
+    expect(durations(expanded)).toEqual([1 / 3, 1 / 3, 1 / 3, 1 / 3])
+  })
+
   it.each(['|:@x100001 C :|', `|:@x${'1' + '0'.repeat(400)} C :|`])(
     'rejects an unsafe repeat without iterating it',
     (source) => {

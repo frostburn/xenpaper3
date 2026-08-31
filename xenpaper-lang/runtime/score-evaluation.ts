@@ -1336,6 +1336,7 @@ export function evaluateScoreSemantics(
         currentArticulationMarks,
         currentDirectiveState,
         environment,
+        subdivisionBase,
       )
       diagnostics.push(...commonResult.diagnostics)
       const commonShapes = hasShape(commonResult) ? [commonResult.shape] : []
@@ -1354,6 +1355,7 @@ export function evaluateScoreSemantics(
           endingArticulation.marks,
           endingDirectiveState,
           environment,
+          subdivisionBase,
         )
         diagnostics.push(...result.diagnostics)
         return hasShape(result) ? [result.shape] : []
@@ -1887,6 +1889,7 @@ export function evaluateScoreSemantics(
         currentArticulationMarks,
         currentDirectiveState,
         environment,
+        subdivisionBase,
       )
       if (!('shape' in evaluated)) return evaluated
       const elimination = current.marks.find((mark) => mark.type === 'TailElimination')
