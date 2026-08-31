@@ -552,9 +552,7 @@ describe('DawView', () => {
     const wrapper = mount(DawView)
     await wrapper.get('[aria-label="Global source"]').setValue('MOS{5L4s}')
     await wrapper.getComponent(InstrumentPianoRollLane).trigger('dblclick', { clientX: 64 })
-    await wrapper
-      .get('textarea[aria-label="Xenpaper clip source"]')
-      .setValue('J K L M N O P Q R j')
+    await wrapper.get('textarea[aria-label="Xenpaper clip source"]').setValue('J K L M N O P Q R j')
 
     expect(wrapper.get('button.clip').attributes('style')).toContain('width: 640px')
     expect(wrapper.findAll('[aria-label="Piano roll preview"] i')).toHaveLength(10)
