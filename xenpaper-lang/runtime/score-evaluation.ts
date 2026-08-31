@@ -4,6 +4,7 @@ import type { Diagnostic } from '../diagnostics'
 import { Value } from '../value'
 import { evaluateDeclaration, evaluateExpression, prepareFunctionCall } from './expressions'
 import { DYNAMIC_VELOCITIES, resolveDirective } from './directives'
+import { Visitor, type VisitorEvaluation } from './visitor'
 import {
   DEFAULT_PITCH_CONTEXT,
   applyPitchContextChange,
@@ -47,25 +48,6 @@ interface VisitorScope {
   readonly directiveState: DirectiveExtensionState
   readonly environment?: LexicalEnvironment
   readonly subdivisionBase: Fraction
-}
-
-type VisitorEvaluation = (node: Expression, visitor: Visitor) => ScoreShapeEvaluationResult
-
-/** Immutable evaluation cursor that derives child context without long recursive argument lists. */
-class Visitor {
-  constructor(
-    private readonly evaluate: VisitorEvaluation,
-    readonly scope: VisitorScope,
-  ) {}
-
-  spawn(overrides: Partial<VisitorScope> = {}): Visitor {
-    return new Visitor(this.evaluate, { ...this.scope, ...overrides })
-  }
-
-  visit(node: Expression, overrides: Partial<VisitorScope> = {}): ScoreShapeEvaluationResult {
-    const visitor = Object.keys(overrides).length ? this.spawn(overrides) : this
-    return this.evaluate(node, visitor)
-  }
 }
 
 const MAX_REPEAT_EXPANSION_NODES = 100_000
@@ -1151,7 +1133,10 @@ export function evaluateScoreSemantics(
     return state
   }
 
-  const evaluateNode: VisitorEvaluation = (current, visitor) => {
+  const evaluateNode: VisitorEvaluation<Expression, VisitorScope, ScoreShapeEvaluationResult> = (
+    current,
+    visitor,
+  ) => {
     const {
       context,
       pulse: currentPulse,
