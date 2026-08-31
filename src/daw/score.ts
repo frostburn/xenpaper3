@@ -7,6 +7,7 @@ import {
   type DirectiveExtensionState,
   type Diagnostic,
   type Expression,
+  type LexicalEnvironment,
   type PitchContext,
   type Program,
   type ScoreShape,
@@ -166,6 +167,7 @@ const ENVELOPE_EXTENSIONS = [envelopeExtension, adsrExtension]
 export interface SourceInitialization {
   readonly pitchContext?: PitchContext
   readonly directiveState?: DirectiveExtensionState
+  readonly lexicalEnvironment?: LexicalEnvironment
   /** Pre-evaluated state annotations applied before a clip without reparsing initialization source. */
   readonly shape?: ScoreShape
 }
@@ -179,6 +181,7 @@ export const compileSourceInitialization = (
     directiveExtensions: ENVELOPE_EXTENSIONS,
     pitchContext: parent.pitchContext,
     directiveState: parent.directiveState,
+    lexicalEnvironment: parent.lexicalEnvironment,
   })
   const errors = result.diagnostics.filter(({ severity }) => severity === 'error')
   if (errors.length) throw new Error(errors.map(({ message }) => message).join('\n'))
@@ -188,6 +191,7 @@ export const compileSourceInitialization = (
   return {
     pitchContext: result.pitchContext,
     directiveState: result.directiveState,
+    lexicalEnvironment: result.lexicalEnvironment,
     shape: parent.shape
       ? {
           kind: 'sequence',
@@ -209,6 +213,7 @@ export const parseClipNotes = (
     directiveExtensions: ENVELOPE_EXTENSIONS,
     pitchContext: initialization.pitchContext,
     directiveState: initialization.directiveState,
+    lexicalEnvironment: initialization.lexicalEnvironment,
     initializationShape: initialization.shape,
   })
   const errors = result.diagnostics.filter(({ severity }) => severity === 'error')
@@ -255,6 +260,7 @@ export const parseDrumClipNotes = (
     directiveExtensions: ENVELOPE_EXTENSIONS,
     pitchContext: initialization.pitchContext,
     directiveState: initialization.directiveState,
+    lexicalEnvironment: initialization.lexicalEnvironment,
     initializationShape: initialization.shape,
   })
   const errors = result.diagnostics.filter(({ severity }) => severity === 'error')
@@ -289,6 +295,7 @@ export const sourceClipLength = (
     directiveExtensions: ENVELOPE_EXTENSIONS,
     pitchContext: initialization.pitchContext,
     directiveState: initialization.directiveState,
+    lexicalEnvironment: initialization.lexicalEnvironment,
     initializationShape: initialization.shape,
   })
   if (!('score' in result) || result.diagnostics.some(({ severity }) => severity === 'error'))

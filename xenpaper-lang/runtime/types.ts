@@ -60,6 +60,8 @@ export interface ScoreShapeOptions {
   readonly pitchContext?: PitchContext
   readonly directiveState?: DirectiveExtensionState
   readonly directiveExtensions?: readonly DirectiveExtension[]
+  /** Lexical declarations inherited from an enclosing source. */
+  readonly lexicalEnvironment?: LexicalEnvironment
 }
 
 /** Persistent lexical scope. Variables and callables intentionally occupy separate namespaces. */
@@ -106,6 +108,7 @@ export type ScoreShapeEvaluationResult =
       readonly diagnostics: readonly Diagnostic[]
       readonly pitchContext?: PitchContext
       readonly directiveState?: DirectiveExtensionState
+      readonly lexicalEnvironment?: LexicalEnvironment
     }
   | { readonly diagnostics: readonly Diagnostic[] }
 

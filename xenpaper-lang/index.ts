@@ -73,6 +73,7 @@ export type {
   PitchOffsetValue,
   PitchSpelling,
   IntervalSpelling,
+  LexicalEnvironment,
   FjsSpelling,
   PrimeMapping,
   PrimeMonzo,
