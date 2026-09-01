@@ -490,6 +490,10 @@ describe('Xenpaper surface grammar', () => {
       type: 'MonzoLiteral',
       components: ['2', '-1'],
     })
+    expect(parse('[4 -4 1⟩@').body[0]).toMatchObject({
+      type: 'MonzoLiteral',
+      components: ['4', '-4', '1'],
+    })
   })
 
   it('accepts optional commas between mapping components', () => {
@@ -503,6 +507,16 @@ describe('Xenpaper surface grammar', () => {
         { type: 'QuantityLiteral', magnitude: '1999', unit: 'c' },
       ],
       closingDelimiter: ']',
+    })
+
+    const angledChange = parse('{map = ⟨1222¢ 1999¢]}').body[0] as SyntaxNode
+    const angledMapping = (angledChange.statements as SyntaxNode[])[0]!.value as SyntaxNode
+    expect(angledMapping).toMatchObject({
+      type: 'MappingLiteral',
+      values: [
+        { type: 'QuantityLiteral', magnitude: '1222', unit: '¢' },
+        { type: 'QuantityLiteral', magnitude: '1999', unit: '¢' },
+      ],
     })
   })
   it('parses adjacent dots as a single cluster rest', () => {

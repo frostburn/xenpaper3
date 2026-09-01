@@ -98,6 +98,7 @@ function quantity(node: QuantityLiteral): EvaluatedLiteral {
 
   switch (node.unit.toLowerCase()) {
     case 'c':
+    case '¢':
       return pitchOffset(Value.cents(magnitude), node)
     case 'db':
       return scalar(Value.decibels(magnitude), node)

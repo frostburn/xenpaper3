@@ -657,6 +657,17 @@ export function evaluateExpression(
       const operand = evaluateExpression(node.operand, mapping, environment)
       if (!('value' in operand)) return operand
       if (node.operator === '+') return operand
+      if (node.operator === '√') {
+        if (operand.value.kind !== 'scalar')
+          throw new TypeError('Square root requires a scalar operand.')
+        return {
+          value: result('scalar', operand.value.value.pow(new Fraction(1, 2)), [
+            ...operand.value.origins,
+            { location: node.location, role: 'operator' },
+          ]),
+          diagnostics: operand.diagnostics,
+        }
+      }
       if (node.operator === '~') {
         if (operand.value.kind === 'absolutePitch')
           throw new TypeError('An absolute pitch cannot be tempered.')

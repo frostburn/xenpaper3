@@ -53,7 +53,9 @@
       case '"': return 'doubleEquaveUp';
       case '`': return 'equaveDown';
       case '^': return 'up';
+      case '∧': return 'up';
       case 'v': return 'down';
+      case '∨': return 'down';
       case '/': return 'lift';
       case '\\': return 'drop';
       default: return 'unknown';
@@ -193,6 +195,7 @@ UnaryOperator
   = "+" { return "+"; }
   / "-" { return "-"; }
   / "~" { return "~"; }
+  / "√" { return "√"; }
   / $("'" / '"' / "`" / "^" / "v" / "/" / "\\")
 
 PostfixExpression
@@ -290,7 +293,7 @@ NormalizedGroup
     }
 
 MonzoLiteral
-  = "[" Spacing components:MonzoComponents? Spacing ">@" subgroup:MonzoSubgroup? {
+  = "[" Spacing components:MonzoComponents? Spacing (">" / "⟩") "@" subgroup:MonzoSubgroup? {
       return node('MonzoLiteral', {
         components: components ?? [],
         subgroup: subgroup?.components ?? [],
@@ -599,7 +602,7 @@ ContextValue
   / AdditiveExpression
 
 MappingLiteral
-  = "<" Spacing first:AdditiveExpression
+  = ("<" / "⟨") Spacing first:AdditiveExpression
     rest:(ComponentSeparator value:AdditiveExpression { return value; })*
     Spacing close:("]" / ">") {
       return node('MappingLiteral', {
@@ -871,7 +874,7 @@ BinaryTailStart
   / RequiredSpacing "**" RequiredSpacing
 
 PitchModifier
-  = raw:$("'" / '"' / "`" / "^" / "v" / "/" / "\\") {
+  = raw:$("'" / '"' / "`" / "^" / "∧" / "v" / "∨" / "/" / "\\") {
       return node('PitchModifier', { kind: modifierKind(raw), raw });
     }
 
@@ -960,7 +963,7 @@ QuantityLiteral
     }
 
 UnitSuffix
-  = value:$("kHz"i / "Hz"i / "ms"i / "dB"i / "beats"i / "beat"i / "s"i / "c" / "%") {
+  = value:$("kHz"i / "Hz"i / "ms"i / "dB"i / "beats"i / "beat"i / "s"i / "c" / "¢" / "%") {
       return value;
     }
 
