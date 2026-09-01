@@ -276,6 +276,20 @@ describe('DAW project model', () => {
     const laneNotes = parseClipNotes('C D', Infinity, lane)
     expect(laneNotes.map(({ beat }) => beat)).toEqual([0, 0.25])
     expect(laneNotes.map(({ duration }) => duration)).toEqual([0.125, 0.125])
+
+    const nested = compileSourceInitialization('@4', compileSourceInitialization('@2'))
+    expect(parseClipNotes('C D', Infinity, nested).map(({ beat }) => beat)).toEqual([0, 0.125])
+  })
+
+  it('propagates initialization context through declarations and repeats', () => {
+    const declared = compileSourceInitialization('let subdivision = 4 @subdivision(subdivision)')
+    expect(parseClipNotes('C D', Infinity, declared).map(({ beat }) => beat)).toEqual([0, 0.25])
+
+    const repeated = compileSourceInitialization('|: @ff @. :|')
+    const inherited = parseClipNotes('C', Infinity, repeated)[0]!
+    const explicit = parseClipNotes('@ff @. C')[0]!
+    expect(inherited.velocity).toBe(explicit.velocity)
+    expect(inherited.duration).toBe(explicit.duration)
   })
 
   it('propagates global function declarations into lane and clip sources', () => {

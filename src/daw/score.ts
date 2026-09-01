@@ -178,7 +178,6 @@ export interface SourceInitialization {
 const inheritedScoreOptions = (initialization: SourceInitialization) => ({
   pitchContext: initialization.visitorContext?.pitchContext ?? initialization.pitchContext,
   pulse: initialization.visitorContext?.pulse,
-  subdivisionBase: initialization.visitorContext?.subdivisionBase,
   dynamic: initialization.visitorContext?.dynamic,
   articulation: initialization.visitorContext?.articulation,
   articulationMarks: initialization.visitorContext?.articulationMarks,

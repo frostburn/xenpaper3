@@ -56,8 +56,6 @@ export interface RepeatExpansionOptions {
 
 export interface ScoreShapeOptions {
   readonly pulse?: FractionValue
-  /** Pulse against which subdivision directives are resolved. Defaults to `pulse`. */
-  readonly subdivisionBase?: FractionValue
   readonly dynamic?: DynamicMark
   readonly articulation?: FractionValue
   readonly articulationMarks?: readonly string[]
@@ -122,7 +120,6 @@ export type ScoreShapeEvaluationResult =
 export interface ScoreVisitorContext {
   readonly pitchContext: PitchContext
   readonly pulse: Fraction
-  readonly subdivisionBase: Fraction
   readonly dynamic: DynamicMark
   readonly articulation: Fraction
   readonly articulationMarks: readonly string[]
