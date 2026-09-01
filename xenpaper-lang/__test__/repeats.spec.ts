@@ -11,6 +11,33 @@ function body(source: string, expansionLimit?: number): readonly ExpandedNode[] 
 }
 
 describe('repeat expansion', () => {
+  it('defaults an unmatched repeat end to the start of its scope', () => {
+    const implicit = body('C D E :|')
+    const explicit = body('|: C D E :|')
+
+    expect(implicit.map((node) => node.type)).toEqual([
+      'PitchLiteral',
+      'PitchLiteral',
+      'PitchLiteral',
+      'PitchLiteral',
+      'PitchLiteral',
+      'PitchLiteral',
+    ])
+    expect(implicit.map((node) => node.type)).toEqual(explicit.map((node) => node.type))
+  })
+
+  it('uses the containing group and parallel branch as implicit repeat scopes', () => {
+    const expanded = body('(C D :|) E, F G :|')
+
+    expect(expanded[0]).toMatchObject({
+      type: 'Parallel',
+      branches: [
+        { type: 'Sequence', items: [{ type: 'Group' }, { type: 'PitchLiteral', raw: 'E' }] },
+        { type: 'Sequence' },
+      ],
+    })
+  })
+
   it('uses two iterations when the source omits a count', () => {
     const program = parse('|: C :|')
 

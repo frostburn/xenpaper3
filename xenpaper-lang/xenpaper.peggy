@@ -86,8 +86,8 @@ Start
     }
 
 DocumentBody
-  = first:ParallelExpression?
-    rest:(Spacing boundary:HardBoundary Spacing next:ParallelExpression? {
+  = first:ScopedParallelExpression?
+    rest:(Spacing boundary:HardBoundary Spacing next:ScopedParallelExpression? {
       return { boundary, next };
     })* {
       const body = [];
@@ -104,6 +104,27 @@ ParallelExpression
     rest:(Spacing "," Spacing branch:SequenceExpression { return branch; })* {
       return parallel([first, ...rest]);
     }
+
+// A repeat end without a matching repeat start repeats from the beginning of
+// its lexical sequence. Keeping this behavior in the scoped productions lets
+// explicit repeat bodies continue to reserve their own `:|` delimiter.
+ScopedParallelExpression
+  = first:ScopedSequenceExpression
+    rest:(Spacing "," Spacing branch:ScopedSequenceExpression { return branch; })* {
+      return parallel([first, ...rest]);
+    }
+
+ScopedSequenceExpression
+  = repeated:SequenceExpression Spacing ":|" remainder:(Spacing item:ScopedSequenceExpression { return item; })? {
+      const repeat = node('Repeat', {
+        count: null,
+        body: [repeated],
+        endings: [],
+        terminal: ":|",
+      });
+      return sequence(remainder ? [repeat, remainder] : [repeat]);
+    }
+  / SequenceExpression
 
 // Sequencing needs no synthetic separator token. `Spacing` may be empty, so
 // adjacent self-delimiting items (`0.2`, `C[D E]F`, `C=F`) are parsed by
@@ -283,12 +304,12 @@ ChordGroupedEnumerand
     }
 
 ParenthesizedExpression
-  = "(" Spacing expression:ParallelExpression Spacing ")" {
+  = "(" Spacing expression:ScopedParallelExpression Spacing ")" {
       return node('Group', { expression });
     }
 
 NormalizedGroup
-  = "[" Spacing expression:ParallelExpression? Spacing "]" {
+  = "[" Spacing expression:ScopedParallelExpression? Spacing "]" {
       return node('NormalizeToSlot', { expression: expression ?? null });
     }
 
@@ -670,7 +691,7 @@ FunctionBody
 ReturnStatement
   // Return binds more loosely than sequencing and parallel composition so a
   // function can return a complete musical fragment, not only arithmetic.
-  = "ret" !IdentifierContinue RequiredSpacing value:ParallelExpression {
+  = "ret" !IdentifierContinue RequiredSpacing value:ScopedParallelExpression {
       return node('ReturnStatement', { value });
     }
 
