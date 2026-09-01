@@ -53,7 +53,9 @@
       case '"': return 'doubleEquaveUp';
       case '`': return 'equaveDown';
       case '^': return 'up';
+      case '∧': return 'up';
       case 'v': return 'down';
+      case '∨': return 'down';
       case '/': return 'lift';
       case '\\': return 'drop';
       default: return 'unknown';
@@ -193,6 +195,7 @@ UnaryOperator
   = "+" { return "+"; }
   / "-" { return "-"; }
   / "~" { return "~"; }
+  / "√" { return "√"; }
   / $("'" / '"' / "`" / "^" / "v" / "/" / "\\")
 
 PostfixExpression
@@ -290,7 +293,11 @@ NormalizedGroup
     }
 
 MonzoLiteral
-  = "[" Spacing components:MonzoComponents? Spacing ">@" subgroup:MonzoSubgroup? {
+  = "[" Spacing components:MonzoComponents? Spacing
+    subgroup:(
+      ">@" value:MonzoSubgroup? { return value; }
+      / "⟩" value:("@" subgroup:MonzoSubgroup? { return subgroup; })? { return value; }
+    ) {
       return node('MonzoLiteral', {
         components: components ?? [],
         subgroup: subgroup?.components ?? [],
@@ -599,7 +606,7 @@ ContextValue
   / AdditiveExpression
 
 MappingLiteral
-  = "<" Spacing first:AdditiveExpression
+  = ("<" / "⟨") Spacing first:AdditiveExpression
     rest:(ComponentSeparator value:AdditiveExpression { return value; })*
     Spacing close:("]" / ">") {
       return node('MappingLiteral', {
@@ -860,7 +867,7 @@ ScaleDegreeLiteral
     }
 
 NumericLiteralSuffix
-  = "/" / "\\" / "." [0-9]+ ("e" / "r" / UnitSuffix)
+  = "/" / "\\" / UnitSuffix / "." [0-9]+ ("e" / "r" / UnitSuffix)
 
 BinaryTailStart
   = ("+" / "-") ![0-9]
@@ -871,7 +878,7 @@ BinaryTailStart
   / RequiredSpacing "**" RequiredSpacing
 
 PitchModifier
-  = raw:$("'" / '"' / "`" / "^" / "v" / "/" / "\\") {
+  = raw:$("'" / '"' / "`" / "^" / "∧" / "v" / "∨" / "/" / "\\") {
       return node('PitchModifier', { kind: modifierKind(raw), raw });
     }
 
@@ -960,7 +967,7 @@ QuantityLiteral
     }
 
 UnitSuffix
-  = value:$("kHz"i / "Hz"i / "ms"i / "dB"i / "beats"i / "beat"i / "s"i / "c" / "%") {
+  = value:$("kHz"i / "Hz"i / "ms"i / "dB"i / "beats"i / "beat"i / "s"i / "c" / "¢" / "%") {
       return value;
     }
 

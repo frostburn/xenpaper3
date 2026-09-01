@@ -1850,7 +1850,7 @@ export function evaluateScoreSemantics(
       ...(current.type === 'DegreeLiteral' ||
       current.type === 'EqualDivisionLiteral' ||
       (current.type === 'QuantityLiteral' &&
-        ['c', 'hz', 'khz'].includes(current.unit.toLowerCase()))
+        ['c', '¢', 'hz', 'khz'].includes(current.unit.toLowerCase()))
         ? { displayLabel: String(current.raw) }
         : {}),
     }
