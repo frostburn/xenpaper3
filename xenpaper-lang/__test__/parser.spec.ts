@@ -51,6 +51,10 @@ describe('lexical declarations', () => {
     expect(() => parse('|: C |@^1 fn transform() { ret 3/2 } transform() ||')).toThrow(
       /not allowed inside repeats/,
     )
+    expect(() => parse('let interval = 3/2 interval :|')).toThrow(/not allowed inside repeats/)
+    expect(() => parse('fn transform() { ret 3/2 } transform() :|')).toThrow(
+      /not allowed inside repeats/,
+    )
   })
 
   it('does not allow declarations to claim musical spellings', () => {
