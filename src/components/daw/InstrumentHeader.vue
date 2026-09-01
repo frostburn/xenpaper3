@@ -12,7 +12,7 @@ defineEmits<{
 </script>
 
 <template>
-  <header class="instrument-header">
+  <header class="instrument-header" :class="{ collapsed }">
     <strong>{{ lane.name }}</strong>
     <button
       type="button"
@@ -31,7 +31,7 @@ defineEmits<{
     >
       Delete lane
     </button>
-    <label class="source-control">
+    <label v-if="!collapsed" class="source-control">
       Lane source
       <textarea
         aria-label="Instrument lane source"
@@ -40,7 +40,7 @@ defineEmits<{
         @input="$emit('update-source', ($event.target as HTMLTextAreaElement).value)"
       />
     </label>
-    <label>
+    <label v-if="!collapsed">
       {{ lane.patchSource }} SW Patch ·
       <select
         aria-label="Waveform"
@@ -57,7 +57,7 @@ defineEmits<{
         </option>
       </select>
     </label>
-    <label>
+    <label v-if="!collapsed">
       Gain
       <input
         aria-label="Instrument gain"
@@ -81,6 +81,15 @@ defineEmits<{
   gap: 1rem;
   padding: 0.6rem;
   background: #283143;
+}
+.instrument-header.collapsed {
+  justify-content: flex-start;
+  gap: 0.5rem;
+  padding: 0.25rem 0.5rem;
+}
+.instrument-header.collapsed .delete-lane {
+  margin-left: auto;
+  padding-block: 0.2rem;
 }
 .instrument-header label {
   display: flex;

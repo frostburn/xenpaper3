@@ -85,7 +85,7 @@ const moveDrag = (event: PointerEvent) => {
 
 <template>
   <section class="drum-lane">
-    <header>
+    <header :class="{ collapsed }">
       <strong>{{ lane.name }}</strong>
       <button
         type="button"
@@ -95,8 +95,8 @@ const moveDrag = (event: PointerEvent) => {
       >
         {{ collapsed ? '▸ Expand' : '▾ Collapse' }}
       </button>
-      <span>{{ samples.join(' · ') }} · drumkit SW Patch</span>
-      <label>
+      <span v-if="!collapsed">{{ samples.join(' · ') }} · drumkit SW Patch</span>
+      <label v-if="!collapsed">
         Gain
         <input
           aria-label="Drum gain"
@@ -172,6 +172,13 @@ const moveDrag = (event: PointerEvent) => {
   gap: 1rem;
   padding: 0.6rem;
   background: #3a2f43;
+}
+.drum-lane header.collapsed {
+  gap: 0.5rem;
+  padding: 0.25rem 0.5rem;
+}
+.drum-lane header.collapsed > :last-child {
+  margin-left: auto;
 }
 .drum-lane header span {
   flex: 1;

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, ref, watchEffect } from 'vue'
+import { computed, nextTick, onBeforeUnmount, ref, watch, watchEffect } from 'vue'
 import ClipSourceEditor from '../components/daw/ClipSourceEditor.vue'
 import DrumLane from '../components/daw/DrumLane.vue'
 import GlobalLane from '../components/daw/GlobalLane.vue'
@@ -52,6 +52,9 @@ const projectEndBeat = computed(() =>
 )
 // Four empty bars beyond the last clip make room for extending the arrangement.
 const maxScrollLeft = computed(() => Math.ceil((projectEndBeat.value + 16) * pixelsPerBeat.value))
+watch(maxScrollLeft, (maximum) => {
+  scrollLeft.value = Math.min(scrollLeft.value, maximum)
+})
 watchEffect(() => {
   const signature = project.value.globalTrack.timeSignatureChanges[0]!
   const defaultBar = beat(signature.numerator * 4, signature.denominator)
@@ -108,15 +111,12 @@ const selectClip = (lane: InstrumentLane, clip: SourceClip) => {
 }
 
 const startPlayback = async (fromBeat: number, playbackProject = project.value) => {
-  audioEngine?.stop()
-  if (playTimer) clearInterval(playTimer)
-  playTimer = undefined
-  playhead.value = fromBeat
-  playing.value = false
   playbackError.value = ''
   try {
     // Keep the transport usable in SSR/test environments; browsers take the audio path below.
     if (typeof AudioContext === 'undefined') {
+      if (playTimer) clearInterval(playTimer)
+      playhead.value = fromBeat
       playing.value = true
       playTimer = setInterval(() => (playhead.value += 0.05), 25)
       return
@@ -125,13 +125,14 @@ const startPlayback = async (fromBeat: number, playbackProject = project.value) 
     audioEngine.addEventListener('ended', finishPlayback)
     if (audioEngine.context.state === 'suspended') await audioEngine.context.resume()
     await audioEngine.play(playbackProject, fromBeat)
+    if (playTimer) clearInterval(playTimer)
+    playhead.value = fromBeat
     playing.value = true
     playTimer = setInterval(() => {
       playhead.value = audioEngine?.positionBeats ?? playhead.value
     }, 25)
   } catch (error) {
     playbackError.value = error instanceof Error ? error.message : String(error)
-    playing.value = false
   }
 }
 
@@ -192,6 +193,9 @@ const deleteInstrumentLane = (lane: InstrumentLane) => {
   const index = project.value.instrumentLanes.findIndex(({ id }) => id === lane.id)
   if (index === -1) return
   project.value.instrumentLanes.splice(index, 1)
+  const nextCollapsedLaneIds = new Set(collapsedLaneIds.value)
+  nextCollapsedLaneIds.delete(lane.id)
+  collapsedLaneIds.value = nextCollapsedLaneIds
   if (selectedLaneId.value === lane.id) {
     selectedClipId.value = undefined
     selectedLaneId.value = undefined
@@ -344,6 +348,9 @@ onBeforeUnmount(() => {
   display: flex;
   align-items: center;
   gap: 0.5rem;
+}
+.timeline-controls input[type='range'] {
+  width: min(28rem, 45vw);
 }
 .scroll-controls {
   padding: 0 0.5rem 0.75rem;
