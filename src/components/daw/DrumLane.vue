@@ -20,6 +20,7 @@ const props = defineProps<{
   pixelsPerBeat: number
   scrollLeft: number
   displayMode: ClipDisplayMode
+  collapsed?: boolean
 }>()
 const emit = defineEmits<{
   insert: [beat: number]
@@ -29,6 +30,7 @@ const emit = defineEmits<{
   delete: [clip: SourceClip]
   'update-gain': [gain: number]
   deleteLane: []
+  'toggle-collapse': []
 }>()
 
 // Rows run top-to-bottom, so reverse alphabetical order puts alphabetical
@@ -85,6 +87,14 @@ const moveDrag = (event: PointerEvent) => {
   <section class="drum-lane">
     <header>
       <strong>{{ lane.name }}</strong>
+      <button
+        type="button"
+        :aria-label="`${collapsed ? 'Expand' : 'Collapse'} ${lane.name}`"
+        :aria-expanded="!collapsed"
+        @click="emit('toggle-collapse')"
+      >
+        {{ collapsed ? '▸ Expand' : '▾ Collapse' }}
+      </button>
       <span>{{ samples.join(' · ') }} · drumkit SW Patch</span>
       <label>
         Gain
@@ -103,6 +113,7 @@ const moveDrag = (event: PointerEvent) => {
       </button>
     </header>
     <div
+      v-show="!collapsed"
       ref="laneElement"
       class="drum-grid"
       aria-label="Drum lane"

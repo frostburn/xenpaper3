@@ -1,18 +1,28 @@
 <script setup lang="ts">
 import { OSCILLATOR_TYPES, type InstrumentLane } from '../../daw/project'
 
-defineProps<{ lane: InstrumentLane }>()
+defineProps<{ lane: InstrumentLane; collapsed?: boolean }>()
 defineEmits<{
   'update-oscillator': [type: InstrumentLane['oscillatorType']]
   'update-gain': [gain: number]
   'update-source': [source: string]
   delete: []
+  'toggle-collapse': []
 }>()
 </script>
 
 <template>
   <header class="instrument-header">
     <strong>{{ lane.name }}</strong>
+    <button
+      type="button"
+      class="collapse-lane"
+      :aria-label="`${collapsed ? 'Expand' : 'Collapse'} ${lane.name}`"
+      :aria-expanded="!collapsed"
+      @click="$emit('toggle-collapse')"
+    >
+      {{ collapsed ? '▸ Expand' : '▾ Collapse' }}
+    </button>
     <button
       type="button"
       class="delete-lane"
