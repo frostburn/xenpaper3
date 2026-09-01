@@ -107,7 +107,7 @@ context-dependent meanings.
 | U+266E                                       | ♮           | Natural accidental                                                                      |
 | U+266F                                       | ♯           | Sharp accidental                                                                        |
 | U+27E8                                       | ⟨           | Opens a mapping (val)                                                                   |
-| U+27E9                                       | ⟩           | Closes a monzo vector                                                                   |
+| U+27E9                                       | ⟩           | Closes a monzo vector; unlike ASCII `>`, requires `@` only when a subgroup follows      |
 | U+1D12A                                      | 𝄪           | Double-sharp accidental                                                                 |
 | U+1D12B                                      | 𝄫           | Double-flat accidental                                                                  |
 | U+1D12C–U+1D131                              | 𝄬 𝄭 𝄮 𝄯 𝄰 𝄱 | HEJI flat-up, flat-down, natural-up, natural-down, sharp-up, and sharp-down accidentals |

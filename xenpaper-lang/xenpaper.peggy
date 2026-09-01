@@ -293,7 +293,11 @@ NormalizedGroup
     }
 
 MonzoLiteral
-  = "[" Spacing components:MonzoComponents? Spacing (">" / "⟩") "@" subgroup:MonzoSubgroup? {
+  = "[" Spacing components:MonzoComponents? Spacing
+    subgroup:(
+      ">@" value:MonzoSubgroup? { return value; }
+      / "⟩" value:("@" subgroup:MonzoSubgroup? { return subgroup; })? { return value; }
+    ) {
       return node('MonzoLiteral', {
         components: components ?? [],
         subgroup: subgroup?.components ?? [],
@@ -863,7 +867,7 @@ ScaleDegreeLiteral
     }
 
 NumericLiteralSuffix
-  = "/" / "\\" / "." [0-9]+ ("e" / "r" / UnitSuffix)
+  = "/" / "\\" / UnitSuffix / "." [0-9]+ ("e" / "r" / UnitSuffix)
 
 BinaryTailStart
   = ("+" / "-") ![0-9]
