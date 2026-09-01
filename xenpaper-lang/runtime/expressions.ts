@@ -463,11 +463,8 @@ function logarithmicDivision(
   right: EvaluatedLiteral,
   node: Expression,
 ): EvaluatedLiteral {
-  if (left.kind === 'absolutePitch' || right.kind === 'absolutePitch') {
-    throw new TypeError('Logarithmic division does not support absolute pitches.')
-  }
-  if (left.kind !== right.kind) {
-    throw new TypeError('Logarithmic division requires two ratios or two pitch offsets.')
+  if (left.kind !== 'scalar' || right.kind !== 'scalar') {
+    throw new TypeError('Logarithmic division requires scalar operands.')
   }
   return result('scalar', left.value.log(right.value), operatorOrigins(left, right, node))
 }
