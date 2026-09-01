@@ -485,8 +485,13 @@ export class Value {
     if (!bothRatios && !bothPitches) {
       throw new TypeError('Logarithm requires two ratios or two pitch displacements.')
     }
-    if (bothRatios && (!(this.valueOf() > 0) || !(base.valueOf() > 0))) {
-      throw new RangeError('Logarithm requires positive ratios.')
+    if (bothRatios) {
+      const targetFraction = this.exactRational()
+      const baseFraction = base.exactRational()
+      if (targetFraction && baseFraction) {
+        const solution = targetFraction.log(baseFraction)
+        if (solution !== null) return new Value(solution)
+      }
     }
 
     const targetExponents = this.primeExponents()
@@ -511,10 +516,27 @@ export class Value {
           break
         }
       }
-      if (solution !== undefined) return new Value(solution)
-      if (!targetExponents.size && baseExponents.size) return new Value(0)
+      if (solution !== undefined) {
+        if (
+          this.magnitude.kind === 'exact' &&
+          base.magnitude.kind === 'exact' &&
+          base.magnitude.value.pow(solution)?.equals(this.magnitude.value)
+        ) {
+          return new Value(solution)
+        }
+        if (
+          this.magnitude.kind === 'pitch' &&
+          base.magnitude.kind === 'pitch' &&
+          base.magnitude.value.scale(solution).equals(this.magnitude.value)
+        ) {
+          return new Value(solution)
+        }
+      }
     }
 
+    if (bothRatios && (!(this.valueOf() > 0) || !(base.valueOf() > 0))) {
+      throw new RangeError("Logarithm doesn't exist.")
+    }
     const denominator = bothPitches ? base.valueOf() : Math.log(base.valueOf())
     const numerator = bothPitches ? this.valueOf() : Math.log(this.valueOf())
     if (!denominator) throw new RangeError("Logarithm doesn't exist.")

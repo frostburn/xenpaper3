@@ -45,11 +45,15 @@ describe('Xenpaper value arithmetic', () => {
 
   it('calculates exact logarithms of ratios and pitch displacements', () => {
     expect(new Value(81n, 64n).log(new Value(9n, 8n)).equals(2)).toBe(true)
+    expect(new Value(-8).log(new Value(-2)).equals(3)).toBe(true)
     expect(
       Value.pitch(new Value(81n, 64n))
         .log(Value.pitch(new Value(9n, 8n)))
         .equals(2),
     ).toBe(true)
+    expect(() => new Value(8).log(new Value(-2))).toThrow("Logarithm doesn't exist.")
+    expect(() => new Value(-8).log(new Value(2))).toThrow("Logarithm doesn't exist.")
+    expect(() => new Value(-1).log(new Value(2))).toThrow("Logarithm doesn't exist.")
   })
 
   it('calculates mathematical and geometric modulo', () => {
