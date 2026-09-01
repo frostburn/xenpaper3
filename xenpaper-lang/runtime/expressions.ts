@@ -404,6 +404,8 @@ function multiplyOrDivide(
   if (left.kind === 'absolutePitch' || right.kind === 'absolutePitch')
     throw new TypeError('Absolute pitches cannot be multiplied or divided.')
   if (left.kind === 'pitchOffset' && right.kind === 'pitchOffset') {
+    if (divide)
+      return result('scalar', left.value.log(right.value), operatorOrigins(left, right, node))
     throw new TypeError('Pitch offsets cannot be multiplied or divided together.')
   }
   if (divide && right.kind === 'pitchOffset') {
@@ -456,6 +458,17 @@ function geometricModulo(
   return result('scalar', left.value.reduce(right.value), operatorOrigins(left, right, node))
 }
 
+function logarithmicDivision(
+  left: EvaluatedLiteral,
+  right: EvaluatedLiteral,
+  node: Expression,
+): EvaluatedLiteral {
+  if (left.kind !== 'scalar' || right.kind !== 'scalar') {
+    throw new TypeError('Logarithmic division requires scalar operands.')
+  }
+  return result('scalar', left.value.log(right.value), operatorOrigins(left, right, node))
+}
+
 function binary(
   operator: string,
   left: EvaluatedLiteral,
@@ -476,6 +489,8 @@ function binary(
       return modulo(left, right, node)
     case 'rd':
       return geometricModulo(left, right, node)
+    case '/_':
+      return logarithmicDivision(left, right, node)
     case '**': {
       if (left.kind !== 'scalar' || right.kind !== 'scalar') {
         throw new TypeError('Exponentiation requires scalar operands.')

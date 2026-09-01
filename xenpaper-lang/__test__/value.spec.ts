@@ -43,6 +43,26 @@ describe('Xenpaper value arithmetic', () => {
     expect(majorThird.div(syntonicComma).equals(new Value(new Fraction(5, 4)))).toBe(true)
   })
 
+  it('calculates exact logarithms of ratios and pitch displacements', () => {
+    expect(new Value(81n, 64n).log(new Value(9n, 8n)).equals(2)).toBe(true)
+    expect(new Value(-8).log(new Value(-2)).equals(3)).toBe(true)
+    expect(
+      Value.pitch(new Value(81n, 64n))
+        .log(Value.pitch(new Value(9n, 8n)))
+        .equals(2),
+    ).toBe(true)
+    expect(() => new Value(8).log(new Value(-2))).toThrow("Logarithm doesn't exist.")
+    expect(() => new Value(-8).log(new Value(2))).toThrow("Logarithm doesn't exist.")
+    expect(() => new Value(-1).log(new Value(2))).toThrow("Logarithm doesn't exist.")
+  })
+
+  it('calculates logarithms of compatible unitful quantities', () => {
+    const tenHertz = Value.hertz(10)
+    const hundredHertzSquared = Value.hertz(1).pow(2).mul(100)
+    expect(hundredHertzSquared.log(tenHertz).equals(2)).toBe(true)
+    expect(() => Value.seconds(100).log(tenHertz)).toThrow("Logarithm doesn't exist.")
+  })
+
   it('calculates mathematical and geometric modulo', () => {
     expect(new Value(1_000_000_000).mmod(3).equals(1)).toBe(true)
     expect(new Value(2).reduce(new Fraction(3, 2)).equals(new Fraction(4, 3))).toBe(true)

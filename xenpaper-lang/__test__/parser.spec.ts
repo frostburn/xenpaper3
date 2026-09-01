@@ -128,6 +128,10 @@ describe('grammar boundary roles', () => {
     expect(parse('D -n3').body[0]).toMatchObject({ type: 'Sequence' })
     expect(parse('D - n3').body[0]).toMatchObject({ type: 'BinaryExpression', operator: '-' })
     expect(parse('m7 / 2').body[0]).toMatchObject({ type: 'BinaryExpression', operator: '/' })
+    expect(parse('81/64 /_ 9/8').body[0]).toMatchObject({
+      type: 'BinaryExpression',
+      operator: '/_',
+    })
     expect(parse('/2 /cb').body[0]).toMatchObject({ type: 'Sequence' })
     expect(parse('3/2').body[0]).toMatchObject({ type: 'RatioLiteral' })
   })

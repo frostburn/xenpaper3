@@ -477,6 +477,82 @@ export class Value {
     return Value.real(this.valueOf() / other.valueOf(), dimensions)
   }
 
+  /** Return the exponent which raises the given base to this ratio or pitch. */
+  log(input: ValueInput): Value {
+    const base = coerceValue(input)
+    const bothRatios = this.dimensions.isDimensionless && base.dimensions.isDimensionless
+    const bothPitches = this.dimensions.equals({ pitch: 1 }) && base.dimensions.equals({ pitch: 1 })
+    if (bothRatios) {
+      const targetFraction = this.exactRational()
+      const baseFraction = base.exactRational()
+      if (targetFraction && baseFraction) {
+        const solution = targetFraction.log(baseFraction)
+        if (solution !== null) return new Value(solution)
+      }
+    }
+
+    const targetExponents = this.primeExponents()
+    const baseExponents = base.primeExponents()
+    if (targetExponents && baseExponents) {
+      let solution: Fraction | undefined
+      let inconsistent = false
+      const constrainSolution = (target: Fraction, divisor: Fraction) => {
+        if (!divisor.n) {
+          if (target.n) inconsistent = true
+          return
+        }
+        const candidate = target.div(divisor)
+        if (solution === undefined) solution = candidate
+        else if (!solution.equals(candidate)) inconsistent = true
+      }
+
+      if (!bothRatios && !bothPitches) {
+        const dimensions = new Set([
+          ...this.dimensions.powers.keys(),
+          ...base.dimensions.powers.keys(),
+        ])
+        for (const dimension of dimensions) {
+          constrainSolution(
+            this.dimensions.powers.get(dimension) ?? new Fraction(0),
+            base.dimensions.powers.get(dimension) ?? new Fraction(0),
+          )
+        }
+      }
+      const primes = new Set([...targetExponents.keys(), ...baseExponents.keys()])
+      for (const prime of primes) {
+        const target = targetExponents.get(prime) ?? new Fraction(0)
+        const divisor = baseExponents.get(prime) ?? new Fraction(0)
+        constrainSolution(target, divisor)
+      }
+      if (!inconsistent && solution !== undefined) {
+        if (
+          this.magnitude.kind === 'exact' &&
+          base.magnitude.kind === 'exact' &&
+          base.magnitude.value.pow(solution)?.equals(this.magnitude.value) &&
+          (bothPitches || base.dimensions.scale(solution).equals(this.dimensions))
+        ) {
+          return new Value(solution)
+        }
+        if (
+          this.magnitude.kind === 'pitch' &&
+          base.magnitude.kind === 'pitch' &&
+          base.magnitude.value.scale(solution).equals(this.magnitude.value)
+        ) {
+          return new Value(solution)
+        }
+      }
+    }
+
+    if (bothRatios && (!(this.valueOf() > 0) || !(base.valueOf() > 0))) {
+      throw new RangeError("Logarithm doesn't exist.")
+    }
+    if (!bothRatios && !bothPitches) throw new RangeError("Logarithm doesn't exist.")
+    const denominator = bothPitches ? base.valueOf() : Math.log(base.valueOf())
+    const numerator = bothPitches ? this.valueOf() : Math.log(this.valueOf())
+    if (!denominator) throw new RangeError("Logarithm doesn't exist.")
+    return Value.real(numerator / denominator)
+  }
+
   pow(input: ValueInput): Value {
     if (this.magnitude.kind === 'pitch') {
       throw new TypeError('Pitch displacements cannot be exponentiated.')
