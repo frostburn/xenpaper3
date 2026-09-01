@@ -11,6 +11,7 @@ import {
   type PitchContext,
   type Program,
   type ScoreShape,
+  type ScoreVisitorContext,
   type BeatTimedNoteEvent,
 } from '../../xenpaper-lang'
 import { drumNames } from '../../sw-patch'
@@ -170,7 +171,21 @@ export interface SourceInitialization {
   readonly lexicalEnvironment?: LexicalEnvironment
   /** Pre-evaluated state annotations applied before a clip without reparsing initialization source. */
   readonly shape?: ScoreShape
+  /** Complete visitor scope spawned into the next initialization source or clip. */
+  readonly visitorContext?: ScoreVisitorContext
 }
+
+const inheritedScoreOptions = (initialization: SourceInitialization) => ({
+  pitchContext: initialization.visitorContext?.pitchContext ?? initialization.pitchContext,
+  pulse: initialization.visitorContext?.pulse,
+  subdivisionBase: initialization.visitorContext?.subdivisionBase,
+  dynamic: initialization.visitorContext?.dynamic,
+  articulation: initialization.visitorContext?.articulation,
+  articulationMarks: initialization.visitorContext?.articulationMarks,
+  directiveState: initialization.visitorContext?.directiveState ?? initialization.directiveState,
+  lexicalEnvironment:
+    initialization.visitorContext?.lexicalEnvironment ?? initialization.lexicalEnvironment,
+})
 
 /** Evaluate a zero-duration source once and retain its prevailing state for child scopes. */
 export const compileSourceInitialization = (
@@ -179,9 +194,7 @@ export const compileSourceInitialization = (
 ): SourceInitialization => {
   const result = evaluateProgramSemantics(parse(source), {
     directiveExtensions: ENVELOPE_EXTENSIONS,
-    pitchContext: parent.pitchContext,
-    directiveState: parent.directiveState,
-    lexicalEnvironment: parent.lexicalEnvironment,
+    ...inheritedScoreOptions(parent),
   })
   const errors = result.diagnostics.filter(({ severity }) => severity === 'error')
   if (errors.length) throw new Error(errors.map(({ message }) => message).join('\n'))
@@ -192,6 +205,7 @@ export const compileSourceInitialization = (
     pitchContext: result.pitchContext,
     directiveState: result.directiveState,
     lexicalEnvironment: result.lexicalEnvironment,
+    visitorContext: result.visitorContext,
     shape: parent.shape
       ? {
           kind: 'sequence',
@@ -211,9 +225,7 @@ export const parseClipNotes = (
 ): ScheduledLaneNote[] => {
   const result = expandToBeatEvents(parse(source), {
     directiveExtensions: ENVELOPE_EXTENSIONS,
-    pitchContext: initialization.pitchContext,
-    directiveState: initialization.directiveState,
-    lexicalEnvironment: initialization.lexicalEnvironment,
+    ...inheritedScoreOptions(initialization),
     initializationShape: initialization.shape,
   })
   const errors = result.diagnostics.filter(({ severity }) => severity === 'error')
@@ -258,9 +270,7 @@ export const parseDrumClipNotes = (
   const program = lowerDrumSamples(parse(source, { drumSamples: samples }))
   const result = expandToBeatEvents(program, {
     directiveExtensions: ENVELOPE_EXTENSIONS,
-    pitchContext: initialization.pitchContext,
-    directiveState: initialization.directiveState,
-    lexicalEnvironment: initialization.lexicalEnvironment,
+    ...inheritedScoreOptions(initialization),
     initializationShape: initialization.shape,
   })
   const errors = result.diagnostics.filter(({ severity }) => severity === 'error')
@@ -293,9 +303,7 @@ export const sourceClipLength = (
     : parse(source)
   const result = expandToBeatEvents(program, {
     directiveExtensions: ENVELOPE_EXTENSIONS,
-    pitchContext: initialization.pitchContext,
-    directiveState: initialization.directiveState,
-    lexicalEnvironment: initialization.lexicalEnvironment,
+    ...inheritedScoreOptions(initialization),
     initializationShape: initialization.shape,
   })
   if (!('score' in result) || result.diagnostics.some(({ severity }) => severity === 'error'))

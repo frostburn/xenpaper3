@@ -935,6 +935,7 @@ export function evaluateScoreSemantics(
   options: ScoreShapeOptions = {},
 ): ScoreShapeEvaluationResult {
   const pulse = new Fraction(options.pulse ?? 1)
+  const subdivisionBase = new Fraction(options.subdivisionBase ?? pulse)
   if (pulse.compare(0) <= 0) throw new RangeError('pulse must be positive.')
   const extensions = new Map(
     (options.directiveExtensions ?? []).map((extension) => [
@@ -1104,6 +1105,21 @@ export function evaluateScoreSemantics(
     return { ratio, marks }
   }
 
+  const dynamicAfter = (current: Expression, visitor: ScoreVisitor): DynamicMark => {
+    const { dynamic, context, environment } = visitor.scope
+    if (current.type === 'Directive') {
+      const resolved = resolveDirective(current, context, environment).directive
+      return resolved?.kind === 'dynamic' ? resolved.mark : dynamic
+    }
+    if (current.type === 'Sequence') {
+      let activeVisitor = visitor
+      for (const item of current.items)
+        activeVisitor = activeVisitor.spawn({ dynamic: dynamicAfter(item, activeVisitor) })
+      return activeVisitor.scope.dynamic
+    }
+    return dynamic
+  }
+
   const directiveStateAfter = (
     current: Expression,
     visitor: ScoreVisitor,
@@ -1141,12 +1157,17 @@ export function evaluateScoreSemantics(
     return state
   }
 
-  const visitorAfter = (current: Expression, visitor: ScoreVisitor): ScoreVisitor =>
-    visitor.spawn({
+  const visitorAfter = (current: Expression, visitor: ScoreVisitor): ScoreVisitor => {
+    const articulation = articulationAfter(current, visitor)
+    return visitor.spawn({
       context: contextAfter(current, visitor),
       pulse: pulseAfter(current, visitor),
+      dynamic: dynamicAfter(current, visitor),
+      articulation: articulation.ratio,
+      articulationMarks: articulation.marks,
       directiveState: directiveStateAfter(current, visitor),
     })
+  }
 
   const evaluateNode: VisitorEvaluation<Expression, VisitorScope, ScoreShapeEvaluationResult> = (
     current,
@@ -1862,19 +1883,31 @@ export function evaluateScoreSemantics(
   const visitor = new Visitor(evaluateNode, {
     context: initialContext,
     pulse,
-    dynamic: 'mf',
-    articulation: new Fraction(1),
-    articulationMarks: [],
+    dynamic: options.dynamic ?? 'mf',
+    articulation: new Fraction(options.articulation ?? 1),
+    articulationMarks: options.articulationMarks ?? [],
     directiveState: initialDirectiveState,
     environment: options.lexicalEnvironment,
-    subdivisionBase: pulse,
+    subdivisionBase,
   })
   const result = visitor.visit(node)
   if (!('shape' in result)) return result
+  const prevailingVisitor = visitorAfter(node, visitor)
+  const lexicalEnvironment = result.lexicalEnvironment ?? options.lexicalEnvironment
   return {
     ...result,
-    pitchContext: contextAfter(node, visitor),
-    directiveState: directiveStateAfter(node, visitor),
-    lexicalEnvironment: result.lexicalEnvironment ?? options.lexicalEnvironment,
+    pitchContext: prevailingVisitor.scope.context,
+    directiveState: prevailingVisitor.scope.directiveState,
+    lexicalEnvironment,
+    visitorContext: {
+      pitchContext: prevailingVisitor.scope.context,
+      pulse: prevailingVisitor.scope.pulse,
+      subdivisionBase: prevailingVisitor.scope.subdivisionBase,
+      dynamic: prevailingVisitor.scope.dynamic,
+      articulation: prevailingVisitor.scope.articulation,
+      articulationMarks: prevailingVisitor.scope.articulationMarks,
+      directiveState: prevailingVisitor.scope.directiveState,
+      lexicalEnvironment,
+    },
   }
 }

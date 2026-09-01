@@ -56,6 +56,11 @@ export interface RepeatExpansionOptions {
 
 export interface ScoreShapeOptions {
   readonly pulse?: FractionValue
+  /** Pulse against which subdivision directives are resolved. Defaults to `pulse`. */
+  readonly subdivisionBase?: FractionValue
+  readonly dynamic?: DynamicMark
+  readonly articulation?: FractionValue
+  readonly articulationMarks?: readonly string[]
   readonly pitchContext?: PitchContext
   readonly directiveState?: DirectiveExtensionState
   readonly directiveExtensions?: readonly DirectiveExtension[]
@@ -108,8 +113,22 @@ export type ScoreShapeEvaluationResult =
       readonly pitchContext?: PitchContext
       readonly directiveState?: DirectiveExtensionState
       readonly lexicalEnvironment?: LexicalEnvironment
+      /** Complete prevailing visitor context after evaluating the expression. */
+      readonly visitorContext?: ScoreVisitorContext
     }
   | { readonly diagnostics: readonly Diagnostic[] }
+
+/** Serializable public projection of the score visitor's prevailing scope. */
+export interface ScoreVisitorContext {
+  readonly pitchContext: PitchContext
+  readonly pulse: Fraction
+  readonly subdivisionBase: Fraction
+  readonly dynamic: DynamicMark
+  readonly articulation: Fraction
+  readonly articulationMarks: readonly string[]
+  readonly directiveState: DirectiveExtensionState
+  readonly lexicalEnvironment?: LexicalEnvironment
+}
 
 export interface RepeatExpansionResult {
   readonly program?: ExpandedProgram

@@ -83,6 +83,7 @@ export type {
   ParallelShape,
   RestShape,
   ScoreShape,
+  ScoreVisitorContext,
   SequenceShape,
   ShapeBase,
   SourceOrigin,

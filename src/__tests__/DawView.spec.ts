@@ -266,6 +266,18 @@ describe('DAW project model', () => {
     expect(notes[1]!.cents).not.toBe(parseClipNotes('{12edo} D')[0]!.cents - 900)
   })
 
+  it('propagates global and lane subdivision and articulation visitor context', () => {
+    const global = compileSourceInitialization('@2 @.')
+    const globalNotes = parseClipNotes('C D', Infinity, compileSourceInitialization('', global))
+    expect(globalNotes.map(({ beat }) => beat)).toEqual([0, 0.5])
+    expect(globalNotes.map(({ duration }) => duration)).toEqual([0.25, 0.25])
+
+    const lane = compileSourceInitialization('@4 @.')
+    const laneNotes = parseClipNotes('C D', Infinity, lane)
+    expect(laneNotes.map(({ beat }) => beat)).toEqual([0, 0.25])
+    expect(laneNotes.map(({ duration }) => duration)).toEqual([0.125, 0.125])
+  })
+
   it('propagates global function declarations into lane and clip sources', () => {
     const project = createDefaultProject()
     const lane = project.instrumentLanes[0]!
