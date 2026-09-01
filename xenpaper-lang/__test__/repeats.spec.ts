@@ -38,6 +38,21 @@ describe('repeat expansion', () => {
     })
   })
 
+  it.each(['groove', 'drone'])('keeps implicit repeats inside @%s arguments', (name) => {
+    const directive = parse(`@${name}(C D :|) E`).body[0] as {
+      type: string
+      items: Array<{ type: string; arguments?: Array<{ type: string }> }>
+    }
+
+    expect(directive).toMatchObject({
+      type: 'Sequence',
+      items: [
+        { type: 'Directive', arguments: [{ type: 'Repeat' }] },
+        { type: 'PitchLiteral', raw: 'E' },
+      ],
+    })
+  })
+
   it('uses two iterations when the source omits a count', () => {
     const program = parse('|: C :|')
 

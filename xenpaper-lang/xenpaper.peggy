@@ -116,6 +116,9 @@ ScopedParallelExpression
 
 ScopedSequenceExpression
   = repeated:SequenceExpression Spacing ":|" remainder:(Spacing item:ScopedSequenceExpression { return item; })? {
+      if (containsDeclaration(repeated)) {
+        error('Variable and function declarations are not allowed inside repeats.');
+      }
       const repeat = node('Repeat', {
         count: null,
         body: [repeated],
@@ -456,7 +459,7 @@ GlissCurveName
     }
 
 GrooveDirectiveBody
-  = name:$('groove'i) !IdentifierContinue "(" Spacing argument:SequenceExpression? Spacing ")" {
+  = name:$('groove'i) !IdentifierContinue "(" Spacing argument:ScopedSequenceExpression? Spacing ")" {
       return {
         name: 'groove',
         rawName: name,
@@ -466,7 +469,7 @@ GrooveDirectiveBody
     }
 
 DroneDirectiveBody
-  = name:$('drone'i) !IdentifierContinue args:("(" Spacing argument:SequenceExpression? Spacing ")" {
+  = name:$('drone'i) !IdentifierContinue args:("(" Spacing argument:ScopedSequenceExpression? Spacing ")" {
       return argument ? [argument] : [];
     })? {
       return {
