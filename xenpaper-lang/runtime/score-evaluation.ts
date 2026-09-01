@@ -1054,8 +1054,23 @@ export function evaluateScoreSemantics(
       return subdivisionPulse(current, visitor)?.pulse.mul(subdivisionBase) ?? currentPulse
     if (current.type === 'Sequence') {
       let activeVisitor = visitor
-      for (const item of current.items)
-        activeVisitor = activeVisitor.spawn({ pulse: pulseAfter(item, activeVisitor) })
+      for (const item of current.items) {
+        const nextPulse = pulseAfter(item, activeVisitor)
+        const nextContext = contextAfter(item, activeVisitor)
+        const declared =
+          item.type === 'VariableDeclaration' || item.type === 'FunctionDeclaration'
+            ? evaluateDeclaration(
+                item,
+                activeVisitor.scope.context,
+                activeVisitor.scope.environment,
+              )
+            : undefined
+        activeVisitor = activeVisitor.spawn({
+          pulse: nextPulse,
+          context: nextContext,
+          ...(declared ? { environment: declared.environment } : {}),
+        })
+      }
       return activeVisitor.scope.pulse
     }
     if (current.type === 'Repeat') {
@@ -1091,9 +1106,19 @@ export function evaluateScoreSemantics(
       let activeVisitor = visitor
       for (const item of current.items) {
         const active = articulationAfter(item, activeVisitor)
+        const declared =
+          item.type === 'VariableDeclaration' || item.type === 'FunctionDeclaration'
+            ? evaluateDeclaration(
+                item,
+                activeVisitor.scope.context,
+                activeVisitor.scope.environment,
+              )
+            : undefined
         activeVisitor = activeVisitor.spawn({
           articulation: active.ratio,
           articulationMarks: active.marks,
+          context: contextAfter(item, activeVisitor),
+          ...(declared ? { environment: declared.environment } : {}),
         })
       }
       return {
@@ -1101,7 +1126,66 @@ export function evaluateScoreSemantics(
         marks: activeVisitor.scope.articulationMarks,
       }
     }
+    if (current.type === 'Repeat') {
+      let activeVisitor = visitor
+      const count = repeatCount(current)
+      if (count === undefined) return { ratio, marks }
+      for (let iteration = 0; iteration < count; iteration++) {
+        for (const item of repeatBody(current, iteration)) {
+          const active = articulationAfter(item, activeVisitor)
+          activeVisitor = activeVisitor.spawn({
+            articulation: active.ratio,
+            articulationMarks: active.marks,
+            context: contextAfter(item, activeVisitor),
+          })
+        }
+      }
+      return {
+        ratio: activeVisitor.scope.articulation,
+        marks: activeVisitor.scope.articulationMarks,
+      }
+    }
     return { ratio, marks }
+  }
+
+  const dynamicAfter = (current: Expression, visitor: ScoreVisitor): DynamicMark => {
+    const { dynamic, context, environment } = visitor.scope
+    if (current.type === 'Directive') {
+      const resolved = resolveDirective(current, context, environment).directive
+      return resolved?.kind === 'dynamic' ? resolved.mark : dynamic
+    }
+    if (current.type === 'Sequence') {
+      let activeVisitor = visitor
+      for (const item of current.items) {
+        const declared =
+          item.type === 'VariableDeclaration' || item.type === 'FunctionDeclaration'
+            ? evaluateDeclaration(
+                item,
+                activeVisitor.scope.context,
+                activeVisitor.scope.environment,
+              )
+            : undefined
+        activeVisitor = activeVisitor.spawn({
+          dynamic: dynamicAfter(item, activeVisitor),
+          context: contextAfter(item, activeVisitor),
+          ...(declared ? { environment: declared.environment } : {}),
+        })
+      }
+      return activeVisitor.scope.dynamic
+    }
+    if (current.type === 'Repeat') {
+      let activeVisitor = visitor
+      const count = repeatCount(current)
+      if (count === undefined) return dynamic
+      for (let iteration = 0; iteration < count; iteration++)
+        for (const item of repeatBody(current, iteration))
+          activeVisitor = activeVisitor.spawn({
+            dynamic: dynamicAfter(item, activeVisitor),
+            context: contextAfter(item, activeVisitor),
+          })
+      return activeVisitor.scope.dynamic
+    }
+    return dynamic
   }
 
   const directiveStateAfter = (
@@ -1141,12 +1225,17 @@ export function evaluateScoreSemantics(
     return state
   }
 
-  const visitorAfter = (current: Expression, visitor: ScoreVisitor): ScoreVisitor =>
-    visitor.spawn({
+  const visitorAfter = (current: Expression, visitor: ScoreVisitor): ScoreVisitor => {
+    const articulation = articulationAfter(current, visitor)
+    return visitor.spawn({
       context: contextAfter(current, visitor),
       pulse: pulseAfter(current, visitor),
+      dynamic: dynamicAfter(current, visitor),
+      articulation: articulation.ratio,
+      articulationMarks: articulation.marks,
       directiveState: directiveStateAfter(current, visitor),
     })
+  }
 
   const evaluateNode: VisitorEvaluation<Expression, VisitorScope, ScoreShapeEvaluationResult> = (
     current,
@@ -1862,19 +1951,30 @@ export function evaluateScoreSemantics(
   const visitor = new Visitor(evaluateNode, {
     context: initialContext,
     pulse,
-    dynamic: 'mf',
-    articulation: new Fraction(1),
-    articulationMarks: [],
+    dynamic: options.dynamic ?? 'mf',
+    articulation: new Fraction(options.articulation ?? 1),
+    articulationMarks: options.articulationMarks ?? [],
     directiveState: initialDirectiveState,
     environment: options.lexicalEnvironment,
     subdivisionBase: pulse,
   })
   const result = visitor.visit(node)
   if (!('shape' in result)) return result
+  const prevailingVisitor = visitorAfter(node, visitor)
+  const lexicalEnvironment = result.lexicalEnvironment ?? options.lexicalEnvironment
   return {
     ...result,
-    pitchContext: contextAfter(node, visitor),
-    directiveState: directiveStateAfter(node, visitor),
-    lexicalEnvironment: result.lexicalEnvironment ?? options.lexicalEnvironment,
+    pitchContext: prevailingVisitor.scope.context,
+    directiveState: prevailingVisitor.scope.directiveState,
+    lexicalEnvironment,
+    visitorContext: {
+      pitchContext: prevailingVisitor.scope.context,
+      pulse: prevailingVisitor.scope.pulse,
+      dynamic: prevailingVisitor.scope.dynamic,
+      articulation: prevailingVisitor.scope.articulation,
+      articulationMarks: prevailingVisitor.scope.articulationMarks,
+      directiveState: prevailingVisitor.scope.directiveState,
+      lexicalEnvironment,
+    },
   }
 }
