@@ -47,6 +47,11 @@ describe('arithmetic expression evaluation', () => {
     expect(sum.kind).toBe('pitchOffset')
     expect(sum.value.equals(Value.cents(1400))).toBe(true)
     expect(evaluate('700¢ + 700c').value.equals(Value.cents(1400))).toBe(true)
+    expect(expression('700¢')).toMatchObject({
+      type: 'QuantityLiteral',
+      magnitude: '700',
+      unit: '¢',
+    })
   })
 
   it('adds ratios arithmetically rather than stacking them as pitches', () => {

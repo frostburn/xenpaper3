@@ -490,9 +490,14 @@ describe('Xenpaper surface grammar', () => {
       type: 'MonzoLiteral',
       components: ['2', '-1'],
     })
-    expect(parse('[4 -4 1⟩@').body[0]).toMatchObject({
+    expect(parse('[4 -4 1⟩').body[0]).toMatchObject({
       type: 'MonzoLiteral',
       components: ['4', '-4', '1'],
+    })
+    expect(parse('[1 -2 0 -2⟩@101.2..').body[0]).toMatchObject({
+      type: 'MonzoLiteral',
+      subgroup: ['101', '2'],
+      continuation: true,
     })
   })
 
