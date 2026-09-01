@@ -100,6 +100,7 @@ describe('arithmetic expression evaluation', () => {
     expect(evaluate('M3 / M2').value.equals(2)).toBe(true)
     expect(evaluate('81/64 /_ 9/8').value.equals(2)).toBe(true)
     expect(evaluate('-8/1 /_ -2/1').value.equals(3)).toBe(true)
+    expect(evaluate('(100 * 1Hz**2) /_ 10Hz').value.equals(2)).toBe(true)
   })
 
   it('scales pitch offsets only by rational scalars', () => {
