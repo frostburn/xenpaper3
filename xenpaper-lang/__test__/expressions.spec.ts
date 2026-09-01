@@ -46,6 +46,7 @@ describe('arithmetic expression evaluation', () => {
 
     expect(sum.kind).toBe('pitchOffset')
     expect(sum.value.equals(Value.cents(1400))).toBe(true)
+    expect(evaluate('700¢ + 700c').value.equals(Value.cents(1400))).toBe(true)
   })
 
   it('adds ratios arithmetically rather than stacking them as pitches', () => {
@@ -139,6 +140,7 @@ describe('arithmetic expression evaluation', () => {
   it('evaluates square roots while preserving exact values and dimensions', () => {
     expect(evaluate('sqrt(4)').value.equals(2)).toBe(true)
     expect(evaluate('sqrt(2) * sqrt(2)').value.equals(2)).toBe(true)
+    expect(evaluate('√2 * √2').value.equals(2)).toBe(true)
 
     const duration = evaluate('sqrt(4 * 1s**2)')
     expect(duration.value.equals(Value.seconds(2))).toBe(true)
@@ -155,6 +157,8 @@ describe('arithmetic expression evaluation', () => {
     expect(up.kind).toBe('scalar')
     expect(up.value.equals(new Value(3n, 2n).mul(Value.ratio(DEFAULT_PITCH_CONTEXT.up)))).toBe(true)
     expect(up.origins.map((origin) => origin.role)).toEqual(['literal', 'operator'])
+    expect(evaluate('∧3/2').value.equals(up.value)).toBe(true)
+    expect(evaluate('∨3/2').value.equals(evaluate('v3/2').value)).toBe(true)
   })
 
   it('keeps the written octave separate from a custom degree equave', () => {
