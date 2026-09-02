@@ -10,7 +10,7 @@ defineProps<{
   diagnostics?: readonly Diagnostic[]
 }>()
 const emit = defineEmits<{
-  'update-source': [source: string]
+  'update-source': [source: string, clipId?: string]
   delete: []
   play: []
   'play-solo': []
@@ -44,10 +44,11 @@ defineExpose({ focus: () => editor.value?.focus() })
       ref="editor"
       editor-label="Xenpaper clip source"
       :source="clip.source"
+      :source-key="clip.id"
       :drum-samples="drumSamples"
       :diagnostics="diagnostics"
       :rows="8"
-      @update:source="emit('update-source', $event)"
+      @update:source="(source, clipId) => emit('update-source', source, clipId)"
     />
     <p v-else>Select or create a clip to edit its Xenpaper source.</p>
   </section>

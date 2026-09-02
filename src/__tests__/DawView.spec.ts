@@ -42,9 +42,9 @@ import {
 describe('DAW project model', () => {
   it('debounces parsing work while a large source is being edited', async () => {
     vi.useFakeTimers()
-    const source = 'C '.repeat(600)
+    const source = 'C '.repeat(20)
     const wrapper = mount(XenpaperSourceEditor, {
-      props: { source, editorLabel: 'Large source' },
+      props: { source, sourceKey: 'first', editorLabel: 'Large source' },
     })
     const editor = wrapper.get('textarea')
 
@@ -53,8 +53,15 @@ describe('DAW project model', () => {
 
     expect(wrapper.emitted('update:source')).toBeUndefined()
     expect((editor.element as HTMLTextAreaElement).value).toBe(`${source}D E`)
+    expect(wrapper.get('[data-highlight="unparsed"]').text()).toBe(`${source}D E`)
     await vi.advanceTimersByTimeAsync(200)
-    expect(wrapper.emitted('update:source')).toEqual([[`${source}D E`]])
+    expect(wrapper.emitted('update:source')).toEqual([[`${source}D E`, 'first']])
+
+    await editor.setValue(`${source}F`)
+    await wrapper.setProps({ source: 'new clip', sourceKey: 'second' })
+    const updates = wrapper.emitted('update:source')!
+    expect(updates[updates.length - 1]).toEqual([`${source}F`, 'first'])
+    expect((editor.element as HTMLTextAreaElement).value).toBe('new clip')
 
     wrapper.unmount()
     vi.useRealTimers()

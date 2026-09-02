@@ -5,11 +5,14 @@ import { highlightXenpaper, type XenpaperHighlightToken } from '../../xenpaperSy
 
 const props = defineProps<{
   source: string
+  unparsed?: boolean
   drumSamples?: readonly string[]
   diagnostics?: readonly Diagnostic[]
 }>()
 const tokens = computed<XenpaperHighlightToken[]>(() => {
   if (!props.source) return []
+  if (props.unparsed)
+    return [{ kind: 'unparsed', text: props.source, start: 0, end: props.source.length }]
   try {
     const highlighted = highlightXenpaper(parse(props.source, { drumSamples: props.drumSamples }))
     const warningRanges = (props.diagnostics ?? [])

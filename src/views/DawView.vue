@@ -235,6 +235,13 @@ const updateClipSource = (clip: SourceClip, source: string) => {
   clip.source = source
 }
 
+const updateClipSourceById = (source: string, clipId?: string) => {
+  const clip = clipId
+    ? project.value.instrumentLanes.flatMap(({ clips }) => clips).find(({ id }) => id === clipId)
+    : selectedClip.value
+  if (clip) updateClipSource(clip, source)
+}
+
 onMounted(async () => {
   const projectUrl = new URL(document.location.href).searchParams.get('project')
   if (!projectUrl) return
@@ -363,7 +370,7 @@ onBeforeUnmount(() => {
       :clip="selectedClip"
       :drum-samples="selectedLane ? drumSamplesForLane(selectedLane) : undefined"
       :diagnostics="selectedClipDiagnostics"
-      @update-source="selectedClip && updateClipSource(selectedClip, $event)"
+      @update-source="updateClipSourceById"
       @delete="deleteSelectedClip"
       @play="playSelectedClip(false)"
       @play-solo="playSelectedClip(true)"

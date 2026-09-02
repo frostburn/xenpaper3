@@ -6,6 +6,7 @@ import XenpaperSourceHighlight from './XenpaperSourceHighlight.vue'
 const props = withDefaults(
   defineProps<{
     source: string
+    sourceKey?: string
     editorLabel: string
     rows?: number
     drumSamples?: readonly string[]
@@ -13,38 +14,42 @@ const props = withDefaults(
   }>(),
   { rows: 3 },
 )
-const emit = defineEmits<{ 'update:source': [source: string] }>()
+const emit = defineEmits<{ 'update:source': [source: string, sourceKey?: string] }>()
 const textarea = ref<HTMLTextAreaElement>()
 const scroll = ref({ left: 0, top: 0 })
 const draft = ref(props.source)
 let updateTimer: ReturnType<typeof setTimeout> | undefined
+let pendingSourceKey: string | undefined
 
-const LARGE_SOURCE_THRESHOLD = 1_000
+const LARGE_SOURCE_THRESHOLD = 20
 const EDIT_DEBOUNCE_MS = 200
 
 watch(
   () => props.source,
   (source) => {
+    commitDraft()
     draft.value = source
   },
 )
 
-const commitDraft = () => {
+function commitDraft() {
   if (!updateTimer) return
   clearTimeout(updateTimer)
   updateTimer = undefined
-  emit('update:source', draft.value)
+  emit('update:source', draft.value, pendingSourceKey)
+  pendingSourceKey = undefined
 }
 
 const updateDraft = (event: Event) => {
   draft.value = (event.target as HTMLTextAreaElement).value
   if (updateTimer) clearTimeout(updateTimer)
-  if (Math.max(props.source.length, draft.value.length) < LARGE_SOURCE_THRESHOLD) {
-    emit('update:source', draft.value)
+  if (draft.value.length <= LARGE_SOURCE_THRESHOLD) {
+    emit('update:source', draft.value, props.sourceKey)
     return
   }
   // Parsing drives highlighting, diagnostics, clip sizing, and the piano roll. Keep
   // the textarea responsive and let that work happen once after a burst of typing.
+  pendingSourceKey = props.sourceKey
   updateTimer = setTimeout(commitDraft, EDIT_DEBOUNCE_MS)
 }
 
@@ -55,7 +60,7 @@ const syncScroll = (event: Event) => {
 
 defineExpose({ focus: () => textarea.value?.focus() })
 onBeforeUnmount(() => {
-  if (updateTimer) clearTimeout(updateTimer)
+  commitDraft()
 })
 </script>
 
@@ -63,7 +68,7 @@ onBeforeUnmount(() => {
   <div class="xenpaper-source-editor">
     <pre
       aria-hidden="true"
-    ><XenpaperSourceHighlight :source="source" :drum-samples="drumSamples" :diagnostics="diagnostics" :style="{
+    ><XenpaperSourceHighlight :source="draft" :unparsed="Boolean(updateTimer)" :drum-samples="drumSamples" :diagnostics="diagnostics" :style="{
       transform: `translate(${-scroll.left}px, ${-scroll.top}px)`,
     }" /></pre>
     <textarea
