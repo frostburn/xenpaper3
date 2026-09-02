@@ -15,4 +15,31 @@ export default defineConfig({
       '@': fileURLToPath(new URL('./src', import.meta.url)),
     },
   },
+  build: {
+    rolldownOptions: {
+      output: {
+        codeSplitting: {
+          groups: [
+            {
+              name: 'xen-dev-utils',
+              test: /[\\/]node_modules[\\/]xen-dev-utils[\\/]/,
+              priority: 1,
+            },
+            {
+              name: 'xenpaper-lang',
+              test: /[\\/]xenpaper-lang[\\/]/,
+            },
+            {
+              name: 'sw-patch',
+              test: /[\\/]sw-patch[\\/]/,
+            },
+            {
+              name: 'sw-seq',
+              test: /[\\/]sw-seq[\\/]/,
+            },
+          ],
+        },
+      },
+    },
+  },
 })
