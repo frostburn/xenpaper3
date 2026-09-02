@@ -505,6 +505,16 @@ describe('DawView', () => {
     await wrapper.get('textarea[aria-label="Xenpaper clip source"]').setValue('C (')
 
     expect(wrapper.get('.source-editor [data-highlight="unparsed"]').text()).toBe('C (')
+
+    const textarea = wrapper.get<HTMLTextAreaElement>(
+      'textarea[aria-label="Xenpaper clip source"]',
+    )
+    textarea.element.scrollLeft = 24
+    textarea.element.scrollTop = 12
+    await textarea.trigger('scroll')
+    expect(wrapper.get('.source-editor code').attributes('style')).toContain(
+      'translate(-24px, -12px)',
+    )
   })
 
   it('uses a single click for playhead placement and an existing clip click for selection', async () => {

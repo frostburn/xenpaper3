@@ -12,7 +12,7 @@ const props = withDefaults(
 )
 const emit = defineEmits<{ 'update:source': [source: string] }>()
 const textarea = ref<HTMLTextAreaElement>()
-const highlight = ref<HTMLElement>()
+const scroll = ref({ left: 0, top: 0 })
 
 const tokens = computed<XenpaperHighlightToken[]>(() => {
   if (!props.source) return []
@@ -23,10 +23,9 @@ const tokens = computed<XenpaperHighlightToken[]>(() => {
   }
 })
 
-const syncScroll = () => {
-  if (!textarea.value || !highlight.value) return
-  highlight.value.scrollTop = textarea.value.scrollTop
-  highlight.value.scrollLeft = textarea.value.scrollLeft
+const syncScroll = (event: Event) => {
+  const editor = event.currentTarget as HTMLTextAreaElement
+  scroll.value = { left: editor.scrollLeft, top: editor.scrollTop }
 }
 
 defineExpose({ focus: () => textarea.value?.focus() })
@@ -34,7 +33,9 @@ defineExpose({ focus: () => textarea.value?.focus() })
 
 <template>
   <div class="xenpaper-source-editor">
-    <pre ref="highlight" aria-hidden="true"><code><span
+    <pre aria-hidden="true"><code :style="{
+      transform: `translate(${-scroll.left}px, ${-scroll.top}px)`,
+    }"><span
       v-for="token in tokens"
       :key="`${token.start}-${token.end}`"
       :class="`syntax-${token.kind}`"
@@ -45,6 +46,7 @@ defineExpose({ focus: () => textarea.value?.focus() })
       :aria-label="editorLabel"
       :rows="rows"
       :value="source"
+      wrap="off"
       autocomplete="off"
       autocapitalize="off"
       spellcheck="false"
@@ -67,26 +69,32 @@ defineExpose({ focus: () => textarea.value?.focus() })
   min-height: 100%;
   margin: 0;
   padding: 0.35rem;
-  overflow: auto;
   border: 1px solid #667085;
   border-radius: 0.2rem;
   font: inherit;
   line-height: 1.2;
   tab-size: 2;
-  white-space: pre-wrap;
-  overflow-wrap: normal;
+  white-space: pre;
 }
 .xenpaper-source-editor pre {
   position: absolute;
   inset: 0;
+  overflow: hidden;
   pointer-events: none;
   background: #171b24;
   color: #e6e9ef;
+}
+.xenpaper-source-editor code {
+  display: block;
+  width: max-content;
+  min-width: 100%;
+  transform-origin: top left;
 }
 .xenpaper-source-editor textarea {
   position: relative;
   display: block;
   resize: vertical;
+  overflow: auto;
   background: transparent;
   color: transparent;
   caret-color: #fff;
