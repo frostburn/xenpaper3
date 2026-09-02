@@ -56,7 +56,13 @@ const selectedClipDiagnostics = computed(() => {
   try {
     const global = compileSourceInitialization(project.value.globalTrack.source)
     const initialization = compileSourceInitialization(lane.source, global)
-    return clipSourceDiagnostics(clip.source, drumSamplesForLane(lane), initialization, clip.start)
+    return clipSourceDiagnostics(
+      clip.source,
+      drumSamplesForLane(lane),
+      initialization,
+      clip.start,
+      project.value.globalTrack.timeSignatureChanges[0],
+    )
   } catch {
     return []
   }

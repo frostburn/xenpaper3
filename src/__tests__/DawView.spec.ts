@@ -40,8 +40,11 @@ import {
 
 describe('DAW project model', () => {
   it('highlights an off-cycle barline using the clip project offset', () => {
-    const source = '@time(4/4) C D |'
-    const diagnostics = clipSourceDiagnostics(source, [], {}, beat(1))
+    const source = 'C D |'
+    const diagnostics = clipSourceDiagnostics(source, [], {}, beat(1), {
+      numerator: 4,
+      denominator: 4,
+    })
     const wrapper = mount(XenpaperSourceHighlight, { props: { source, diagnostics } })
 
     expect(diagnostics).toContainEqual(expect.objectContaining({ code: 'XP_BARLINE_OFF_CYCLE' }))

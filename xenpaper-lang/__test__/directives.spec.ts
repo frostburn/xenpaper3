@@ -35,6 +35,16 @@ describe('directive runtime', () => {
     )
   })
 
+  it('checks against an inherited time signature without an explicit directive', () => {
+    const result = expandToBeatEvents(parse('C D |'), {
+      beatOffset: new Fraction(1),
+      timeSignature: { numerator: 4, denominator: 4 },
+    })
+    expect(result.diagnostics).toContainEqual(
+      expect.objectContaining({ code: 'XP_BARLINE_OFF_CYCLE' }),
+    )
+  })
+
   it('rejects signed-negative time signatures', () => {
     expect(compile('@time(-3/4) C').diagnostics).toContainEqual(
       expect.objectContaining({ code: 'XP_DIRECTIVE', severity: 'error' }),

@@ -20,6 +20,8 @@ export interface BeatEventExpansionOptions extends ScoreShapeOptions, RepeatExpa
   initializationShape?: ScoreShape
   /** Absolute beat of this score's start. DAW clips use this to align measures to the project. */
   beatOffset?: Fraction
+  /** Prevailing signature before the score starts, aligned to absolute beat zero. */
+  timeSignature?: { readonly numerator: number; readonly denominator: number }
 }
 
 export type BeatEventExpansionResult =
@@ -335,7 +337,15 @@ export function expandToBeatEvents(
     : evaluated.shape
   const flattened = flattenScoreSemantics(shape)
   const allDiagnostics = [...diagnostics, ...flattened.diagnostics]
-  let signature: { length: Fraction; origin: Fraction } | undefined
+  let signature: { length: Fraction; origin: Fraction } | undefined = options.timeSignature
+    ? {
+        length: new Fraction(
+          options.timeSignature.numerator * 4,
+          options.timeSignature.denominator,
+        ),
+        origin: new Fraction(0),
+      }
+    : undefined
   const absoluteOffset = options.beatOffset ?? new Fraction(0)
   for (const event of flattened.score.events) {
     if (event.kind !== 'marker') continue

@@ -267,6 +267,7 @@ export const clipSourceDiagnostics = (
   samples: readonly string[] = [],
   initialization: SourceInitialization = {},
   clipOffset: Beat = beat(0),
+  timeSignature?: { readonly numerator: number; readonly denominator: number },
 ): readonly Diagnostic[] => {
   const program = samples.length
     ? lowerDrumSamples(parse(source, { drumSamples: samples }))
@@ -276,6 +277,7 @@ export const clipSourceDiagnostics = (
     ...inheritedScoreOptions(initialization),
     initializationShape: initialization.shape,
     beatOffset: clipOffset,
+    timeSignature,
   }).diagnostics
 }
 
