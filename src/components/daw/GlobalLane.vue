@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { GlobalTrack } from '../../daw/project'
+import XenpaperSourceEditor from './XenpaperSourceEditor.vue'
 
 defineProps<{ track: GlobalTrack }>()
 defineEmits<{
@@ -13,11 +14,11 @@ defineEmits<{
   <section class="global-lane" aria-label="Global track">
     <label class="source-control">
       Global source
-      <textarea
-        aria-label="Global source"
-        :value="track.source"
-        rows="3"
-        @input="$emit('update-source', ($event.target as HTMLTextAreaElement).value)"
+      <XenpaperSourceEditor
+        editor-label="Global source"
+        :source="track.source"
+        :rows="3"
+        @update:source="$emit('update-source', $event)"
       />
     </label>
     <label v-for="tempo in track.tempoChanges" :key="tempo.id">
@@ -77,7 +78,7 @@ defineEmits<{
   align-items: stretch !important;
   flex-direction: column;
 }
-.source-control textarea {
+.source-control .xenpaper-source-editor {
   min-width: 20rem;
   font-family: monospace;
 }

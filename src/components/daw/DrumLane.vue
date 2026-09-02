@@ -12,6 +12,8 @@ import {
   type InstrumentLane,
   type SourceClip,
 } from '../../daw/project'
+import XenpaperSourceEditor from './XenpaperSourceEditor.vue'
+import XenpaperSourceHighlight from './XenpaperSourceHighlight.vue'
 
 const props = defineProps<{
   lane: InstrumentLane
@@ -99,11 +101,11 @@ const moveDrag = (event: PointerEvent) => {
       <span v-if="!collapsed">{{ samples.join(' · ') }} · drumkit SW Patch</span>
       <label v-if="!collapsed" class="source-control">
         Lane source
-        <textarea
-          aria-label="Drum lane source"
-          :value="lane.source"
-          rows="3"
-          @input="emit('update-source', ($event.target as HTMLTextAreaElement).value)"
+        <XenpaperSourceEditor
+          editor-label="Drum lane source"
+          :source="lane.source"
+          :rows="3"
+          @update:source="emit('update-source', $event)"
         />
       </label>
       <label v-if="!collapsed">
@@ -148,7 +150,7 @@ const moveDrag = (event: PointerEvent) => {
         @dblclick.stop
         @pointerdown.prevent="startDrag($event, clip)"
       >
-        <pre v-if="displayMode === 'source'">{{ clip.source }}</pre>
+        <pre v-if="displayMode === 'source'"><XenpaperSourceHighlight :source="clip.source" /></pre>
         <span v-else class="drum-preview" aria-label="Drum pattern preview">
           <span
             v-for="sample in samples"
@@ -201,7 +203,7 @@ const moveDrag = (event: PointerEvent) => {
   flex-direction: column;
   gap: 0.4rem;
 }
-.source-control textarea {
+.source-control .xenpaper-source-editor {
   min-width: 18rem;
   font-family: monospace;
 }

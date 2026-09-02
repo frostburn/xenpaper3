@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { OSCILLATOR_TYPES, type InstrumentLane } from '../../daw/project'
+import XenpaperSourceEditor from './XenpaperSourceEditor.vue'
 
 defineProps<{ lane: InstrumentLane; collapsed?: boolean }>()
 defineEmits<{
@@ -33,11 +34,11 @@ defineEmits<{
     </button>
     <label v-if="!collapsed" class="source-control">
       Lane source
-      <textarea
-        aria-label="Instrument lane source"
-        :value="lane.source"
-        rows="3"
-        @input="$emit('update-source', ($event.target as HTMLTextAreaElement).value)"
+      <XenpaperSourceEditor
+        editor-label="Instrument lane source"
+        :source="lane.source"
+        :rows="3"
+        @update:source="$emit('update-source', $event)"
       />
     </label>
     <label v-if="!collapsed">
@@ -109,7 +110,7 @@ defineEmits<{
   align-items: stretch !important;
   flex-direction: column;
 }
-.source-control textarea {
+.source-control .xenpaper-source-editor {
   min-width: 18rem;
   font-family: monospace;
 }
