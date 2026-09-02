@@ -7,6 +7,7 @@ import DawView from '../views/DawView.vue'
 import InstrumentPianoRollLane from '../components/daw/InstrumentPianoRollLane.vue'
 import DrumLane from '../components/daw/DrumLane.vue'
 import XenpaperSourceHighlight from '../components/daw/XenpaperSourceHighlight.vue'
+import XenpaperSourceEditor from '../components/daw/XenpaperSourceEditor.vue'
 import {
   OSCILLATOR_TYPES,
   beat,
@@ -39,6 +40,26 @@ import {
 } from '../daw/score'
 
 describe('DAW project model', () => {
+  it('debounces parsing work while a large source is being edited', async () => {
+    vi.useFakeTimers()
+    const source = 'C '.repeat(600)
+    const wrapper = mount(XenpaperSourceEditor, {
+      props: { source, editorLabel: 'Large source' },
+    })
+    const editor = wrapper.get('textarea')
+
+    await editor.setValue(`${source}D`)
+    await editor.setValue(`${source}D E`)
+
+    expect(wrapper.emitted('update:source')).toBeUndefined()
+    expect((editor.element as HTMLTextAreaElement).value).toBe(`${source}D E`)
+    await vi.advanceTimersByTimeAsync(200)
+    expect(wrapper.emitted('update:source')).toEqual([[`${source}D E`]])
+
+    wrapper.unmount()
+    vi.useRealTimers()
+  })
+
   it('highlights an off-cycle barline using the clip project offset', () => {
     const source = 'C D |'
     const diagnostics = clipSourceDiagnostics(source, [], {}, beat(1), {

@@ -1,9 +1,9 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { onBeforeUnmount, ref, watch } from 'vue'
 import type { Diagnostic } from '../../../xenpaper-lang'
 import XenpaperSourceHighlight from './XenpaperSourceHighlight.vue'
 
-withDefaults(
+const props = withDefaults(
   defineProps<{
     source: string
     editorLabel: string
@@ -16,6 +16,37 @@ withDefaults(
 const emit = defineEmits<{ 'update:source': [source: string] }>()
 const textarea = ref<HTMLTextAreaElement>()
 const scroll = ref({ left: 0, top: 0 })
+const draft = ref(props.source)
+let updateTimer: ReturnType<typeof setTimeout> | undefined
+
+const LARGE_SOURCE_THRESHOLD = 1_000
+const EDIT_DEBOUNCE_MS = 200
+
+watch(
+  () => props.source,
+  (source) => {
+    draft.value = source
+  },
+)
+
+const commitDraft = () => {
+  if (!updateTimer) return
+  clearTimeout(updateTimer)
+  updateTimer = undefined
+  emit('update:source', draft.value)
+}
+
+const updateDraft = (event: Event) => {
+  draft.value = (event.target as HTMLTextAreaElement).value
+  if (updateTimer) clearTimeout(updateTimer)
+  if (Math.max(props.source.length, draft.value.length) < LARGE_SOURCE_THRESHOLD) {
+    emit('update:source', draft.value)
+    return
+  }
+  // Parsing drives highlighting, diagnostics, clip sizing, and the piano roll. Keep
+  // the textarea responsive and let that work happen once after a burst of typing.
+  updateTimer = setTimeout(commitDraft, EDIT_DEBOUNCE_MS)
+}
 
 const syncScroll = (event: Event) => {
   const editor = event.currentTarget as HTMLTextAreaElement
@@ -23,6 +54,9 @@ const syncScroll = (event: Event) => {
 }
 
 defineExpose({ focus: () => textarea.value?.focus() })
+onBeforeUnmount(() => {
+  if (updateTimer) clearTimeout(updateTimer)
+})
 </script>
 
 <template>
@@ -36,12 +70,13 @@ defineExpose({ focus: () => textarea.value?.focus() })
       ref="textarea"
       :aria-label="editorLabel"
       :rows="rows"
-      :value="source"
+      :value="draft"
       wrap="off"
       autocomplete="off"
       autocapitalize="off"
       spellcheck="false"
-      @input="emit('update:source', ($event.target as HTMLTextAreaElement).value)"
+      @input="updateDraft"
+      @blur="commitDraft"
       @scroll="syncScroll"
     />
   </div>
