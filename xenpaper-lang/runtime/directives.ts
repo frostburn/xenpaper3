@@ -30,6 +30,7 @@ export const DIRECTIVE_REGISTRY = Object.freeze({
   groove: 'groove',
   drone: 'drone',
   clef: 'clef',
+  time: 'time',
   art: 'articulation',
   'articulation-shorthand': 'articulation',
   staccatissimo: 'articulation',
@@ -57,6 +58,7 @@ export type ResolvedDirective =
   | { kind: 'drone'; argument?: Expression }
   | { kind: 'articulation'; ratio: Fraction; mark?: string; shorthand: boolean }
   | { kind: 'clef'; clef: Extract<StaffClef, { kind: 'treble' | 'bass' }> }
+  | { kind: 'time'; numerator: number; denominator: number }
   | { kind: 'unknown' }
 
 export function resolveDirective(
@@ -98,6 +100,24 @@ export function resolveDirective(
     if (kind !== 'treble' && kind !== 'bass')
       return fail(`Unsupported clef ${argument.name}. Expected treble or bass.`)
     return { directive: { kind: 'clef', clef: { kind } }, diagnostics: [] }
+  }
+  if (registered === 'time') {
+    const argument = node.arguments[0]
+    if (node.arguments.length !== 1 || argument?.type !== 'RatioLiteral')
+      return fail('@time requires one positive integer time signature, for example @time(10/8).')
+    const numerator = Number(argument.numerator)
+    const denominator = Number(argument.denominator)
+    if (
+      !Number.isSafeInteger(numerator) ||
+      numerator <= 0 ||
+      !Number.isSafeInteger(denominator) ||
+      denominator <= 0
+    )
+      return fail('@time requires a positive time signature.')
+    return {
+      directive: { kind: 'time', numerator, denominator },
+      diagnostics: [],
+    }
   }
   if (registered === 'groove') {
     if (node.arguments.length > 1 || node.arguments[0]?.type === 'NamedArgument')

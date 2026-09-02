@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { Fraction } from 'xen-dev-utils/fraction'
 import { parse } from '../parser.generated.js'
 import { expandToBeatEvents } from '../runtime/beat-events'
 import type { BeatTimedNoteEvent } from '../runtime/types'
@@ -12,6 +13,28 @@ const notes = (source: string) => {
 }
 
 describe('directive runtime', () => {
+  it('warns when structural barlines do not align with the prevailing time signature', () => {
+    const result = compile('@time(10/8) C D E F G | A |')
+    expect(result.diagnostics.filter(({ code }) => code === 'XP_BARLINE_OFF_CYCLE')).toHaveLength(1)
+    expect(
+      result.diagnostics.find(({ code }) => code === 'XP_BARLINE_OFF_CYCLE')?.locations[0],
+    ).toMatchObject({ start: { offset: 26 }, end: { offset: 27 } })
+  })
+
+  it('restarts measure cycles at each time directive', () => {
+    const result = compile('C @time(3/4) D E F | @time(2/4) G A |')
+    expect(result.diagnostics.filter(({ code }) => code === 'XP_BARLINE_OFF_CYCLE')).toEqual([])
+  })
+
+  it('uses an absolute offset when checking DAW clips', () => {
+    const result = expandToBeatEvents(parse('@time(4/4) C D |'), {
+      beatOffset: new Fraction(1),
+    })
+    expect(result.diagnostics).toContainEqual(
+      expect.objectContaining({ code: 'XP_BARLINE_OFF_CYCLE' }),
+    )
+  })
+
   it.each(['@clef()', '@clef(alto)', '@clef(bass, treble)'])(
     'diagnoses invalid clef directive %s',
     (source) => {

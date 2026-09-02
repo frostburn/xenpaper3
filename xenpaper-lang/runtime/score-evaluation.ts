@@ -538,6 +538,7 @@ function scaleShape(shape: ScoreShape, factor: Fraction): ScoreShape {
     case 'annotation':
     case 'dynamic':
     case 'clef':
+    case 'time-signature':
     case 'key-signature':
     case 'groove':
     case 'drone':
@@ -1581,7 +1582,15 @@ export function evaluateScoreSemantics(
                           duration: new Fraction(0),
                           origins: [origin(item, 'directive')],
                         }
-                      : sequence([], [origin(item, 'directive')])
+                      : directive?.kind === 'time'
+                        ? {
+                            kind: 'time-signature',
+                            numerator: directive.numerator,
+                            denominator: directive.denominator,
+                            duration: new Fraction(0),
+                            origins: [origin(item, 'directive')],
+                          }
+                        : sequence([], [origin(item, 'directive')])
           results.push({ shape, diagnostics: resolved.diagnostics })
           continue
         }

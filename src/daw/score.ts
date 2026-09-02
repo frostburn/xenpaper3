@@ -221,11 +221,13 @@ export const parseClipNotes = (
   source: string,
   duration = Number.POSITIVE_INFINITY,
   initialization: SourceInitialization = {},
+  clipOffset: Beat = beat(0),
 ): ScheduledLaneNote[] => {
   const result = expandToBeatEvents(parse(source), {
     directiveExtensions: ENVELOPE_EXTENSIONS,
     ...inheritedScoreOptions(initialization),
     initializationShape: initialization.shape,
+    beatOffset: clipOffset,
   })
   const errors = result.diagnostics.filter(({ severity }) => severity === 'error')
   if (errors.length) throw new Error(errors.map(({ message }) => message).join('\n'))
@@ -265,12 +267,14 @@ export const parseDrumClipNotes = (
   samples: readonly string[],
   duration = Number.POSITIVE_INFINITY,
   initialization: SourceInitialization = {},
+  clipOffset: Beat = beat(0),
 ): ScheduledLaneNote[] => {
   const program = lowerDrumSamples(parse(source, { drumSamples: samples }))
   const result = expandToBeatEvents(program, {
     directiveExtensions: ENVELOPE_EXTENSIONS,
     ...inheritedScoreOptions(initialization),
     initializationShape: initialization.shape,
+    beatOffset: clipOffset,
   })
   const errors = result.diagnostics.filter(({ severity }) => severity === 'error')
   if (errors.length) throw new Error(errors.map(({ message }) => message).join('\n'))
@@ -322,8 +326,14 @@ export const parseLaneNotes = (
   const notes = lane.clips.flatMap((clip) => {
     const clipStart = beatToNumber(clip.start)
     const clipNotes = samples.length
-      ? parseDrumClipNotes(clip.source, samples, beatToNumber(clip.length), laneInitialization)
-      : parseClipNotes(clip.source, beatToNumber(clip.length), laneInitialization)
+      ? parseDrumClipNotes(
+          clip.source,
+          samples,
+          beatToNumber(clip.length),
+          laneInitialization,
+          clip.start,
+        )
+      : parseClipNotes(clip.source, beatToNumber(clip.length), laneInitialization, clip.start)
     return clipNotes.map((event) => ({ ...event, beat: clipStart + event.beat }))
   })
   return notes.sort((left, right) => left.beat - right.beat)

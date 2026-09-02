@@ -388,6 +388,12 @@ export function constructStaffNotationShape(shape: ScoreShape): StaffNotationSha
       return { kind: 'dynamic', mark: shape.mark, duration: shape.duration }
     case 'clef':
       return { kind: 'clef', clef: shape.clef, duration: shape.duration }
+    case 'time-signature':
+      return {
+        kind: 'annotation',
+        text: `${shape.numerator}/${shape.denominator}`,
+        duration: shape.duration,
+      }
     case 'key-signature':
       return {
         kind: 'key-signature',

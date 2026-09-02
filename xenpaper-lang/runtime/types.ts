@@ -460,6 +460,13 @@ export interface ClefShape extends ShapeBase {
   readonly clef: StaffClef
 }
 
+/** Establishes the prevailing measure length used to check structural barlines. */
+export interface TimeSignatureShape extends ShapeBase {
+  readonly kind: 'time-signature'
+  readonly numerator: number
+  readonly denominator: number
+}
+
 export interface KeySignatureShape extends ShapeBase {
   readonly kind: 'key-signature'
   readonly pitches: readonly AbsolutePitchValue[]
@@ -509,6 +516,7 @@ export type ScoreShape =
   | AnnotationShape
   | DynamicShape
   | ClefShape
+  | TimeSignatureShape
   | KeySignatureShape
   | GrooveShape
   | DroneShape
@@ -535,7 +543,7 @@ export interface BeatTimedNoteEvent {
 export interface BeatTimedMarkerEvent {
   readonly kind: 'marker'
   readonly start: Fraction
-  readonly marker: 'barline' | 'annotation' | 'dynamic'
+  readonly marker: 'barline' | 'annotation' | 'dynamic' | 'time-signature'
   readonly label: string
   readonly origins: readonly SourceOrigin[]
 }

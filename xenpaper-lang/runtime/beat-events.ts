@@ -18,6 +18,8 @@ import type {
 export interface BeatEventExpansionOptions extends ScoreShapeOptions, RepeatExpansionOptions {
   /** Pre-evaluated, zero-duration state annotations applied before the program. */
   initializationShape?: ScoreShape
+  /** Absolute beat of this score's start. DAW clips use this to align measures to the project. */
+  beatOffset?: Fraction
 }
 
 export type BeatEventExpansionResult =
@@ -222,7 +224,8 @@ export function flattenScoreSemantics(shape: ScoreShape): BeatEventFlatteningRes
     } else if (
       current.kind === 'barline' ||
       current.kind === 'annotation' ||
-      current.kind === 'dynamic'
+      current.kind === 'dynamic' ||
+      current.kind === 'time-signature'
     ) {
       events.push({
         kind: 'marker',
@@ -233,7 +236,9 @@ export function flattenScoreSemantics(shape: ScoreShape): BeatEventFlatteningRes
             ? current.style
             : current.kind === 'dynamic'
               ? current.mark
-              : current.text,
+              : current.kind === 'time-signature'
+                ? `${current.numerator}/${current.denominator}`
+                : current.text,
         origins: current.origins,
       })
     } else if (current.kind === 'clef' || current.kind === 'key-signature') {
@@ -330,6 +335,28 @@ export function expandToBeatEvents(
     : evaluated.shape
   const flattened = flattenScoreSemantics(shape)
   const allDiagnostics = [...diagnostics, ...flattened.diagnostics]
+  let signature: { length: Fraction; origin: Fraction } | undefined
+  const absoluteOffset = options.beatOffset ?? new Fraction(0)
+  for (const event of flattened.score.events) {
+    if (event.kind !== 'marker') continue
+    const absoluteStart = event.start.add(absoluteOffset)
+    if (event.marker === 'time-signature') {
+      const [numerator, denominator] = event.label.split('/').map(Number)
+      signature = {
+        length: new Fraction(numerator! * 4, denominator),
+        origin: options.beatOffset ? new Fraction(0) : absoluteStart,
+      }
+    } else if (event.marker === 'barline' && signature) {
+      const cycles = absoluteStart.sub(signature.origin).div(signature.length)
+      if (cycles.d !== 1)
+        allDiagnostics.push({
+          code: 'XP_BARLINE_OFF_CYCLE',
+          severity: 'warning',
+          message: `Barline does not fall on a whole multiple of the ${signature.length.toFraction()}-beat measure.`,
+          locations: event.origins.map((origin) => origin.location),
+        })
+    }
+  }
   return allDiagnostics.some((diagnostic) => diagnostic.severity === 'error')
     ? { diagnostics: allDiagnostics }
     : { score: flattened.score, diagnostics: allDiagnostics }
