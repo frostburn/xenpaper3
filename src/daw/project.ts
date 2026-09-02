@@ -70,6 +70,8 @@ export const DEFAULT_GLOBAL_SOURCE = `# Shared tuning and score initialization (
 export const DEFAULT_INSTRUMENT_SOURCE = `# Defaults inherited by every clip in this lane
 @adsr(100ms, 200ms, 70%, 300ms)
 `
+export const DEFAULT_DRUM_SOURCE = `# Defaults inherited by every clip in this lane
+`
 
 export const beat = (numerator: number, denominator = 1): Beat => {
   if (!Number.isInteger(numerator) || !Number.isInteger(denominator) || denominator <= 0) {
@@ -115,7 +117,7 @@ export const createDrumLane = (project: DawProject): InstrumentLane => {
     patchSource: 'drumkit',
     oscillatorType: 'sine',
     gain: 0.8,
-    source: '',
+    source: DEFAULT_DRUM_SOURCE,
     clips: [],
   }
 }
