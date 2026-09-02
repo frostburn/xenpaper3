@@ -82,6 +82,7 @@ describe('DAW project model', () => {
     const samples = drumSamplesForLane(lane)
 
     expect(lane).toMatchObject({ id: 'drum-1', kind: 'drum', patchSource: 'drumkit' })
+    expect(lane.source).toBe('# Defaults inherited by every clip in this lane\n')
     expect(clip.source).toContain('[bd,hh hh] [hh hh] [sd,hh hh] [hh hh]')
     expect(
       parseDrumClipNotes(clip.source, samples).map(({ beat, sample }) => [beat, sample]),
@@ -560,7 +561,7 @@ describe('DawView', () => {
     await wrapper.get('[aria-label="Delete Instrument 1"]').trigger('click')
     await wrapper.get('button.add-lane').trigger('click')
 
-    expect(wrapper.get('[aria-label="Collapse Instrument 1"]').exists()).toBe(true)
+    expect(wrapper.find('[aria-label="Collapse Instrument 1"]').exists()).toBe(true)
     expect(wrapper.get('[aria-label="Instrument piano roll"]').attributes('style')).not.toContain(
       'display: none',
     )
@@ -617,6 +618,14 @@ describe('DawView', () => {
     await wrapper.get('button.add-drum-lane').trigger('click')
     const lane = wrapper.getComponent(DrumLane)
     expect(lane.get('[aria-label="Drum lane"]').attributes('aria-label')).toBe('Drum lane')
+    const laneSource = lane.get('[aria-label="Drum lane source"]')
+    expect((laneSource.element as HTMLTextAreaElement).value).toBe(
+      '# Defaults inherited by every clip in this lane\n',
+    )
+    await laneSource.setValue('@adsr(10ms, 20ms, 50%, 30ms)')
+    expect((laneSource.element as HTMLTextAreaElement).value).toBe(
+      '@adsr(10ms, 20ms, 50%, 30ms)',
+    )
 
     await lane.get('[aria-label="Drum lane"]').trigger('dblclick', { clientX: 64 })
     expect(wrapper.get('[aria-label="Xenpaper clip source"]').element).toHaveProperty(

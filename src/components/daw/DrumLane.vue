@@ -28,6 +28,7 @@ const emit = defineEmits<{
   'place-playhead': [beat: number]
   move: [clip: SourceClip, beat: number]
   delete: [clip: SourceClip]
+  'update-source': [source: string]
   'update-gain': [gain: number]
   deleteLane: []
   'toggle-collapse': []
@@ -96,6 +97,15 @@ const moveDrag = (event: PointerEvent) => {
         {{ collapsed ? '▸ Expand' : '▾ Collapse' }}
       </button>
       <span v-if="!collapsed">{{ samples.join(' · ') }} · drumkit SW Patch</span>
+      <label v-if="!collapsed" class="source-control">
+        Lane source
+        <textarea
+          aria-label="Drum lane source"
+          :value="lane.source"
+          rows="3"
+          @input="emit('update-source', ($event.target as HTMLTextAreaElement).value)"
+        />
+      </label>
       <label v-if="!collapsed">
         Gain
         <input
@@ -183,6 +193,17 @@ const moveDrag = (event: PointerEvent) => {
 .drum-lane header span {
   flex: 1;
   color: #cfbadb;
+}
+.source-control {
+  display: flex;
+  flex: 1;
+  align-items: stretch;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+.source-control textarea {
+  min-width: 18rem;
+  font-family: monospace;
 }
 .drum-grid {
   position: relative;

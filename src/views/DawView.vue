@@ -283,6 +283,7 @@ onBeforeUnmount(() => {
         @place-playhead="playhead = $event"
         @move="moveClip"
         @delete="deleteClip(lane, $event)"
+        @update-source="lane.source = $event"
         @update-gain="lane.gain = $event"
         @delete-lane="deleteInstrumentLane(lane)"
         @toggle-collapse="toggleLaneCollapse(lane.id)"
