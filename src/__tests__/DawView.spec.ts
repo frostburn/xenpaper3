@@ -488,7 +488,23 @@ describe('DawView', () => {
     expect(source.element.value).toContain('[0,4,7]')
     expect(source.element.value).not.toContain('@patch')
     expect(document.activeElement).toBe(source.element)
+    expect(wrapper.get('.source-editor [data-highlight="punctuation"]').text()).toContain('[')
+    expect(wrapper.get('.source-editor [data-highlight="pitch"]').text()).toContain('0')
     wrapper.unmount()
+  })
+
+  it('syntax-highlights every DAW source editor and tolerates incomplete input', async () => {
+    const wrapper = mount(DawView)
+
+    expect(wrapper.get('.global-lane [data-highlight="comment"]').text()).toContain('Shared tuning')
+    expect(wrapper.get('.instrument-header [data-highlight="directive"]').text()).toContain(
+      '@adsr',
+    )
+
+    await wrapper.getComponent(InstrumentPianoRollLane).trigger('dblclick', { clientX: 64 })
+    await wrapper.get('textarea[aria-label="Xenpaper clip source"]').setValue('C (')
+
+    expect(wrapper.get('.source-editor [data-highlight="unparsed"]').text()).toBe('C (')
   })
 
   it('uses a single click for playhead placement and an existing clip click for selection', async () => {

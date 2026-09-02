@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import type { SourceClip } from '../../daw/project'
+import XenpaperSourceEditor from './XenpaperSourceEditor.vue'
 
 defineProps<{ clip?: SourceClip }>()
 const emit = defineEmits<{
@@ -10,7 +11,7 @@ const emit = defineEmits<{
   'play-solo': []
   stop: []
 }>()
-const editor = ref<HTMLTextAreaElement>()
+const editor = ref<InstanceType<typeof XenpaperSourceEditor>>()
 defineExpose({ focus: () => editor.value?.focus() })
 </script>
 
@@ -33,13 +34,13 @@ defineExpose({ focus: () => editor.value?.focus() })
         <button type="button" aria-label="Delete clip" @click="emit('delete')">Delete</button>
       </div>
     </header>
-    <textarea
+    <XenpaperSourceEditor
       v-if="clip"
       ref="editor"
-      aria-label="Xenpaper clip source"
-      :value="clip.source"
-      rows="8"
-      @input="emit('update-source', ($event.target as HTMLTextAreaElement).value)"
+      editor-label="Xenpaper clip source"
+      :source="clip.source"
+      :rows="8"
+      @update:source="emit('update-source', $event)"
     />
     <p v-else>Select or create a clip to edit its Xenpaper source.</p>
   </section>
@@ -56,7 +57,7 @@ defineExpose({ focus: () => editor.value?.focus() })
   flex-wrap: wrap;
   gap: 0.4rem;
 }
-.source-editor textarea {
+.source-editor .xenpaper-source-editor {
   box-sizing: border-box;
   width: 100%;
   font-family: monospace;
