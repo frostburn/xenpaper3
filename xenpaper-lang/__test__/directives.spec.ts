@@ -35,6 +35,12 @@ describe('directive runtime', () => {
     )
   })
 
+  it('rejects signed-negative time signatures', () => {
+    expect(compile('@time(-3/4) C').diagnostics).toContainEqual(
+      expect.objectContaining({ code: 'XP_DIRECTIVE', severity: 'error' }),
+    )
+  })
+
   it.each(['@clef()', '@clef(alto)', '@clef(bass, treble)'])(
     'diagnoses invalid clef directive %s',
     (source) => {

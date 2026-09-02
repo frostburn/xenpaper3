@@ -261,6 +261,24 @@ export const parseClipNotes = (
     }))
 }
 
+/** Evaluate a clip for source diagnostics, retaining warnings for editor highlighting. */
+export const clipSourceDiagnostics = (
+  source: string,
+  samples: readonly string[] = [],
+  initialization: SourceInitialization = {},
+  clipOffset: Beat = beat(0),
+): readonly Diagnostic[] => {
+  const program = samples.length
+    ? lowerDrumSamples(parse(source, { drumSamples: samples }))
+    : parse(source)
+  return expandToBeatEvents(program, {
+    directiveExtensions: ENVELOPE_EXTENSIONS,
+    ...inheritedScoreOptions(initialization),
+    initializationShape: initialization.shape,
+    beatOffset: clipOffset,
+  }).diagnostics
+}
+
 /** Compile a drum clip through the shared score runtime while retaining named voices. */
 export const parseDrumClipNotes = (
   source: string,

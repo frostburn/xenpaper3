@@ -20,6 +20,7 @@ export type XenpaperHighlightKind =
   | 'identifier'
   | 'whitespace'
   | 'unparsed'
+  | 'warning'
 
 export interface XenpaperHighlightToken {
   kind: XenpaperHighlightKind

@@ -105,6 +105,7 @@ export function resolveDirective(
     const argument = node.arguments[0]
     if (node.arguments.length !== 1 || argument?.type !== 'RatioLiteral')
       return fail('@time requires one positive integer time signature, for example @time(10/8).')
+    if (argument.sign === '-') return fail('@time requires a positive time signature.')
     const numerator = Number(argument.numerator)
     const denominator = Number(argument.denominator)
     if (
