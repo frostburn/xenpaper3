@@ -333,7 +333,7 @@ onBeforeUnmount(() => {
 
 <style scoped>
 .daw {
-  max-width: 1100px;
+  max-width: 1200px;
   margin: auto;
   padding: 1rem;
   color: #eef3ff;
