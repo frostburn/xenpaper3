@@ -727,6 +727,7 @@ function contextAnnotation(
   }
   const text = node.statements
     .map((statement) => {
+      if (statement.type === 'TuningStretch') return statement.raw
       if (statement.type !== 'ContextAssignment')
         return statement.type === 'ContextPreset' ? statement.raw : 'context'
       const target =

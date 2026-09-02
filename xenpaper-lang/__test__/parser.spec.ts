@@ -311,6 +311,18 @@ describe('enumerated chords', () => {
     })
   })
 
+  it('parses tuning stretches as pitch-context statements', () => {
+    expect(parse('{tuning *= 102%}').body[0]).toMatchObject({
+      type: 'PitchContextChange',
+      statements: [
+        {
+          type: 'TuningStretch',
+          factor: { type: 'QuantityLiteral', unit: '%' },
+        },
+      ],
+    })
+  })
+
   it('parses root associations in both directions and rejects assignment syntax', () => {
     for (const source of ['{root as D}', '{D as root}', "{root as 'A}", "{'A as root}"]) {
       expect(parse(source).body[0]).toMatchObject({

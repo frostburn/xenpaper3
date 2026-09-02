@@ -4,6 +4,11 @@
 
 The pitched and sample languages share document sequencing, parallel branches,
 normalized groups, repeats, rests, continuations, postfix marks, and directives.
+
+Pitch-context blocks also support `tuning *= factor`. For example,
+`{tuning *= 102%}` stretches the active scale, prime mapping, equave, ups/lifts,
+and MOS intervals to 102% of their current size in pitch-space while leaving the
+root frequency fixed.
 Callers enumerate sample names when parsing, so the grammars split only for those
 bare event leaves. Without that option, `bd` retains its pitched meaning as B
 half-flat.

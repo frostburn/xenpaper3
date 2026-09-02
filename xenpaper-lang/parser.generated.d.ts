@@ -61,6 +61,7 @@ export type Expression =
   | Sequence
   | SignatureDeclaration
   | TailElimination
+  | TuningStretch
   | UnaryExpression
   | VariableDeclaration
 
@@ -128,6 +129,13 @@ export interface ContextAssignment extends Node {
   target: ContextNameTarget | ContextOperatorTarget | ContextPitchTarget
   value: Expression
   association?: 'rootAsTarget' | 'targetAsRoot'
+}
+
+/** Multiplies all intervals in the active pitch context by a dimensionless factor. */
+export interface TuningStretch extends Node {
+  type: 'TuningStretch'
+  factor: Expression
+  raw: string
 }
 
 export interface ContextExpression extends Node {

@@ -231,6 +231,54 @@ export function createPitchContext(mapping: PrimeMapping = DEFAULT_MAPPING): Pit
 
 export const DEFAULT_PITCH_CONTEXT = createPitchContext()
 
+function stretchPitchContext(context: PitchContext, factor: Value): PitchContext {
+  if (!factor.dimensions.isDimensionless || !(factor.valueOf() > 0))
+    throw new TypeError('A tuning stretch requires a positive dimensionless factor.')
+  const stretch = (value: Value) => value.mul(factor)
+  const mapping: PrimeMapping = {
+    ...context.mapping,
+    id: `${context.mapping.id}*${factor.valueOf()}`,
+    mapPrime: (prime) => stretch(context.mapping.mapPrime(prime)),
+    ...(context.mapping.equalDivision
+      ? {
+          equalDivision: {
+            ...context.mapping.equalDivision,
+            equave: stretch(context.mapping.equalDivision.equave),
+          },
+        }
+      : {}),
+  }
+  const mos = context.mos
+    ? {
+        ...context.mos,
+        equave: stretch(context.mos.equave),
+        period: stretch(context.mos.period),
+        large: stretch(context.mos.large),
+        small: stretch(context.mos.small),
+        ...(context.mos.hostStep ? { hostStep: stretch(context.mos.hostStep) } : {}),
+        ...(context.mos.up ? { up: stretch(context.mos.up) } : {}),
+        ...(context.mos.lift ? { lift: stretch(context.mos.lift) } : {}),
+        nominals: new Map(
+          [...context.mos.nominals].map(([nominal, value]) => [nominal, stretch(value)]),
+        ),
+        degrees: context.mos.degrees.map((degree) => ({
+          ...degree,
+          center: stretch(degree.center),
+          ...(degree.mid ? { mid: stretch(degree.mid) } : {}),
+        })),
+      }
+    : undefined
+  return {
+    ...context,
+    mapping,
+    degrees: context.degrees.map(stretch),
+    degreeEquave: stretch(context.degreeEquave),
+    up: stretch(context.up),
+    lift: stretch(context.lift),
+    ...(mos ? { mos } : {}),
+  }
+}
+
 function asContext(input: PrimeMapping | PitchContext): PitchContext {
   return 'rootPitch' in input ? input : createPitchContext(input)
 }
@@ -242,6 +290,13 @@ export function applyPitchContextChange(
 ): PitchContext {
   let context = input
   for (const statement of node.statements) {
+    if (statement.type === 'TuningStretch') {
+      const evaluated = evaluateExpression(statement.factor, context)
+      if (!('value' in evaluated) || evaluated.value.kind !== 'scalar')
+        throw new TypeError('A tuning stretch requires a positive dimensionless factor.')
+      context = stretchPitchContext(context, evaluated.value.value)
+      continue
+    }
     if (statement.type === 'SignatureDeclaration') {
       context = applySignatureDeclaration(statement, context)
       continue
