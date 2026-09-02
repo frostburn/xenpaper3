@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, ref, watch, watchEffect } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch, watchEffect } from 'vue'
 import ClipSourceEditor from '../components/daw/ClipSourceEditor.vue'
 import DrumLane from '../components/daw/DrumLane.vue'
 import GlobalLane from '../components/daw/GlobalLane.vue'
@@ -15,6 +15,7 @@ import {
   createDefaultProject,
   createDrumLane,
   createInstrumentLane,
+  parseDawProject,
   snapBeat,
   type Beat,
   type ClipDisplayMode,
@@ -23,6 +24,7 @@ import {
 } from '../daw/project'
 
 const project = ref(createDefaultProject())
+const projectLoadError = ref('')
 const selectedClipId = ref<string>()
 const playhead = ref(0)
 const pixelsPerBeat = ref(64)
@@ -210,6 +212,18 @@ const updateClipSource = (clip: SourceClip, source: string) => {
   clip.source = source
 }
 
+onMounted(async () => {
+  const projectUrl = new URL(document.location.href).searchParams.get('project')
+  if (!projectUrl) return
+  try {
+    const response = await fetch(new URL(projectUrl, document.baseURI))
+    if (!response.ok) throw new Error(`Could not load project (${response.status})`)
+    project.value = parseDawProject(await response.text())
+  } catch (error) {
+    projectLoadError.value = error instanceof Error ? error.message : String(error)
+  }
+})
+
 onBeforeUnmount(() => {
   if (playTimer) clearInterval(playTimer)
   audioEngine?.dispose()
@@ -220,6 +234,7 @@ onBeforeUnmount(() => {
 <template>
   <div class="daw">
     <h1>Xenpaper DAW</h1>
+    <p v-if="projectLoadError" class="playback-error" role="alert">{{ projectLoadError }}</p>
     <TransportControls
       :playhead="playhead"
       :playing="playing"

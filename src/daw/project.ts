@@ -58,6 +58,20 @@ export interface DawProject {
   instrumentLanes: InstrumentLane[]
 }
 
+export const parseDawProject = (source: string): DawProject => {
+  const project: unknown = JSON.parse(source, Fraction.reviver)
+  if (
+    !project ||
+    typeof project !== 'object' ||
+    (project as Partial<DawProject>).version !== 1 ||
+    !Array.isArray((project as Partial<DawProject>).instrumentLanes) ||
+    !(project as Partial<DawProject>).globalTrack
+  ) {
+    throw new TypeError('Invalid Xenpaper project file')
+  }
+  return project as DawProject
+}
+
 export const DEFAULT_CLIP_SOURCE = `# New Xenpaper clip
 [0,4,7]===
 `
