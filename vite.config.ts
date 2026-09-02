@@ -21,6 +21,11 @@ export default defineConfig({
         codeSplitting: {
           groups: [
             {
+              name: 'xen-dev-utils',
+              test: /[\\/]node_modules[\\/]xen-dev-utils[\\/]/,
+              priority: 1,
+            },
+            {
               name: 'xenpaper-lang',
               test: /[\\/]xenpaper-lang[\\/]/,
             },
