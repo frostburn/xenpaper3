@@ -7,7 +7,12 @@ import InstrumentHeader from '../components/daw/InstrumentHeader.vue'
 import InstrumentPianoRollLane from '../components/daw/InstrumentPianoRollLane.vue'
 import TransportControls from '../components/daw/TransportControls.vue'
 import { DawAudioEngine } from '../daw/audio-engine'
-import { compileSourceInitialization, drumSamplesForLane, sourceClipLength } from '../daw/score'
+import {
+  clipSourceDiagnostics,
+  compileSourceInitialization,
+  drumSamplesForLane,
+  sourceClipLength,
+} from '../daw/score'
 import {
   beat,
   beatToNumber,
@@ -44,6 +49,24 @@ const selectedLane = computed(() =>
 const selectedClip = computed(() =>
   selectedLane.value?.clips.find(({ id }) => id === selectedClipId.value),
 )
+const selectedClipDiagnostics = computed(() => {
+  const lane = selectedLane.value
+  const clip = selectedClip.value
+  if (!lane || !clip) return []
+  try {
+    const global = compileSourceInitialization(project.value.globalTrack.source)
+    const initialization = compileSourceInitialization(lane.source, global)
+    return clipSourceDiagnostics(
+      clip.source,
+      drumSamplesForLane(lane),
+      initialization,
+      clip.start,
+      project.value.globalTrack.timeSignatureChanges[0],
+    )
+  } catch {
+    return []
+  }
+})
 const projectEndBeat = computed(() =>
   Math.max(
     0,
@@ -339,6 +362,7 @@ onBeforeUnmount(() => {
       ref="editor"
       :clip="selectedClip"
       :drum-samples="selectedLane ? drumSamplesForLane(selectedLane) : undefined"
+      :diagnostics="selectedClipDiagnostics"
       @update-source="selectedClip && updateClipSource(selectedClip, $event)"
       @delete="deleteSelectedClip"
       @play="playSelectedClip(false)"

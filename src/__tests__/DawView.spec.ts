@@ -6,6 +6,7 @@ import router from '../router'
 import DawView from '../views/DawView.vue'
 import InstrumentPianoRollLane from '../components/daw/InstrumentPianoRollLane.vue'
 import DrumLane from '../components/daw/DrumLane.vue'
+import XenpaperSourceHighlight from '../components/daw/XenpaperSourceHighlight.vue'
 import {
   OSCILLATOR_TYPES,
   beat,
@@ -31,9 +32,25 @@ import {
   projectSecondsToBeat,
   sourceClipLength,
 } from '../daw/audio-engine'
-import { compileSourceInitialization, drumSamplesForLane } from '../daw/score'
+import {
+  clipSourceDiagnostics,
+  compileSourceInitialization,
+  drumSamplesForLane,
+} from '../daw/score'
 
 describe('DAW project model', () => {
+  it('highlights an off-cycle barline using the clip project offset', () => {
+    const source = 'C D |'
+    const diagnostics = clipSourceDiagnostics(source, [], {}, beat(1), {
+      numerator: 4,
+      denominator: 4,
+    })
+    const wrapper = mount(XenpaperSourceHighlight, { props: { source, diagnostics } })
+
+    expect(diagnostics).toContainEqual(expect.objectContaining({ code: 'XP_BARLINE_OFF_CYCLE' }))
+    expect(wrapper.get('[data-highlight="warning"]').text()).toBe('|')
+  })
+
   it('offers periodic and aperiodic oscillator timbres', () => {
     expect(OSCILLATOR_TYPES).toContain('rich')
     expect(OSCILLATOR_TYPES).toContain('piano')
@@ -497,18 +514,14 @@ describe('DawView', () => {
     const wrapper = mount(DawView)
 
     expect(wrapper.get('.global-lane [data-highlight="comment"]').text()).toContain('Shared tuning')
-    expect(wrapper.get('.instrument-header [data-highlight="directive"]').text()).toContain(
-      '@adsr',
-    )
+    expect(wrapper.get('.instrument-header [data-highlight="directive"]').text()).toContain('@adsr')
 
     await wrapper.getComponent(InstrumentPianoRollLane).trigger('dblclick', { clientX: 64 })
     await wrapper.get('textarea[aria-label="Xenpaper clip source"]').setValue('C (')
 
     expect(wrapper.get('.source-editor [data-highlight="unparsed"]').text()).toBe('C (')
 
-    const textarea = wrapper.get<HTMLTextAreaElement>(
-      'textarea[aria-label="Xenpaper clip source"]',
-    )
+    const textarea = wrapper.get<HTMLTextAreaElement>('textarea[aria-label="Xenpaper clip source"]')
     textarea.element.scrollLeft = 24
     textarea.element.scrollTop = 12
     await textarea.trigger('scroll')

@@ -1,9 +1,14 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import type { SourceClip } from '../../daw/project'
+import type { Diagnostic } from '../../../xenpaper-lang'
 import XenpaperSourceEditor from './XenpaperSourceEditor.vue'
 
-defineProps<{ clip?: SourceClip; drumSamples?: readonly string[] }>()
+defineProps<{
+  clip?: SourceClip
+  drumSamples?: readonly string[]
+  diagnostics?: readonly Diagnostic[]
+}>()
 const emit = defineEmits<{
   'update-source': [source: string]
   delete: []
@@ -40,6 +45,7 @@ defineExpose({ focus: () => editor.value?.focus() })
       editor-label="Xenpaper clip source"
       :source="clip.source"
       :drum-samples="drumSamples"
+      :diagnostics="diagnostics"
       :rows="8"
       @update:source="emit('update-source', $event)"
     />

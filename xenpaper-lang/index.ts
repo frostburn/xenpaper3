@@ -92,5 +92,6 @@ export type {
   StaffNotationShape,
   StaffInflection,
   StaffOperatorInflection,
+  TimeSignatureShape,
 } from './runtime/types'
 export { Dimensions, Value } from './value'

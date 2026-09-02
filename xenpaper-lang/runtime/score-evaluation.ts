@@ -522,6 +522,50 @@ function barline(node: Expression, style: BarlineStyle, endingNumber?: number): 
   }
 }
 
+function repeatMarker(
+  node: Extract<Expression, { type: 'Repeat' }>,
+  edge: 'start' | 'end',
+  style: BarlineStyle,
+): BarlineShape {
+  const width = edge === 'start' ? 2 : (node.terminal?.length ?? 0)
+  const boundary = edge === 'start' ? node.location.start : node.location.end
+  const start =
+    edge === 'start'
+      ? boundary
+      : { ...boundary, offset: boundary.offset - width, column: boundary.column - width }
+  const end =
+    edge === 'start'
+      ? { ...boundary, offset: boundary.offset + width, column: boundary.column + width }
+      : boundary
+  return barline({ ...node, location: { source: node.location.source, start, end } }, style)
+}
+
+function endingMarker(
+  node: Extract<Expression, { type: 'Repeat' }>,
+  ending: Extract<Expression, { type: 'Repeat' }>['endings'][number],
+  index: number,
+  style: 'ending-start' | 'repeat-end' = 'ending-start',
+): BarlineShape {
+  const prefixWidth = index ? 2 : 1
+  const boundary = ending.number.location.start
+  return barline(
+    {
+      ...node,
+      location: {
+        source: node.location.source,
+        start: {
+          ...boundary,
+          offset: boundary.offset - prefixWidth,
+          column: boundary.column - prefixWidth,
+        },
+        end: ending.number.location.end,
+      },
+    },
+    style,
+    style === 'ending-start' ? Number(ending.number.value) : undefined,
+  )
+}
+
 function pad(shape: ScoreShape, duration: Fraction): ScoreShape {
   const missing = duration.sub(shape.duration)
   if (!missing.n) return shape
@@ -538,6 +582,7 @@ function scaleShape(shape: ScoreShape, factor: Fraction): ScoreShape {
     case 'annotation':
     case 'dynamic':
     case 'clef':
+    case 'time-signature':
     case 'key-signature':
     case 'groove':
     case 'drone':
@@ -1394,16 +1439,18 @@ export function evaluateScoreSemantics(
         return hasShape(result) ? [result.shape] : []
       })
       const endingMarkers = current.endings.flatMap((ending, index): ScoreShape[] => [
-        barline(current, 'ending-start', Number(ending.number.value)),
+        endingMarker(current, ending, index),
         ...endingShapes[index]!,
-        barline(current, index === current.endings.length - 1 ? 'ending-end' : 'repeat-end'),
+        index === current.endings.length - 1
+          ? repeatMarker(current, 'end', 'ending-end')
+          : endingMarker(current, current.endings[index + 1]!, index + 1, 'repeat-end'),
       ])
       return {
         shape: sequence(
           [
-            barline(current, 'repeat-start'),
+            repeatMarker(current, 'start', 'repeat-start'),
             ...(current.endings.length ? [...commonShapes, ...endingMarkers] : displayed.children),
-            ...(current.endings.length ? [] : [barline(current, 'repeat-end')]),
+            ...(current.endings.length ? [] : [repeatMarker(current, 'end', 'repeat-end')]),
           ],
           [origin(current)],
         ),
@@ -1581,7 +1628,15 @@ export function evaluateScoreSemantics(
                           duration: new Fraction(0),
                           origins: [origin(item, 'directive')],
                         }
-                      : sequence([], [origin(item, 'directive')])
+                      : directive?.kind === 'time'
+                        ? {
+                            kind: 'time-signature',
+                            numerator: directive.numerator,
+                            denominator: directive.denominator,
+                            duration: new Fraction(0),
+                            origins: [origin(item, 'directive')],
+                          }
+                        : sequence([], [origin(item, 'directive')])
           results.push({ shape, diagnostics: resolved.diagnostics })
           continue
         }

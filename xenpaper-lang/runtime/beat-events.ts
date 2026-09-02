@@ -18,6 +18,10 @@ import type {
 export interface BeatEventExpansionOptions extends ScoreShapeOptions, RepeatExpansionOptions {
   /** Pre-evaluated, zero-duration state annotations applied before the program. */
   initializationShape?: ScoreShape
+  /** Absolute beat of this score's start. DAW clips use this to align measures to the project. */
+  beatOffset?: Fraction
+  /** Prevailing signature before the score starts, aligned to absolute beat zero. */
+  timeSignature?: { readonly numerator: number; readonly denominator: number }
 }
 
 export type BeatEventExpansionResult =
@@ -222,7 +226,8 @@ export function flattenScoreSemantics(shape: ScoreShape): BeatEventFlatteningRes
     } else if (
       current.kind === 'barline' ||
       current.kind === 'annotation' ||
-      current.kind === 'dynamic'
+      current.kind === 'dynamic' ||
+      current.kind === 'time-signature'
     ) {
       events.push({
         kind: 'marker',
@@ -233,7 +238,9 @@ export function flattenScoreSemantics(shape: ScoreShape): BeatEventFlatteningRes
             ? current.style
             : current.kind === 'dynamic'
               ? current.mark
-              : current.text,
+              : current.kind === 'time-signature'
+                ? `${current.numerator}/${current.denominator}`
+                : current.text,
         origins: current.origins,
       })
     } else if (current.kind === 'clef' || current.kind === 'key-signature') {
@@ -330,6 +337,67 @@ export function expandToBeatEvents(
     : evaluated.shape
   const flattened = flattenScoreSemantics(shape)
   const allDiagnostics = [...diagnostics, ...flattened.diagnostics]
+  // Repeat expansion removes authored repeat/ending markers. Evaluate the original
+  // tree as notation as well so every structural marker remains available for checks.
+  const authored = evaluateScoreSemantics(
+    {
+      type: 'Sequence',
+      items: program.body,
+      location: program.location,
+      expansionPath: [],
+    } as unknown as never,
+    options,
+  )
+  const structuralEvents =
+    'shape' in authored
+      ? flattenScoreSemantics(
+          options.initializationShape
+            ? {
+                kind: 'sequence',
+                duration: authored.shape.duration,
+                origins: [...options.initializationShape.origins, ...authored.shape.origins],
+                children: [options.initializationShape, authored.shape],
+              }
+            : authored.shape,
+        ).score.events
+      : flattened.score.events
+  let signature: { length: Fraction; origin: Fraction } | undefined = options.timeSignature
+    ? {
+        length: new Fraction(
+          options.timeSignature.numerator * 4,
+          options.timeSignature.denominator,
+        ),
+        origin: new Fraction(0),
+      }
+    : undefined
+  const absoluteOffset = options.beatOffset ?? new Fraction(0)
+  const warnedBarlines = new Set<string>()
+  for (const event of structuralEvents) {
+    if (event.kind !== 'marker') continue
+    const absoluteStart = event.start.add(absoluteOffset)
+    if (event.marker === 'time-signature') {
+      const [numerator, denominator] = event.label.split('/').map(Number)
+      signature = {
+        length: new Fraction(numerator! * 4, denominator),
+        origin: options.beatOffset ? new Fraction(0) : absoluteStart,
+      }
+    } else if (event.marker === 'barline' && signature) {
+      const cycles = absoluteStart.sub(signature.origin).div(signature.length)
+      const locations = event.origins.map((origin) => origin.location)
+      const warningKey = locations
+        .map(({ start, end }) => `${start.offset}:${end.offset}`)
+        .join(',')
+      if (cycles.d !== 1 && !warnedBarlines.has(warningKey)) {
+        warnedBarlines.add(warningKey)
+        allDiagnostics.push({
+          code: 'XP_BARLINE_OFF_CYCLE',
+          severity: 'warning',
+          message: `Barline does not fall on a whole multiple of the ${signature.length.toFraction()}-beat measure.`,
+          locations,
+        })
+      }
+    }
+  }
   return allDiagnostics.some((diagnostic) => diagnostic.severity === 'error')
     ? { diagnostics: allDiagnostics }
     : { score: flattened.score, diagnostics: allDiagnostics }

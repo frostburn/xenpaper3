@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref } from 'vue'
+import type { Diagnostic } from '../../../xenpaper-lang'
 import XenpaperSourceHighlight from './XenpaperSourceHighlight.vue'
 
 withDefaults(
@@ -8,6 +9,7 @@ withDefaults(
     editorLabel: string
     rows?: number
     drumSamples?: readonly string[]
+    diagnostics?: readonly Diagnostic[]
   }>(),
   { rows: 3 },
 )
@@ -27,7 +29,7 @@ defineExpose({ focus: () => textarea.value?.focus() })
   <div class="xenpaper-source-editor">
     <pre
       aria-hidden="true"
-    ><XenpaperSourceHighlight :source="source" :drum-samples="drumSamples" :style="{
+    ><XenpaperSourceHighlight :source="source" :drum-samples="drumSamples" :diagnostics="diagnostics" :style="{
       transform: `translate(${-scroll.left}px, ${-scroll.top}px)`,
     }" /></pre>
     <textarea
