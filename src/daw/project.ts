@@ -52,10 +52,94 @@ export interface InstrumentLane {
 }
 
 export interface DawProject {
+  format: 'xenpaper3-daw'
   version: 1
+  createdAt: string
+  xenpaperVersion: string
   title: string
   globalTrack: GlobalTrack
   instrumentLanes: InstrumentLane[]
+}
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === 'object' && value !== null
+
+const isString = (value: unknown): value is string => typeof value === 'string'
+const isFiniteNumber = (value: unknown): value is number =>
+  typeof value === 'number' && Number.isFinite(value)
+const isPositiveInteger = (value: unknown): value is number =>
+  Number.isInteger(value) && Number(value) > 0
+const isBeat = (value: unknown): value is Beat =>
+  value instanceof Fraction && Number.isFinite(value.valueOf())
+const isNonnegativeBeat = (value: unknown): value is Beat => isBeat(value) && value.valueOf() >= 0
+const isPositiveBeat = (value: unknown): value is Beat => isBeat(value) && value.valueOf() > 0
+
+export const parseDawProject = (source: string): DawProject => {
+  const project: unknown = JSON.parse(source, Fraction.reviver)
+  if (!isRecord(project)) throw new TypeError('Invalid Xenpaper project file')
+
+  const globalTrack = project.globalTrack
+  const validGlobalTrack =
+    isRecord(globalTrack) &&
+    isString(globalTrack.source) &&
+    Array.isArray(globalTrack.tempoChanges) &&
+    globalTrack.tempoChanges.length > 0 &&
+    globalTrack.tempoChanges.every(
+      (change) =>
+        isRecord(change) &&
+        isString(change.id) &&
+        isNonnegativeBeat(change.beat) &&
+        isFiniteNumber(change.bpm) &&
+        change.bpm > 0,
+    ) &&
+    Array.isArray(globalTrack.timeSignatureChanges) &&
+    globalTrack.timeSignatureChanges.length > 0 &&
+    globalTrack.timeSignatureChanges.every(
+      (change) =>
+        isRecord(change) &&
+        isString(change.id) &&
+        isNonnegativeBeat(change.beat) &&
+        isPositiveInteger(change.numerator) &&
+        isPositiveInteger(change.denominator),
+    )
+
+  const validInstrumentLanes =
+    Array.isArray(project.instrumentLanes) &&
+    project.instrumentLanes.every(
+      (lane) =>
+        isRecord(lane) &&
+        (lane.kind === undefined || lane.kind === 'instrument' || lane.kind === 'drum') &&
+        isString(lane.id) &&
+        isString(lane.name) &&
+        isString(lane.patchSource) &&
+        isString(lane.oscillatorType) &&
+        OSCILLATOR_TYPES.includes(lane.oscillatorType as OscillatorType) &&
+        isFiniteNumber(lane.gain) &&
+        isString(lane.source) &&
+        Array.isArray(lane.clips) &&
+        lane.clips.every(
+          (clip) =>
+            isRecord(clip) &&
+            isString(clip.id) &&
+            isNonnegativeBeat(clip.start) &&
+            isPositiveBeat(clip.length) &&
+            isString(clip.source),
+        ),
+    )
+
+  if (
+    project.format !== 'xenpaper3-daw' ||
+    project.version !== 1 ||
+    !isString(project.createdAt) ||
+    !Number.isFinite(Date.parse(project.createdAt)) ||
+    !isString(project.xenpaperVersion) ||
+    !isString(project.title) ||
+    !validGlobalTrack ||
+    !validInstrumentLanes
+  ) {
+    throw new TypeError('Invalid Xenpaper project file')
+  }
+  return project as unknown as DawProject
 }
 
 export const DEFAULT_CLIP_SOURCE = `# New Xenpaper clip
@@ -124,7 +208,10 @@ export const createDrumLane = (project: DawProject): InstrumentLane => {
 
 export const createDefaultProject = (): DawProject => {
   const project: DawProject = {
+    format: 'xenpaper3-daw',
     version: 1,
+    createdAt: new Date().toISOString(),
+    xenpaperVersion: '3.0.0-beta.6',
     title: 'Untitled project',
     globalTrack: {
       source: DEFAULT_GLOBAL_SOURCE,

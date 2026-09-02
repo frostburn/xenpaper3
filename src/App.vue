@@ -8,6 +8,9 @@ import TheFooter from './components/TheFooter.vue'
       <h1>Xenpaper 3</h1>
       <nav>
         <RouterLink to="/daw">Open the Xenpaper DAW</RouterLink>
+        <RouterLink :to="{ path: '/daw', query: { project: 'minuet.xenpaper.json' } }">
+          Open Minuet in G Major
+        </RouterLink>
         <RouterLink to="/xenpaper-lang-testing"
           >xenpaper-lang debugging/development view</RouterLink
         >

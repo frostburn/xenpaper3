@@ -1,4 +1,5 @@
 import { mount } from '@vue/test-utils'
+import { readFileSync } from 'node:fs'
 import { describe, expect, it, vi } from 'vitest'
 import { Fraction } from 'xen-dev-utils'
 import router from '../router'
@@ -14,6 +15,7 @@ import {
   createDrumLane,
   createInstrumentLane,
   pointerXToBeat,
+  parseDawProject,
   snapBeat,
 } from '../daw/project'
 import {
@@ -63,6 +65,53 @@ describe('DAW project model', () => {
       clips: [],
     })
     expect(JSON.parse(JSON.stringify(project), Fraction.reviver)).toEqual(project)
+  })
+
+  it('parses serialized project fractions', () => {
+    const serialized = JSON.stringify(createDefaultProject())
+    const project = parseDawProject(serialized)
+
+    expect(project.globalTrack.tempoChanges[0]!.beat).toBeInstanceOf(Fraction)
+    expect(project.globalTrack.timeSignatureChanges[0]!.beat.valueOf()).toBe(0)
+  })
+
+  it('rejects data that is not a Xenpaper project', () => {
+    expect(() => parseDawProject('{"version": 2}')).toThrow('Invalid Xenpaper project file')
+
+    const missingGlobalFields = createDefaultProject() as unknown as Record<string, unknown>
+    missingGlobalFields.globalTrack = {}
+    expect(() => parseDawProject(JSON.stringify(missingGlobalFields))).toThrow(
+      'Invalid Xenpaper project file',
+    )
+
+    const invalidClip = createDefaultProject()
+    invalidClip.instrumentLanes[0]!.clips.push({
+      id: 'invalid',
+      start: undefined as unknown as Fraction,
+      length: beat(1),
+      source: 'C',
+    })
+    expect(() => parseDawProject(JSON.stringify(invalidClip))).toThrow(
+      'Invalid Xenpaper project file',
+    )
+  })
+
+  it('loads the Minuet example as a playable two-lane project', () => {
+    const project = parseDawProject(readFileSync('public/minuet.xenpaper.json', 'utf8'))
+
+    expect(project.globalTrack.timeSignatureChanges[0]).toMatchObject({
+      numerator: 3,
+      denominator: 4,
+    })
+    expect(project.instrumentLanes.map(({ oscillatorType }) => oscillatorType)).toEqual([
+      'semisine',
+      'triangle',
+    ])
+    expect(project.instrumentLanes.every(({ clips }) => clips.length === 2)).toBe(true)
+    expect(project.instrumentLanes.every(({ clips }) => clips[1]!.start.valueOf() === 96)).toBe(
+      true,
+    )
+    expect(parseProjectNotes(project).length).toBeGreaterThan(0)
   })
 
   it('creates an instrument lane with a reusable unique number', () => {
@@ -623,9 +672,7 @@ describe('DawView', () => {
       '# Defaults inherited by every clip in this lane\n',
     )
     await laneSource.setValue('@adsr(10ms, 20ms, 50%, 30ms)')
-    expect((laneSource.element as HTMLTextAreaElement).value).toBe(
-      '@adsr(10ms, 20ms, 50%, 30ms)',
-    )
+    expect((laneSource.element as HTMLTextAreaElement).value).toBe('@adsr(10ms, 20ms, 50%, 30ms)')
 
     await lane.get('[aria-label="Drum lane"]').trigger('dblclick', { clientX: 64 })
     expect(wrapper.get('[aria-label="Xenpaper clip source"]').element).toHaveProperty(
