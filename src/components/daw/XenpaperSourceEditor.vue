@@ -21,7 +21,6 @@ const draft = ref(props.source)
 let updateTimer: ReturnType<typeof setTimeout> | undefined
 let pendingSourceKey: string | undefined
 
-const LARGE_SOURCE_THRESHOLD = 20
 const EDIT_DEBOUNCE_MS = 200
 
 watch(
@@ -43,10 +42,6 @@ function commitDraft() {
 const updateDraft = (event: Event) => {
   draft.value = (event.target as HTMLTextAreaElement).value
   if (updateTimer) clearTimeout(updateTimer)
-  if (draft.value.length <= LARGE_SOURCE_THRESHOLD) {
-    emit('update:source', draft.value, props.sourceKey)
-    return
-  }
   // Parsing drives highlighting, diagnostics, clip sizing, and the piano roll. Keep
   // the textarea responsive and let that work happen once after a burst of typing.
   pendingSourceKey = props.sourceKey
@@ -68,7 +63,7 @@ onBeforeUnmount(() => {
   <div class="xenpaper-source-editor">
     <pre
       aria-hidden="true"
-    ><XenpaperSourceHighlight :source="draft" :unparsed="Boolean(updateTimer)" :drum-samples="drumSamples" :diagnostics="diagnostics" :style="{
+    ><XenpaperSourceHighlight :source="draft" :stable-source="updateTimer ? source : undefined" :drum-samples="drumSamples" :diagnostics="diagnostics" :style="{
       transform: `translate(${-scroll.left}px, ${-scroll.top}px)`,
     }" /></pre>
     <textarea
