@@ -6,11 +6,11 @@ import {
   type XenpaperHighlightToken,
 } from '../../xenpaperSyntaxHighlight'
 
-const props = defineProps<{ source: string }>()
+const props = defineProps<{ source: string; drumSamples?: readonly string[] }>()
 const tokens = computed<XenpaperHighlightToken[]>(() => {
   if (!props.source) return []
   try {
-    return highlightXenpaper(parse(props.source))
+    return highlightXenpaper(parse(props.source, { drumSamples: props.drumSamples }))
   } catch {
     return [{ kind: 'unparsed', text: props.source, start: 0, end: props.source.length }]
   }

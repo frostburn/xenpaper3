@@ -3,7 +3,12 @@ import { ref } from 'vue'
 import XenpaperSourceHighlight from './XenpaperSourceHighlight.vue'
 
 withDefaults(
-  defineProps<{ source: string; editorLabel: string; rows?: number }>(),
+  defineProps<{
+    source: string
+    editorLabel: string
+    rows?: number
+    drumSamples?: readonly string[]
+  }>(),
   { rows: 3 },
 )
 const emit = defineEmits<{ 'update:source': [source: string] }>()
@@ -20,7 +25,9 @@ defineExpose({ focus: () => textarea.value?.focus() })
 
 <template>
   <div class="xenpaper-source-editor">
-    <pre aria-hidden="true"><XenpaperSourceHighlight :source="source" :style="{
+    <pre
+      aria-hidden="true"
+    ><XenpaperSourceHighlight :source="source" :drum-samples="drumSamples" :style="{
       transform: `translate(${-scroll.left}px, ${-scroll.top}px)`,
     }" /></pre>
     <textarea

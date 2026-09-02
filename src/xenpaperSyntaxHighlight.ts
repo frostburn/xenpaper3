@@ -102,6 +102,7 @@ const kindsByNodeType: Partial<Record<string, XenpaperHighlightKind>> = {
   EqualDivisionLiteral: 'number',
   MonzoLiteral: 'number',
   MappingLiteral: 'number',
+  DrumSampleLiteral: 'identifier',
   Identifier: 'identifier',
   CallExpression: 'identifier',
   BinaryExpression: 'operator',

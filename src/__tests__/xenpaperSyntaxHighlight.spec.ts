@@ -3,6 +3,17 @@ import { highlightXenpaper } from '../xenpaperSyntaxHighlight'
 import { parse } from '../../xenpaper-lang'
 
 describe('highlightXenpaper', () => {
+  it('highlights every configured drum sample consistently', () => {
+    const tokens = highlightXenpaper(parse('[bd,hh hh]', { drumSamples: ['bd', 'hh'] }))
+
+    expect(tokens.filter(({ kind }) => kind === 'identifier').map(({ text }) => text)).toEqual([
+      'bd',
+      'hh',
+      'hh',
+    ])
+    expect(tokens.some(({ kind }) => kind.startsWith('pitch'))).toBe(false)
+  })
+
   it('returns lossless, contiguous source ranges', () => {
     const source = 'MOS {5L 2s} || # comment\n@tempo(120) C D^ 3/2'
     const tokens = highlightXenpaper(parse(source))
