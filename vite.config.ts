@@ -23,17 +23,14 @@ export default defineConfig({
             {
               name: 'xenpaper-lang',
               test: /[\\/]xenpaper-lang[\\/]/,
-              includeDependenciesRecursively: false,
             },
             {
               name: 'sw-patch',
               test: /[\\/]sw-patch[\\/]/,
-              includeDependenciesRecursively: false,
             },
             {
               name: 'sw-seq',
               test: /[\\/]sw-seq[\\/]/,
-              includeDependenciesRecursively: false,
             },
           ],
         },
