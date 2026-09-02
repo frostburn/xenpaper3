@@ -713,6 +713,24 @@ K L M N j k=`) as SequenceShape
       )
   })
 
+  it('preserves an active MOS root association while stretching', () => {
+    for (const factor of ['100%', '3/2']) {
+      const score = shape(`MOS{5L2s} {K as root} {tuning *= ${factor}} K`) as SequenceShape
+      const attack = score.children.find((child) => child.kind === 'attack')
+      expect(attack?.kind === 'attack' ? attack.pitch.value.valueOf() : undefined).toBeCloseTo(0)
+    }
+
+    let context = applyPitchContextChange(parse('MOS{5L2s}').body[0] as PitchContextChange)
+    context = applyPitchContextChange(parse('{K as root}').body[0] as PitchContextChange, context)
+    const originalRootOffset = context.rootPitch.rootOffset.valueOf()
+    context = applyPitchContextChange(
+      parse('{tuning *= 3/2}').body[0] as PitchContextChange,
+      context,
+    )
+    expect(context.rootPitch.rootOffset.valueOf()).toBeCloseTo(originalRootOffset * 1.5)
+    expect(context.rootPitch.mos?.context).toBe(context.mos)
+  })
+
   it.each(['Pythagorean', 'JustIntonation', 'JI', 'Untempered'])(
     'uses %s to restore the original prime mapping',
     (preset) => {

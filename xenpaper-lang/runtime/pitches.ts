@@ -268,6 +268,15 @@ function stretchPitchContext(context: PitchContext, factor: Value): PitchContext
         })),
       }
     : undefined
+  const rootMos = context.rootPitch.mos
+  const rootPitch =
+    rootMos && mos && rootMos.context === context.mos
+      ? {
+          ...context.rootPitch,
+          rootOffset: stretch(context.rootPitch.rootOffset),
+          mos: { rank: rootMos.rank, context: mos },
+        }
+      : context.rootPitch
   return {
     ...context,
     mapping,
@@ -275,6 +284,7 @@ function stretchPitchContext(context: PitchContext, factor: Value): PitchContext
     degreeEquave: stretch(context.degreeEquave),
     up: stretch(context.up),
     lift: stretch(context.lift),
+    rootPitch,
     ...(mos ? { mos } : {}),
   }
 }
