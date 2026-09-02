@@ -9,6 +9,7 @@ import {
   type InstrumentLane,
   type SourceClip,
 } from '../../daw/project'
+import XenpaperSourceHighlight from './XenpaperSourceHighlight.vue'
 
 const props = defineProps<{
   lane: InstrumentLane
@@ -248,7 +249,7 @@ const onKeyDown = (event: KeyboardEvent) => {
       @dblclick.stop
       @pointerdown.prevent="startDrag($event, clip)"
     >
-      <pre v-if="displayMode === 'source'">{{ clip.source }}</pre>
+      <pre v-if="displayMode === 'source'"><XenpaperSourceHighlight :source="clip.source" /></pre>
       <span v-else class="piano-roll" aria-label="Piano roll preview">
         <span v-if="clipPreview(clip.id).registerOffset" class="register-label"
           >{{ clipPreview(clip.id).registerOffset > 0 ? '+' : ''

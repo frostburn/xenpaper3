@@ -13,6 +13,7 @@ import {
   type SourceClip,
 } from '../../daw/project'
 import XenpaperSourceEditor from './XenpaperSourceEditor.vue'
+import XenpaperSourceHighlight from './XenpaperSourceHighlight.vue'
 
 const props = defineProps<{
   lane: InstrumentLane
@@ -149,7 +150,7 @@ const moveDrag = (event: PointerEvent) => {
         @dblclick.stop
         @pointerdown.prevent="startDrag($event, clip)"
       >
-        <pre v-if="displayMode === 'source'">{{ clip.source }}</pre>
+        <pre v-if="displayMode === 'source'"><XenpaperSourceHighlight :source="clip.source" /></pre>
         <span v-else class="drum-preview" aria-label="Drum pattern preview">
           <span
             v-for="sample in samples"
