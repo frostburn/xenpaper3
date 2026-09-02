@@ -104,6 +104,7 @@ const moveDrag = (event: PointerEvent) => {
         <XenpaperSourceEditor
           editor-label="Drum lane source"
           :source="lane.source"
+          :drum-samples="samples"
           :rows="3"
           @update:source="emit('update-source', $event)"
         />
@@ -150,7 +151,10 @@ const moveDrag = (event: PointerEvent) => {
         @dblclick.stop
         @pointerdown.prevent="startDrag($event, clip)"
       >
-        <pre v-if="displayMode === 'source'"><XenpaperSourceHighlight :source="clip.source" /></pre>
+        <pre v-if="displayMode === 'source'"><XenpaperSourceHighlight
+          :source="clip.source"
+          :drum-samples="samples"
+        /></pre>
         <span v-else class="drum-preview" aria-label="Drum pattern preview">
           <span
             v-for="sample in samples"

@@ -713,9 +713,12 @@ describe('DawView', () => {
     expect(lane.findAll('.drum-row-label').map((label) => label.text())).toEqual(['sd', 'hh', 'bd'])
 
     await wrapper.get('[aria-label="Clip display"]').setValue('source')
-    expect(
-      lane.findAll('button.clip [data-highlight="identifier"]').map((token) => token.text()),
-    ).toContain('hh')
+    const highlightedDrums = lane
+      .findAll('button.clip [data-highlight="identifier"]')
+      .map((token) => token.text())
+    expect(highlightedDrums).toContain('bd')
+    expect(highlightedDrums).toContain('hh')
+    expect(lane.find('button.clip [data-highlight^="pitch"]').exists()).toBe(false)
   })
 
   it('resizes a clip when its source duration changes', async () => {

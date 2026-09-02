@@ -3,7 +3,7 @@ import { ref } from 'vue'
 import type { SourceClip } from '../../daw/project'
 import XenpaperSourceEditor from './XenpaperSourceEditor.vue'
 
-defineProps<{ clip?: SourceClip }>()
+defineProps<{ clip?: SourceClip; drumSamples?: readonly string[] }>()
 const emit = defineEmits<{
   'update-source': [source: string]
   delete: []
@@ -39,6 +39,7 @@ defineExpose({ focus: () => editor.value?.focus() })
       ref="editor"
       editor-label="Xenpaper clip source"
       :source="clip.source"
+      :drum-samples="drumSamples"
       :rows="8"
       @update:source="emit('update-source', $event)"
     />

@@ -338,6 +338,7 @@ onBeforeUnmount(() => {
     <ClipSourceEditor
       ref="editor"
       :clip="selectedClip"
+      :drum-samples="selectedLane ? drumSamplesForLane(selectedLane) : undefined"
       @update-source="selectedClip && updateClipSource(selectedClip, $event)"
       @delete="deleteSelectedClip"
       @play="playSelectedClip(false)"
