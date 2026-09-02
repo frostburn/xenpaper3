@@ -557,13 +557,17 @@ ContextStatementList
 
 ContextAssignmentStart
   = ("sig"i / "key"i / "root"i) !IdentifierContinue Spacing "="
+  / "tuning"i !IdentifierContinue Spacing "*="
   / "'" Spacing "="
   / ContextAssignmentTarget Spacing "="
   / 'root'i !IdentifierContinue Spacing 'as'i !IdentifierContinue
   / ContextAssignmentTarget Spacing 'as'i !IdentifierContinue Spacing 'root'i !IdentifierContinue
 
 ContextStatement
-  = operator:$("'") Spacing "=" Spacing value:ContextValue {
+  = name:$('tuning'i) !IdentifierContinue Spacing '*=' Spacing value:AdditiveExpression {
+      return node('TuningStretch', { factor: value, raw: text() });
+    }
+  / operator:$("'") Spacing "=" Spacing value:ContextValue {
       return node('ContextAssignment', {
         target: node('ContextOperatorTarget', { operator }),
         value,

@@ -676,6 +676,61 @@ K L M N j k=`) as SequenceShape
     expect(context.mapping.mapPrime(7).equals(edo.mapping.mapPrime(7))).toBe(false)
   })
 
+  it('stretches scales, prime mappings, and notation operators in pitch-space', () => {
+    const base = applyPitchContextChange(parse('{12edo}').body[0] as PitchContextChange)
+    const stretched = applyPitchContextChange(
+      parse('{tuning *= 102%}').body[0] as PitchContextChange,
+      base,
+    )
+
+    expect(stretched.degrees[0]!.valueOf()).toBeCloseTo(102)
+    expect(stretched.degreeEquave.valueOf()).toBeCloseTo(1224)
+    expect(stretched.mapping.mapPrime(2).valueOf()).toBeCloseTo(1224)
+    expect(stretched.mapping.mapPrime(3).valueOf()).toBeCloseTo(
+      base.mapping.mapPrime(3).valueOf() * 1.02,
+    )
+    expect(stretched.up.valueOf()).toBeCloseTo(base.up.valueOf() * 1.02)
+    expect(stretched.lift.valueOf()).toBeCloseTo(base.lift.valueOf() * 1.02)
+
+    const score = shape('{12edo} {tuning *= 102%} 1') as SequenceShape
+    const attack = score.children.find((child) => child.kind === 'attack')
+    expect(attack?.kind === 'attack' ? attack.pitch.value.valueOf() : undefined).toBeCloseTo(102)
+  })
+
+  it('stretches active MOS intervals and rejects invalid stretch factors', () => {
+    const mos = applyPitchContextChange(parse('MOS{5L2s}').body[0] as PitchContextChange)
+    const stretched = applyPitchContextChange(
+      parse('{tuning *= 3/2}').body[0] as PitchContextChange,
+      mos,
+    )
+    expect(stretched.mos!.large.valueOf()).toBeCloseTo(mos.mos!.large.valueOf() * 1.5)
+    expect([...stretched.mos!.nominals.values()][1]!.valueOf()).toBeCloseTo(
+      [...mos.mos!.nominals.values()][1]!.valueOf() * 1.5,
+    )
+    for (const source of ['{tuning *= 0%}', '{tuning *= 1s}'])
+      expect(() => applyPitchContextChange(parse(source).body[0] as PitchContextChange)).toThrow(
+        /positive dimensionless factor/,
+      )
+  })
+
+  it('preserves an active MOS root association while stretching', () => {
+    for (const factor of ['100%', '3/2']) {
+      const score = shape(`MOS{5L2s} {K as root} {tuning *= ${factor}} K`) as SequenceShape
+      const attack = score.children.find((child) => child.kind === 'attack')
+      expect(attack?.kind === 'attack' ? attack.pitch.value.valueOf() : undefined).toBeCloseTo(0)
+    }
+
+    let context = applyPitchContextChange(parse('MOS{5L2s}').body[0] as PitchContextChange)
+    context = applyPitchContextChange(parse('{K as root}').body[0] as PitchContextChange, context)
+    const originalRootOffset = context.rootPitch.rootOffset.valueOf()
+    context = applyPitchContextChange(
+      parse('{tuning *= 3/2}').body[0] as PitchContextChange,
+      context,
+    )
+    expect(context.rootPitch.rootOffset.valueOf()).toBeCloseTo(originalRootOffset * 1.5)
+    expect(context.rootPitch.mos?.context).toBe(context.mos)
+  })
+
   it.each(['Pythagorean', 'JustIntonation', 'JI', 'Untempered'])(
     'uses %s to restore the original prime mapping',
     (preset) => {
