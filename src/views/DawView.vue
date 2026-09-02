@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, ref, watchEffect } from 'vue'
+import { computed, nextTick, onBeforeUnmount, ref, watch, watchEffect } from 'vue'
 import ClipSourceEditor from '../components/daw/ClipSourceEditor.vue'
 import DrumLane from '../components/daw/DrumLane.vue'
 import GlobalLane from '../components/daw/GlobalLane.vue'
@@ -27,6 +27,7 @@ const selectedClipId = ref<string>()
 const playhead = ref(0)
 const pixelsPerBeat = ref(64)
 const scrollLeft = ref(0)
+const collapsedLaneIds = ref(new Set<string>())
 const grid = ref<Beat>(beat(1, 4))
 const displayMode = ref<ClipDisplayMode>('piano-roll')
 const playing = ref(false)
@@ -41,6 +42,19 @@ const selectedLane = computed(() =>
 const selectedClip = computed(() =>
   selectedLane.value?.clips.find(({ id }) => id === selectedClipId.value),
 )
+const projectEndBeat = computed(() =>
+  Math.max(
+    0,
+    ...project.value.instrumentLanes.flatMap((lane) =>
+      lane.clips.map((clip) => beatToNumber(clip.start) + beatToNumber(clip.length)),
+    ),
+  ),
+)
+// Four empty bars beyond the last clip make room for extending the arrangement.
+const maxScrollLeft = computed(() => Math.ceil((projectEndBeat.value + 16) * pixelsPerBeat.value))
+watch(maxScrollLeft, (maximum) => {
+  scrollLeft.value = Math.min(scrollLeft.value, maximum)
+})
 watchEffect(() => {
   const signature = project.value.globalTrack.timeSignatureChanges[0]!
   const defaultBar = beat(signature.numerator * 4, signature.denominator)
@@ -96,6 +110,32 @@ const selectClip = (lane: InstrumentLane, clip: SourceClip) => {
   playhead.value = beatToNumber(clip.start)
 }
 
+const startPlayback = async (fromBeat: number, playbackProject = project.value) => {
+  playbackError.value = ''
+  try {
+    // Keep the transport usable in SSR/test environments; browsers take the audio path below.
+    if (typeof AudioContext === 'undefined') {
+      if (playTimer) clearInterval(playTimer)
+      playhead.value = fromBeat
+      playing.value = true
+      playTimer = setInterval(() => (playhead.value += 0.05), 25)
+      return
+    }
+    audioEngine ??= new DawAudioEngine()
+    audioEngine.addEventListener('ended', finishPlayback)
+    if (audioEngine.context.state === 'suspended') await audioEngine.context.resume()
+    await audioEngine.play(playbackProject, fromBeat)
+    if (playTimer) clearInterval(playTimer)
+    playhead.value = fromBeat
+    playing.value = true
+    playTimer = setInterval(() => {
+      playhead.value = audioEngine?.positionBeats ?? playhead.value
+    }, 25)
+  } catch (error) {
+    playbackError.value = error instanceof Error ? error.message : String(error)
+  }
+}
+
 const togglePlayback = async () => {
   if (playing.value) {
     audioEngine?.stop()
@@ -104,26 +144,22 @@ const togglePlayback = async () => {
     playTimer = undefined
     return
   }
-  playbackError.value = ''
-  try {
-    // Keep the transport usable in SSR/test environments; browsers take the audio path below.
-    if (typeof AudioContext === 'undefined') {
-      playing.value = true
-      playTimer = setInterval(() => (playhead.value += 0.05), 25)
-      return
-    }
-    audioEngine ??= new DawAudioEngine()
-    audioEngine.addEventListener('ended', finishPlayback)
-    if (audioEngine.context.state === 'suspended') await audioEngine.context.resume()
-    await audioEngine.play(project.value, playhead.value)
-    playing.value = true
-    playTimer = setInterval(() => {
-      playhead.value = audioEngine?.positionBeats ?? playhead.value
-    }, 25)
-  } catch (error) {
-    playbackError.value = error instanceof Error ? error.message : String(error)
-    playing.value = false
-  }
+  await startPlayback(playhead.value)
+}
+
+const playSelectedClip = (solo: boolean) => {
+  if (!selectedLane.value || !selectedClip.value) return
+  const fromBeat = beatToNumber(selectedClip.value.start)
+  if (!solo) return startPlayback(fromBeat)
+  const soloLane = { ...selectedLane.value, clips: [selectedClip.value] }
+  return startPlayback(fromBeat, { ...project.value, instrumentLanes: [soloLane] })
+}
+
+const toggleLaneCollapse = (laneId: string) => {
+  const next = new Set(collapsedLaneIds.value)
+  if (next.has(laneId)) next.delete(laneId)
+  else next.add(laneId)
+  collapsedLaneIds.value = next
 }
 
 const stopPlayback = () => {
@@ -157,6 +193,9 @@ const deleteInstrumentLane = (lane: InstrumentLane) => {
   const index = project.value.instrumentLanes.findIndex(({ id }) => id === lane.id)
   if (index === -1) return
   project.value.instrumentLanes.splice(index, 1)
+  const nextCollapsedLaneIds = new Set(collapsedLaneIds.value)
+  nextCollapsedLaneIds.delete(lane.id)
+  collapsedLaneIds.value = nextCollapsedLaneIds
   if (selectedLaneId.value === lane.id) {
     selectedClipId.value = undefined
     selectedLaneId.value = undefined
@@ -189,14 +228,33 @@ onBeforeUnmount(() => {
     />
     <p v-if="playbackError" class="playback-error" role="alert">{{ playbackError }}</p>
     <div class="timeline-controls">
-      <label>Zoom <input v-model.number="pixelsPerBeat" type="range" min="32" max="160" /></label>
-      <label>Scroll <input v-model.number="scrollLeft" type="range" min="0" max="2048" /></label>
+      <label
+        >Zoom
+        <input
+          v-model.number="pixelsPerBeat"
+          aria-label="Timeline zoom"
+          type="range"
+          min="8"
+          max="160"
+      /></label>
       <label>
         Clip view
         <select v-model="displayMode" aria-label="Clip display">
           <option value="piano-roll">Piano roll</option>
           <option value="source">Source</option>
         </select>
+      </label>
+    </div>
+    <div class="scroll-controls">
+      <label>
+        Timeline scroll
+        <input
+          v-model.number="scrollLeft"
+          aria-label="Timeline scroll"
+          type="range"
+          min="0"
+          :max="maxScrollLeft"
+        />
       </label>
     </div>
     <GlobalLane
@@ -219,6 +277,7 @@ onBeforeUnmount(() => {
         :pixels-per-beat="pixelsPerBeat"
         :scroll-left="scrollLeft"
         :display-mode="displayMode"
+        :collapsed="collapsedLaneIds.has(lane.id)"
         @insert="insertClip(lane, $event)"
         @select="selectClip(lane, $event)"
         @place-playhead="playhead = $event"
@@ -226,16 +285,20 @@ onBeforeUnmount(() => {
         @delete="deleteClip(lane, $event)"
         @update-gain="lane.gain = $event"
         @delete-lane="deleteInstrumentLane(lane)"
+        @toggle-collapse="toggleLaneCollapse(lane.id)"
       />
       <template v-else>
         <InstrumentHeader
           :lane="lane"
+          :collapsed="collapsedLaneIds.has(lane.id)"
           @update-source="lane.source = $event"
           @update-oscillator="lane.oscillatorType = $event"
           @update-gain="lane.gain = $event"
           @delete="deleteInstrumentLane(lane)"
+          @toggle-collapse="toggleLaneCollapse(lane.id)"
         />
         <InstrumentPianoRollLane
+          v-show="!collapsedLaneIds.has(lane.id)"
           :lane="lane"
           :global-source="project.globalTrack.source"
           :selected-clip-id="selectedLaneId === lane.id ? selectedClipId : undefined"
@@ -261,6 +324,9 @@ onBeforeUnmount(() => {
       :clip="selectedClip"
       @update-source="selectedClip && updateClipSource(selectedClip, $event)"
       @delete="deleteSelectedClip"
+      @play="playSelectedClip(false)"
+      @play-solo="playSelectedClip(true)"
+      @stop="stopPlayback"
     />
   </div>
 </template>
@@ -282,6 +348,21 @@ onBeforeUnmount(() => {
   display: flex;
   align-items: center;
   gap: 0.5rem;
+}
+.timeline-controls input[type='range'] {
+  width: min(28rem, 45vw);
+}
+.scroll-controls {
+  padding: 0 0.5rem 0.75rem;
+}
+.scroll-controls label {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+.scroll-controls input {
+  flex: 1;
+  min-width: 0;
 }
 .playback-error {
   color: #ff9b9b;

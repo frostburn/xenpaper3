@@ -1,18 +1,28 @@
 <script setup lang="ts">
 import { OSCILLATOR_TYPES, type InstrumentLane } from '../../daw/project'
 
-defineProps<{ lane: InstrumentLane }>()
+defineProps<{ lane: InstrumentLane; collapsed?: boolean }>()
 defineEmits<{
   'update-oscillator': [type: InstrumentLane['oscillatorType']]
   'update-gain': [gain: number]
   'update-source': [source: string]
   delete: []
+  'toggle-collapse': []
 }>()
 </script>
 
 <template>
-  <header class="instrument-header">
+  <header class="instrument-header" :class="{ collapsed }">
     <strong>{{ lane.name }}</strong>
+    <button
+      type="button"
+      class="collapse-lane"
+      :aria-label="`${collapsed ? 'Expand' : 'Collapse'} ${lane.name}`"
+      :aria-expanded="!collapsed"
+      @click="$emit('toggle-collapse')"
+    >
+      {{ collapsed ? '▸ Expand' : '▾ Collapse' }}
+    </button>
     <button
       type="button"
       class="delete-lane"
@@ -21,7 +31,7 @@ defineEmits<{
     >
       Delete lane
     </button>
-    <label class="source-control">
+    <label v-if="!collapsed" class="source-control">
       Lane source
       <textarea
         aria-label="Instrument lane source"
@@ -30,7 +40,7 @@ defineEmits<{
         @input="$emit('update-source', ($event.target as HTMLTextAreaElement).value)"
       />
     </label>
-    <label>
+    <label v-if="!collapsed">
       {{ lane.patchSource }} SW Patch ·
       <select
         aria-label="Waveform"
@@ -47,7 +57,7 @@ defineEmits<{
         </option>
       </select>
     </label>
-    <label>
+    <label v-if="!collapsed">
       Gain
       <input
         aria-label="Instrument gain"
@@ -71,6 +81,15 @@ defineEmits<{
   gap: 1rem;
   padding: 0.6rem;
   background: #283143;
+}
+.instrument-header.collapsed {
+  justify-content: flex-start;
+  gap: 0.5rem;
+  padding: 0.25rem 0.5rem;
+}
+.instrument-header.collapsed .delete-lane {
+  margin-left: auto;
+  padding-block: 0.2rem;
 }
 .instrument-header label {
   display: flex;

@@ -508,13 +508,76 @@ describe('DawView', () => {
 
   it('keeps the visual grid aligned with zoom and scroll', async () => {
     const wrapper = mount(DawView)
-    const controls = wrapper.findAll<HTMLInputElement>('.timeline-controls input')
-    await controls[0]!.setValue('96')
-    await controls[1]!.setValue('32')
+    await wrapper.get('[aria-label="Timeline zoom"]').setValue('96')
+    await wrapper.get('[aria-label="Timeline scroll"]').setValue('32')
 
     const style = wrapper.get('[aria-label="Instrument piano roll"]').attributes('style')
     expect(style).toContain('--beat-width: 96px')
     expect(style).toContain('--grid-offset: -32px')
+  })
+
+  it('offers a wide project-aware scroll range and a lower minimum zoom', async () => {
+    const wrapper = mount(DawView)
+    const zoom = wrapper.get('[aria-label="Timeline zoom"]')
+    const scroll = wrapper.get('[aria-label="Timeline scroll"]')
+
+    expect(zoom.attributes('min')).toBe('8')
+    expect(scroll.element.parentElement?.parentElement?.className).toBe('scroll-controls')
+    expect(Number(scroll.attributes('max'))).toBe(16 * 64)
+
+    await wrapper.getComponent(InstrumentPianoRollLane).trigger('dblclick', { clientX: 1280 })
+    expect(Number(scroll.attributes('max'))).toBe((24 + 16) * 64)
+
+    await scroll.setValue('2000')
+    await zoom.setValue('8')
+    expect((scroll.element as HTMLInputElement).value).toBe(String((24 + 16) * 8))
+  })
+
+  it('collapses and expands instrument and drum lanes', async () => {
+    const wrapper = mount(DawView)
+    const instrumentGrid = wrapper.get('[aria-label="Instrument piano roll"]')
+
+    await wrapper.get('[aria-label="Collapse Instrument 1"]').trigger('click')
+    expect(instrumentGrid.attributes('style')).toContain('display: none')
+    expect(wrapper.get('.instrument-header').classes()).toContain('collapsed')
+    expect(wrapper.find('[aria-label="Instrument lane source"]').exists()).toBe(false)
+    await wrapper.get('[aria-label="Expand Instrument 1"]').trigger('click')
+    expect(wrapper.get('[aria-label="Instrument piano roll"]').attributes('style')).not.toContain(
+      'display: none',
+    )
+
+    await wrapper.get('button.add-drum-lane').trigger('click')
+    await wrapper.get('[aria-label="Collapse Drums 1"]').trigger('click')
+    expect(wrapper.get('[aria-label="Drum lane"]').attributes('style')).toContain('display: none')
+    expect(wrapper.get('.drum-lane header').classes()).toContain('collapsed')
+    expect(wrapper.find('[aria-label="Drum gain"]').exists()).toBe(false)
+  })
+
+  it('does not reuse the collapsed state of a deleted lane', async () => {
+    const wrapper = mount(DawView)
+
+    await wrapper.get('[aria-label="Collapse Instrument 1"]').trigger('click')
+    await wrapper.get('[aria-label="Delete Instrument 1"]').trigger('click')
+    await wrapper.get('button.add-lane').trigger('click')
+
+    expect(wrapper.get('[aria-label="Collapse Instrument 1"]').exists()).toBe(true)
+    expect(wrapper.get('[aria-label="Instrument piano roll"]').attributes('style')).not.toContain(
+      'display: none',
+    )
+  })
+
+  it('adds play, solo, and stop actions to the selected clip header', async () => {
+    const wrapper = mount(DawView)
+    await wrapper.getComponent(InstrumentPianoRollLane).trigger('dblclick', { clientX: 64 })
+
+    await wrapper.get('[aria-label="Play from clip start"]').trigger('click')
+    expect(wrapper.get('[aria-label="Play"]').attributes('aria-pressed')).toBe('true')
+    expect(wrapper.get('output').text()).toBe('Beat 1.00')
+    await wrapper.get('[aria-label="Play clip solo from clip start"]').trigger('click')
+    expect(wrapper.get('[aria-label="Play"]').attributes('aria-pressed')).toBe('true')
+    await wrapper.get('[aria-label="Stop clip playback"]').trigger('click')
+    expect(wrapper.get('output').text()).toBe('Beat 0.00')
+    wrapper.unmount()
   })
 
   it('edits global controls, waveform, and the clip preview mode', async () => {
