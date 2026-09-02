@@ -20,7 +20,9 @@ const tokens = computed<XenpaperHighlightToken[]>(() => {
       const boundaries = warningRanges
         .flatMap(({ start, end }) => [start.offset, end.offset])
         .filter((offset) => offset > token.start && offset < token.end)
-      const offsets = [token.start, ...boundaries, token.end].sort((left, right) => left - right)
+      const offsets = [...new Set([token.start, ...boundaries, token.end])].sort(
+        (left, right) => left - right,
+      )
       return offsets.slice(0, -1).map((start, index) => {
         const end = offsets[index + 1]!
         const warning = warningRanges.some(

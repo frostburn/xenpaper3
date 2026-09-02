@@ -26,6 +26,17 @@ describe('directive runtime', () => {
     expect(result.diagnostics.filter(({ code }) => code === 'XP_BARLINE_OFF_CYCLE')).toEqual([])
   })
 
+  it('locates off-cycle repeat and alternate-ending markers', () => {
+    const source = '@time(4/4) C |: D |¹ E :|² F G ||'
+    const result = compile(source)
+    const highlighted = result.diagnostics
+      .filter(({ code }) => code === 'XP_BARLINE_OFF_CYCLE')
+      .flatMap(({ locations }) => locations)
+      .map(({ start, end }) => source.slice(start.offset, end.offset))
+
+    expect(highlighted).toEqual(expect.arrayContaining(['|:', '|¹', ':|²', '||']))
+  })
+
   it('uses an absolute offset when checking DAW clips', () => {
     const result = expandToBeatEvents(parse('@time(4/4) C D |'), {
       beatOffset: new Fraction(1),

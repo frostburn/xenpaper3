@@ -337,6 +337,30 @@ export function expandToBeatEvents(
     : evaluated.shape
   const flattened = flattenScoreSemantics(shape)
   const allDiagnostics = [...diagnostics, ...flattened.diagnostics]
+  // Repeat expansion removes authored repeat/ending markers. Evaluate the original
+  // tree as notation as well so every structural marker remains available for checks.
+  const authored = evaluateScoreSemantics(
+    {
+      type: 'Sequence',
+      items: program.body,
+      location: program.location,
+      expansionPath: [],
+    } as unknown as never,
+    options,
+  )
+  const structuralEvents =
+    'shape' in authored
+      ? flattenScoreSemantics(
+          options.initializationShape
+            ? {
+                kind: 'sequence',
+                duration: authored.shape.duration,
+                origins: [...options.initializationShape.origins, ...authored.shape.origins],
+                children: [options.initializationShape, authored.shape],
+              }
+            : authored.shape,
+        ).score.events
+      : flattened.score.events
   let signature: { length: Fraction; origin: Fraction } | undefined = options.timeSignature
     ? {
         length: new Fraction(
@@ -347,7 +371,8 @@ export function expandToBeatEvents(
       }
     : undefined
   const absoluteOffset = options.beatOffset ?? new Fraction(0)
-  for (const event of flattened.score.events) {
+  const warnedBarlines = new Set<string>()
+  for (const event of structuralEvents) {
     if (event.kind !== 'marker') continue
     const absoluteStart = event.start.add(absoluteOffset)
     if (event.marker === 'time-signature') {
@@ -358,13 +383,19 @@ export function expandToBeatEvents(
       }
     } else if (event.marker === 'barline' && signature) {
       const cycles = absoluteStart.sub(signature.origin).div(signature.length)
-      if (cycles.d !== 1)
+      const locations = event.origins.map((origin) => origin.location)
+      const warningKey = locations
+        .map(({ start, end }) => `${start.offset}:${end.offset}`)
+        .join(',')
+      if (cycles.d !== 1 && !warnedBarlines.has(warningKey)) {
+        warnedBarlines.add(warningKey)
         allDiagnostics.push({
           code: 'XP_BARLINE_OFF_CYCLE',
           severity: 'warning',
           message: `Barline does not fall on a whole multiple of the ${signature.length.toFraction()}-beat measure.`,
-          locations: event.origins.map((origin) => origin.location),
+          locations,
         })
+      }
     }
   }
   return allDiagnostics.some((diagnostic) => diagnostic.severity === 'error')
