@@ -77,6 +77,23 @@ describe('DAW project model', () => {
 
   it('rejects data that is not a Xenpaper project', () => {
     expect(() => parseDawProject('{"version": 2}')).toThrow('Invalid Xenpaper project file')
+
+    const missingGlobalFields = createDefaultProject() as unknown as Record<string, unknown>
+    missingGlobalFields.globalTrack = {}
+    expect(() => parseDawProject(JSON.stringify(missingGlobalFields))).toThrow(
+      'Invalid Xenpaper project file',
+    )
+
+    const invalidClip = createDefaultProject()
+    invalidClip.instrumentLanes[0]!.clips.push({
+      id: 'invalid',
+      start: undefined as unknown as Fraction,
+      length: beat(1),
+      source: 'C',
+    })
+    expect(() => parseDawProject(JSON.stringify(invalidClip))).toThrow(
+      'Invalid Xenpaper project file',
+    )
   })
 
   it('loads the Minuet example as a playable two-lane project', () => {
@@ -91,6 +108,9 @@ describe('DAW project model', () => {
       'triangle',
     ])
     expect(project.instrumentLanes.every(({ clips }) => clips.length === 2)).toBe(true)
+    expect(project.instrumentLanes.every(({ clips }) => clips[1]!.start.valueOf() === 96)).toBe(
+      true,
+    )
     expect(parseProjectNotes(project).length).toBeGreaterThan(0)
   })
 

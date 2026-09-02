@@ -1,5 +1,8 @@
 {
+  "format": "xenpaper3-daw",
   "version": 1,
+  "createdAt": "2026-09-02T07:04:43.000Z",
+  "xenpaperVersion": "3.0.0-beta.6",
   "title": "Minuet in G Major, BWV Anh. 114",
   "globalTrack": {
     "source": "# Minuet in\n{key = G Major}\n# BWV Anhang 114\n# Formerly attributed to Johann Sebastian Bach\n# Christian Petzold (1677-1733)\n",
@@ -42,7 +45,7 @@
             "d": 1
           },
           "length": {
-            "n": 48,
+            "n": 96,
             "d": 1
           },
           "source": "d= G A B c | d= G=  G=  | e= c d e f | g= G= G=      |\nc= d c B A | B= c B A G | F= G A B G | @8? B A=====  |\nd= G A B c | d= G=  G=  | e= c d e f | g= G= G=      |\nc= d c B A | B= c B A G | A= B A G F | G=====       :|\n"
@@ -50,11 +53,11 @@
         {
           "id": "clip-2",
           "start": {
-            "n": 48,
+            "n": 96,
             "d": 1
           },
           "length": {
-            "n": 48,
+            "n": 96,
             "d": 1
           },
           "source": "b= g a b g | a= d e f d | g= e f g d | c#= B c# A= | A B c# d e f | g= f= e= | f=  A= c#= | d=====           |\nd= G F G=  | e= G F G=  | d= c=  B=  | A G F G  A= | D E F  G A B | c= B= A= | B d G= F=  | [G, D, `B]===== :|==\n"
@@ -77,7 +80,7 @@
             "d": 1
           },
           "length": {
-            "n": 48,
+            "n": 96,
             "d": 1
           },
           "source": "@p [d, B, G]= @mp A | B==   | c== | B==          | A==  | G==  | d B G | d [D c] [B A] |\n    B=            A | G B G | c== | B [c B A G]= | A= F | G= B | c d D | G=      `G   :|\n"
@@ -85,11 +88,11 @@
         {
           "id": "clip-2",
           "start": {
-            "n": 48,
+            "n": 96,
             "d": 1
           },
           "length": {
-            "n": 48,
+            "n": 96,
             "d": 1
           },
           "source": " G==        | F==        | E G E | A= `A | A==       | B d c# | d  F A | d D  c  |\n(B= B, . d=)|(c= c, . e=)| B A G | D=  . |(D==, .. F)| E G F  | G `B D | G D `G :|=\n"
