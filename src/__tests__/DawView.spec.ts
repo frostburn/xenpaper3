@@ -168,6 +168,12 @@ describe('DAW project model', () => {
     expect(() => parseDawProject(JSON.stringify(invalidClip))).toThrow(
       'Invalid Xenpaper project file',
     )
+
+    const ambiguousIds = createDefaultProject()
+    ambiguousIds.instrumentLanes[0]!.id = 'instrument-1\u0000clip'
+    expect(() => parseDawProject(JSON.stringify(ambiguousIds))).toThrow(
+      'Invalid Xenpaper project file',
+    )
   })
 
   it('loads the Minuet example as a playable two-lane project', () => {
