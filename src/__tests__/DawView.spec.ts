@@ -878,6 +878,28 @@ describe('DawView', () => {
     expect((notes[2]!.element as HTMLElement).style.top).toBe('0%')
   })
 
+  it('does not let an extreme pitch fold an audible clip out of view', () => {
+    const project = createDefaultProject()
+    const lane = project.instrumentLanes[0]!
+    lane.clips = [
+      { id: 'audible', start: beat(0), length: beat(1), source: 'C' },
+      { id: 'extreme', start: beat(1), length: beat(1), source: '1000000000Hz' },
+    ]
+    const wrapper = mount(InstrumentPianoRollLane, {
+      props: { lane, pixelsPerBeat: 64, scrollLeft: 0, displayMode: 'piano-roll' },
+    })
+
+    const previews = wrapper.findAll('[aria-label="Piano roll preview"]')
+    const audibleNote = previews[0]!.get('i')
+    const extremeNote = previews[1]!.get('i')
+    expect(audibleNote.classes()).not.toContain('inaudible')
+    expect((audibleNote.element as HTMLElement).style.top).not.toBe('0%')
+    expect((audibleNote.element as HTMLElement).style.top).not.toBe('100%')
+    expect(extremeNote.classes()).toContain('inaudible')
+    expect((extremeNote.element as HTMLElement).style.top).toBe('0%')
+    expect(wrapper.find('.register-label').exists()).toBe(false)
+  })
+
   it('renders glissandi as eased bendy notes in the piano roll', () => {
     const project = createDefaultProject()
     const lane = project.instrumentLanes[0]!

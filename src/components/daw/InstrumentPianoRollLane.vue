@@ -77,10 +77,11 @@ const pianoRoll = computed(() => {
     }
   })
   const clipCenters = parsedClips
-    .filter(({ notes }) => notes.length)
-    .map(({ notes }) => {
-      const pitches = notes.flatMap(notePitches)
-      return (Math.min(...pitches) + Math.max(...pitches)) / 2
+    .flatMap(({ notes }) => {
+      // Inaudible pitches are warning markers, not representative musical content.
+      // Excluding them prevents an extreme value from folding audible clips away.
+      const pitches = notes.flatMap(notePitches).filter(isAudiblePitch)
+      return pitches.length ? [(Math.min(...pitches) + Math.max(...pitches)) / 2] : []
     })
     .sort((left, right) => left - right)
   const middle = Math.floor(clipCenters.length / 2)
