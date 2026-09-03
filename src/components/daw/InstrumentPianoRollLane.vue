@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
+import { clamp, frequencyToCentOffset } from 'xen-dev-utils'
 import { compileSourceInitialization, parseClipNotes } from '../../daw/score'
 import { easeGlissando } from '../../daw/easing'
 import {
@@ -31,6 +32,14 @@ const dragging = ref<{ clip: SourceClip; pointerOffset: number }>()
 const laneElement = ref<HTMLElement>()
 
 type PreviewNote = ReturnType<typeof parseClipNotes>[number]
+
+const XENPAPER_C_OFFSET_FROM_A4 = -900
+const MINIMUM_AUDIBLE_CENTS = frequencyToCentOffset(20) - XENPAPER_C_OFFSET_FROM_A4
+const MAXIMUM_AUDIBLE_CENTS = frequencyToCentOffset(20_000) - XENPAPER_C_OFFSET_FROM_A4
+const clampAudiblePitch = (cents: number) =>
+  clamp(MINIMUM_AUDIBLE_CENTS, MAXIMUM_AUDIBLE_CENTS, cents)
+const isAudiblePitch = (cents: number) =>
+  cents >= MINIMUM_AUDIBLE_CENTS && cents <= MAXIMUM_AUDIBLE_CENTS
 
 const segmentPitch = (segment: NonNullable<PreviewNote['glissando']>[number], t: number) =>
   segment.from + (segment.to - segment.from) * easeGlissando(segment.easing, t)
@@ -87,26 +96,31 @@ const pianoRoll = computed(() => {
     const distance = clipCenter - laneCenter
     // Fold disparate registers into the representative lane range by whole octaves.
     // The authored register remains explicit in the label rendered on that clip.
-    const registerOffset = Math.abs(distance) >= 1200 ? Math.round(distance / 1200) * 1200 : 0
+    const hasInaudiblePitch = notes.flatMap(notePitches).some((pitch) => !isAudiblePitch(pitch))
+    const registerOffset =
+      !hasInaudiblePitch && Math.abs(distance) >= 1200
+        ? Math.round(distance / 1200) * 1200
+        : 0
     return { clip, notes, registerOffset }
   })
   const pitches = displayClips.flatMap(({ notes, registerOffset }) =>
-    notes.flatMap(notePitches).map((cents) => cents - registerOffset),
+    notes.flatMap(notePitches).map((cents) => clampAudiblePitch(cents - registerOffset)),
   )
   // Keep zero visible as the pitch reference and guarantee enough room around tightly
-  // clustered material. Outlying clips still expand this single lane-wide scale.
+  // clustered material. Outlying clips expand this scale only as far as human hearing.
   const lowestPitch = Math.min(0, ...pitches)
   const highestPitch = Math.max(0, ...pitches)
   const minimumSpan = 2400
   const contentSpan = highestPitch - lowestPitch
   const padding = Math.max(100, contentSpan * 0.06)
   const missingSpan = Math.max(0, minimumSpan - contentSpan)
-  const lowerBound = lowestPitch - padding - missingSpan / 2
-  const upperBound = highestPitch + padding + missingSpan / 2
+  const lowerBound = clampAudiblePitch(lowestPitch - padding - missingSpan / 2)
+  const upperBound = clampAudiblePitch(highestPitch + padding + missingSpan / 2)
   const pitchSpan = upperBound - lowerBound
-  const pitchTop = (cents: number) => `${((upperBound - cents) / pitchSpan) * 100}%`
+  const pitchTop = (cents: number) =>
+    `${((upperBound - clampAudiblePitch(cents)) / pitchSpan) * 100}%`
   const point = (beat: number, cents: number, clipDuration: number) =>
-    `${(beat / clipDuration) * 100},${((upperBound - cents) / pitchSpan) * 100}`
+    `${(beat / clipDuration) * 100},${((upperBound - clampAudiblePitch(cents)) / pitchSpan) * 100}`
 
   const firstOctave = Math.ceil(lowerBound / 1200)
   const lastOctave = Math.floor(upperBound / 1200)
@@ -128,6 +142,7 @@ const pianoRoll = computed(() => {
               top: pitchTop(displayCents),
             })),
             notes: notes.map((note) => {
+              const inaudible = notePitches(note).some((pitch) => !isAudiblePitch(pitch))
               const glissandoPath = note.glissando
                 ? (() => {
                     const points = [point(note.beat, note.cents - registerOffset, clipDuration)]
@@ -166,6 +181,7 @@ const pianoRoll = computed(() => {
                 width: `${(note.duration / clipDuration) * 100}%`,
                 top: pitchTop(note.cents - registerOffset),
                 glissandoPath,
+                inaudible,
               }
             }),
           },
@@ -273,6 +289,7 @@ const onKeyDown = (event: KeyboardEvent) => {
             v-for="(note, index) in clipPreview(clip.id).notes.filter((note) => note.glissandoPath)"
             :key="index"
             class="bendy-note"
+            :class="{ inaudible: note.inaudible }"
             :data-beat="note.beat"
             :data-duration="note.duration"
             :data-cents="note.cents"
@@ -286,6 +303,7 @@ const onKeyDown = (event: KeyboardEvent) => {
           :data-beat="note.beat"
           :data-duration="note.duration"
           :data-cents="note.cents"
+          :class="{ inaudible: note.inaudible }"
           :style="{ top: note.top, left: note.left, width: note.width }"
         />
       </span>
@@ -361,6 +379,9 @@ const onKeyDown = (event: KeyboardEvent) => {
   border-radius: 2px;
   background: #9de3ff;
 }
+.piano-roll i.inaudible {
+  background: #ff9f43;
+}
 .bendy-notes {
   position: absolute;
   z-index: 2;
@@ -376,6 +397,9 @@ const onKeyDown = (event: KeyboardEvent) => {
   stroke-linecap: round;
   stroke-linejoin: round;
   vector-effect: non-scaling-stroke;
+}
+.bendy-note.inaudible {
+  stroke: #ff9f43;
 }
 .clip.selected {
   border-color: #8ce6ff;

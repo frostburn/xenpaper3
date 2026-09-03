@@ -859,6 +859,25 @@ describe('DawView', () => {
     expect(notes[0]!.attributes('data-cents')).not.toBe(notes[1]!.attributes('data-cents'))
   })
 
+  it('clamps notes outside human hearing to contrasting pitch boundaries', () => {
+    const project = createDefaultProject()
+    const lane = project.instrumentLanes[0]!
+    lane.clips = [
+      { id: 'inaudible', start: beat(0), length: beat(3), source: '10Hz C 30kHz' },
+    ]
+    const wrapper = mount(InstrumentPianoRollLane, {
+      props: { lane, pixelsPerBeat: 64, scrollLeft: 0, displayMode: 'piano-roll' },
+    })
+
+    const notes = wrapper.findAll('[aria-label="Piano roll preview"] i')
+    expect(notes).toHaveLength(3)
+    expect(notes[0]!.classes()).toContain('inaudible')
+    expect((notes[0]!.element as HTMLElement).style.top).toBe('100%')
+    expect(notes[1]!.classes()).not.toContain('inaudible')
+    expect(notes[2]!.classes()).toContain('inaudible')
+    expect((notes[2]!.element as HTMLElement).style.top).toBe('0%')
+  })
+
   it('renders glissandi as eased bendy notes in the piano roll', () => {
     const project = createDefaultProject()
     const lane = project.instrumentLanes[0]!
