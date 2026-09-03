@@ -91,6 +91,10 @@
       {
         "description": "Root changes can also switch octaves for a time.",
         "tune": "4 0={root = '0}4 0={root = `0}4 0="
+      },
+      {
+        "tune": "{12edo} [0,4,7]===\n{tuning *= 102%} [0,4,7]===",
+        "html": "<p>Multiply <code>tuning</code> by a positive dimensionless factor to stretch or compress the entire active pitch space while keeping its root fixed. The change scales degrees, the equave, prime mappings, accidentals, and MOS intervals together; here, <code>102%</code> makes 12edo slightly wider.</p>"
       }
     ]
   },
@@ -108,6 +112,10 @@
       {
         "tune": "@2 0 2 3 7 @3 0 2 3 7 @4 0 2 3 7 @1/2 0 2 3 7",
         "html": "<p>Set the number of subdivisions per beat with <code>@</code> followed by a positive number. For example, <code>@2</code> makes each plain note half a beat long; <code>@1/2</code> makes it two beats long.</p>"
+      },
+      {
+        "tune": "@time(3/4) C D E | F G A |\n@time(2/4) B c |",
+        "html": "<p>Use <code>@time(n/d)</code> to set the time signature for notation and barline checks. It starts a new measure cycle but does not change note durations; use subdivision directives to control rhythmic spacing.</p>"
       }
     ]
   },
@@ -143,6 +151,10 @@
       {
         "description": "To add more repeats use @x followed by a number attached to the opening |:.",
         "tune": "|:@x6\n4:5:6\n4:5:3 * 5/4\n8:5:6 * 25/16\n{root = 125/128}\n:|"
+      },
+      {
+        "tune": "0 2 |¹ 4 5 :|\n    |² 7 9 ||",
+        "html": "<p>When alternate endings are present, the initial <code>|:</code> may be omitted. A later ending marker can begin on an aligned line after <code>:|</code>, making conventional multiline scores easier to write.</p>"
       }
     ]
   },
