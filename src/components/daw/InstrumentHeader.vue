@@ -4,6 +4,7 @@ import XenpaperSourceEditor from './XenpaperSourceEditor.vue'
 
 defineProps<{ lane: InstrumentLane; collapsed?: boolean }>()
 defineEmits<{
+  'update-name': [name: string]
   'update-oscillator': [type: InstrumentLane['oscillatorType']]
   'update-gain': [gain: number]
   'update-source': [source: string]
@@ -14,7 +15,12 @@ defineEmits<{
 
 <template>
   <header class="instrument-header" :class="{ collapsed }">
-    <strong>{{ lane.name }}</strong>
+    <input
+      class="lane-name"
+      aria-label="Instrument lane name"
+      :value="lane.name"
+      @input="$emit('update-name', ($event.target as HTMLInputElement).value)"
+    />
     <button
       type="button"
       class="collapse-lane"
@@ -96,6 +102,12 @@ defineEmits<{
   display: flex;
   align-items: center;
   gap: 0.4rem;
+}
+.lane-name {
+  min-width: 6rem;
+  width: 10rem;
+  font: inherit;
+  font-weight: bold;
 }
 .delete-lane {
   color: #ffd8d8;
