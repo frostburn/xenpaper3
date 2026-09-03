@@ -7,6 +7,7 @@ import DawView from '../views/DawView.vue'
 import InstrumentPianoRollLane from '../components/daw/InstrumentPianoRollLane.vue'
 import DrumLane from '../components/daw/DrumLane.vue'
 import XenpaperSourceHighlight from '../components/daw/XenpaperSourceHighlight.vue'
+import XenpaperSourceEditor from '../components/daw/XenpaperSourceEditor.vue'
 import {
   OSCILLATOR_TYPES,
   beat,
@@ -39,6 +40,47 @@ import {
 } from '../daw/score'
 
 describe('DAW project model', () => {
+  it('debounces parsing work while a large source is being edited', async () => {
+    vi.useFakeTimers()
+    const source = 'C '.repeat(20)
+    const wrapper = mount(XenpaperSourceEditor, {
+      props: { source, sourceKey: 'first', editorLabel: 'Large source' },
+    })
+    const editor = wrapper.get('textarea')
+
+    await editor.setValue(`${source}D`)
+    await editor.setValue(`${source}D E`)
+
+    expect(wrapper.emitted('update:source')).toBeUndefined()
+    expect((editor.element as HTMLTextAreaElement).value).toBe(`${source}D E`)
+    expect(wrapper.get('[data-highlight="unparsed"]').text()).toBe('D E')
+    expect(wrapper.get('[data-highlight="pitch-latin"]').text()).toContain('C')
+    await vi.advanceTimersByTimeAsync(200)
+    expect(wrapper.emitted('update:source')).toEqual([[`${source}D E`, 'first']])
+
+    await editor.setValue(`${source}F`)
+    await wrapper.setProps({ source: 'new clip', sourceKey: 'second' })
+    const updates = wrapper.emitted('update:source')!
+    expect(updates[updates.length - 1]).toEqual([`${source}F`, 'first'])
+    expect((editor.element as HTMLTextAreaElement).value).toBe('new clip')
+
+    wrapper.unmount()
+    vi.useRealTimers()
+  })
+
+  it('keeps stable highlighting aligned around a pending insertion', () => {
+    const wrapper = mount(XenpaperSourceHighlight, {
+      props: { source: 'C XX D', stableSource: 'C D' },
+    })
+
+    expect(wrapper.findAll('[data-highlight="pitch-latin"]').map((token) => token.text())).toEqual([
+      'C',
+      'D',
+    ])
+    expect(wrapper.get('[data-highlight="unparsed"]').text()).toBe('XX')
+    expect(wrapper.get('code').text()).toBe('C XX D')
+  })
+
   it('highlights an off-cycle barline using the clip project offset', () => {
     const source = 'C D |'
     const diagnostics = clipSourceDiagnostics(source, [], {}, beat(1), {
@@ -738,6 +780,7 @@ describe('DawView', () => {
     const wrapper = mount(DawView)
     await wrapper.getComponent(InstrumentPianoRollLane).trigger('dblclick', { clientX: 64 })
     await wrapper.get('textarea[aria-label="Xenpaper clip source"]').setValue('C D')
+    await wrapper.get('textarea[aria-label="Xenpaper clip source"]').trigger('blur')
 
     expect(wrapper.get('button.clip').attributes('style')).toContain('width: 128px')
   })
@@ -745,8 +788,10 @@ describe('DawView', () => {
   it('resizes a MOS clip using the global source context', async () => {
     const wrapper = mount(DawView)
     await wrapper.get('[aria-label="Global source"]').setValue('MOS{5L4s}')
+    await wrapper.get('[aria-label="Global source"]').trigger('blur')
     await wrapper.getComponent(InstrumentPianoRollLane).trigger('dblclick', { clientX: 64 })
     await wrapper.get('textarea[aria-label="Xenpaper clip source"]').setValue('J K L M N O P Q R j')
+    await wrapper.get('textarea[aria-label="Xenpaper clip source"]').trigger('blur')
 
     expect(wrapper.get('button.clip').attributes('style')).toContain('width: 640px')
     expect(wrapper.findAll('[aria-label="Piano roll preview"] i')).toHaveLength(10)
@@ -755,13 +800,16 @@ describe('DawView', () => {
   it('recalculates an invalid MOS clip when the global source becomes compatible', async () => {
     const wrapper = mount(DawView)
     await wrapper.get('[aria-label="Global source"]').setValue('MOS{2L 1s}')
+    await wrapper.get('[aria-label="Global source"]').trigger('blur')
     await wrapper.getComponent(InstrumentPianoRollLane).trigger('dblclick', { clientX: 64 })
     await wrapper.get('textarea[aria-label="Xenpaper clip source"]').setValue('J K L M j')
+    await wrapper.get('textarea[aria-label="Xenpaper clip source"]').trigger('blur')
 
     expect(wrapper.get('button.clip').attributes('style')).toContain('width: 256px')
     expect(wrapper.findAll('[aria-label="Piano roll preview"] i')).toHaveLength(0)
 
     await wrapper.get('[aria-label="Global source"]').setValue('MOS{3L 1s}')
+    await wrapper.get('[aria-label="Global source"]').trigger('blur')
 
     expect(wrapper.get('button.clip').attributes('style')).toContain('width: 320px')
     expect(wrapper.findAll('[aria-label="Piano roll preview"] i')).toHaveLength(5)
@@ -770,13 +818,16 @@ describe('DawView', () => {
   it('isolates incomplete clip syntax while recalculating other clips', async () => {
     const wrapper = mount(DawView)
     await wrapper.get('[aria-label="Global source"]').setValue('MOS{2L 1s}')
+    await wrapper.get('[aria-label="Global source"]').trigger('blur')
     const lane = wrapper.getComponent(InstrumentPianoRollLane)
     await lane.trigger('dblclick', { clientX: 64 })
     await wrapper.get('textarea[aria-label="Xenpaper clip source"]').setValue('C (')
     await lane.trigger('dblclick', { clientX: 384 })
     await wrapper.get('textarea[aria-label="Xenpaper clip source"]').setValue('J K L M j')
+    await wrapper.get('textarea[aria-label="Xenpaper clip source"]').trigger('blur')
 
     await wrapper.get('[aria-label="Global source"]').setValue('MOS{3L 1s}')
+    await wrapper.get('[aria-label="Global source"]').trigger('blur')
 
     const clips = wrapper.findAll('button.clip')
     expect(clips[0]!.attributes('style')).toContain('width: 256px')
@@ -786,8 +837,10 @@ describe('DawView', () => {
   it('falls back safely when resizing with an invalid initialization source', async () => {
     const wrapper = mount(DawView)
     await wrapper.get('[aria-label="Global source"]').setValue('MOS{')
+    await wrapper.get('[aria-label="Global source"]').trigger('blur')
     await wrapper.getComponent(InstrumentPianoRollLane).trigger('dblclick', { clientX: 64 })
     await wrapper.get('textarea[aria-label="Xenpaper clip source"]').setValue('C D')
+    await wrapper.get('textarea[aria-label="Xenpaper clip source"]').trigger('blur')
 
     expect(wrapper.get('button.clip').attributes('style')).toContain('width: 128px')
   })
@@ -796,6 +849,7 @@ describe('DawView', () => {
     const wrapper = mount(DawView)
     await wrapper.getComponent(InstrumentPianoRollLane).trigger('dblclick', { clientX: 64 })
     await wrapper.get('textarea[aria-label="Xenpaper clip source"]').setValue('C D E')
+    await wrapper.get('textarea[aria-label="Xenpaper clip source"]').trigger('blur')
 
     const notes = wrapper.findAll('[aria-label="Piano roll preview"] i')
     expect(notes).toHaveLength(3)

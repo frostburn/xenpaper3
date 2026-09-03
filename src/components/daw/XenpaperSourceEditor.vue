@@ -1,11 +1,12 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { onBeforeUnmount, ref, watch } from 'vue'
 import type { Diagnostic } from '../../../xenpaper-lang'
 import XenpaperSourceHighlight from './XenpaperSourceHighlight.vue'
 
-withDefaults(
+const props = withDefaults(
   defineProps<{
     source: string
+    sourceKey?: string
     editorLabel: string
     rows?: number
     drumSamples?: readonly string[]
@@ -13,9 +14,39 @@ withDefaults(
   }>(),
   { rows: 3 },
 )
-const emit = defineEmits<{ 'update:source': [source: string] }>()
+const emit = defineEmits<{ 'update:source': [source: string, sourceKey?: string] }>()
 const textarea = ref<HTMLTextAreaElement>()
 const scroll = ref({ left: 0, top: 0 })
+const draft = ref(props.source)
+let updateTimer: ReturnType<typeof setTimeout> | undefined
+let pendingSourceKey: string | undefined
+
+const EDIT_DEBOUNCE_MS = 200
+
+watch(
+  () => props.source,
+  (source) => {
+    commitDraft()
+    draft.value = source
+  },
+)
+
+function commitDraft() {
+  if (!updateTimer) return
+  clearTimeout(updateTimer)
+  updateTimer = undefined
+  emit('update:source', draft.value, pendingSourceKey)
+  pendingSourceKey = undefined
+}
+
+const updateDraft = (event: Event) => {
+  draft.value = (event.target as HTMLTextAreaElement).value
+  if (updateTimer) clearTimeout(updateTimer)
+  // Parsing drives highlighting, diagnostics, clip sizing, and the piano roll. Keep
+  // the textarea responsive and let that work happen once after a burst of typing.
+  pendingSourceKey = props.sourceKey
+  updateTimer = setTimeout(commitDraft, EDIT_DEBOUNCE_MS)
+}
 
 const syncScroll = (event: Event) => {
   const editor = event.currentTarget as HTMLTextAreaElement
@@ -23,25 +54,29 @@ const syncScroll = (event: Event) => {
 }
 
 defineExpose({ focus: () => textarea.value?.focus() })
+onBeforeUnmount(() => {
+  commitDraft()
+})
 </script>
 
 <template>
   <div class="xenpaper-source-editor">
     <pre
       aria-hidden="true"
-    ><XenpaperSourceHighlight :source="source" :drum-samples="drumSamples" :diagnostics="diagnostics" :style="{
+    ><XenpaperSourceHighlight :source="draft" :stable-source="updateTimer ? source : undefined" :drum-samples="drumSamples" :diagnostics="diagnostics" :style="{
       transform: `translate(${-scroll.left}px, ${-scroll.top}px)`,
     }" /></pre>
     <textarea
       ref="textarea"
       :aria-label="editorLabel"
       :rows="rows"
-      :value="source"
+      :value="draft"
       wrap="off"
       autocomplete="off"
       autocapitalize="off"
       spellcheck="false"
-      @input="emit('update:source', ($event.target as HTMLTextAreaElement).value)"
+      @input="updateDraft"
+      @blur="commitDraft"
       @scroll="syncScroll"
     />
   </div>
