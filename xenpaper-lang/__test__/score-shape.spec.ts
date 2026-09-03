@@ -1128,6 +1128,31 @@ K L M N j k=`) as SequenceShape
     expect(durations(expanded)).toEqual([1 / 3, 1 / 3, 1 / 3, 1 / 3])
   })
 
+  it.each([
+    ['0 |¹ 1 :|² 2 ||', 7],
+    [`0 |¹ 1 :|\n    |² 2 ||`, 14],
+  ])('locates aligned ending markers in %s', (source, secondMarkerOffset) => {
+    const evaluated = evaluateScoreShape(parse(source).body[0]!)
+    expect(evaluated).toHaveProperty('shape')
+    const serialized = JSON.stringify('shape' in evaluated ? evaluated.shape : undefined)
+    expect(serialized).toBeDefined()
+
+    const origins: Array<{ location: { start: { offset: number } } }> = []
+    const visit = (value: unknown) => {
+      if (!value || typeof value !== 'object') return
+      if ('origins' in value && Array.isArray(value.origins)) origins.push(...value.origins)
+      for (const child of Object.values(value)) visit(child)
+    }
+    visit('shape' in evaluated ? evaluated.shape : undefined)
+    expect(origins).toContainEqual(
+      expect.objectContaining({
+        location: expect.objectContaining({
+          start: expect.objectContaining({ offset: secondMarkerOffset }),
+        }),
+      }),
+    )
+  })
+
   it.each(['|:@x100001 C :|', `|:@x${'1' + '0'.repeat(400)} C :|`])(
     'rejects an unsafe repeat without iterating it',
     (source) => {

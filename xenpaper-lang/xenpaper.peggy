@@ -124,6 +124,21 @@ ScopedSequenceExpression
         body: [repeated],
         endings: [],
         terminal: ":|",
+        incompleteEndings: false,
+      });
+      return sequence(remainder ? [repeat, remainder] : [repeat]);
+    }
+  / body:SequenceExpression result:RepeatEndings
+    remainder:(Spacing item:ScopedSequenceExpression { return item; })? {
+      if (containsDeclaration(body) || containsDeclaration(result.endings)) {
+        error('Variable and function declarations are not allowed inside repeats.');
+      }
+      const repeat = node('Repeat', {
+        count: null,
+        body: [body],
+        endings: result.endings,
+        terminal: result.terminal,
+        incompleteEndings: result.incomplete,
       });
       return sequence(remainder ? [repeat, remainder] : [repeat]);
     }
@@ -365,18 +380,32 @@ RepeatExpression
       if (containsDeclaration(body) || containsDeclaration(result.endings)) {
         error('Variable and function declarations are not allowed inside repeats.');
       }
-      return node('Repeat', { count, body: body ?? [], endings: result.endings, terminal: result.terminal });
+      return node('Repeat', {
+        count,
+        body: body ?? [],
+        endings: result.endings,
+        terminal: result.terminal,
+        incompleteEndings: result.incomplete,
+      });
     }
 
 RepeatEndings
-  = Spacing firstNumber:FirstEndingMarker Spacing firstBody:EndingParallelExpression?
-    rest:(Spacing number:NextEndingMarker Spacing body:EndingParallelExpression? {
-      return { number, body: body ? [body] : [] };
+  = Spacing first:FirstEndingMarker Spacing firstBody:EndingParallelExpression?
+    rest:(Spacing marker:NextEndingMarker Spacing body:EndingParallelExpression? {
+      return { ...marker, body: body ? [body] : [] };
     })*
     Spacing terminal:("||" / "|" / !. { return null; }) {
-      return { endings: [{ number: firstNumber, body: firstBody ? [firstBody] : [] }, ...rest], terminal };
+      return { endings: [{ ...first, body: firstBody ? [firstBody] : [] }, ...rest], terminal, incomplete: false };
     }
-  / Spacing ":|" { return { endings: [], terminal: ":|" }; }
+  / Spacing first:FirstEndingMarker Spacing firstBody:EndingParallelExpression?
+    Spacing terminal:":|" {
+      return {
+        endings: [{ ...first, body: firstBody ? [firstBody] : [] }],
+        terminal,
+        incomplete: true,
+      };
+    }
+  / Spacing ":|" { return { endings: [], terminal: ":|", incomplete: false }; }
 
 EndingParallelExpression
   = first:EndingSequenceExpression
@@ -392,10 +421,12 @@ EndingSequenceExpression
     }
 
 FirstEndingMarker
-  = "|" number:EndingNumber { return number; }
+  = "|" number:EndingNumber { return { number, markerLocation: location() }; }
 
 NextEndingMarker
-  = ":|" number:EndingNumber { return number; }
+  = ":|" Spacing marker:FirstEndingMarker { return marker; }
+  / ":|" number:EndingNumber { return { number, markerLocation: location() }; }
+  / "|" number:EndingNumber { return { number, markerLocation: location() }; }
 
 EndingNumber
   = "@^" value:UnsignedInteger {

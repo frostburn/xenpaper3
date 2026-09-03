@@ -543,22 +543,17 @@ function repeatMarker(
 function endingMarker(
   node: Extract<Expression, { type: 'Repeat' }>,
   ending: Extract<Expression, { type: 'Repeat' }>['endings'][number],
-  index: number,
+  _index: number,
   style: 'ending-start' | 'repeat-end' = 'ending-start',
 ): BarlineShape {
-  const prefixWidth = index ? 2 : 1
-  const boundary = ending.number.location.start
+  const markerLocation = ending.markerLocation
   return barline(
     {
       ...node,
       location: {
         source: node.location.source,
-        start: {
-          ...boundary,
-          offset: boundary.offset - prefixWidth,
-          column: boundary.column - prefixWidth,
-        },
-        end: ending.number.location.end,
+        start: markerLocation.start,
+        end: markerLocation.end,
       },
     },
     style,

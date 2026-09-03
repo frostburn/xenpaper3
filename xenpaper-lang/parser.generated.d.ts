@@ -398,11 +398,13 @@ export interface Repeat extends Node {
   body: Expression[]
   endings: RepeatEnding[]
   terminal: ':|' | '|' | '||' | null
+  incompleteEndings: boolean
 }
 
 export interface RepeatEnding {
   number: IntegerLiteral
   body: Expression[]
+  markerLocation: LocationRange
 }
 
 export interface Rest extends Node {
