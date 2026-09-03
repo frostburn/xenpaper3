@@ -21,6 +21,7 @@ import {
   createDrumLane,
   createInstrumentLane,
   parseDawProject,
+  serializeDawProject,
   snapBeat,
   type Beat,
   type ClipDisplayMode,
@@ -242,13 +243,58 @@ const updateClipSourceById = (source: string, clipId?: string) => {
   if (clip) updateClipSource(clip, source)
 }
 
+const replaceProject = (source: string) => {
+  const importedProject = parseDawProject(source)
+  stopPlayback()
+  project.value = importedProject
+  projectLoadError.value = ''
+  selectedClipId.value = undefined
+  selectedLaneId.value = undefined
+  collapsedLaneIds.value = new Set()
+  scrollLeft.value = 0
+}
+
+const importProject = async (event: Event) => {
+  const input = event.currentTarget as HTMLInputElement
+  const file = input.files?.[0]
+  if (!file) return
+  try {
+    replaceProject(await file.text())
+  } catch (error) {
+    projectLoadError.value = error instanceof Error ? error.message : String(error)
+  } finally {
+    // Allow selecting the same file again after fixing it on disk.
+    input.value = ''
+  }
+}
+
+const exportProject = () => {
+  try {
+    const blob = new Blob([serializeDawProject(project.value)], { type: 'application/json' })
+    const url = URL.createObjectURL(blob)
+    const anchor = document.createElement('a')
+    const basename =
+      project.value.title
+        .trim()
+        .replace(/[^a-z0-9_-]+/gi, '-')
+        .replace(/^-+|-+$/g, '') || 'untitled-project'
+    anchor.href = url
+    anchor.download = `${basename}.xenpaper.json`
+    anchor.click()
+    URL.revokeObjectURL(url)
+    projectLoadError.value = ''
+  } catch (error) {
+    projectLoadError.value = error instanceof Error ? error.message : String(error)
+  }
+}
+
 onMounted(async () => {
   const projectUrl = new URL(document.location.href).searchParams.get('project')
   if (!projectUrl) return
   try {
     const response = await fetch(new URL(projectUrl, document.baseURI))
     if (!response.ok) throw new Error(`Could not load project (${response.status})`)
-    project.value = parseDawProject(await response.text())
+    replaceProject(await response.text())
   } catch (error) {
     projectLoadError.value = error instanceof Error ? error.message : String(error)
   }
@@ -263,7 +309,28 @@ onBeforeUnmount(() => {
 
 <template>
   <div class="daw">
-    <h1>Xenpaper DAW</h1>
+    <div class="project-header">
+      <h1>Xenpaper DAW</h1>
+      <label class="project-title">
+        Project title
+        <input v-model="project.title" aria-label="Project title" />
+      </label>
+      <div class="project-file-actions">
+        <label class="project-file-button">
+          Import project
+          <input
+            class="project-file-input"
+            aria-label="Import Xenpaper project"
+            type="file"
+            accept=".xenpaper.json,application/json"
+            @change="importProject"
+          />
+        </label>
+        <button type="button" class="project-file-button" @click="exportProject">
+          Export project
+        </button>
+      </div>
+    </div>
     <p v-if="projectLoadError" class="playback-error" role="alert">{{ projectLoadError }}</p>
     <TransportControls
       :playhead="playhead"
@@ -386,6 +453,50 @@ onBeforeUnmount(() => {
   padding: 1rem;
   color: #eef3ff;
   background: #101622;
+}
+.project-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem 1.25rem;
+  margin-bottom: 0.75rem;
+}
+.project-header h1 {
+  margin: 0;
+}
+.project-title {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.project-title input {
+  min-width: min(18rem, 45vw);
+  border: 1px solid #7184a8;
+  border-radius: 0.25rem;
+  padding: 0.45rem 0.55rem;
+  color: inherit;
+  background: #1b2536;
+}
+.project-file-actions {
+  display: flex;
+  gap: 0.5rem;
+  margin-left: auto;
+}
+.project-file-button {
+  border: 1px solid #7184a8;
+  border-radius: 0.25rem;
+  padding: 0.45rem 0.65rem;
+  color: inherit;
+  font: inherit;
+  background: #1b2536;
+  cursor: pointer;
+}
+.project-file-input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
 }
 .timeline-controls {
   display: flex;

@@ -18,6 +18,7 @@ import {
   createInstrumentLane,
   pointerXToBeat,
   parseDawProject,
+  serializeDawProject,
   snapBeat,
 } from '../daw/project'
 import {
@@ -132,6 +133,20 @@ describe('DAW project model', () => {
 
     expect(project.globalTrack.tempoChanges[0]!.beat).toBeInstanceOf(Fraction)
     expect(project.globalTrack.timeSignatureChanges[0]!.beat.valueOf()).toBe(0)
+  })
+
+  it('serializes projects as readable, round-trippable JSON files', () => {
+    const project = createDefaultProject()
+    project.title = 'Exported piece'
+
+    const serialized = serializeDawProject(project)
+
+    expect(serialized.endsWith('\n')).toBe(true)
+    expect(serialized).toContain('\n  "format": "xenpaper3-daw"')
+    expect(parseDawProject(serialized)).toEqual(project)
+
+    project.globalTrack.tempoChanges[0]!.bpm = 0
+    expect(() => serializeDawProject(project)).toThrow('Invalid Xenpaper project file')
   })
 
   it('rejects data that is not a Xenpaper project', () => {
@@ -498,6 +513,61 @@ describe('DAW routing', () => {
 })
 
 describe('DawView', () => {
+  it('exports the current titled project as a .xenpaper.json download', async () => {
+    const createObjectURL = vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:project')
+    const revokeObjectURL = vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => {})
+    const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {})
+    const wrapper = mount(DawView)
+
+    await wrapper.get('[aria-label="Project title"]').setValue('My First / Piece')
+    await wrapper.get('button.project-file-button').trigger('click')
+
+    expect(createObjectURL).toHaveBeenCalledWith(expect.any(Blob))
+    expect(click).toHaveBeenCalledOnce()
+    expect(click.mock.instances[0]).toMatchObject({
+      href: 'blob:project',
+      download: 'My-First-Piece.xenpaper.json',
+    })
+    expect(revokeObjectURL).toHaveBeenCalledWith('blob:project')
+
+    createObjectURL.mockClear()
+    click.mockClear()
+    await wrapper.get('[aria-label="Tempo in BPM"]').setValue('')
+    await wrapper.get('button.project-file-button').trigger('click')
+
+    expect(wrapper.get('[role="alert"]').text()).toContain('Invalid Xenpaper project file')
+    expect(createObjectURL).not.toHaveBeenCalled()
+    expect(click).not.toHaveBeenCalled()
+  })
+
+  it('imports a local project file and reports invalid files without replacing it', async () => {
+    const wrapper = mount(DawView)
+    const imported = createDefaultProject()
+    imported.title = 'Imported piece'
+    imported.instrumentLanes.push(createInstrumentLane(imported))
+    const input = wrapper.get<HTMLInputElement>('[aria-label="Import Xenpaper project"]')
+    const validFile = new File([serializeDawProject(imported)], 'piece.xenpaper.json', {
+      type: 'application/json',
+    })
+    Object.defineProperty(validFile, 'text', {
+      value: () => Promise.resolve(serializeDawProject(imported)),
+    })
+    Object.defineProperty(input.element, 'files', { configurable: true, value: [validFile] })
+
+    await input.trigger('change')
+    await vi.waitFor(() => expect(wrapper.findAll('.instrument-header')).toHaveLength(2))
+    expect((wrapper.get('[aria-label="Project title"]').element as HTMLInputElement).value).toBe(
+      'Imported piece',
+    )
+
+    const invalidFile = new File(['{}'], 'invalid.xenpaper.json', { type: 'application/json' })
+    Object.defineProperty(invalidFile, 'text', { value: () => Promise.resolve('{}') })
+    Object.defineProperty(input.element, 'files', { configurable: true, value: [invalidFile] })
+    await input.trigger('change')
+    await vi.waitFor(() => expect(wrapper.get('[role="alert"]').text()).toContain('Invalid'))
+    expect(wrapper.findAll('.instrument-header')).toHaveLength(2)
+  })
+
   it('adds and deletes instrument lanes while keeping their clips independent', async () => {
     const wrapper = mount(DawView)
 
@@ -862,9 +932,7 @@ describe('DawView', () => {
   it('clamps notes outside human hearing to contrasting pitch boundaries', () => {
     const project = createDefaultProject()
     const lane = project.instrumentLanes[0]!
-    lane.clips = [
-      { id: 'inaudible', start: beat(0), length: beat(3), source: '10Hz C 30kHz' },
-    ]
+    lane.clips = [{ id: 'inaudible', start: beat(0), length: beat(3), source: '10Hz C 30kHz' }]
     const wrapper = mount(InstrumentPianoRollLane, {
       props: { lane, pixelsPerBeat: 64, scrollLeft: 0, displayMode: 'piano-roll' },
     })
