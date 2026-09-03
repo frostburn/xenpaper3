@@ -6,11 +6,12 @@ import XenpaperSourceEditor from './XenpaperSourceEditor.vue'
 
 defineProps<{
   clip?: SourceClip
+  sourceKey?: string
   drumSamples?: readonly string[]
   diagnostics?: readonly Diagnostic[]
 }>()
 const emit = defineEmits<{
-  'update-source': [source: string, clipId?: string]
+  'update-source': [source: string, sourceKey?: string]
   delete: []
   play: []
   'play-solo': []
@@ -44,11 +45,11 @@ defineExpose({ focus: () => editor.value?.focus() })
       ref="editor"
       editor-label="Xenpaper clip source"
       :source="clip.source"
-      :source-key="clip.id"
+      :source-key="sourceKey"
       :drum-samples="drumSamples"
       :diagnostics="diagnostics"
       :rows="8"
-      @update:source="(source, clipId) => emit('update-source', source, clipId)"
+      @update:source="(source, sourceKey) => emit('update-source', source, sourceKey)"
     />
     <p v-else>Select or create a clip to edit its Xenpaper source.</p>
   </section>

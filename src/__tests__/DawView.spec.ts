@@ -168,6 +168,12 @@ describe('DAW project model', () => {
     expect(() => parseDawProject(JSON.stringify(invalidClip))).toThrow(
       'Invalid Xenpaper project file',
     )
+
+    const ambiguousIds = createDefaultProject()
+    ambiguousIds.instrumentLanes[0]!.id = 'instrument-1\u0000clip'
+    expect(() => parseDawProject(JSON.stringify(ambiguousIds))).toThrow(
+      'Invalid Xenpaper project file',
+    )
   })
 
   it('loads the Minuet example as a playable two-lane project', () => {
@@ -566,6 +572,33 @@ describe('DawView', () => {
     await input.trigger('change')
     await vi.waitFor(() => expect(wrapper.get('[role="alert"]').text()).toContain('Invalid'))
     expect(wrapper.findAll('.instrument-header')).toHaveLength(2)
+  })
+
+  it('edits a new lane clip without changing a deserialized clip with the same id', async () => {
+    const wrapper = mount(DawView)
+    const imported = parseDawProject(readFileSync('public/minuet.xenpaper.json', 'utf8'))
+    const originalSource = imported.instrumentLanes[0]!.clips[0]!.source
+    const input = wrapper.get<HTMLInputElement>('[aria-label="Import Xenpaper project"]')
+    const file = new File([serializeDawProject(imported)], 'minuet.xenpaper.json', {
+      type: 'application/json',
+    })
+    Object.defineProperty(file, 'text', {
+      value: () => Promise.resolve(serializeDawProject(imported)),
+    })
+    Object.defineProperty(input.element, 'files', { configurable: true, value: [file] })
+
+    await input.trigger('change')
+    await vi.waitFor(() => expect(wrapper.findAll('.instrument-header')).toHaveLength(2))
+    await wrapper.get('button.add-lane').trigger('click')
+    await wrapper.findAllComponents(InstrumentPianoRollLane)[2]!.trigger('dblclick', { clientX: 64 })
+    await wrapper.get('[aria-label="Xenpaper clip source"]').setValue('C D E')
+    await wrapper.get('[aria-label="Xenpaper clip source"]').trigger('blur')
+    await wrapper.get('[aria-label="Clip display"]').setValue('source')
+
+    expect(wrapper.findAll('button.clip')[0]!.text()).toContain(originalSource.trim())
+    expect(wrapper.findAllComponents(InstrumentPianoRollLane)[2]!.get('button.clip').text()).toContain(
+      'C D E',
+    )
   })
 
   it('adds and deletes instrument lanes while keeping their clips independent', async () => {
