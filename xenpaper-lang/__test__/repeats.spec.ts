@@ -225,6 +225,22 @@ describe('repeat expansion', () => {
     ])
   })
 
+  it('continues after implicit-start alternate endings', () => {
+    const program = parse('0 1 |¹ 2 3 :|² 4 5 | 6 7')
+
+    expect(program.body[0]).toMatchObject({
+      type: 'Sequence',
+      items: [{ type: 'Repeat', terminal: '|' }, { type: 'Sequence' }],
+    })
+  })
+
+  it('populates incompleteEndings on unmatched repeat ends', () => {
+    expect(parse('0 1 :|').body[0]).toMatchObject({
+      type: 'Repeat',
+      incompleteEndings: false,
+    })
+  })
+
   it('allows a partial alternate-ending score at end of input', () => {
     expect(parse('0 1 |¹ 2 3').body[0]).toMatchObject({
       type: 'Repeat',

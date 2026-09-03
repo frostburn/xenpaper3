@@ -124,20 +124,23 @@ ScopedSequenceExpression
         body: [repeated],
         endings: [],
         terminal: ":|",
+        incompleteEndings: false,
       });
       return sequence(remainder ? [repeat, remainder] : [repeat]);
     }
-  / body:SequenceExpression result:RepeatEndings {
+  / body:SequenceExpression result:RepeatEndings
+    remainder:(Spacing item:ScopedSequenceExpression { return item; })? {
       if (containsDeclaration(body) || containsDeclaration(result.endings)) {
         error('Variable and function declarations are not allowed inside repeats.');
       }
-      return node('Repeat', {
+      const repeat = node('Repeat', {
         count: null,
         body: [body],
         endings: result.endings,
         terminal: result.terminal,
         incompleteEndings: result.incomplete,
       });
+      return sequence(remainder ? [repeat, remainder] : [repeat]);
     }
   / SequenceExpression
 
@@ -387,17 +390,17 @@ RepeatExpression
     }
 
 RepeatEndings
-  = Spacing firstNumber:FirstEndingMarker Spacing firstBody:EndingParallelExpression?
-    rest:(Spacing number:NextEndingMarker Spacing body:EndingParallelExpression? {
-      return { number, body: body ? [body] : [] };
+  = Spacing first:FirstEndingMarker Spacing firstBody:EndingParallelExpression?
+    rest:(Spacing marker:NextEndingMarker Spacing body:EndingParallelExpression? {
+      return { ...marker, body: body ? [body] : [] };
     })*
     Spacing terminal:("||" / "|" / !. { return null; }) {
-      return { endings: [{ number: firstNumber, body: firstBody ? [firstBody] : [] }, ...rest], terminal, incomplete: false };
+      return { endings: [{ ...first, body: firstBody ? [firstBody] : [] }, ...rest], terminal, incomplete: false };
     }
-  / Spacing firstNumber:FirstEndingMarker Spacing firstBody:EndingParallelExpression?
+  / Spacing first:FirstEndingMarker Spacing firstBody:EndingParallelExpression?
     Spacing terminal:":|" {
       return {
-        endings: [{ number: firstNumber, body: firstBody ? [firstBody] : [] }],
+        endings: [{ ...first, body: firstBody ? [firstBody] : [] }],
         terminal,
         incomplete: true,
       };
@@ -418,12 +421,12 @@ EndingSequenceExpression
     }
 
 FirstEndingMarker
-  = "|" number:EndingNumber { return number; }
+  = "|" number:EndingNumber { return { number, markerLocation: location() }; }
 
 NextEndingMarker
-  = ":|" Spacing "|" number:EndingNumber { return number; }
-  / ":|" number:EndingNumber { return number; }
-  / "|" number:EndingNumber { return number; }
+  = ":|" Spacing marker:FirstEndingMarker { return marker; }
+  / ":|" number:EndingNumber { return { number, markerLocation: location() }; }
+  / "|" number:EndingNumber { return { number, markerLocation: location() }; }
 
 EndingNumber
   = "@^" value:UnsignedInteger {

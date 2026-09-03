@@ -404,6 +404,7 @@ export interface Repeat extends Node {
 export interface RepeatEnding {
   number: IntegerLiteral
   body: Expression[]
+  markerLocation: LocationRange
 }
 
 export interface Rest extends Node {
