@@ -127,6 +127,18 @@ ScopedSequenceExpression
       });
       return sequence(remainder ? [repeat, remainder] : [repeat]);
     }
+  / body:SequenceExpression result:RepeatEndings {
+      if (containsDeclaration(body) || containsDeclaration(result.endings)) {
+        error('Variable and function declarations are not allowed inside repeats.');
+      }
+      return node('Repeat', {
+        count: null,
+        body: [body],
+        endings: result.endings,
+        terminal: result.terminal,
+        incompleteEndings: result.incomplete,
+      });
+    }
   / SequenceExpression
 
 // Sequencing needs no synthetic separator token. `Spacing` may be empty, so
@@ -365,7 +377,13 @@ RepeatExpression
       if (containsDeclaration(body) || containsDeclaration(result.endings)) {
         error('Variable and function declarations are not allowed inside repeats.');
       }
-      return node('Repeat', { count, body: body ?? [], endings: result.endings, terminal: result.terminal });
+      return node('Repeat', {
+        count,
+        body: body ?? [],
+        endings: result.endings,
+        terminal: result.terminal,
+        incompleteEndings: result.incomplete,
+      });
     }
 
 RepeatEndings
@@ -374,9 +392,17 @@ RepeatEndings
       return { number, body: body ? [body] : [] };
     })*
     Spacing terminal:("||" / "|" / !. { return null; }) {
-      return { endings: [{ number: firstNumber, body: firstBody ? [firstBody] : [] }, ...rest], terminal };
+      return { endings: [{ number: firstNumber, body: firstBody ? [firstBody] : [] }, ...rest], terminal, incomplete: false };
     }
-  / Spacing ":|" { return { endings: [], terminal: ":|" }; }
+  / Spacing firstNumber:FirstEndingMarker Spacing firstBody:EndingParallelExpression?
+    Spacing terminal:":|" {
+      return {
+        endings: [{ number: firstNumber, body: firstBody ? [firstBody] : [] }],
+        terminal,
+        incomplete: true,
+      };
+    }
+  / Spacing ":|" { return { endings: [], terminal: ":|", incomplete: false }; }
 
 EndingParallelExpression
   = first:EndingSequenceExpression
@@ -395,7 +421,9 @@ FirstEndingMarker
   = "|" number:EndingNumber { return number; }
 
 NextEndingMarker
-  = ":|" number:EndingNumber { return number; }
+  = ":|" Spacing "|" number:EndingNumber { return number; }
+  / ":|" number:EndingNumber { return number; }
+  / "|" number:EndingNumber { return number; }
 
 EndingNumber
   = "@^" value:UnsignedInteger {

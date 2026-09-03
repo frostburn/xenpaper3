@@ -209,4 +209,52 @@ describe('repeat expansion', () => {
       '6',
     ])
   })
+
+  it('allows an omitted initial repeat marker', () => {
+    const source = '0 1 |¹ 2 3 :|² 4 5 ||'
+
+    expect(body(source).map((node) => node.degree as string)).toEqual([
+      '0',
+      '1',
+      '2',
+      '3',
+      '0',
+      '1',
+      '4',
+      '5',
+    ])
+  })
+
+  it('allows a partial alternate-ending score at end of input', () => {
+    expect(parse('0 1 |¹ 2 3').body[0]).toMatchObject({
+      type: 'Repeat',
+      terminal: null,
+      endings: [{ number: { value: '1' } }],
+    })
+  })
+
+  it('warns when a subsequent alternate-ending marker is omitted', () => {
+    const result = expandRepeats(parse('|: 0 1 |¹ 2 3 :| 4 5 ||'))
+
+    expect(result.program).toBeDefined()
+    expect(result.diagnostics).toMatchObject([
+      { code: 'XP_INCOMPLETE_REPEAT_ENDINGS', severity: 'warning' },
+    ])
+  })
+
+  it('allows alternate-ending markers on aligned plain barlines', () => {
+    const source = `0 1 |¹ 2 3 :|
+        |² 4 5 ||`
+
+    expect(body(source).map((node) => node.degree as string)).toEqual([
+      '0',
+      '1',
+      '2',
+      '3',
+      '0',
+      '1',
+      '4',
+      '5',
+    ])
+  })
 })

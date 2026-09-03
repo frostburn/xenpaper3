@@ -52,6 +52,14 @@ export function expandRepeats(
 
   const cloneNode = (node: SyntaxNode, path: ExpansionPath): ExpandedNode[] => {
     if (node.type === 'Repeat') {
+      if (node.incompleteEndings) {
+        diagnostics.push({
+          code: 'XP_INCOMPLETE_REPEAT_ENDINGS',
+          severity: 'warning',
+          message: 'Alternate endings ended without a subsequent numbered ending.',
+          locations: [node.location],
+        })
+      }
       const countNode = node.count as (SyntaxNode & { value?: unknown }) | undefined
       let count: bigint
       try {

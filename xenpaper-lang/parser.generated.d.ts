@@ -398,6 +398,7 @@ export interface Repeat extends Node {
   body: Expression[]
   endings: RepeatEnding[]
   terminal: ':|' | '|' | '||' | null
+  incompleteEndings: boolean
 }
 
 export interface RepeatEnding {
