@@ -38,15 +38,6 @@ defineEmits<{
     >
       Delete lane
     </button>
-    <label v-if="!collapsed" class="source-control">
-      Lane source
-      <XenpaperSourceEditor
-        editor-label="Instrument lane source"
-        :source="lane.source"
-        :rows="3"
-        @update:source="$emit('update-source', $event)"
-      />
-    </label>
     <label v-if="!collapsed">
       {{ lane.patchSource }} SW Patch ·
       <select
@@ -77,12 +68,22 @@ defineEmits<{
       />
       <output>{{ Math.round(lane.gain * 100) }}%</output>
     </label>
+    <label v-if="!collapsed" class="source-control">
+      Lane source
+      <XenpaperSourceEditor
+        editor-label="Instrument lane source"
+        :source="lane.source"
+        :rows="3"
+        @update:source="$emit('update-source', $event)"
+      />
+    </label>
   </header>
 </template>
 
 <style scoped>
 .instrument-header {
   display: flex;
+  flex-wrap: wrap;
   justify-content: space-between;
   align-items: center;
   gap: 1rem;
@@ -109,6 +110,10 @@ defineEmits<{
   font: inherit;
   font-weight: bold;
 }
+.collapse-lane {
+  flex: none;
+  white-space: nowrap;
+}
 .delete-lane {
   color: #ffd8d8;
   border: 1px solid #a85d67;
@@ -118,12 +123,12 @@ defineEmits<{
   cursor: pointer;
 }
 .source-control {
-  flex: 1;
+  flex: 1 0 100%;
   align-items: stretch !important;
   flex-direction: column;
 }
 .source-control .xenpaper-source-editor {
-  min-width: 18rem;
+  min-width: 0;
   font-family: monospace;
 }
 </style>
