@@ -404,6 +404,7 @@ onBeforeUnmount(() => {
         <InstrumentHeader
           :lane="lane"
           :collapsed="collapsedLaneIds.has(lane.id)"
+          @update-name="lane.name = $event"
           @update-source="lane.source = $event"
           @update-oscillator="lane.oscillatorType = $event"
           @update-gain="lane.gain = $event"

@@ -573,10 +573,11 @@ describe('DawView', () => {
 
     await wrapper.get('button.add-lane').trigger('click')
     expect(wrapper.findAll('.instrument-header')).toHaveLength(2)
-    expect(wrapper.findAll('.instrument-header strong').map((name) => name.text())).toEqual([
-      'Instrument 1',
-      'Instrument 2',
-    ])
+    expect(
+      wrapper
+        .findAll('[aria-label="Instrument lane name"]')
+        .map((name) => (name.element as HTMLInputElement).value),
+    ).toEqual(['Instrument 1', 'Instrument 2'])
 
     const lanes = wrapper.findAllComponents(InstrumentPianoRollLane)
     await lanes[1]!.trigger('dblclick', { clientX: 64 })
@@ -590,7 +591,9 @@ describe('DawView', () => {
     await wrapper.get('button[aria-label="Delete Instrument 1"]').trigger('click')
     expect(wrapper.findAll('.instrument-header')).toHaveLength(0)
     await wrapper.get('button.add-lane').trigger('click')
-    expect(wrapper.get('.instrument-header strong').text()).toBe('Instrument 1')
+    expect(
+      (wrapper.get('[aria-label="Instrument lane name"]').element as HTMLInputElement).value,
+    ).toBe('Instrument 1')
   })
 
   it('double-clicks the empty lane to create, select, and edit a snapped clip', async () => {
@@ -781,8 +784,9 @@ describe('DawView', () => {
     wrapper.unmount()
   })
 
-  it('edits global controls, waveform, and the clip preview mode', async () => {
+  it('edits global controls, the instrument name, waveform, and the clip preview mode', async () => {
     const wrapper = mount(DawView)
+    await wrapper.get('[aria-label="Instrument lane name"]').setValue('Lead')
     await wrapper.get('[aria-label="Tempo in BPM"]').setValue('144')
     await wrapper.get('[aria-label="Time signature numerator"]').setValue('7')
     await wrapper.get('[aria-label="Time signature denominator"]').setValue('8')
@@ -797,6 +801,11 @@ describe('DawView', () => {
     expect((wrapper.get('[aria-label="Waveform"]').element as HTMLSelectElement).value).toBe(
       'triangle',
     )
+    expect(
+      (wrapper.get('[aria-label="Instrument lane name"]').element as HTMLInputElement).value,
+    ).toBe('Lead')
+    expect(wrapper.find('[aria-label="Collapse Lead"]').exists()).toBe(true)
+    expect(wrapper.find('[aria-label="Delete Lead"]').exists()).toBe(true)
     expect(wrapper.get('.instrument-header output').text()).toBe('42%')
     expect(wrapper.find('[aria-label="Default attack"]').exists()).toBe(false)
     expect(wrapper.find('[aria-label="Default sustain"]').exists()).toBe(false)
