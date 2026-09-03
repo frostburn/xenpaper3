@@ -176,6 +176,38 @@ describe('DAW project model', () => {
     )
   })
 
+  it('rejects duplicate IDs that would make editor operations ambiguous', () => {
+    const duplicateLane = createDefaultProject()
+    duplicateLane.instrumentLanes.push({ ...duplicateLane.instrumentLanes[0]!, clips: [] })
+
+    const duplicateClip = createDefaultProject()
+    const clip = createClip(duplicateClip.instrumentLanes[0]!, beat(0))
+    duplicateClip.instrumentLanes[0]!.clips.push(clip, { ...clip })
+
+    const duplicateTempo = createDefaultProject()
+    duplicateTempo.globalTrack.tempoChanges.push({
+      ...duplicateTempo.globalTrack.tempoChanges[0]!,
+      beat: beat(4),
+    })
+
+    const duplicateTimeSignature = createDefaultProject()
+    duplicateTimeSignature.globalTrack.timeSignatureChanges.push({
+      ...duplicateTimeSignature.globalTrack.timeSignatureChanges[0]!,
+      beat: beat(4),
+    })
+
+    for (const project of [
+      duplicateLane,
+      duplicateClip,
+      duplicateTempo,
+      duplicateTimeSignature,
+    ]) {
+      expect(() => parseDawProject(JSON.stringify(project))).toThrow(
+        'Invalid Xenpaper project file',
+      )
+    }
+  })
+
   it('loads the Minuet example as a playable two-lane project', () => {
     const project = parseDawProject(readFileSync('public/minuet.xenpaper.json', 'utf8'))
 

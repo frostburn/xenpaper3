@@ -9,7 +9,7 @@ Vue test application used to exercise them:
 - [`sw-patch/`](sw-patch/) implements a sandboxed language for constructing Web
   Audio synthesizers and effects.
 - [`src/`](src/) contains test pages and notation, piano-roll, and waveform
-  components. It is development scaffolding rather than the finished editor.
+  components and the in-progress DAW editor.
 
 ## Requirements
 
@@ -32,7 +32,12 @@ using them.
 npm run dev
 ```
 
-The home page links to the SW Patch and Xenpaper language test pages.
+The home page links to the DAW, SW Patch, and Xenpaper language test pages. The
+DAW is also available directly at `/daw`. Double-click an instrument or drum
+timeline to add a clip, then edit its Xenpaper source below the lanes. Projects
+can be imported and exported as readable `.xenpaper.json` files; add a
+`?project=URL` query parameter to load one when the editor opens (for example,
+`/daw?project=/minuet.xenpaper.json`).
 
 ## Playback architecture
 

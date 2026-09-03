@@ -66,6 +66,14 @@ const isRecord = (value: unknown): value is Record<string, unknown> =>
 
 const isString = (value: unknown): value is string => typeof value === 'string'
 const isId = (value: unknown): value is string => isString(value) && !value.includes('\u0000')
+const hasUniqueIds = (values: readonly unknown[]): boolean => {
+  const ids = new Set<string>()
+  return values.every((value) => {
+    if (!isRecord(value) || !isId(value.id) || ids.has(value.id)) return false
+    ids.add(value.id)
+    return true
+  })
+}
 const isFiniteNumber = (value: unknown): value is number =>
   typeof value === 'number' && Number.isFinite(value)
 const isPositiveInteger = (value: unknown): value is number =>
@@ -85,20 +93,20 @@ export const parseDawProject = (source: string): DawProject => {
     isString(globalTrack.source) &&
     Array.isArray(globalTrack.tempoChanges) &&
     globalTrack.tempoChanges.length > 0 &&
+    hasUniqueIds(globalTrack.tempoChanges) &&
     globalTrack.tempoChanges.every(
       (change) =>
         isRecord(change) &&
-        isId(change.id) &&
         isNonnegativeBeat(change.beat) &&
         isFiniteNumber(change.bpm) &&
         change.bpm > 0,
     ) &&
     Array.isArray(globalTrack.timeSignatureChanges) &&
     globalTrack.timeSignatureChanges.length > 0 &&
+    hasUniqueIds(globalTrack.timeSignatureChanges) &&
     globalTrack.timeSignatureChanges.every(
       (change) =>
         isRecord(change) &&
-        isId(change.id) &&
         isNonnegativeBeat(change.beat) &&
         isPositiveInteger(change.numerator) &&
         isPositiveInteger(change.denominator),
@@ -106,11 +114,11 @@ export const parseDawProject = (source: string): DawProject => {
 
   const validInstrumentLanes =
     Array.isArray(project.instrumentLanes) &&
+    hasUniqueIds(project.instrumentLanes) &&
     project.instrumentLanes.every(
       (lane) =>
         isRecord(lane) &&
         (lane.kind === undefined || lane.kind === 'instrument' || lane.kind === 'drum') &&
-        isId(lane.id) &&
         isString(lane.name) &&
         isString(lane.patchSource) &&
         isString(lane.oscillatorType) &&
@@ -118,10 +126,10 @@ export const parseDawProject = (source: string): DawProject => {
         isFiniteNumber(lane.gain) &&
         isString(lane.source) &&
         Array.isArray(lane.clips) &&
+        hasUniqueIds(lane.clips) &&
         lane.clips.every(
           (clip) =>
             isRecord(clip) &&
-            isId(clip.id) &&
             isNonnegativeBeat(clip.start) &&
             isPositiveBeat(clip.length) &&
             isString(clip.source),
