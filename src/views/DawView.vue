@@ -236,9 +236,15 @@ const updateClipSource = (clip: SourceClip, source: string) => {
   clip.source = source
 }
 
-const updateClipSourceById = (source: string, clipId?: string) => {
-  const clip = clipId
-    ? project.value.instrumentLanes.flatMap(({ clips }) => clips).find(({ id }) => id === clipId)
+const clipSourceKey = (laneId: string, clipId: string) => `${laneId}\u0000${clipId}`
+
+const updateClipSourceById = (source: string, sourceKey?: string) => {
+  const clip = sourceKey
+    ? project.value.instrumentLanes
+        .flatMap((lane) =>
+          lane.clips.map((clip) => ({ clip, sourceKey: clipSourceKey(lane.id, clip.id) })),
+        )
+        .find((entry) => entry.sourceKey === sourceKey)?.clip
     : selectedClip.value
   if (clip) updateClipSource(clip, source)
 }
@@ -436,6 +442,9 @@ onBeforeUnmount(() => {
     <ClipSourceEditor
       ref="editor"
       :clip="selectedClip"
+      :source-key="
+        selectedLane && selectedClip ? clipSourceKey(selectedLane.id, selectedClip.id) : undefined
+      "
       :drum-samples="selectedLane ? drumSamplesForLane(selectedLane) : undefined"
       :diagnostics="selectedClipDiagnostics"
       @update-source="updateClipSourceById"
