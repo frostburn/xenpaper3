@@ -269,18 +269,23 @@ const importProject = async (event: Event) => {
 }
 
 const exportProject = () => {
-  const blob = new Blob([serializeDawProject(project.value)], { type: 'application/json' })
-  const url = URL.createObjectURL(blob)
-  const anchor = document.createElement('a')
-  const basename =
-    project.value.title
-      .trim()
-      .replace(/[^a-z0-9_-]+/gi, '-')
-      .replace(/^-+|-+$/g, '') || 'untitled-project'
-  anchor.href = url
-  anchor.download = `${basename}.xenpaper.json`
-  anchor.click()
-  URL.revokeObjectURL(url)
+  try {
+    const blob = new Blob([serializeDawProject(project.value)], { type: 'application/json' })
+    const url = URL.createObjectURL(blob)
+    const anchor = document.createElement('a')
+    const basename =
+      project.value.title
+        .trim()
+        .replace(/[^a-z0-9_-]+/gi, '-')
+        .replace(/^-+|-+$/g, '') || 'untitled-project'
+    anchor.href = url
+    anchor.download = `${basename}.xenpaper.json`
+    anchor.click()
+    URL.revokeObjectURL(url)
+    projectLoadError.value = ''
+  } catch (error) {
+    projectLoadError.value = error instanceof Error ? error.message : String(error)
+  }
 }
 
 onMounted(async () => {

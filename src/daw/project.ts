@@ -142,8 +142,11 @@ export const parseDawProject = (source: string): DawProject => {
   return project as unknown as DawProject
 }
 
-export const serializeDawProject = (project: DawProject): string =>
-  `${JSON.stringify(project, null, 2)}\n`
+export const serializeDawProject = (project: DawProject): string => {
+  const source = `${JSON.stringify(project, null, 2)}\n`
+  parseDawProject(source)
+  return source
+}
 
 export const DEFAULT_CLIP_SOURCE = `# New Xenpaper clip
 [0,4,7]===

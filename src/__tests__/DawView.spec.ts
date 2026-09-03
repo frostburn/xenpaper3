@@ -144,6 +144,9 @@ describe('DAW project model', () => {
     expect(serialized.endsWith('\n')).toBe(true)
     expect(serialized).toContain('\n  "format": "xenpaper3-daw"')
     expect(parseDawProject(serialized)).toEqual(project)
+
+    project.globalTrack.tempoChanges[0]!.bpm = 0
+    expect(() => serializeDawProject(project)).toThrow('Invalid Xenpaper project file')
   })
 
   it('rejects data that is not a Xenpaper project', () => {
@@ -526,6 +529,15 @@ describe('DawView', () => {
       download: 'My-First-Piece.xenpaper.json',
     })
     expect(revokeObjectURL).toHaveBeenCalledWith('blob:project')
+
+    createObjectURL.mockClear()
+    click.mockClear()
+    await wrapper.get('[aria-label="Tempo in BPM"]').setValue('')
+    await wrapper.get('button.project-file-button').trigger('click')
+
+    expect(wrapper.get('[role="alert"]').text()).toContain('Invalid Xenpaper project file')
+    expect(createObjectURL).not.toHaveBeenCalled()
+    expect(click).not.toHaveBeenCalled()
   })
 
   it('imports a local project file and reports invalid files without replacing it', async () => {
