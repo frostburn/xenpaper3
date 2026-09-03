@@ -104,17 +104,15 @@ const moveDrag = (event: PointerEvent) => {
       >
         {{ collapsed ? '▸ Expand' : '▾ Collapse' }}
       </button>
+      <button
+        type="button"
+        class="delete-lane"
+        :aria-label="`Delete ${lane.name}`"
+        @click="emit('deleteLane')"
+      >
+        Delete lane
+      </button>
       <span v-if="!collapsed">{{ samples.join(' · ') }} · drumkit SW Patch</span>
-      <label v-if="!collapsed" class="source-control">
-        Lane source
-        <XenpaperSourceEditor
-          editor-label="Drum lane source"
-          :source="lane.source"
-          :drum-samples="samples"
-          :rows="3"
-          @update:source="emit('update-source', $event)"
-        />
-      </label>
       <label v-if="!collapsed">
         Gain
         <input
@@ -128,14 +126,16 @@ const moveDrag = (event: PointerEvent) => {
         />
         <output>{{ Math.round(lane.gain * 100) }}%</output>
       </label>
-      <button
-        type="button"
-        class="delete-lane"
-        :aria-label="`Delete ${lane.name}`"
-        @click="emit('deleteLane')"
-      >
-        Delete lane
-      </button>
+      <label v-if="!collapsed" class="source-control">
+        Lane source
+        <XenpaperSourceEditor
+          editor-label="Drum lane source"
+          :source="lane.source"
+          :drum-samples="samples"
+          :rows="3"
+          @update:source="emit('update-source', $event)"
+        />
+      </label>
     </header>
     <div
       v-show="!collapsed"

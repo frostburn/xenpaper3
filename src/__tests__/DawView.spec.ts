@@ -898,6 +898,11 @@ describe('DawView', () => {
     expect(wrapper.find('[aria-label="Collapse Percussion"]').exists()).toBe(true)
     expect(lane.get('output').text()).toBe('37%')
     expect(lane.get('[aria-label="Delete Percussion"]').classes()).toContain('delete-lane')
+    expect(
+      Array.from(lane.get('header').element.children).map((element) =>
+        element.getAttribute('aria-label'),
+      ),
+    ).toEqual(['Drum lane name', 'Collapse Percussion', 'Delete Percussion', null, null, null])
     expect(lane.get('[aria-label="Drum lane"]').attributes('aria-label')).toBe('Drum lane')
     const laneSource = lane.get('[aria-label="Drum lane source"]')
     expect((laneSource.element as HTMLTextAreaElement).value).toBe(
