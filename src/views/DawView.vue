@@ -3,7 +3,7 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch, watchEffect
 import ClipSourceEditor from '../components/daw/ClipSourceEditor.vue'
 import DrumLane from '../components/daw/DrumLane.vue'
 import GlobalLane from '../components/daw/GlobalLane.vue'
-import InstrumentPianoRollLane from '../components/daw/InstrumentPianoRollLane.vue'
+import PitchedLane from '../components/daw/PitchedLane.vue'
 import TransportControls from '../components/daw/TransportControls.vue'
 import { DawAudioEngine } from '../daw/audio-engine'
 import {
@@ -407,7 +407,7 @@ onBeforeUnmount(() => {
         @toggle-collapse="toggleLaneCollapse(lane.id)"
       />
       <template v-else>
-        <InstrumentPianoRollLane
+        <PitchedLane
           :collapsed="collapsedLaneIds.has(lane.id)"
           :lane="lane"
           :global-source="project.globalTrack.source"

@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { Fraction } from 'xen-dev-utils'
 import router from '../router'
 import DawView from '../views/DawView.vue'
-import InstrumentPianoRollLane from '../components/daw/InstrumentPianoRollLane.vue'
+import PitchedLane from '../components/daw/PitchedLane.vue'
 import DrumLane from '../components/daw/DrumLane.vue'
 import XenpaperSourceHighlight from '../components/daw/XenpaperSourceHighlight.vue'
 import XenpaperSourceEditor from '../components/daw/XenpaperSourceEditor.vue'
@@ -618,7 +618,7 @@ describe('DawView', () => {
     await vi.waitFor(() => expect(wrapper.findAll('.instrument-header')).toHaveLength(2))
     await wrapper.get('button.add-lane').trigger('click')
     await wrapper
-      .findAllComponents(InstrumentPianoRollLane)[2]!
+      .findAllComponents(PitchedLane)[2]!
       .trigger('dblclick', { clientX: 64 })
     await wrapper.get('[aria-label="Xenpaper clip source"]').setValue('C D E')
     await wrapper.get('[aria-label="Xenpaper clip source"]').trigger('blur')
@@ -626,7 +626,7 @@ describe('DawView', () => {
 
     expect(wrapper.findAll('button.clip')[0]!.text()).toContain(originalSource.trim())
     expect(
-      wrapper.findAllComponents(InstrumentPianoRollLane)[2]!.get('button.clip').text(),
+      wrapper.findAllComponents(PitchedLane)[2]!.get('button.clip').text(),
     ).toContain('C D E')
   })
 
@@ -641,7 +641,7 @@ describe('DawView', () => {
         .map((name) => (name.element as HTMLInputElement).value),
     ).toEqual(['Instrument 1', 'Instrument 2'])
 
-    const lanes = wrapper.findAllComponents(InstrumentPianoRollLane)
+    const lanes = wrapper.findAllComponents(PitchedLane)
     await lanes[1]!.trigger('dblclick', { clientX: 64 })
     expect(lanes[0]!.find('button.clip').exists()).toBe(false)
     expect(lanes[1]!.find('button.clip').exists()).toBe(true)
@@ -660,7 +660,7 @@ describe('DawView', () => {
 
   it('double-clicks the empty lane to create, select, and edit a snapped clip', async () => {
     const wrapper = mount(DawView, { attachTo: document.body })
-    const lane = wrapper.getComponent(InstrumentPianoRollLane)
+    const lane = wrapper.getComponent(PitchedLane)
     vi.spyOn(lane.element, 'getBoundingClientRect').mockReturnValue({
       left: 0,
       top: 0,
@@ -693,7 +693,7 @@ describe('DawView', () => {
     expect(wrapper.get('.global-lane [data-highlight="comment"]').text()).toContain('Shared tuning')
     expect(wrapper.get('.instrument-header [data-highlight="directive"]').text()).toContain('@adsr')
 
-    await wrapper.getComponent(InstrumentPianoRollLane).trigger('dblclick', { clientX: 64 })
+    await wrapper.getComponent(PitchedLane).trigger('dblclick', { clientX: 64 })
     await wrapper.get('textarea[aria-label="Xenpaper clip source"]').setValue('C (')
 
     expect(wrapper.get('.source-editor [data-highlight="unparsed"]').text()).toBe('C (')
@@ -709,7 +709,7 @@ describe('DawView', () => {
 
   it('uses a single click for playhead placement and an existing clip click for selection', async () => {
     const wrapper = mount(DawView)
-    const lane = wrapper.getComponent(InstrumentPianoRollLane)
+    const lane = wrapper.getComponent(PitchedLane)
     await lane.trigger('click', { clientX: 128 })
     expect(wrapper.get('output').text()).toBe('Beat 2.00')
 
@@ -721,7 +721,7 @@ describe('DawView', () => {
 
   it('does not create overlapping clips when an existing clip is double-clicked', async () => {
     const wrapper = mount(DawView)
-    const lane = wrapper.getComponent(InstrumentPianoRollLane)
+    const lane = wrapper.getComponent(PitchedLane)
     await lane.trigger('dblclick', { clientX: 64 })
     await wrapper.get('button.clip').trigger('dblclick', { clientX: 64 })
 
@@ -730,7 +730,7 @@ describe('DawView', () => {
 
   it('deletes the selected clip with Delete while the instrument lane has focus', async () => {
     const wrapper = mount(DawView, { attachTo: document.body })
-    const lane = wrapper.getComponent(InstrumentPianoRollLane)
+    const lane = wrapper.getComponent(PitchedLane)
     await lane.trigger('dblclick', { clientX: 64 })
     const laneElement = lane.element as HTMLElement
     laneElement.focus()
@@ -746,7 +746,7 @@ describe('DawView', () => {
 
   it('focuses a clicked clip and deletes it with Delete', async () => {
     const wrapper = mount(DawView, { attachTo: document.body })
-    const lane = wrapper.getComponent(InstrumentPianoRollLane)
+    const lane = wrapper.getComponent(PitchedLane)
     await lane.trigger('dblclick', { clientX: 64 })
     const clip = wrapper.get('button.clip')
     const focus = vi.spyOn(clip.element as HTMLElement, 'focus')
@@ -762,7 +762,7 @@ describe('DawView', () => {
 
   it('deletes the selected clip from the Clip source header', async () => {
     const wrapper = mount(DawView)
-    const lane = wrapper.getComponent(InstrumentPianoRollLane)
+    const lane = wrapper.getComponent(PitchedLane)
     await lane.trigger('dblclick', { clientX: 64 })
 
     await wrapper.get('button[aria-label="Delete clip"]').trigger('click')
@@ -791,7 +791,7 @@ describe('DawView', () => {
     expect(scroll.element.parentElement?.parentElement?.className).toBe('scroll-controls')
     expect(Number(scroll.attributes('max'))).toBe(16 * 64)
 
-    await wrapper.getComponent(InstrumentPianoRollLane).trigger('dblclick', { clientX: 1280 })
+    await wrapper.getComponent(PitchedLane).trigger('dblclick', { clientX: 1280 })
     expect(Number(scroll.attributes('max'))).toBe((24 + 16) * 64)
 
     await scroll.setValue('2000')
@@ -834,7 +834,7 @@ describe('DawView', () => {
 
   it('adds play, solo, and stop actions to the selected clip header', async () => {
     const wrapper = mount(DawView)
-    await wrapper.getComponent(InstrumentPianoRollLane).trigger('dblclick', { clientX: 64 })
+    await wrapper.getComponent(PitchedLane).trigger('dblclick', { clientX: 64 })
 
     await wrapper.get('[aria-label="Play from clip start"]').trigger('click')
     expect(wrapper.get('[aria-label="Play"]').attributes('aria-pressed')).toBe('true')
@@ -878,7 +878,7 @@ describe('DawView', () => {
       (wrapper.get('[aria-label="Instrument lane source"]').element as HTMLTextAreaElement).value,
     ).toBe('@patch(sustain: 45%)')
 
-    await wrapper.getComponent(InstrumentPianoRollLane).trigger('dblclick', { clientX: 64 })
+    await wrapper.getComponent(PitchedLane).trigger('dblclick', { clientX: 64 })
     expect(wrapper.find('[aria-label="Piano roll preview"]').exists()).toBe(true)
     await wrapper.get('[aria-label="Clip display"]').setValue('source')
     expect(wrapper.get('button.clip pre').text()).toContain('[0,4,7]===')
@@ -929,7 +929,7 @@ describe('DawView', () => {
 
   it('resizes a clip when its source duration changes', async () => {
     const wrapper = mount(DawView)
-    await wrapper.getComponent(InstrumentPianoRollLane).trigger('dblclick', { clientX: 64 })
+    await wrapper.getComponent(PitchedLane).trigger('dblclick', { clientX: 64 })
     await wrapper.get('textarea[aria-label="Xenpaper clip source"]').setValue('C D')
     await wrapper.get('textarea[aria-label="Xenpaper clip source"]').trigger('blur')
 
@@ -940,7 +940,7 @@ describe('DawView', () => {
     const wrapper = mount(DawView)
     await wrapper.get('[aria-label="Global source"]').setValue('MOS{5L4s}')
     await wrapper.get('[aria-label="Global source"]').trigger('blur')
-    await wrapper.getComponent(InstrumentPianoRollLane).trigger('dblclick', { clientX: 64 })
+    await wrapper.getComponent(PitchedLane).trigger('dblclick', { clientX: 64 })
     await wrapper.get('textarea[aria-label="Xenpaper clip source"]').setValue('J K L M N O P Q R j')
     await wrapper.get('textarea[aria-label="Xenpaper clip source"]').trigger('blur')
 
@@ -952,7 +952,7 @@ describe('DawView', () => {
     const wrapper = mount(DawView)
     await wrapper.get('[aria-label="Global source"]').setValue('MOS{2L 1s}')
     await wrapper.get('[aria-label="Global source"]').trigger('blur')
-    await wrapper.getComponent(InstrumentPianoRollLane).trigger('dblclick', { clientX: 64 })
+    await wrapper.getComponent(PitchedLane).trigger('dblclick', { clientX: 64 })
     await wrapper.get('textarea[aria-label="Xenpaper clip source"]').setValue('J K L M j')
     await wrapper.get('textarea[aria-label="Xenpaper clip source"]').trigger('blur')
 
@@ -970,7 +970,7 @@ describe('DawView', () => {
     const wrapper = mount(DawView)
     await wrapper.get('[aria-label="Global source"]').setValue('MOS{2L 1s}')
     await wrapper.get('[aria-label="Global source"]').trigger('blur')
-    const lane = wrapper.getComponent(InstrumentPianoRollLane)
+    const lane = wrapper.getComponent(PitchedLane)
     await lane.trigger('dblclick', { clientX: 64 })
     await wrapper.get('textarea[aria-label="Xenpaper clip source"]').setValue('C (')
     await lane.trigger('dblclick', { clientX: 384 })
@@ -989,7 +989,7 @@ describe('DawView', () => {
     const wrapper = mount(DawView)
     await wrapper.get('[aria-label="Global source"]').setValue('MOS{')
     await wrapper.get('[aria-label="Global source"]').trigger('blur')
-    await wrapper.getComponent(InstrumentPianoRollLane).trigger('dblclick', { clientX: 64 })
+    await wrapper.getComponent(PitchedLane).trigger('dblclick', { clientX: 64 })
     await wrapper.get('textarea[aria-label="Xenpaper clip source"]').setValue('C D')
     await wrapper.get('textarea[aria-label="Xenpaper clip source"]').trigger('blur')
 
@@ -998,7 +998,7 @@ describe('DawView', () => {
 
   it('renders piano-roll notes parsed from the edited clip source', async () => {
     const wrapper = mount(DawView)
-    await wrapper.getComponent(InstrumentPianoRollLane).trigger('dblclick', { clientX: 64 })
+    await wrapper.getComponent(PitchedLane).trigger('dblclick', { clientX: 64 })
     await wrapper.get('textarea[aria-label="Xenpaper clip source"]').setValue('C D E')
     await wrapper.get('textarea[aria-label="Xenpaper clip source"]').trigger('blur')
 
@@ -1014,7 +1014,7 @@ describe('DawView', () => {
     const project = createDefaultProject()
     const lane = project.instrumentLanes[0]!
     lane.clips = [{ id: 'inaudible', start: beat(0), length: beat(3), source: '10Hz C 30kHz' }]
-    const wrapper = mount(InstrumentPianoRollLane, {
+    const wrapper = mount(PitchedLane, {
       props: { lane, pixelsPerBeat: 64, scrollLeft: 0, displayMode: 'piano-roll' },
     })
 
@@ -1034,7 +1034,7 @@ describe('DawView', () => {
       { id: 'audible', start: beat(0), length: beat(1), source: 'C' },
       { id: 'extreme', start: beat(1), length: beat(1), source: '1000000000Hz' },
     ]
-    const wrapper = mount(InstrumentPianoRollLane, {
+    const wrapper = mount(PitchedLane, {
       props: { lane, pixelsPerBeat: 64, scrollLeft: 0, displayMode: 'piano-roll' },
     })
 
@@ -1055,7 +1055,7 @@ describe('DawView', () => {
     lane.clips = [
       { id: 'glissando', start: beat(0), length: beat(2), source: '@gliss(ease-in) C G' },
     ]
-    const wrapper = mount(InstrumentPianoRollLane, {
+    const wrapper = mount(PitchedLane, {
       props: { lane, pixelsPerBeat: 64, scrollLeft: 0, displayMode: 'piano-roll' },
     })
 
@@ -1074,7 +1074,7 @@ describe('DawView', () => {
     lane.clips = [
       { id: 'clipped-glissando', start: beat(0), length: beat(2), source: "@gliss C=== '''C" },
     ]
-    const wrapper = mount(InstrumentPianoRollLane, {
+    const wrapper = mount(PitchedLane, {
       props: { lane, pixelsPerBeat: 64, scrollLeft: 0, displayMode: 'piano-roll' },
     })
 
@@ -1092,7 +1092,7 @@ describe('DawView', () => {
       { id: 'ascending', start: beat(0), length: beat(2), source: 'C D' },
       { id: 'descending', start: beat(2), length: beat(2), source: 'B C' },
     ]
-    const wrapper = mount(InstrumentPianoRollLane, {
+    const wrapper = mount(PitchedLane, {
       props: { lane, pixelsPerBeat: 64, scrollLeft: 0, displayMode: 'piano-roll' },
     })
 
@@ -1111,7 +1111,7 @@ describe('DawView', () => {
 
   it('renders the zero-cent guide as solid for the default chord clip', async () => {
     const wrapper = mount(DawView)
-    await wrapper.getComponent(InstrumentPianoRollLane).trigger('dblclick', { clientX: 64 })
+    await wrapper.getComponent(PitchedLane).trigger('dblclick', { clientX: 64 })
 
     const preview = wrapper.get('[aria-label="Piano roll preview"]')
     const zeroGuides = preview.findAll('.pitch-guide[data-cents="0"]')
@@ -1127,7 +1127,7 @@ describe('DawView', () => {
       { id: 'home-2', start: beat(1), length: beat(1), source: 'D' },
       { id: 'high', start: beat(2), length: beat(1), source: "''C" },
     ]
-    const wrapper = mount(InstrumentPianoRollLane, {
+    const wrapper = mount(PitchedLane, {
       props: { lane, pixelsPerBeat: 64, scrollLeft: 0, displayMode: 'piano-roll' },
     })
 
@@ -1147,7 +1147,7 @@ describe('DawView', () => {
       { id: 'home-2', start: beat(1), length: beat(1), source: 'D' },
       { id: 'low', start: beat(2), length: beat(1), source: '`C' },
     ]
-    const wrapper = mount(InstrumentPianoRollLane, {
+    const wrapper = mount(PitchedLane, {
       props: { lane, pixelsPerBeat: 64, scrollLeft: 0, displayMode: 'piano-roll' },
     })
 
@@ -1162,7 +1162,7 @@ describe('DawView', () => {
 
   it('moves clips on the snapped grid and wires play and stop', async () => {
     const wrapper = mount(DawView)
-    const lane = wrapper.getComponent(InstrumentPianoRollLane)
+    const lane = wrapper.getComponent(PitchedLane)
     await lane.trigger('dblclick', { clientX: 64 })
     const clip = wrapper.get('button.clip')
     clip.element.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, clientX: 70 }))
