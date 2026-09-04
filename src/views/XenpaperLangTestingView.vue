@@ -136,12 +136,25 @@ const logStaffNotation = () => {
 <style scoped>
 .testing-layout {
   display: grid;
+  min-height: 100vh;
   grid-template-columns: minmax(16rem, 24rem) minmax(0, 1fr);
   grid-template-areas:
     'tutorial editor'
     'tutorial visualisers';
   gap: 1rem;
   align-items: start;
+  padding: 1rem;
+  color: #202838;
+  background: #f4f6fa;
+  font-family: var(--xenpaper-font-copy);
+}
+
+.testing-layout :deep(a) {
+  color: #5d4698;
+}
+
+.testing-layout :deep(a:hover) {
+  color: #453275;
 }
 
 .source-editor {
@@ -169,7 +182,7 @@ textarea {
   box-sizing: border-box;
   width: 100%;
   max-width: 100%;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-family: var(--xenpaper-font-mono);
 }
 
 .highlight-preview,
@@ -193,69 +206,10 @@ textarea {
   border-radius: 0.25rem;
   background: #171b24;
   color: #e6e9ef;
+  font-family: var(--xenpaper-font-mono);
   white-space: pre-wrap;
   overflow-wrap: anywhere;
   tab-size: 2;
-}
-
-.syntax-comment {
-  color: #8b949e;
-  font-style: italic;
-}
-.syntax-directive {
-  color: #ff9e64;
-}
-.syntax-keyword {
-  color: #bb9af7;
-  font-weight: 600;
-}
-.syntax-pitch {
-  color: #7dcfff;
-}
-.syntax-pitch-latin {
-  color: #7dcfff;
-}
-.syntax-pitch-greek {
-  color: #2ac3de;
-}
-.syntax-pitch-mos {
-  color: #89ddff;
-}
-.syntax-number {
-  color: #9ece6a;
-}
-.syntax-ratio {
-  color: #73daca;
-}
-.syntax-rest {
-  color: #c0caf5;
-  font-weight: 600;
-}
-.syntax-mos-declaration {
-  color: #bb9af7;
-  font-weight: 600;
-}
-.syntax-mos-pattern {
-  color: #e0af68;
-}
-.syntax-mos-udp {
-  color: #f7768e;
-}
-.syntax-mos-hardness {
-  color: #ff9e64;
-  font-weight: 600;
-}
-.syntax-operator {
-  color: #ff7a93;
-}
-.syntax-punctuation {
-  color: #a9b1d6;
-}
-.syntax-identifier {
-  color: #e0af68;
-}
-.syntax-unparsed {
-  color: #e6e9ef;
 }
 
 .highlight-error {
@@ -314,3 +268,5 @@ textarea {
   }
 }
 </style>
+
+<style scoped src="../assets/syntax-highlight.css"></style>
