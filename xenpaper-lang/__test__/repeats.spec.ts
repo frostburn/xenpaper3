@@ -216,6 +216,18 @@ describe('repeat expansion', () => {
     ).toEqual(['C', 'D', 'E', 'F', 'G', 'C', 'D', 'A', 'B'])
   })
 
+  it('does not scan past a detached terminal into a later implicit repeat', () => {
+    const source = 'C |¹ D :|² E | F |¹ G :|² A |'
+    const pitches = (nodes: readonly ExpandedNode[]): string[] =>
+      nodes.flatMap((node) =>
+        node.type === 'PitchLiteral'
+          ? [node.raw as string]
+          : pitches((node.items as ExpandedNode[] | undefined) ?? []),
+      )
+
+    expect(pitches(body(source))).toEqual(['C', 'D', 'C', 'E', 'F', 'G', 'F', 'A'])
+  })
+
   it('accepts the end of the document as an alternate-ending terminal', () => {
     const source = '|: 1 2 |¹ 3 4 :|² 5 6'
     const repeat = parse(source).body[0]

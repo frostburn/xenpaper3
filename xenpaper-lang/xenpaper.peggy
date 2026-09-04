@@ -408,9 +408,11 @@ RepeatEndings
   / Spacing ":|" { return { endings: [], terminal: ":|", incomplete: false }; }
 
 EndingParallelExpression
-  // When another numbered ending follows, its marker gives us an unambiguous
-  // stopping point, so ordinary barlines may remain in the current ending.
-  = expression:ParallelExpression &(Spacing NextEndingMarker) { return expression; }
+  // A repeat-end marker gives us an unambiguous stopping point, so ordinary
+  // barlines may remain in the current ending. A later plain ending marker is
+  // not sufficient: a detached bar may terminate this repeat before another
+  // implicit-start repeat begins.
+  = expression:ParallelExpression &(Spacing RepeatEndEndingMarker) { return expression; }
   / first:EndingSequenceExpression
     rest:(Spacing "," Spacing branch:EndingSequenceExpression { return branch; })* {
       return parallel([first, ...rest]);
@@ -427,9 +429,12 @@ FirstEndingMarker
   = "|" number:EndingNumber { return { number, markerLocation: location() }; }
 
 NextEndingMarker
+  = RepeatEndEndingMarker
+  / "|" number:EndingNumber { return { number, markerLocation: location() }; }
+
+RepeatEndEndingMarker
   = ":|" Spacing marker:FirstEndingMarker { return marker; }
   / ":|" number:EndingNumber { return { number, markerLocation: location() }; }
-  / "|" number:EndingNumber { return { number, markerLocation: location() }; }
 
 EndingNumber
   = "@^" value:UnsignedInteger {
