@@ -408,7 +408,10 @@ RepeatEndings
   / Spacing ":|" { return { endings: [], terminal: ":|", incomplete: false }; }
 
 EndingParallelExpression
-  = first:EndingSequenceExpression
+  // When another numbered ending follows, its marker gives us an unambiguous
+  // stopping point, so ordinary barlines may remain in the current ending.
+  = expression:ParallelExpression &(Spacing NextEndingMarker) { return expression; }
+  / first:EndingSequenceExpression
     rest:(Spacing "," Spacing branch:EndingSequenceExpression { return branch; })* {
       return parallel([first, ...rest]);
     }

@@ -193,6 +193,29 @@ describe('repeat expansion', () => {
     })
   })
 
+  it('preserves detached barlines before a subsequent alternate ending', () => {
+    const source = 'C D |¹ E F | G :|² A B'
+    const program = parse(source)
+    const repeat = program.body[0] as {
+      endings: Array<{ body: Array<{ type: string; items: Array<{ type: string; raw: string }> }> }>
+    }
+
+    expect(repeat.endings[0]!.body[0]).toMatchObject({
+      type: 'Sequence',
+      items: [
+        { type: 'PitchLiteral', raw: 'E' },
+        { type: 'PitchLiteral', raw: 'F' },
+        { type: 'Barline', raw: '|' },
+        { type: 'PitchLiteral', raw: 'G' },
+      ],
+    })
+    expect(
+      body(source)
+        .filter((node) => node.type === 'PitchLiteral')
+        .map((node) => node.raw),
+    ).toEqual(['C', 'D', 'E', 'F', 'G', 'C', 'D', 'A', 'B'])
+  })
+
   it('accepts the end of the document as an alternate-ending terminal', () => {
     const source = '|: 1 2 |¹ 3 4 :|² 5 6'
     const repeat = parse(source).body[0]
