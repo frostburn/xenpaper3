@@ -200,7 +200,7 @@ const moveDrag = (event: PointerEvent) => {
   align-items: center;
   gap: 1rem;
   padding: 0.6rem;
-  background: #3a2f43;
+  background: var(--xenpaper-bg-light);
 }
 .drum-lane header.collapsed {
   gap: 0.5rem;
@@ -211,7 +211,7 @@ const moveDrag = (event: PointerEvent) => {
 }
 .drum-lane header span {
   flex: 1;
-  color: #cfbadb;
+  color: var(--xenpaper-lavender);
 }
 .lane-name {
   min-width: 6rem;
@@ -223,11 +223,11 @@ const moveDrag = (event: PointerEvent) => {
   white-space: nowrap;
 }
 .delete-lane {
-  color: #ffd8d8;
-  border: 1px solid #a85d67;
+  color: var(--xenpaper-light-red);
+  border: 1px solid var(--xenpaper-light-red);
   border-radius: 0.25rem;
   padding: 0.35rem 0.55rem;
-  background: #4d2730;
+  background: var(--xenpaper-brown);
   cursor: pointer;
 }
 .source-control {
@@ -247,8 +247,8 @@ const moveDrag = (event: PointerEvent) => {
   overflow: hidden;
   background: repeating-linear-gradient(
     90deg,
-    #151b26 0 calc(var(--beat-width) - 1px),
-    #39445a calc(var(--beat-width) - 1px) var(--beat-width)
+    var(--xenpaper-bg-canvas) 0 calc(var(--beat-width) - 1px),
+    var(--xenpaper-border) calc(var(--beat-width) - 1px) var(--beat-width)
   );
 }
 .drum-clip {
@@ -256,12 +256,12 @@ const moveDrag = (event: PointerEvent) => {
   top: 0.5rem;
   bottom: 0.5rem;
   overflow: hidden;
-  border: 1px solid #b078cf;
-  background: #39254a;
+  border: 1px solid var(--xenpaper-lavender);
+  background: var(--xenpaper-purple);
   color: white;
 }
 .drum-clip.selected {
-  outline: 2px solid #f0bdff;
+  outline: 2px solid var(--xenpaper-lavender);
 }
 .drum-preview {
   position: absolute;
@@ -276,18 +276,18 @@ const moveDrag = (event: PointerEvent) => {
   color: white;
   font-weight: 700;
   text-shadow:
-    -1px -1px 0 #281732,
-    1px -1px 0 #281732,
-    -1px 1px 0 #281732,
-    1px 1px 0 #281732;
-  border-bottom: 1px solid #654b74;
+    -1px -1px 0 var(--xenpaper-purple),
+    1px -1px 0 var(--xenpaper-purple),
+    -1px 1px 0 var(--xenpaper-purple),
+    1px 1px 0 var(--xenpaper-purple);
+  border-bottom: 1px solid var(--xenpaper-purple);
   pointer-events: none;
 }
 .drum-preview i {
   position: absolute;
   z-index: 1;
   border-radius: 0.2rem;
-  background: #f0bdff;
+  background: var(--xenpaper-lavender);
 }
 .drum-clip pre {
   margin: 0;

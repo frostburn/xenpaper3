@@ -60,9 +60,9 @@ const activeChapter = ref(0)
   flex-direction: column;
   gap: 0.75rem;
   padding: 1rem;
-  border: 1px solid #c8ccd0;
+  border: 1px solid var(--xenpaper-border);
   border-radius: 0.5rem;
-  background: #f7f8fa;
+  background: var(--xenpaper-surface);
 }
 
 h2,
@@ -90,7 +90,7 @@ p {
 
 .chapter-tabs button:hover,
 .chapter-tabs button.active {
-  background: #dfe8f5;
+  background: var(--xenpaper-text-soft);
 }
 
 .chapter-tabs button.active {
@@ -106,7 +106,7 @@ p {
   display: grid;
   gap: 0.5rem;
   padding: 0.75rem 0;
-  border-top: 1px solid #d9dde2;
+  border-top: 1px solid var(--xenpaper-border);
 }
 
 .tutorial-demo {
@@ -129,17 +129,17 @@ p {
   width: 100%;
   padding: 0;
   overflow: hidden;
-  border: 1px solid #b8bec6;
+  border: 1px solid var(--xenpaper-border-strong);
   border-radius: 0.25rem;
-  background: #fff;
+  background: var(--xenpaper-text);
   color: inherit;
   text-align: left;
   cursor: pointer;
 }
 
 .tune:hover {
-  border-color: #4d78aa;
-  background: #f0f6ff;
+  border-color: var(--xenpaper-blue);
+  background: var(--xenpaper-text-soft);
 }
 
 pre {

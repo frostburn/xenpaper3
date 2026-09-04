@@ -462,8 +462,8 @@ onBeforeUnmount(() => {
   max-width: 1200px;
   margin: auto;
   padding: 1rem;
-  color: #eef3ff;
-  background: #101622;
+  color: var(--xenpaper-text-soft);
+  background: var(--xenpaper-bg);
 }
 .project-header {
   display: flex;
@@ -482,11 +482,11 @@ onBeforeUnmount(() => {
 }
 .project-title input {
   min-width: min(18rem, 45vw);
-  border: 1px solid #7184a8;
+  border: 1px solid var(--xenpaper-border-strong);
   border-radius: 0.25rem;
   padding: 0.45rem 0.55rem;
   color: inherit;
-  background: #1b2536;
+  background: var(--xenpaper-bg-control);
 }
 .project-file-actions {
   display: flex;
@@ -494,12 +494,12 @@ onBeforeUnmount(() => {
   margin-left: auto;
 }
 .project-file-button {
-  border: 1px solid #7184a8;
+  border: 1px solid var(--xenpaper-border-strong);
   border-radius: 0.25rem;
   padding: 0.45rem 0.65rem;
   color: inherit;
   font: inherit;
-  background: #1b2536;
+  background: var(--xenpaper-bg-control);
   cursor: pointer;
 }
 .project-file-input {
@@ -535,7 +535,7 @@ onBeforeUnmount(() => {
   min-width: 0;
 }
 .playback-error {
-  color: #ff9b9b;
+  color: var(--xenpaper-light-red);
   margin: 0 0.75rem;
 }
 .instrument-lane + .instrument-lane {
@@ -544,11 +544,11 @@ onBeforeUnmount(() => {
 .add-lane {
   flex: 1;
   margin: 0.75rem 0;
-  border: 1px dashed #7184a8;
+  border: 1px dashed var(--xenpaper-border-strong);
   border-radius: 0.25rem;
   padding: 0.65rem;
-  color: #eef3ff;
-  background: #1b2536;
+  color: var(--xenpaper-text-soft);
+  background: var(--xenpaper-bg-control);
   cursor: pointer;
 }
 .add-lanes {

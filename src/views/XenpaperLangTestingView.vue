@@ -144,17 +144,17 @@ const logStaffNotation = () => {
   gap: 1rem;
   align-items: start;
   padding: 1rem;
-  color: #202838;
-  background: #f4f6fa;
+  color: var(--xenpaper-bg-light);
+  background: var(--xenpaper-surface);
   font-family: var(--xenpaper-font-copy);
 }
 
 .testing-layout :deep(a) {
-  color: #5d4698;
+  color: var(--xenpaper-purple);
 }
 
 .testing-layout :deep(a:hover) {
-  color: #453275;
+  color: var(--xenpaper-purple);
 }
 
 .source-editor {
@@ -202,10 +202,10 @@ textarea {
   margin: 0;
   padding: 0.75rem;
   overflow: auto;
-  border: 1px solid #667085;
+  border: 1px solid var(--xenpaper-border);
   border-radius: 0.25rem;
-  background: #171b24;
-  color: #e6e9ef;
+  background: var(--xenpaper-bg-editor);
+  color: var(--xenpaper-text-soft);
   font-family: var(--xenpaper-font-mono);
   white-space: pre-wrap;
   overflow-wrap: anywhere;
@@ -214,7 +214,7 @@ textarea {
 
 .highlight-error {
   margin: 0.35rem 0 0;
-  color: #b42318;
+  color: var(--xenpaper-red);
   font-size: 0.8rem;
 }
 
@@ -233,7 +233,7 @@ textarea {
 .highlight-debugger th,
 .highlight-debugger td {
   padding: 0.25rem 0.4rem;
-  border-bottom: 1px solid #d0d5dd;
+  border-bottom: 1px solid var(--xenpaper-border);
   text-align: left;
   vertical-align: top;
 }
@@ -247,7 +247,7 @@ textarea {
   display: inline-block;
   padding: 0.1rem 0.3rem;
   border-radius: 0.2rem;
-  background: #171b24;
+  background: var(--xenpaper-bg-editor);
 }
 
 .actions {

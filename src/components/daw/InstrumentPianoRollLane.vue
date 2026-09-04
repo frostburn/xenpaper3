@@ -99,9 +99,7 @@ const pianoRoll = computed(() => {
     // The authored register remains explicit in the label rendered on that clip.
     const hasInaudiblePitch = notes.flatMap(notePitches).some((pitch) => !isAudiblePitch(pitch))
     const registerOffset =
-      !hasInaudiblePitch && Math.abs(distance) >= 1200
-        ? Math.round(distance / 1200) * 1200
-        : 0
+      !hasInaudiblePitch && Math.abs(distance) >= 1200 ? Math.round(distance / 1200) * 1200 : 0
     return { clip, notes, registerOffset }
   })
   const pitches = displayClips.flatMap(({ notes, registerOffset }) =>
@@ -319,8 +317,8 @@ const onKeyDown = (event: KeyboardEvent) => {
   overflow: hidden;
   height: 9rem;
   cursor: crosshair;
-  background-color: #151b27;
-  background-image: linear-gradient(90deg, #30394a 1px, transparent 1px);
+  background-color: var(--xenpaper-bg-canvas);
+  background-image: linear-gradient(90deg, var(--xenpaper-border) 1px, transparent 1px);
   background-position-x: var(--grid-offset);
   background-size: var(--beat-width) 100%;
   user-select: none;
@@ -331,8 +329,8 @@ const onKeyDown = (event: KeyboardEvent) => {
   top: 1rem;
   height: 7rem;
   overflow: hidden;
-  border: 2px solid #788aa8;
-  background: #40577d;
+  border: 2px solid var(--xenpaper-border-strong);
+  background: var(--xenpaper-focus);
   color: white;
   text-align: left;
   user-select: none;
@@ -347,18 +345,22 @@ const onKeyDown = (event: KeyboardEvent) => {
 .piano-roll {
   position: absolute;
   inset: 0;
-  background: repeating-linear-gradient(0deg, transparent 0 11%, #ffffff13 12% 13%);
+  background: repeating-linear-gradient(
+    0deg,
+    transparent 0 11%,
+    color-mix(in srgb, var(--xenpaper-text) 7%, transparent) 12% 13%
+  );
   pointer-events: none;
 }
 .pitch-guide {
   position: absolute;
   right: 0;
   left: 0;
-  border-top: 1px dashed #ff6666aa;
+  border-top: 1px dashed color-mix(in srgb, var(--xenpaper-light-red) 67%, transparent);
 }
 .pitch-guide.global-reference {
   z-index: 1;
-  border-top: 3px solid #ff3535;
+  border-top: 3px solid var(--xenpaper-red);
 }
 .register-label {
   position: absolute;
@@ -367,8 +369,8 @@ const onKeyDown = (event: KeyboardEvent) => {
   right: 0.25rem;
   padding: 0.08rem 0.25rem;
   border-radius: 2px;
-  background: #1b2638dd;
-  color: #ffaaaa;
+  background: color-mix(in srgb, var(--xenpaper-bg-control) 87%, transparent);
+  color: var(--xenpaper-light-red);
   font: 0.65rem/1.2 monospace;
 }
 .piano-roll i {
@@ -378,10 +380,10 @@ const onKeyDown = (event: KeyboardEvent) => {
   height: 9%;
   min-width: 2px;
   border-radius: 2px;
-  background: #9de3ff;
+  background: var(--xenpaper-cyan);
 }
 .piano-roll i.inaudible {
-  background: #ff9f43;
+  background: var(--xenpaper-orange);
 }
 .bendy-notes {
   position: absolute;
@@ -393,24 +395,24 @@ const onKeyDown = (event: KeyboardEvent) => {
 }
 .bendy-note {
   fill: none;
-  stroke: #9de3ff;
+  stroke: var(--xenpaper-cyan);
   stroke-width: 6;
   stroke-linecap: round;
   stroke-linejoin: round;
   vector-effect: non-scaling-stroke;
 }
 .bendy-note.inaudible {
-  stroke: #ff9f43;
+  stroke: var(--xenpaper-orange);
 }
 .clip.selected {
-  border-color: #8ce6ff;
-  background: #486d93;
+  border-color: var(--xenpaper-cyan);
+  background: var(--xenpaper-focus);
 }
 .hint {
   position: absolute;
   inset: 3.5rem 0 auto;
   text-align: center;
-  color: #9aa5b8;
+  color: var(--xenpaper-text-muted);
   pointer-events: none;
 }
 </style>
