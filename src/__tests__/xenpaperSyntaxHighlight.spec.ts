@@ -46,6 +46,16 @@ describe('highlightXenpaper', () => {
     )
   })
 
+  it('does not let replayed implicit-repeat prefixes mask later source tokens', () => {
+    const source = 'C |¹ D :|² E | F |¹ G :|² A |'
+    const tokens = highlightXenpaper(parse(source))
+
+    expect(tokens.map(({ text }) => text).join('')).toBe(source)
+    expect(
+      tokens.filter(({ kind }) => kind === 'pitch-latin').map(({ text }) => text),
+    ).toEqual(['C', 'D', 'E', 'F', 'G', 'A'])
+  })
+
   it('distinguishes a MOS declaration, its patterns, and UDP modes', () => {
     const tokens = highlightXenpaper(parse('MOS {5L 2s 1|3}'))
 
