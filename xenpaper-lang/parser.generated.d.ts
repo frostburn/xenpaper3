@@ -396,6 +396,8 @@ export interface Repeat extends Node {
   type: 'Repeat'
   count: IntegerLiteral | null
   body: Expression[]
+  /** Earlier items in the lexical sequence replayed after an implicit repeat's first pass. */
+  replayPrefix?: Expression[]
   endings: RepeatEnding[]
   terminal: ':|' | '|' | '||' | null
   incompleteEndings: boolean

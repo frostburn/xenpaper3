@@ -159,7 +159,10 @@ function collectRanges(
   }
 
   for (const [key, value] of Object.entries(node)) {
-    if (key === 'location') continue
+    // replayPrefix references syntax that already appears earlier in the source.
+    // Traversing it again at a greater AST depth would let those duplicate ranges
+    // override the ranges belonging to the later implicit repeat.
+    if (key === 'location' || key === 'replayPrefix') continue
     const childRatioInteger =
       ratioInteger ||
       node.type === 'EnumeratedChord' ||

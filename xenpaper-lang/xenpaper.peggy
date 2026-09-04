@@ -31,6 +31,16 @@
   const sequence = (items, loc = location()) =>
     items.length === 1 ? items[0] : node('Sequence', { items }, loc);
 
+  const implicitRepeats = new WeakSet();
+
+  const prependImplicitRepeatScope = (expression, prefix) => {
+    if (implicitRepeats.has(expression)) {
+      expression.replayPrefix = [...prefix, ...(expression.replayPrefix ?? [])];
+    } else if (expression?.type === 'Sequence') {
+      for (const item of expression.items) prependImplicitRepeatScope(item, prefix);
+    }
+  };
+
   const parallel = (branches, loc = location()) =>
     branches.length === 1 ? branches[0] : node('Parallel', { branches }, loc);
 
@@ -126,6 +136,8 @@ ScopedSequenceExpression
         terminal: ":|",
         incompleteEndings: false,
       });
+      implicitRepeats.add(repeat);
+      if (remainder) prependImplicitRepeatScope(remainder, [repeat]);
       return sequence(remainder ? [repeat, remainder] : [repeat]);
     }
   / body:SequenceExpression result:RepeatEndings
@@ -140,6 +152,8 @@ ScopedSequenceExpression
         terminal: result.terminal,
         incompleteEndings: result.incomplete,
       });
+      implicitRepeats.add(repeat);
+      if (remainder) prependImplicitRepeatScope(remainder, [repeat]);
       return sequence(remainder ? [repeat, remainder] : [repeat]);
     }
   / SequenceExpression
@@ -408,7 +422,12 @@ RepeatEndings
   / Spacing ":|" { return { endings: [], terminal: ":|", incomplete: false }; }
 
 EndingParallelExpression
-  = first:EndingSequenceExpression
+  // A repeat-end marker gives us an unambiguous stopping point, so ordinary
+  // barlines may remain in the current ending. A later plain ending marker is
+  // not sufficient: a detached bar may terminate this repeat before another
+  // implicit-start repeat begins.
+  = expression:ParallelExpression &(Spacing RepeatEndEndingMarker) { return expression; }
+  / first:EndingSequenceExpression
     rest:(Spacing "," Spacing branch:EndingSequenceExpression { return branch; })* {
       return parallel([first, ...rest]);
     }
@@ -424,9 +443,12 @@ FirstEndingMarker
   = "|" number:EndingNumber { return { number, markerLocation: location() }; }
 
 NextEndingMarker
+  = RepeatEndEndingMarker
+  / "|" number:EndingNumber { return { number, markerLocation: location() }; }
+
+RepeatEndEndingMarker
   = ":|" Spacing marker:FirstEndingMarker { return marker; }
   / ":|" number:EndingNumber { return { number, markerLocation: location() }; }
-  / "|" number:EndingNumber { return { number, markerLocation: location() }; }
 
 EndingNumber
   = "@^" value:UnsignedInteger {
