@@ -1,14 +1,31 @@
+@import url('https://fonts.googleapis.com/css2?family=DM+Mono:ital,wght@0,400;0,500;1,400&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Nunito:wght@300;400&display=swap');
+
 :root {
-  color: #202838;
-  background: #f4f6fa;
-  font-family:
-    Inter,
-    ui-sans-serif,
-    system-ui,
-    -apple-system,
-    BlinkMacSystemFont,
-    'Segoe UI',
-    sans-serif;
+  --xenpaper-bg: #0e151b;
+  --xenpaper-bg-light: #18232d;
+  --xenpaper-text: #ffffff;
+  --xenpaper-placeholder: #198c8c;
+  --xenpaper-focus: #115d5d;
+  --xenpaper-cyan: #22cece;
+  --xenpaper-blue: #3377ee;
+  --xenpaper-green: #62c370;
+  --xenpaper-light-green: #a8e6a3;
+  --xenpaper-solo: #ffd166;
+  --xenpaper-orange: #ff541e;
+  --xenpaper-red: #cc0000;
+  --xenpaper-light-red: #e57373;
+  --xenpaper-pink: #c52373;
+  --xenpaper-brown: #94472f;
+  --xenpaper-purple: #821361;
+  --xenpaper-magenta: #d61ba4;
+  --xenpaper-lavender: #a490b3;
+  --xenpaper-font-mono: 'DM Mono', monospace;
+  --xenpaper-font-copy: 'Nunito', sans-serif;
+
+  color: var(--xenpaper-text);
+  background: var(--xenpaper-bg);
+  font-family: var(--xenpaper-font-mono);
   font-synthesis: none;
   text-rendering: optimizeLegibility;
 }
@@ -19,8 +36,22 @@ body,
   min-height: 100%;
 }
 
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
 body {
   margin: 0;
+  overflow-x: hidden;
+  color: var(--xenpaper-text);
+  background: var(--xenpaper-bg);
+  font-size: 16px;
+  font-weight: 400;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 #app {
@@ -33,6 +64,13 @@ body {
   flex: 1;
 }
 
+h1,
+h2,
+h3 {
+  font-family: var(--xenpaper-font-copy);
+  font-weight: 400;
+}
+
 button,
 input,
 select,
@@ -40,11 +78,21 @@ textarea {
   font: inherit;
 }
 
+input::placeholder,
+textarea::placeholder {
+  color: var(--xenpaper-placeholder);
+}
+
 a {
-  color: #5d4698;
+  color: var(--xenpaper-cyan);
   text-underline-offset: 0.15em;
 }
 
 a:hover {
-  color: #453275;
+  color: var(--xenpaper-light-green);
+}
+
+:focus-visible {
+  outline: 2px solid var(--xenpaper-cyan);
+  outline-offset: 2px;
 }
