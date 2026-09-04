@@ -1,0 +1,174 @@
+{
+  "format": "xenpaper3-daw",
+  "version": 1,
+  "createdAt": "2026-09-03T12:35:51.991Z",
+  "xenpaperVersion": "3.0.0-beta.6",
+  "title": "Lucky Debugger",
+  "globalTrack": {
+    "source": "{22edo}\n@groove([0===0==])\n# CC BY 4.0: Lumi Pakkanen\n# https://creativecommons.org/licenses/by/4.0/",
+    "tempoChanges": [
+      {
+        "id": "tempo-1",
+        "beat": {
+          "n": 0,
+          "d": 1
+        },
+        "bpm": 240
+      }
+    ],
+    "timeSignatureChanges": [
+      {
+        "id": "time-signature-1",
+        "beat": {
+          "n": 0,
+          "d": 1
+        },
+        "numerator": 4,
+        "denominator": 4
+      }
+    ]
+  },
+  "instrumentLanes": [
+    {
+      "id": "instrument-1",
+      "kind": "instrument",
+      "name": "Lead",
+      "patchSource": "default",
+      "oscillatorType": "semisine",
+      "gain": 0.9,
+      "source": "{root = `0}\n@adsr(20ms, 40ms, 80%, 40ms)\n@2",
+      "clips": [
+        {
+          "id": "clip-1",
+          "start": {
+            "n": 0,
+            "d": 1
+          },
+          "length": {
+            "n": 64,
+            "d": 1
+          },
+          "source": "g ve d c  .. .. |  c= g=   ve= d=   |\na ^c B A  .. .. |  .a .d   =^c B .  |\na c vg d  .. .d |  .d .vg  .d  d D  |\nG g d vb  .. .G |¹  .d .g   G=  a. :|\n                |²  .g .f  ve=  d= ||"
+        },
+        {
+          "id": "clip-2",
+          "start": {
+            "n": 64,
+            "d": 1
+          },
+          "length": {
+            "n": 64,
+            "d": 1
+          },
+          "source": "c  G  g=   d ve  d c | .. ..  ..  f  g  |\na  A  e=   B ^c  d e | .. ..  ..  f  g  |\nd  D  A=   e ^f  .vg | .. ..  .^f f vg  |\ng vg ^f f  e ve ^d d |¹.. ..  ..  A  B :|\n                     |².B .A  =G  =  . ||"
+        },
+        {
+          "id": "clip-3",
+          "start": {
+            "n": 192,
+            "d": 1
+          },
+          "length": {
+            "n": 68,
+            "d": 1
+          },
+          "source": "g ve d c  .. .. |  c= g=   ve= d=   |\na ^c B A  .. .. |  .a .d   =^c B .  |\na c vg d  .. .d |  .d .vg  .d  d D  |\nG g d vb  .. .G |¹  .d .g   G=  a. :|\n                |²  .g f=  ve  d==  | c= == .. .'c ||"
+        }
+      ]
+    },
+    {
+      "id": "instrument-2",
+      "kind": "instrument",
+      "name": "Bass",
+      "patchSource": "default",
+      "oscillatorType": "fmsine",
+      "gain": 0.6,
+      "source": "{root = ```0}\n@adsr(20ms, 40ms, 80%, 40ms)\n@2",
+      "clips": [
+        {
+          "id": "clip-1",
+          "start": {
+            "n": 0,
+            "d": 1
+          },
+          "length": {
+            "n": 128,
+            "d": 1
+          },
+          "source": "|:@x4\n.c .c   g= g. | .c .c   g= g.  |\n.A .A   e= e. | .A .A   e= e.  |\n.d .d   a= a. | .d .d   a= a.  |\n.G .G   d= d. | d. c.   B. A. :|"
+        },
+        {
+          "id": "clip-2",
+          "start": {
+            "n": 128,
+            "d": 1
+          },
+          "length": {
+            "n": 64,
+            "d": 1
+          },
+          "source": "@ff\n.c  g.   f .  d.  | c`g =  =  Bb. d.  |\nc=  =c   . G  =Bb | . c =  c  . . ..  |\n.'c .bb  g f  .e  |ve^d d vd  .^c c.  |\n.Bb ==   G .  d.  |¹. .ve  e  . f g. :|\n                  |²c ='c  c  . . .. ||"
+        },
+        {
+          "id": "clip-3",
+          "start": {
+            "n": 192,
+            "d": 1
+          },
+          "length": {
+            "n": 68,
+            "d": 1
+          },
+          "source": ".G . c  g= g.  | .c .G  g= g.  |\n.A a A  e= e.  | .A e.  a= e.  |\n.d . d  a= .^f | .d .d  a= a.  |\n.G g G  d= d.  | d. c.  B. A. :|\n\nc===    .. G c ||"
+        }
+      ]
+    },
+    {
+      "id": "drum-1",
+      "kind": "drum",
+      "name": "Drums 1",
+      "patchSource": "drumkit",
+      "oscillatorType": "sine",
+      "gain": 0.66,
+      "source": "",
+      "clips": [
+        {
+          "id": "clip-1",
+          "start": {
+            "n": 0,
+            "d": 1
+          },
+          "length": {
+            "n": 128,
+            "d": 1
+          },
+          "source": "|:@x15\n[bd,hh . ] [hh hh]  [sd,hh .]  [bd, hh hh] |\n[bd,hh . ] [hh hh]  [sd,hh .]  [hh hh]    :|\n\n[bd,hh . ] [hh hh]  [sd,hh .]  [bd, hh hh] |\n[bd,hh hh] [sd,.hh] [sd,hh hh] [sd,hh hh] ||"
+        },
+        {
+          "id": "clip-2",
+          "start": {
+            "n": 128,
+            "d": 1
+          },
+          "length": {
+            "n": 64,
+            "d": 1
+          },
+          "source": "|:@x7\n[bd, hh hh] [hh .]    [sd,hh hh] [hh .]  |\n[hh hh]     [bd,hh .] [sd,hh hh] [hh .] :|\n\n[bd, hh hh] [hh .]       [sd,hh hh] [hh .]     |\n[bd, hh hh] [bd,sd,hh .] [sd,hh hh] [sd,hh .] ||"
+        },
+        {
+          "id": "clip-3",
+          "start": {
+            "n": 192,
+            "d": 1
+          },
+          "length": {
+            "n": 64,
+            "d": 1
+          },
+          "source": "(@time(2/4)|:@x32 [.hh] [@mf hh @mp hh] :|),\n|:@x8 bd= sd=  [.bd]. sd= :|\n"
+        }
+      ]
+    }
+  ]
+}
