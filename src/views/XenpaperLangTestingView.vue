@@ -198,66 +198,6 @@ textarea {
   tab-size: 2;
 }
 
-.syntax-comment {
-  color: #8b949e;
-  font-style: italic;
-}
-.syntax-directive {
-  color: #ff9e64;
-}
-.syntax-keyword {
-  color: #bb9af7;
-  font-weight: 600;
-}
-.syntax-pitch {
-  color: #7dcfff;
-}
-.syntax-pitch-latin {
-  color: #7dcfff;
-}
-.syntax-pitch-greek {
-  color: #2ac3de;
-}
-.syntax-pitch-mos {
-  color: #89ddff;
-}
-.syntax-number {
-  color: #9ece6a;
-}
-.syntax-ratio {
-  color: #73daca;
-}
-.syntax-rest {
-  color: #c0caf5;
-  font-weight: 600;
-}
-.syntax-mos-declaration {
-  color: #bb9af7;
-  font-weight: 600;
-}
-.syntax-mos-pattern {
-  color: #e0af68;
-}
-.syntax-mos-udp {
-  color: #f7768e;
-}
-.syntax-mos-hardness {
-  color: #ff9e64;
-  font-weight: 600;
-}
-.syntax-operator {
-  color: #ff7a93;
-}
-.syntax-punctuation {
-  color: #a9b1d6;
-}
-.syntax-identifier {
-  color: #e0af68;
-}
-.syntax-unparsed {
-  color: #e6e9ef;
-}
-
 .highlight-error {
   margin: 0.35rem 0 0;
   color: #b42318;
@@ -314,3 +254,5 @@ textarea {
   }
 }
 </style>
+
+<style scoped src="../assets/syntax-highlight.css"></style>
