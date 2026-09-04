@@ -227,7 +227,7 @@ const moveDrag = (event: PointerEvent) => {
   border: 1px solid var(--xenpaper-light-red);
   border-radius: 0.25rem;
   padding: 0.35rem 0.55rem;
-  background: var(--xenpaper-brown);
+  background: var(--xenpaper-bg);
   cursor: pointer;
 }
 .source-control {
