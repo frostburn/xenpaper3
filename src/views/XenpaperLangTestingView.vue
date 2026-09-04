@@ -136,12 +136,24 @@ const logStaffNotation = () => {
 <style scoped>
 .testing-layout {
   display: grid;
+  min-height: 100vh;
   grid-template-columns: minmax(16rem, 24rem) minmax(0, 1fr);
   grid-template-areas:
     'tutorial editor'
     'tutorial visualisers';
   gap: 1rem;
   align-items: start;
+  padding: 1rem;
+  color: #202838;
+  background: #f4f6fa;
+}
+
+.testing-layout :deep(a) {
+  color: #5d4698;
+}
+
+.testing-layout :deep(a:hover) {
+  color: #453275;
 }
 
 .source-editor {
