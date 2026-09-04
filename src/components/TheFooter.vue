@@ -9,6 +9,6 @@ import { version } from '../../package.json'
 </template>
 <style scoped>
 footer {
-  color: #333;
+  color: var(--xenpaper-ink);
 }
 </style>

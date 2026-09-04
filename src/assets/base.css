@@ -4,7 +4,16 @@
 :root {
   --xenpaper-bg: #0e151b;
   --xenpaper-bg-light: #18232d;
+  --xenpaper-bg-editor: #171b24;
+  --xenpaper-bg-control: #1b2536;
+  --xenpaper-bg-canvas: #151b27;
+  --xenpaper-surface: #fafafa;
   --xenpaper-text: #ffffff;
+  --xenpaper-text-soft: #e6e9ef;
+  --xenpaper-text-muted: #8b949e;
+  --xenpaper-ink: #555555;
+  --xenpaper-border: #667085;
+  --xenpaper-border-strong: #7184a8;
   --xenpaper-placeholder: #198c8c;
   --xenpaper-focus: #115d5d;
   --xenpaper-cyan: #22cece;

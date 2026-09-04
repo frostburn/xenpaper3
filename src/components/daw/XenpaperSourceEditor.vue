@@ -95,7 +95,7 @@ onBeforeUnmount(() => {
   min-height: 100%;
   margin: 0;
   padding: 0.35rem;
-  border: 1px solid #667085;
+  border: 1px solid var(--xenpaper-border);
   border-radius: 0.2rem;
   font: inherit;
   line-height: 1.2;
@@ -107,8 +107,8 @@ onBeforeUnmount(() => {
   inset: 0;
   overflow: hidden;
   pointer-events: none;
-  background: #171b24;
-  color: #e6e9ef;
+  background: var(--xenpaper-bg-editor);
+  color: var(--xenpaper-text-soft);
 }
 .xenpaper-source-editor .xenpaper-source-highlight {
   display: block;
@@ -123,10 +123,10 @@ onBeforeUnmount(() => {
   overflow: auto;
   background: transparent;
   color: transparent;
-  caret-color: #fff;
+  caret-color: var(--xenpaper-text);
 }
 .xenpaper-source-editor textarea::selection {
-  background: #526d9b;
+  background: var(--xenpaper-blue);
   color: transparent;
 }
 </style>

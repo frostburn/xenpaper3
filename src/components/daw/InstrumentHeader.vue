@@ -88,7 +88,7 @@ defineEmits<{
   align-items: center;
   gap: 1rem;
   padding: 0.6rem;
-  background: #283143;
+  background: var(--xenpaper-bg-light);
 }
 .instrument-header.collapsed {
   justify-content: flex-start;
@@ -115,11 +115,11 @@ defineEmits<{
   white-space: nowrap;
 }
 .delete-lane {
-  color: #ffd8d8;
-  border: 1px solid #a85d67;
+  color: var(--xenpaper-light-red);
+  border: 1px solid var(--xenpaper-light-red);
   border-radius: 0.25rem;
   padding: 0.35rem 0.55rem;
-  background: #4d2730;
+  background: var(--xenpaper-bg);
   cursor: pointer;
 }
 .source-control {

@@ -71,7 +71,7 @@ defineEmits<{
   display: flex;
   gap: 1.5rem;
   padding: 0.5rem;
-  background: #202738;
+  background: var(--xenpaper-bg-light);
 }
 .source-control {
   flex: 1;

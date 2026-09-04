@@ -316,9 +316,9 @@ const selectionBox = computed(() => {
 }
 .scroll {
   overflow-x: auto;
-  border: 1px solid #aaa;
+  border: 1px solid var(--xenpaper-border-strong);
   border-radius: 0.35rem;
-  background: #fafafa;
+  background: var(--xenpaper-surface);
 }
 .canvas {
   position: relative;
@@ -343,47 +343,47 @@ svg {
   overflow: visible;
 }
 .ruler-background {
-  fill: #fafafa;
-  stroke: #aaa;
+  fill: var(--xenpaper-surface);
+  stroke: var(--xenpaper-border-strong);
   stroke-width: 1;
 }
 .pitch-line {
-  stroke: #ddd;
+  stroke: var(--xenpaper-text-soft);
   stroke-width: 1;
 }
 .beat-line {
-  stroke: #bbb;
+  stroke: var(--xenpaper-border-strong);
   stroke-dasharray: 3 3;
 }
 .note {
-  fill: #6750a4;
-  stroke: #342366;
+  fill: var(--xenpaper-purple);
+  stroke: var(--xenpaper-purple);
   rx: 2px;
 }
 .note.inspected {
-  fill: #8068bd;
+  fill: var(--xenpaper-lavender);
 }
 .note.selected {
-  fill: #b33c68;
+  fill: var(--xenpaper-pink);
   stroke-width: 2;
 }
 .selection-box {
-  fill: rgb(179 60 104 / 15%);
-  stroke: #b33c68;
+  fill: color-mix(in srgb, var(--xenpaper-pink) 15%, transparent);
+  stroke: var(--xenpaper-pink);
   stroke-width: 1.5;
   stroke-dasharray: 5 3;
   pointer-events: none;
 }
 .inspection-line,
 .boundary-line {
-  stroke: #b33c68;
+  stroke: var(--xenpaper-pink);
   stroke-width: 1.5;
 }
 .boundary-line {
   stroke-dasharray: 4 2;
 }
 text {
-  fill: #555;
+  fill: var(--xenpaper-ink);
   font: 11px sans-serif;
 }
 .beat-label {
@@ -391,16 +391,16 @@ text {
   font-weight: 600;
 }
 .cents-label rect {
-  fill: #fff;
-  stroke: #b33c68;
+  fill: var(--xenpaper-text);
+  stroke: var(--xenpaper-pink);
   stroke-width: 1.5;
 }
 .cents-label line {
-  stroke: #b33c68;
+  stroke: var(--xenpaper-pink);
   stroke-width: 1.5;
 }
 .cents-label text {
-  fill: #762344;
+  fill: var(--xenpaper-purple);
   font-weight: 700;
   text-anchor: middle;
 }
