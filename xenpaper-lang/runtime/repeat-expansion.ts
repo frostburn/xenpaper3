@@ -93,6 +93,7 @@ export function expandRepeats(
         if (!endingsByIteration.has(iteration)) endingsByIteration.set(iteration, ending.body)
       }
       const body = (node.body as SyntaxNode[]) ?? []
+      const replayPrefix = (node.replayPrefix as SyntaxNode[]) ?? []
       const appendChildren = (
         target: ExpandedNode[],
         source: readonly SyntaxNode[],
@@ -126,6 +127,7 @@ export function expandRepeats(
           { repeatOffset: node.location.start.offset, iteration: Number(iteration) },
         ]
         const children: ExpandedNode[] = []
+        if (iteration > 0n) appendChildren(children, replayPrefix, iterationPath)
         appendChildren(children, body, iterationPath)
         appendChildren(children, endingsByIteration.get(iteration) ?? [], iterationPath)
         // An empty, ending-free repeat has no observable occurrences. Stop

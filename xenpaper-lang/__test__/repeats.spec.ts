@@ -225,7 +225,20 @@ describe('repeat expansion', () => {
           : pitches((node.items as ExpandedNode[] | undefined) ?? []),
       )
 
-    expect(pitches(body(source))).toEqual(['C', 'D', 'C', 'E', 'F', 'G', 'F', 'A'])
+    expect(pitches(body(source))).toEqual([
+      'C',
+      'D',
+      'C',
+      'E',
+      'F',
+      'G',
+      'C',
+      'D',
+      'C',
+      'E',
+      'F',
+      'A',
+    ])
   })
 
   it('accepts the end of the document as an alternate-ending terminal', () => {

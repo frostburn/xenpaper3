@@ -31,6 +31,16 @@
   const sequence = (items, loc = location()) =>
     items.length === 1 ? items[0] : node('Sequence', { items }, loc);
 
+  const implicitRepeats = new WeakSet();
+
+  const prependImplicitRepeatScope = (expression, prefix) => {
+    if (implicitRepeats.has(expression)) {
+      expression.replayPrefix = [...prefix, ...(expression.replayPrefix ?? [])];
+    } else if (expression?.type === 'Sequence') {
+      for (const item of expression.items) prependImplicitRepeatScope(item, prefix);
+    }
+  };
+
   const parallel = (branches, loc = location()) =>
     branches.length === 1 ? branches[0] : node('Parallel', { branches }, loc);
 
@@ -126,6 +136,8 @@ ScopedSequenceExpression
         terminal: ":|",
         incompleteEndings: false,
       });
+      implicitRepeats.add(repeat);
+      if (remainder) prependImplicitRepeatScope(remainder, [repeat]);
       return sequence(remainder ? [repeat, remainder] : [repeat]);
     }
   / body:SequenceExpression result:RepeatEndings
@@ -140,6 +152,8 @@ ScopedSequenceExpression
         terminal: result.terminal,
         incompleteEndings: result.incomplete,
       });
+      implicitRepeats.add(repeat);
+      if (remainder) prependImplicitRepeatScope(remainder, [repeat]);
       return sequence(remainder ? [repeat, remainder] : [repeat]);
     }
   / SequenceExpression
