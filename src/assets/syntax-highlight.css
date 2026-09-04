@@ -1,5 +1,6 @@
 .xenpaper-source-highlight {
   color: #e6e9ef;
+  font-family: var(--xenpaper-font-mono);
 }
 
 .syntax-comment {

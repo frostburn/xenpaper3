@@ -146,6 +146,7 @@ const logStaffNotation = () => {
   padding: 1rem;
   color: #202838;
   background: #f4f6fa;
+  font-family: var(--xenpaper-font-copy);
 }
 
 .testing-layout :deep(a) {
@@ -181,7 +182,7 @@ textarea {
   box-sizing: border-box;
   width: 100%;
   max-width: 100%;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-family: var(--xenpaper-font-mono);
 }
 
 .highlight-preview,
@@ -205,6 +206,7 @@ textarea {
   border-radius: 0.25rem;
   background: #171b24;
   color: #e6e9ef;
+  font-family: var(--xenpaper-font-mono);
   white-space: pre-wrap;
   overflow-wrap: anywhere;
   tab-size: 2;
