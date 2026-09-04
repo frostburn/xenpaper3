@@ -3,7 +3,6 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch, watchEffect
 import ClipSourceEditor from '../components/daw/ClipSourceEditor.vue'
 import DrumLane from '../components/daw/DrumLane.vue'
 import GlobalLane from '../components/daw/GlobalLane.vue'
-import InstrumentHeader from '../components/daw/InstrumentHeader.vue'
 import InstrumentPianoRollLane from '../components/daw/InstrumentPianoRollLane.vue'
 import TransportControls from '../components/daw/TransportControls.vue'
 import { DawAudioEngine } from '../daw/audio-engine'
@@ -408,18 +407,8 @@ onBeforeUnmount(() => {
         @toggle-collapse="toggleLaneCollapse(lane.id)"
       />
       <template v-else>
-        <InstrumentHeader
-          :lane="lane"
-          :collapsed="collapsedLaneIds.has(lane.id)"
-          @update-name="lane.name = $event"
-          @update-source="lane.source = $event"
-          @update-oscillator="lane.oscillatorType = $event"
-          @update-gain="lane.gain = $event"
-          @delete="deleteInstrumentLane(lane)"
-          @toggle-collapse="toggleLaneCollapse(lane.id)"
-        />
         <InstrumentPianoRollLane
-          v-show="!collapsedLaneIds.has(lane.id)"
+          :collapsed="collapsedLaneIds.has(lane.id)"
           :lane="lane"
           :global-source="project.globalTrack.source"
           :selected-clip-id="selectedLaneId === lane.id ? selectedClipId : undefined"
@@ -431,6 +420,12 @@ onBeforeUnmount(() => {
           @place-playhead="playhead = $event"
           @move="moveClip"
           @delete="deleteClip(lane, $event)"
+          @update-name="lane.name = $event"
+          @update-source="lane.source = $event"
+          @update-oscillator="lane.oscillatorType = $event"
+          @update-gain="lane.gain = $event"
+          @delete-lane="deleteInstrumentLane(lane)"
+          @toggle-collapse="toggleLaneCollapse(lane.id)"
         />
       </template>
     </section>
