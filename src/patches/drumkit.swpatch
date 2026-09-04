@@ -1,14 +1,14 @@
 fn bd(destination: AudioNode, start: Instant, velocity: Level):
-    osc = OscillatorNode(type = 'sine', frequency = 75Hz)
+    osc = OscillatorNode(type = 'sine', frequency = 80Hz)
     env = GainNode(gain = 0)
 
     until osc:ended:
         osc -> env -> destination
 
     osc.start(start)
-    @(start) env.gain = velocity
+    @(start) env.gain = velocity * 1.7
     @(start) osc.detune = 0c
-    @(start + 100ms) osc.detune = -500c
+    @(start + 100ms) osc.detune = -550c
     @(start + 180ms; exponential) env.gain = 0.0001
 
     ret once fn off(end: Instant):
