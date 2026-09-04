@@ -196,12 +196,7 @@ describe('DAW project model', () => {
       beat: beat(4),
     })
 
-    for (const project of [
-      duplicateLane,
-      duplicateClip,
-      duplicateTempo,
-      duplicateTimeSignature,
-    ]) {
+    for (const project of [duplicateLane, duplicateClip, duplicateTempo, duplicateTimeSignature]) {
       expect(() => parseDawProject(JSON.stringify(project))).toThrow(
         'Invalid Xenpaper project file',
       )
@@ -622,15 +617,17 @@ describe('DawView', () => {
     await input.trigger('change')
     await vi.waitFor(() => expect(wrapper.findAll('.instrument-header')).toHaveLength(2))
     await wrapper.get('button.add-lane').trigger('click')
-    await wrapper.findAllComponents(InstrumentPianoRollLane)[2]!.trigger('dblclick', { clientX: 64 })
+    await wrapper
+      .findAllComponents(InstrumentPianoRollLane)[2]!
+      .trigger('dblclick', { clientX: 64 })
     await wrapper.get('[aria-label="Xenpaper clip source"]').setValue('C D E')
     await wrapper.get('[aria-label="Xenpaper clip source"]').trigger('blur')
     await wrapper.get('[aria-label="Clip display"]').setValue('source')
 
     expect(wrapper.findAll('button.clip')[0]!.text()).toContain(originalSource.trim())
-    expect(wrapper.findAllComponents(InstrumentPianoRollLane)[2]!.get('button.clip').text()).toContain(
-      'C D E',
-    )
+    expect(
+      wrapper.findAllComponents(InstrumentPianoRollLane)[2]!.get('button.clip').text(),
+    ).toContain('C D E')
   })
 
   it('adds and deletes instrument lanes while keeping their clips independent', async () => {

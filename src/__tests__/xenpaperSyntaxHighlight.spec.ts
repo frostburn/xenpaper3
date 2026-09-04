@@ -51,9 +51,14 @@ describe('highlightXenpaper', () => {
     const tokens = highlightXenpaper(parse(source))
 
     expect(tokens.map(({ text }) => text).join('')).toBe(source)
-    expect(
-      tokens.filter(({ kind }) => kind === 'pitch-latin').map(({ text }) => text),
-    ).toEqual(['C', 'D', 'E', 'F', 'G', 'A'])
+    expect(tokens.filter(({ kind }) => kind === 'pitch-latin').map(({ text }) => text)).toEqual([
+      'C',
+      'D',
+      'E',
+      'F',
+      'G',
+      'A',
+    ])
   })
 
   it('distinguishes a MOS declaration, its patterns, and UDP modes', () => {
