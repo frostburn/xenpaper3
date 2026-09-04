@@ -31,6 +31,7 @@ const emit = defineEmits<{
   move: [clip: SourceClip, beat: number]
   delete: [clip: SourceClip]
   'update-source': [source: string]
+  'update-name': [name: string]
   'update-gain': [gain: number]
   deleteLane: []
   'toggle-collapse': []
@@ -89,7 +90,12 @@ const moveDrag = (event: PointerEvent) => {
 <template>
   <section class="drum-lane">
     <header :class="{ collapsed }">
-      <strong>{{ lane.name }}</strong>
+      <input
+        class="lane-name"
+        aria-label="Drum lane name"
+        :value="lane.name"
+        @input="emit('update-name', ($event.target as HTMLInputElement).value)"
+      />
       <button
         type="button"
         :aria-label="`${collapsed ? 'Expand' : 'Collapse'} ${lane.name}`"
@@ -98,17 +104,15 @@ const moveDrag = (event: PointerEvent) => {
       >
         {{ collapsed ? '▸ Expand' : '▾ Collapse' }}
       </button>
+      <button
+        type="button"
+        class="delete-lane"
+        :aria-label="`Delete ${lane.name}`"
+        @click="emit('deleteLane')"
+      >
+        Delete lane
+      </button>
       <span v-if="!collapsed">{{ samples.join(' · ') }} · drumkit SW Patch</span>
-      <label v-if="!collapsed" class="source-control">
-        Lane source
-        <XenpaperSourceEditor
-          editor-label="Drum lane source"
-          :source="lane.source"
-          :drum-samples="samples"
-          :rows="3"
-          @update:source="emit('update-source', $event)"
-        />
-      </label>
       <label v-if="!collapsed">
         Gain
         <input
@@ -120,10 +124,18 @@ const moveDrag = (event: PointerEvent) => {
           :value="lane.gain"
           @input="emit('update-gain', Number(($event.target as HTMLInputElement).value))"
         />
+        <output>{{ Math.round(lane.gain * 100) }}%</output>
       </label>
-      <button type="button" :aria-label="`Delete ${lane.name}`" @click="emit('deleteLane')">
-        Delete lane
-      </button>
+      <label v-if="!collapsed" class="source-control">
+        Lane source
+        <XenpaperSourceEditor
+          editor-label="Drum lane source"
+          :source="lane.source"
+          :drum-samples="samples"
+          :rows="3"
+          @update:source="emit('update-source', $event)"
+        />
+      </label>
     </header>
     <div
       v-show="!collapsed"
@@ -184,6 +196,7 @@ const moveDrag = (event: PointerEvent) => {
 <style scoped>
 .drum-lane header {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 1rem;
   padding: 0.6rem;
@@ -200,15 +213,32 @@ const moveDrag = (event: PointerEvent) => {
   flex: 1;
   color: #cfbadb;
 }
+.lane-name {
+  min-width: 6rem;
+  width: 10rem;
+  font: inherit;
+  font-weight: bold;
+}
+.drum-lane header button {
+  white-space: nowrap;
+}
+.delete-lane {
+  color: #ffd8d8;
+  border: 1px solid #a85d67;
+  border-radius: 0.25rem;
+  padding: 0.35rem 0.55rem;
+  background: #4d2730;
+  cursor: pointer;
+}
 .source-control {
   display: flex;
-  flex: 1;
+  flex: 1 0 100%;
   align-items: stretch;
   flex-direction: column;
   gap: 0.4rem;
 }
 .source-control .xenpaper-source-editor {
-  min-width: 18rem;
+  min-width: 0;
   font-family: monospace;
 }
 .drum-grid {
