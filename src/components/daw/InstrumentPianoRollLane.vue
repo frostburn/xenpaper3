@@ -1,16 +1,16 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed } from 'vue'
 import { clamp, frequencyToCentOffset } from 'xen-dev-utils'
 import { compileSourceInitialization, parseClipNotes } from '../../daw/score'
 import { easeGlissando } from '../../daw/easing'
 import {
   beatToNumber,
-  pointerXToBeat,
+  OSCILLATOR_TYPES,
   type ClipDisplayMode,
   type InstrumentLane,
   type SourceClip,
 } from '../../daw/project'
-import XenpaperSourceHighlight from './XenpaperSourceHighlight.vue'
+import InstrumentLaneComponent from './InstrumentLane.vue'
 
 const props = defineProps<{
   lane: InstrumentLane
@@ -19,6 +19,7 @@ const props = defineProps<{
   pixelsPerBeat: number
   scrollLeft: number
   displayMode: ClipDisplayMode
+  collapsed?: boolean
 }>()
 const emit = defineEmits<{
   insert: [beat: number]
@@ -26,10 +27,13 @@ const emit = defineEmits<{
   'place-playhead': [beat: number]
   move: [clip: SourceClip, beat: number]
   delete: [clip: SourceClip]
+  'update-source': [source: string]
+  'update-name': [name: string]
+  'update-oscillator': [type: InstrumentLane['oscillatorType']]
+  'update-gain': [gain: number]
+  'delete-lane': []
+  'toggle-collapse': []
 }>()
-
-const dragging = ref<{ clip: SourceClip; pointerOffset: number }>()
-const laneElement = ref<HTMLElement>()
 
 type PreviewNote = ReturnType<typeof parseClipNotes>[number]
 
@@ -191,81 +195,49 @@ const pianoRoll = computed(() => {
 })
 
 const clipPreview = (clipId: string) => pianoRoll.value.notesByClip[clipId]!
-
-const pointerBeat = (event: MouseEvent) =>
-  pointerXToBeat(
-    event.clientX - (laneElement.value?.getBoundingClientRect().left ?? 0),
-    props.scrollLeft,
-    props.pixelsPerBeat,
-  )
-
-const onClick = (event: MouseEvent) => {
-  if ((event.target as HTMLElement).closest('.clip')) return
-  emit('place-playhead', pointerBeat(event))
-}
-
-const onDoubleClick = (event: MouseEvent) => {
-  if ((event.target as HTMLElement).closest('.clip')) return
-  emit('insert', pointerBeat(event))
-}
-
-const startDrag = (event: PointerEvent, clip: SourceClip) => {
-  emit('select', clip)
-  dragging.value = { clip, pointerOffset: pointerBeat(event) - beatToNumber(clip.start) }
-  const clipElement = event.currentTarget as HTMLElement
-  // Preventing the pointer event keeps dragging smooth, but also suppresses the
-  // button's native focus behavior. Restore it so keyboard actions target the clip.
-  clipElement.focus({ preventScroll: true })
-  clipElement.setPointerCapture?.(event.pointerId)
-}
-
-const moveDrag = (event: PointerEvent) => {
-  if (!dragging.value) return
-  emit('move', dragging.value.clip, Math.max(0, pointerBeat(event) - dragging.value.pointerOffset))
-}
-
-const onKeyDown = (event: KeyboardEvent) => {
-  if (event.key !== 'Delete' || !props.selectedClipId) return
-  const clip = props.lane.clips.find(({ id }) => id === props.selectedClipId)
-  if (!clip) return
-  event.preventDefault()
-  emit('delete', clip)
-}
 </script>
 
 <template>
-  <div
-    ref="laneElement"
-    class="lane"
-    aria-label="Instrument piano roll"
-    tabindex="0"
-    @click="onClick"
-    :style="{
-      '--beat-width': `${pixelsPerBeat}px`,
-      '--grid-offset': `${-scrollLeft}px`,
-    }"
-    @dblclick="onDoubleClick"
-    @pointermove="moveDrag"
-    @pointerup="dragging = undefined"
-    @pointercancel="dragging = undefined"
-    @keydown="onKeyDown"
+  <InstrumentLaneComponent
+    :lane="lane"
+    :selected-clip-id="selectedClipId"
+    :pixels-per-beat="pixelsPerBeat"
+    :scroll-left="scrollLeft"
+    :display-mode="displayMode"
+    :collapsed="collapsed"
+    lane-label="Instrument lane"
+    timeline-label="Instrument piano roll"
+    editor-label="Instrument lane source"
+    @insert="emit('insert', $event)"
+    @select="emit('select', $event)"
+    @place-playhead="emit('place-playhead', $event)"
+    @move="(clip, beat) => emit('move', clip, beat)"
+    @delete="emit('delete', $event)"
+    @update-source="emit('update-source', $event)"
+    @update-name="emit('update-name', $event)"
+    @update-gain="emit('update-gain', $event)"
+    @delete-lane="emit('delete-lane')"
+    @toggle-collapse="emit('toggle-collapse')"
   >
-    <button
-      v-for="clip in lane.clips"
-      :key="clip.id"
-      type="button"
-      class="clip"
-      :class="{ selected: selectedClipId === clip.id }"
-      :style="{
-        left: `${beatToNumber(clip.start) * pixelsPerBeat - scrollLeft}px`,
-        width: `${beatToNumber(clip.length) * pixelsPerBeat}px`,
-      }"
-      @click.stop="emit('select', clip)"
-      @dblclick.stop
-      @pointerdown.prevent="startDrag($event, clip)"
-    >
-      <pre v-if="displayMode === 'source'"><XenpaperSourceHighlight :source="clip.source" /></pre>
-      <span v-else class="piano-roll" aria-label="Piano roll preview">
+    <template #settings>
+      <label>
+        {{ lane.patchSource }} SW Patch ·
+        <select
+          aria-label="Waveform"
+          :value="lane.oscillatorType"
+          @change="
+            emit(
+              'update-oscillator',
+              ($event.target as HTMLSelectElement).value as InstrumentLane['oscillatorType'],
+            )
+          "
+        >
+          <option v-for="type in OSCILLATOR_TYPES" :key="type">{{ type }}</option>
+        </select>
+      </label>
+    </template>
+    <template #preview="{ clip }">
+      <span class="piano-roll" aria-label="Piano roll preview">
         <span v-if="clipPreview(clip.id).registerOffset" class="register-label"
           >{{ clipPreview(clip.id).registerOffset > 0 ? '+' : ''
           }}{{ clipPreview(clip.id).registerOffset }}¢</span
@@ -306,42 +278,11 @@ const onKeyDown = (event: KeyboardEvent) => {
           :style="{ top: note.top, left: note.left, width: note.width }"
         />
       </span>
-    </button>
-    <span v-if="!lane.clips.length" class="hint">Double-click to create a clip</span>
-  </div>
+    </template>
+  </InstrumentLaneComponent>
 </template>
 
 <style scoped>
-.lane {
-  position: relative;
-  overflow: hidden;
-  height: 9rem;
-  cursor: crosshair;
-  background-color: var(--xenpaper-bg-canvas);
-  background-image: linear-gradient(90deg, var(--xenpaper-border) 1px, transparent 1px);
-  background-position-x: var(--grid-offset);
-  background-size: var(--beat-width) 100%;
-  user-select: none;
-  touch-action: none;
-}
-.clip {
-  position: absolute;
-  top: 1rem;
-  height: 7rem;
-  overflow: hidden;
-  border: 2px solid var(--xenpaper-border-strong);
-  background: var(--xenpaper-focus);
-  color: white;
-  text-align: left;
-  user-select: none;
-}
-.clip pre {
-  height: 100%;
-  margin: 0;
-  overflow: hidden;
-  white-space: pre-wrap;
-  pointer-events: none;
-}
 .piano-roll {
   position: absolute;
   inset: 0;
@@ -403,16 +344,5 @@ const onKeyDown = (event: KeyboardEvent) => {
 }
 .bendy-note.inaudible {
   stroke: var(--xenpaper-orange);
-}
-.clip.selected {
-  border-color: var(--xenpaper-cyan);
-  background: var(--xenpaper-focus);
-}
-.hint {
-  position: absolute;
-  inset: 3.5rem 0 auto;
-  text-align: center;
-  color: var(--xenpaper-text-muted);
-  pointer-events: none;
 }
 </style>
