@@ -41,6 +41,7 @@ const playing = ref(false)
 const playbackError = ref('')
 let playTimer: ReturnType<typeof setInterval> | undefined
 let audioEngine: DawAudioEngine | undefined
+let playbackRequestId = 0
 const editor = ref<InstanceType<typeof ClipSourceEditor>>()
 const selectedLaneId = ref<string>()
 const selectedLane = computed(() =>
@@ -111,11 +112,15 @@ watchEffect(() => {
   }
 })
 
+const clearPlayTimer = () => {
+  if (playTimer !== undefined) clearInterval(playTimer)
+  playTimer = undefined
+}
+
 const finishPlayback = () => {
   playing.value = false
   playhead.value = 0
-  if (playTimer) clearInterval(playTimer)
-  playTimer = undefined
+  clearPlayTimer()
 }
 
 const insertClip = async (lane: InstrumentLane, rawBeat: number) => {
@@ -136,11 +141,12 @@ const selectClip = (lane: InstrumentLane, clip: SourceClip) => {
 }
 
 const startPlayback = async (fromBeat: number, playbackProject = project.value) => {
+  const requestId = ++playbackRequestId
   playbackError.value = ''
   try {
     // Keep the transport usable in SSR/test environments; browsers take the audio path below.
     if (typeof AudioContext === 'undefined') {
-      if (playTimer) clearInterval(playTimer)
+      clearPlayTimer()
       playhead.value = fromBeat
       playing.value = true
       playTimer = setInterval(() => (playhead.value += 0.05), 25)
@@ -149,26 +155,30 @@ const startPlayback = async (fromBeat: number, playbackProject = project.value) 
     audioEngine ??= new DawAudioEngine()
     audioEngine.addEventListener('ended', finishPlayback)
     if (audioEngine.context.state === 'suspended') await audioEngine.context.resume()
+    if (requestId !== playbackRequestId) return
     await audioEngine.play(playbackProject, fromBeat)
-    if (playTimer) clearInterval(playTimer)
+    if (requestId !== playbackRequestId) return
+    clearPlayTimer()
     playhead.value = fromBeat
     playing.value = true
     playTimer = setInterval(() => {
       playhead.value = audioEngine?.positionBeats ?? playhead.value
     }, 25)
   } catch (error) {
+    if (requestId !== playbackRequestId) return
     playbackError.value = error instanceof Error ? error.message : String(error)
   }
 }
 
+const pausePlayback = () => {
+  playbackRequestId += 1
+  audioEngine?.stop()
+  playing.value = false
+  clearPlayTimer()
+}
+
 const togglePlayback = async () => {
-  if (playing.value) {
-    audioEngine?.stop()
-    playing.value = false
-    if (playTimer) clearInterval(playTimer)
-    playTimer = undefined
-    return
-  }
+  if (playing.value) return pausePlayback()
   await startPlayback(playhead.value)
 }
 
@@ -188,11 +198,8 @@ const toggleLaneCollapse = (laneId: string) => {
 }
 
 const stopPlayback = () => {
-  playing.value = false
+  pausePlayback()
   playhead.value = 0
-  audioEngine?.stop()
-  if (playTimer) clearInterval(playTimer)
-  playTimer = undefined
 }
 
 const moveClip = (clip: SourceClip, rawBeat: number) => {
@@ -306,7 +313,7 @@ onMounted(async () => {
 })
 
 onBeforeUnmount(() => {
-  if (playTimer) clearInterval(playTimer)
+  pausePlayback()
   audioEngine?.dispose()
   audioEngine?.removeEventListener('ended', finishPlayback)
 })
