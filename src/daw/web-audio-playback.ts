@@ -159,9 +159,9 @@ export class WebAudioPlaybackSession {
           duration: note.duration,
           noteOn: (time) => {
             const pitch = this.context.createConstantSource()
-            this.pitchSignals.push(pitch)
             applyPitchAutomation(pitch.offset, note.pitch, time)
             pitch.start(time)
+            this.pitchSignals.push(pitch)
             const { attack, decay, sustain, release } = note.envelope
             let off: ReturnType<PlayableSynthPatch['on']>
             try {
@@ -231,7 +231,10 @@ export class WebAudioPlaybackSession {
     this.synths.length = 0
     for (const drumkit of this.drumkits) drumkit.dispose()
     this.drumkits.length = 0
-    for (const pitch of this.pitchSignals) pitch.disconnect()
+    for (const pitch of this.pitchSignals) {
+      pitch.stop(this.context.currentTime)
+      pitch.disconnect()
+    }
     this.pitchSignals.length = 0
     this.latestCutoff = 0
   }

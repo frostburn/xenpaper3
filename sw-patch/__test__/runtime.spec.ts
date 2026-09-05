@@ -19,6 +19,64 @@ function location() {
 }
 
 describe('SW Patch runtime', () => {
+  it('disconnects an already constructed graph when patch evaluation fails', () => {
+    const source = {
+      connect: vi.fn<(_: unknown) => void>(),
+      disconnect: vi.fn<(_: unknown) => void>(),
+    }
+    const destination = {}
+
+    expect(() =>
+      createPatch('source -> destination\nmissing()\n', {} as BaseAudioContext, {
+        globals: { source, destination },
+      }),
+    ).toThrow(/missing/)
+
+    expect(source.connect).toHaveBeenCalledWith(destination)
+    expect(source.disconnect).toHaveBeenCalledWith(destination)
+  })
+
+  it('rolls back connections when a later link in the same chain fails', () => {
+    const source = {
+      connect: vi.fn<(_: unknown) => void>(),
+      disconnect: vi.fn<(_: unknown) => void>(),
+    }
+    const middle = {
+      connect: vi.fn<(_: unknown) => void>(() => {
+        throw new Error('Invalid destination')
+      }),
+      disconnect: vi.fn<(_: unknown) => void>(),
+    }
+
+    expect(() =>
+      createPatch('source -> middle -> destination\n', {} as BaseAudioContext, {
+        globals: { source, middle, destination: {} },
+      }),
+    ).toThrow('Invalid destination')
+
+    expect(source.disconnect).toHaveBeenCalledWith(middle)
+  })
+
+  it('retries worklet registration after a failed attempt', async () => {
+    const addModule = vi
+      .fn<(_: string) => Promise<void>>()
+      .mockRejectedValueOnce(new Error('Module load failed'))
+      .mockResolvedValue(undefined)
+    const create = vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:retry-worklets')
+    const revoke = vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => {})
+    const context = { audioWorklet: { addModule } } as unknown as BaseAudioContext
+
+    try {
+      await expect(registerMathWorklets(context)).rejects.toThrow('Module load failed')
+      await expect(registerMathWorklets(context)).resolves.toBeUndefined()
+      expect(addModule).toHaveBeenCalledTimes(2)
+      expect(revoke).toHaveBeenCalledTimes(2)
+    } finally {
+      create.mockRestore()
+      revoke.mockRestore()
+    }
+  })
+
   it('evaluates map literals with Python-style keys and subscript mutation', () => {
     const patch = createPatch(
       'fn mapValues(key: Number):\n' +

@@ -643,7 +643,13 @@ export function registerMathWorklets(context: BaseAudioContext): Promise<void> {
     return unsupported
   }
   const url = URL.createObjectURL(new Blob([MATH_WORKLET_SOURCE], { type: 'text/javascript' }))
-  const registration = context.audioWorklet.addModule(url).finally(() => URL.revokeObjectURL(url))
+  const registration = context.audioWorklet
+    .addModule(url)
+    .catch((error: unknown) => {
+      registeredMathWorklets.delete(key)
+      throw error
+    })
+    .finally(() => URL.revokeObjectURL(url))
   registeredMathWorklets.set(key, registration)
   return registration
 }
@@ -759,10 +765,15 @@ export class PatchRuntime {
         this.dispose()
       },
     }
-    const result = this.statements(program.body, this.root, undefined, patch)
-    if (result && BREAK in result) throw new Error('`break` used outside a loop')
-    if (result && CONTINUE in result) throw new Error('`continue` used outside a loop')
-    return this.effectNode(patch)
+    try {
+      const result = this.statements(program.body, this.root, undefined, patch)
+      if (result && BREAK in result) throw new Error('`break` used outside a loop')
+      if (result && CONTINUE in result) throw new Error('`continue` used outside a loop')
+      return this.effectNode(patch)
+    } catch (error) {
+      this.dispose()
+      throw error
+    }
   }
 
   /** Convenience wrapper for a started `ConstantSourceNode`. */
@@ -1235,8 +1246,7 @@ export class PatchRuntime {
         this.expression(statement.expression, scope)
         return undefined
       case 'ConnectionStatement': {
-        const cleanups = this.connection(statement.first, statement.links, scope)
-        for (const cleanup of cleanups) this.registerCleanup(cleanup)
+        this.connection(statement.first, statement.links, scope)
         return undefined
       }
       case 'ScheduledStatement':
@@ -1388,9 +1398,8 @@ export class PatchRuntime {
       input?: number
     }[],
     scope: Scope,
-  ): Array<() => void> {
+  ): void {
     let source = this.expression(first, scope) as Connectable
-    const cleanups: Array<() => void> = []
     for (const link of links) {
       const target = this.expression(link.target, scope)
       const connectedSource = this.internalConnections.get(source as object) ?? source
@@ -1399,14 +1408,14 @@ export class PatchRuntime {
       else connectedSource[link.operator](target, link.output ?? 0, link.input ?? 0)
       if (link.operator === 'connect') {
         const disconnect = connectedSource.disconnect.bind(connectedSource)
-        cleanups.push(() => {
+        // Retain each connection immediately: a later link in this chain may fail.
+        this.registerCleanup(() => {
           if (link.output === undefined && link.input === undefined) disconnect(target)
           else disconnect(target, link.output ?? 0, link.input ?? 0)
         })
       }
       source = target as Connectable
     }
-    return cleanups
   }
 
   private assign(statement: AssignmentStatement, scope: Scope): void {

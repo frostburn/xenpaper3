@@ -33,6 +33,56 @@ function createTransport() {
 }
 
 describe('Sample-accurate look-ahead transport', () => {
+  it('does not schedule more events after a callback stops the transport', () => {
+    const transport = createTransport()
+    const later = vi.fn<() => void>()
+    const noteOn = vi.fn<(time: number) => (end: number) => number>(() => (end) => end)
+    transport.scheduleParametric(() => transport.stop(), 0)
+    transport.scheduleParametric(later, 0)
+    transport.scheduleParametricNote({ noteOn, when: 0, duration: 1 })
+
+    transport.start()
+
+    expect(later).not.toHaveBeenCalled()
+    expect(noteOn).not.toHaveBeenCalled()
+    expect(transport.active).toBe(false)
+  })
+
+  it('keeps a restarted run intact when a callback replaces the current run', () => {
+    const context = new MockAudioContext()
+    const transport = new Transport(context as unknown as AudioContext)
+    const heard: number[] = []
+    transport.scheduleParametric(() => transport.start(1), 0)
+    transport.scheduleParametric((time) => heard.push(time), 1)
+    transport.scheduleParametric((time) => heard.push(time), 1.1)
+
+    transport.start()
+    tick(transport)
+
+    expect(heard).toEqual([0.2, 0.3])
+    expect(transport.position).toBe(1)
+  })
+
+  it('pairs note-off before abandoning a run stopped by note-on', () => {
+    const transport = createTransport()
+    const off = vi.fn<(end: number) => number>((end) => end)
+    const later = vi.fn<(time: number) => (end: number) => number>(() => (end) => end)
+    transport.scheduleParametricNote({
+      noteOn: () => {
+        transport.stop()
+        return off
+      },
+      when: 0,
+      duration: 1,
+    })
+    transport.scheduleParametricNote({ noteOn: later, when: 0, duration: 1 })
+
+    transport.start()
+
+    expect(off).toHaveBeenCalledWith(1.2)
+    expect(later).not.toHaveBeenCalled()
+  })
+
   it('can schedule and fire a single event', () => {
     const calls: number[] = []
     const transport = createTransport()
