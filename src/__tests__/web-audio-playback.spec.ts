@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { PlayableDrumkitPatch, PlayableSynthPatch } from '../../sw-patch'
+import type { SampledDrumkit } from '../../sw-seq'
 import { DawAudioEngine } from '../daw/audio-engine'
 import type { PlaybackPlan } from '../daw/playback-plan'
 import { TempoMap } from '../daw/timeline'
@@ -203,6 +204,38 @@ describe('Web Audio playback session', () => {
     expect(hit).toHaveBeenCalledWith('bd', MockGainNode.instances[0], 0.2, 0.4, 0.1, 0.2, 0.7, 0.3)
     // The transport owns one timing source; drum playback adds no pitch source.
     expect(context.sources).toHaveLength(1)
+    session.stop()
+    expect(dispose).toHaveBeenCalledOnce()
+  })
+
+  it('dispatches drum notes to a prepared sampled drumkit', () => {
+    const context = new MockAudioContext()
+    const hit = vi.fn<SampledDrumkit['hit']>(() => (end) => end)
+    const dispose = vi.fn<() => void>()
+    const sampledKit = { hit, dispose } as unknown as SampledDrumkit
+    const drumkitFactory = vi.fn<(_: string, __: BaseAudioContext) => PlayableDrumkitPatch>()
+    const pitchedPlan = createPlan()
+    const plan: PlaybackPlan = {
+      ...pitchedPlan,
+      lanes: [
+        {
+          ...pitchedPlan.lanes[0]!,
+          id: 'samples',
+          kind: 'drum',
+          patchSource: '{"bd":["bd.wav"]}',
+          notes: [{ ...pitchedPlan.lanes[0]!.notes[0]!, sample: 'bd' }],
+        },
+      ],
+    }
+    const session = new WebAudioPlaybackSession(context as unknown as AudioContext, plan, {
+      drumkitFactory,
+      sampledDrumkits: new Map([['samples', sampledKit]]),
+    })
+
+    session.start()
+
+    expect(hit).toHaveBeenCalledWith('bd', MockGainNode.instances[0], 0.2, { gain: 0.4 })
+    expect(drumkitFactory).not.toHaveBeenCalled()
     session.stop()
     expect(dispose).toHaveBeenCalledOnce()
   })

@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref, watch } from 'vue'
+import { githubRawUrl, parseStrudelSampleMap } from '../../../sw-seq'
 import {
   compileSourceInitialization,
   drumSamplesForLane,
@@ -31,17 +32,102 @@ const emit = defineEmits<{
   move: [clip: SourceClip, beat: number]
   delete: [clip: SourceClip]
   'update-source': [source: string]
+  'update-patch-source': [source: string]
   'update-name': [name: string]
   'update-gain': [gain: number]
   deleteLane: []
   'toggle-collapse': []
 }>()
 
+type DrumkitMode = 'patch' | 'samples'
+
+const sourceMode = (source: string): DrumkitMode =>
+  source.trimStart().startsWith('{') ? 'samples' : 'patch'
+
+const drumkitMode = ref<DrumkitMode>(sourceMode(props.lane.patchSource))
+const patchDraft = ref(drumkitMode.value === 'patch' ? props.lane.patchSource : 'drumkit')
+const drumkitUrl = ref('')
+const drumkitError = ref('')
+const loadingDrumkit = ref(false)
+
+watch(
+  () => props.lane.patchSource,
+  (source) => {
+    drumkitMode.value = sourceMode(source)
+    if (drumkitMode.value === 'patch' && source !== patchDraft.value) patchDraft.value = source
+  },
+)
+
+const commitDrumkitSource = (source: string): boolean => {
+  try {
+    drumSamplesForLane({ ...props.lane, patchSource: source })
+    drumkitError.value = ''
+    emit('update-patch-source', source)
+    return true
+  } catch (error) {
+    drumkitError.value = error instanceof Error ? error.message : String(error)
+    return false
+  }
+}
+
+const editDrumkitSource = (source: string) => {
+  patchDraft.value = source
+  commitDrumkitSource(source)
+}
+
+const selectDrumkitMode = (mode: DrumkitMode) => {
+  drumkitMode.value = mode
+  drumkitError.value = ''
+  if (mode === 'patch') commitDrumkitSource(patchDraft.value)
+}
+
+const importDrumkitJson = (source: string, manifestUrl?: string) => {
+  const manifest = parseStrudelSampleMap(JSON.parse(source))
+  const normalized = manifestUrl
+    ? {
+        ...manifest,
+        _base: new URL(manifest._base ?? '.', manifestUrl).href,
+      }
+    : manifest
+  const serialized = JSON.stringify(normalized, null, 2)
+  drumkitMode.value = 'samples'
+  commitDrumkitSource(serialized)
+}
+
+const loadDrumkitUrl = async () => {
+  loadingDrumkit.value = true
+  drumkitError.value = ''
+  try {
+    const url = githubRawUrl(drumkitUrl.value, globalThis.location.href)
+    const response = await fetch(url)
+    if (!response.ok) throw new Error(`Unable to load drumkit: HTTP ${response.status}`)
+    importDrumkitJson(await response.text(), url.href)
+  } catch (error) {
+    drumkitError.value = error instanceof Error ? error.message : String(error)
+  } finally {
+    loadingDrumkit.value = false
+  }
+}
+
+const uploadDrumkit = async (event: Event) => {
+  const input = event.target as HTMLInputElement
+  const file = input.files?.[0]
+  if (!file) return
+  try {
+    importDrumkitJson(await file.text())
+  } catch (error) {
+    drumkitError.value = error instanceof Error ? error.message : String(error)
+  } finally {
+    input.value = ''
+  }
+}
+
 // Rows run top-to-bottom, so reverse alphabetical order puts alphabetical
 // progression from the bottom of the roll upwards.
-const samples = computed(() =>
-  [...drumSamplesForLane(props.lane)].sort((left, right) => right.localeCompare(left)),
-)
+const samples = computed(() => {
+  if (drumkitMode.value === 'samples' && sourceMode(props.lane.patchSource) !== 'samples') return []
+  return [...drumSamplesForLane(props.lane)].sort((left, right) => right.localeCompare(left))
+})
 const eventsByClip = computed(() => {
   let initialization
   try {
@@ -92,7 +178,65 @@ const eventsByClip = computed(() => {
     @toggle-collapse="emit('toggle-collapse')"
   >
     <template #settings>
-      <span class="drum-description">{{ samples.join(' · ') }} · drumkit SW Patch</span>
+      <fieldset class="drumkit-kind">
+        <legend>Drum sound source</legend>
+        <label>
+          <input
+            type="radio"
+            value="patch"
+            :checked="drumkitMode === 'patch'"
+            @change="selectDrumkitMode('patch')"
+          />
+          SW Patch
+        </label>
+        <label>
+          <input
+            type="radio"
+            value="samples"
+            :checked="drumkitMode === 'samples'"
+            @change="selectDrumkitMode('samples')"
+          />
+          Sampled drums
+        </label>
+      </fieldset>
+      <label v-if="drumkitMode === 'patch'" class="drumkit-source">
+        Drum patch source
+        <textarea
+          aria-label="Drum patch source"
+          rows="3"
+          :value="patchDraft"
+          @input="editDrumkitSource(($event.target as HTMLTextAreaElement).value)"
+        />
+      </label>
+      <section v-else class="drumkit-source" aria-label="Sampled drumkit source">
+        <strong>{{
+          samples.length
+            ? `${samples.length} sample banks loaded`
+            : 'Choose a Strudel JSON manifest'
+        }}</strong>
+        <span v-if="samples.length" class="drum-description">{{ samples.join(' · ') }}</span>
+        <span class="drumkit-import">
+          <input
+            v-model="drumkitUrl"
+            aria-label="Drumkit JSON URL"
+            type="url"
+            placeholder="https://…/strudel.json"
+          />
+          <button type="button" :disabled="loadingDrumkit || !drumkitUrl" @click="loadDrumkitUrl">
+            {{ loadingDrumkit ? 'Loading…' : 'Load URL' }}
+          </button>
+          <label class="drumkit-upload">
+            Upload JSON
+            <input
+              aria-label="Upload drumkit JSON"
+              type="file"
+              accept="application/json,.json"
+              @change="uploadDrumkit"
+            />
+          </label>
+        </span>
+      </section>
+      <span v-if="drumkitError" class="drumkit-error" role="alert">{{ drumkitError }}</span>
     </template>
     <template #preview="{ clip }">
       <span class="drum-preview" aria-label="Drum pattern preview">
@@ -124,6 +268,42 @@ const eventsByClip = computed(() => {
 .drum-description {
   flex: 1;
   color: var(--xenpaper-lavender);
+}
+.drumkit-kind {
+  display: flex;
+  gap: 0.75rem;
+  border: 0;
+  padding: 0;
+}
+.drumkit-source {
+  display: grid;
+  gap: 0.25rem;
+  flex: 1 1 24rem;
+}
+.drumkit-source textarea {
+  min-width: 20rem;
+  color: inherit;
+  background: var(--xenpaper-bg-control);
+}
+.drumkit-import {
+  display: flex;
+  gap: 0.4rem;
+}
+.drumkit-import input[type='url'] {
+  flex: 1;
+  min-width: 12rem;
+}
+.drumkit-upload {
+  cursor: pointer;
+}
+.drumkit-upload input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  clip-path: inset(50%);
+}
+.drumkit-error {
+  color: var(--xenpaper-light-red);
 }
 .drum-preview {
   position: absolute;

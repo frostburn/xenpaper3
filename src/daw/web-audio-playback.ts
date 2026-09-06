@@ -6,7 +6,7 @@ import {
   type PlayableSynthPatch,
   type SynthPatch,
 } from '../../sw-patch'
-import { Transport } from '../../sw-seq'
+import { SampledDrumkit, Transport } from '../../sw-seq'
 import { isAppleWebKit } from '../browser'
 import DEFAULT_PATCH_SOURCE from '../patches/default.swpatch?raw'
 import DRUMKIT_PATCH_SOURCE from '../patches/drumkit.swpatch?raw'
@@ -30,6 +30,7 @@ export interface WebAudioPlaybackOptions {
   readonly outputGain?: number
   readonly patchFactory?: PatchFactory
   readonly drumkitFactory?: DrumkitFactory
+  readonly sampledDrumkits?: ReadonlyMap<string, SampledDrumkit>
   readonly resolvePatchSource?: (source: string) => string
   readonly onEnded?: () => void
 }
@@ -57,6 +58,7 @@ export class WebAudioPlaybackSession {
   private readonly onEnded?: () => void
   private readonly synths: PlayableSynthPatch[] = []
   private readonly drumkits: PlayableDrumkitPatch[] = []
+  private readonly sampledDrumkits: ReadonlyMap<string, SampledDrumkit>
   private readonly pitchSignals: ConstantSourceNode[] = []
   private completionTimer: ReturnType<typeof setTimeout> | undefined
   private latestCutoff = 0
@@ -68,6 +70,7 @@ export class WebAudioPlaybackSession {
     this.transport = new Transport(context, { useSetTimeoutFallback: isAppleWebKit() })
     this.patchFactory = options.patchFactory ?? createPatch
     this.drumkitFactory = options.drumkitFactory ?? createDrumkit
+    this.sampledDrumkits = options.sampledDrumkits ?? new Map()
     this.resolvePatchSource = options.resolvePatchSource ?? defaultPatchSource
     this.onEnded = options.onEnded
     this.output = new GainNode(context, { gain: options.outputGain ?? DEFAULT_OUTPUT_GAIN })
@@ -110,6 +113,22 @@ export class WebAudioPlaybackSession {
   private schedulePlan(): void {
     for (const lane of this.plan.lanes) {
       if (lane.kind === 'drum') {
+        const sampledKit = this.sampledDrumkits.get(lane.id)
+        if (sampledKit) {
+          for (const note of lane.notes) {
+            if (!note.sample)
+              throw new TypeError(`Drum lane "${lane.name}" contains a pitched note`)
+            this.transport.scheduleParametricNote({
+              when: note.when,
+              duration: note.duration,
+              noteOn: (time) =>
+                sampledKit.hit(note.sample!, this.output, time, {
+                  gain: note.velocity * lane.gain,
+                }),
+            })
+          }
+          continue
+        }
         const kit = this.drumkitFactory(this.resolvePatchSource(lane.patchSource), this.context)
         this.drumkits.push(kit)
         for (const note of lane.notes) {
@@ -231,6 +250,7 @@ export class WebAudioPlaybackSession {
     this.synths.length = 0
     for (const drumkit of this.drumkits) drumkit.dispose()
     this.drumkits.length = 0
+    for (const drumkit of this.sampledDrumkits.values()) drumkit.dispose()
     for (const pitch of this.pitchSignals) {
       pitch.stop(this.context.currentTime)
       pitch.disconnect()

@@ -36,6 +36,29 @@ transport.scheduleParametricNote({
 })
 ```
 
+## Sampled drumkits
+
+`loadSampledDrumkit` loads a Strudel-compatible `samples.json`, resolves its optional `_base`, and
+decodes all variants before returning. The resulting kit can be scheduled directly by a
+`Transport`; variant indices wrap in the same way as Strudel's `n` parameter.
+
+```ts
+const kit = await loadSampledDrumkit(context, '/samples/uzu.json')
+
+transport.scheduleParametricNote({
+  when: 0,
+  duration: 0.25,
+  noteOn: (time) => kit.hit('bd', destination, time, { index: 1, gain: 0.8 }),
+})
+```
+
+Call `kit.dispose()` when playback is torn down to stop and disconnect any active samples.
+
+In Xenpaper's DAW, select **Sampled drums**, then upload a JSON file or enter either a raw manifest
+URL or a GitHub `blob` page URL. GitHub pages are converted to raw-content URLs without an initial
+request, avoiding their CORS restriction. Relative `_base` paths are made absolute so the project
+remains portable. The manifest's bank names become the lane's drum literals automatically.
+
 ## Motivation
 
 I can't figure out why Tone.js runs out of polyphony. This library takes care to re-use resources as much as possible based on years of experience working around Web Audio API jank in sw-synth.
