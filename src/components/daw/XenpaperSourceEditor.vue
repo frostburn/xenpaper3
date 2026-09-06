@@ -99,6 +99,7 @@ onBeforeUnmount(() => {
   border: 1px solid var(--xenpaper-border);
   border-radius: 0.2rem;
   font: inherit;
+  font-family: var(--xenpaper-font-mono);
   line-height: 1.2;
   tab-size: 2;
   white-space: pre;
