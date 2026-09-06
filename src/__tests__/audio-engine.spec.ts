@@ -55,6 +55,35 @@ describe('DAW playback preparation', () => {
     engine.dispose()
   })
 
+  it('cancels pending preparation when a newer playback plan is invalid', async () => {
+    const registration = deferred()
+    vi.spyOn(swPatch, 'registerMathWorklets').mockReturnValue(registration.promise)
+    const engine = new DawAudioEngine({} as AudioContext)
+    const older = engine.play(drumProject())
+    const invalidProject = createDefaultProject()
+    invalidProject.globalTrack.source = '{'
+
+    await expect(engine.play(invalidProject)).rejects.toThrow(/end of input/)
+    registration.resolve()
+    await older
+
+    expect(WebAudioPlaybackSession).not.toHaveBeenCalled()
+    engine.dispose()
+  })
+
+  it('keeps the audible session when replacement compilation fails', async () => {
+    const engine = new DawAudioEngine({} as AudioContext)
+    await engine.play(createDefaultProject())
+    const session = vi.mocked(WebAudioPlaybackSession).mock.results[0]!.value
+    const invalidProject = createDefaultProject()
+    invalidProject.globalTrack.source = '{'
+
+    await expect(engine.play(invalidProject)).rejects.toThrow(/end of input/)
+
+    expect(session.stop).not.toHaveBeenCalled()
+    engine.dispose()
+  })
+
   it('does not create a session after disposal during preparation', async () => {
     const registration = deferred()
     vi.spyOn(swPatch, 'registerMathWorklets').mockReturnValue(registration.promise)
