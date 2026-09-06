@@ -10,6 +10,8 @@ import {
   clipSourceDiagnostics,
   compileSourceInitialization,
   drumSamplesForLane,
+  parseClipNotes,
+  parseDrumClipNotes,
   sourceClipLength,
 } from '../daw/score'
 import {
@@ -64,6 +66,25 @@ const selectedClipDiagnostics = computed(() => {
       clip.start,
       project.value.globalTrack.timeSignatureChanges[0],
     )
+  } catch {
+    return []
+  }
+})
+const selectedClipPlayingRanges = computed(() => {
+  const lane = selectedLane.value
+  const clip = selectedClip.value
+  if (!playing.value || !lane || !clip) return []
+  try {
+    const global = compileSourceInitialization(project.value.globalTrack.source)
+    const initialization = compileSourceInitialization(lane.source, global)
+    const relativeBeat = playhead.value - beatToNumber(clip.start)
+    const samples = drumSamplesForLane(lane)
+    const notes = samples.length
+      ? parseDrumClipNotes(clip.source, samples, beatToNumber(clip.length), initialization)
+      : parseClipNotes(clip.source, beatToNumber(clip.length), initialization)
+    return notes
+      .filter(({ beat, duration }) => beat <= relativeBeat && relativeBeat < beat + duration)
+      .flatMap(({ sourceRanges }) => sourceRanges)
   } catch {
     return []
   }
@@ -402,6 +423,8 @@ onBeforeUnmount(() => {
         :scroll-left="scrollLeft"
         :display-mode="displayMode"
         :collapsed="collapsedLaneIds.has(lane.id)"
+        :playing="playing"
+        :playhead="playhead"
         @insert="insertClip(lane, $event)"
         @select="selectClip(lane, $event)"
         @place-playhead="playhead = $event"
@@ -422,6 +445,8 @@ onBeforeUnmount(() => {
           :pixels-per-beat="pixelsPerBeat"
           :scroll-left="scrollLeft"
           :display-mode="displayMode"
+          :playing="playing"
+          :playhead="playhead"
           @insert="insertClip(lane, $event)"
           @select="selectClip(lane, $event)"
           @place-playhead="playhead = $event"
@@ -450,6 +475,7 @@ onBeforeUnmount(() => {
       "
       :drum-samples="selectedLane ? drumSamplesForLane(selectedLane) : undefined"
       :diagnostics="selectedClipDiagnostics"
+      :playing-ranges="selectedClipPlayingRanges"
       @update-source="updateClipSourceById"
       @delete="deleteSelectedClip"
       @play="playSelectedClip(false)"

@@ -35,7 +35,23 @@ export interface ScheduledLaneNote {
   readonly velocity: number
   readonly envelope: EnvelopeSettings
   readonly glissando?: readonly PitchGlideSegment[]
+  /** Clip-source spans which contributed to this sounding event. */
+  readonly sourceRanges: readonly SourceRange[]
 }
+
+export interface SourceRange {
+  readonly start: number
+  readonly end: number
+}
+
+const eventSourceRanges = (
+  event: BeatTimedNoteEvent,
+  sourceLength: number,
+): readonly SourceRange[] =>
+  event.origins
+    .filter(({ role, location }) => role !== 'generated' && location.end.offset <= sourceLength)
+    .map(({ location }) => ({ start: location.start.offset, end: location.end.offset }))
+    .filter(({ start, end }) => start < end)
 
 const resolvePatchSource = (source: string): string =>
   source === 'drumkit' ? DRUMKIT_PATCH_SOURCE : source
@@ -234,7 +250,7 @@ export const parseClipNotes = (
   if (!('score' in result)) return []
 
   return result.score.events
-    .filter((event) => event.kind === 'note')
+    .filter((event): event is BeatTimedNoteEvent => event.kind === 'note')
     .filter((event) => event.start.valueOf() < duration)
     .map((event) => ({
       beat: event.start.valueOf(),
@@ -242,6 +258,7 @@ export const parseClipNotes = (
       cents: event.pitch.value.valueOf(),
       velocity: event.dynamic.valueOf(),
       envelope: (event.directiveState.patch as EnvelopeSettings | undefined) ?? DEFAULT_ENVELOPE,
+      sourceRanges: eventSourceRanges(event, source.length),
       glissando: event.automation
         ? (
             event.automation.segments ?? [
@@ -311,6 +328,7 @@ export const parseDrumClipNotes = (
       sample: event.label,
       velocity: event.dynamic.valueOf(),
       envelope: (event.directiveState.patch as EnvelopeSettings | undefined) ?? DEFAULT_ENVELOPE,
+      sourceRanges: eventSourceRanges(event, source.length),
     }))
 }
 

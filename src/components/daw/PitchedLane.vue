@@ -20,6 +20,8 @@ const props = defineProps<{
   scrollLeft: number
   displayMode: ClipDisplayMode
   collapsed?: boolean
+  playing?: boolean
+  playhead?: number
 }>()
 const emit = defineEmits<{
   insert: [beat: number]
@@ -205,6 +207,9 @@ const clipPreview = (clipId: string) => pianoRoll.value.notesByClip[clipId]!
     :scroll-left="scrollLeft"
     :display-mode="displayMode"
     :collapsed="collapsed"
+    :global-source="globalSource"
+    :playing="playing"
+    :playhead="playhead"
     lane-label="Instrument lane"
     timeline-label="Instrument piano roll"
     editor-label="Instrument lane source"

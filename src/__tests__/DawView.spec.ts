@@ -94,6 +94,23 @@ describe('DAW project model', () => {
     expect(wrapper.get('[data-highlight="warning"]').text()).toBe('|')
   })
 
+  it('marks only the currently playing parts of a source token', () => {
+    const wrapper = mount(XenpaperSourceHighlight, {
+      props: { source: 'C4 D', playingRanges: [{ start: 0, end: 1 }] },
+    })
+
+    expect(wrapper.get('[data-playing="true"]').text()).toBe('C')
+    expect(wrapper.get('[data-playing="true"]').classes()).toContain('source-playing')
+    expect(wrapper.get('code').text()).toBe('C4 D')
+  })
+
+  it('retains source ranges on compiled clip notes for playback highlighting', () => {
+    const notes = parseClipNotes('C D')
+
+    expect(notes[0]!.sourceRanges).toContainEqual({ start: 0, end: 1 })
+    expect(notes[1]!.sourceRanges).toContainEqual({ start: 2, end: 3 })
+  })
+
   it('offers periodic and aperiodic oscillator timbres', () => {
     expect(OSCILLATOR_TYPES).toContain('rich')
     expect(OSCILLATOR_TYPES).toContain('piano')
