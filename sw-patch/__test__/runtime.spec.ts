@@ -1070,6 +1070,41 @@ describe('SW Patch runtime', () => {
     expect(start).toHaveBeenCalledWith(12.5)
   })
 
+  it('falls back when cancelAndHoldAtTime is unavailable', () => {
+    const parameter = {
+      value: 0.75,
+      cancelScheduledValues: vi.fn<(time: number) => void>(),
+      setValueAtTime: vi.fn<(value: number, time: number) => void>(),
+    }
+    const patch = createPatch(
+      'fn release(end: Instant):\n    @(end; hold) parameter\n',
+      {} as BaseAudioContext,
+      { globals: { parameter } },
+    )
+
+    ;(patch.release as PatchFunction)(4.5)
+
+    expect(parameter.cancelScheduledValues).toHaveBeenCalledWith(4.5)
+    expect(parameter.setValueAtTime).toHaveBeenCalledWith(0.75, 4.5)
+  })
+
+  it('uses cancelAndHoldAtTime when the browser provides it', () => {
+    const parameter = {
+      cancelAndHoldAtTime: vi.fn<(time: number) => void>(),
+      cancelScheduledValues: vi.fn<(time: number) => void>(),
+    }
+    const patch = createPatch(
+      'fn release(end: Instant):\n    @(end; hold) parameter\n',
+      {} as BaseAudioContext,
+      { globals: { parameter } },
+    )
+
+    ;(patch.release as PatchFunction)(4.5)
+
+    expect(parameter.cancelAndHoldAtTime).toHaveBeenCalledWith(4.5)
+    expect(parameter.cancelScheduledValues).not.toHaveBeenCalled()
+  })
+
   it('runs nested branches in until suites and disconnects their connections', () => {
     const emitter = new EventTarget()
     const source = {

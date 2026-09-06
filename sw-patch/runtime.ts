@@ -76,7 +76,20 @@ type AudioParameter = {
   exponentialRampToValueAtTime(value: number, time: number): unknown
   setTargetAtTime(value: number, time: number, constant: number): unknown
   cancelScheduledValues(time: number): unknown
-  cancelAndHoldAtTime(time: number): unknown
+  cancelAndHoldAtTime?(time: number): unknown
+}
+
+function cancelAndHold(parameter: AudioParameter, time: number): void {
+  if (typeof parameter.cancelAndHoldAtTime === 'function') {
+    parameter.cancelAndHoldAtTime(time)
+    return
+  }
+
+  // Firefox does not expose cancelAndHoldAtTime. Its value is the value at the
+  // current time, so pin that value after removing future automation events.
+  const value = parameter.value
+  parameter.cancelScheduledValues(time)
+  if (value !== undefined) parameter.setValueAtTime(value, time)
 }
 
 const NATIVE_NODE_KINDS = [
@@ -1324,7 +1337,7 @@ export class PatchRuntime {
       if (statement.type === 'ExpressionStatement') {
         if (automation?.type === 'HoldAutomation' || automation?.type === 'CancelAutomation') {
           const target = this.expression(statement.expression, scope) as AudioParameter
-          if (automation.type === 'HoldAutomation') target.cancelAndHoldAtTime(time)
+          if (automation.type === 'HoldAutomation') cancelAndHold(target, time)
           else target.cancelScheduledValues(time)
         } else {
           if (automation) throw new Error(`${automation.type} requires an assignment`)
@@ -1357,7 +1370,7 @@ export class PatchRuntime {
         target.setTargetAtTime(value, time, Number(this.expression(automation.timeConstant, scope)))
         break
       case 'HoldAutomation':
-        target.cancelAndHoldAtTime(time)
+        cancelAndHold(target, time)
         break
       case 'CancelAutomation':
         target.cancelScheduledValues(time)
