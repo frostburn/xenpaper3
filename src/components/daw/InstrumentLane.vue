@@ -119,21 +119,21 @@ const onKeyDown = (event: KeyboardEvent) => {
         Delete lane
       </button>
       <slot v-if="!collapsed" name="settings" />
-      <label v-if="!collapsed">
-        Gain
-        <input
-          :aria-label="`${laneLabel.replace(' lane', '')} gain`"
-          type="range"
-          min="0"
-          max="1"
-          step="0.01"
-          :value="lane.gain"
-          @input="emit('update-gain', Number(($event.target as HTMLInputElement).value))"
-        />
-        <output>{{ Math.round(lane.gain * 100) }}%</output>
-      </label>
-      <label v-if="!collapsed" class="source-control">
-        Lane source
+      <div v-if="!collapsed" class="source-control">
+        <span>Lane source</span>
+        <label class="gain-control">
+          Gain
+          <input
+            :aria-label="`${laneLabel.replace(' lane', '')} gain`"
+            type="range"
+            min="0"
+            max="1"
+            step="0.01"
+            :value="lane.gain"
+            @input="emit('update-gain', Number(($event.target as HTMLInputElement).value))"
+          />
+          <output>{{ Math.round(lane.gain * 100) }}%</output>
+        </label>
         <XenpaperSourceEditor
           :editor-label="editorLabel"
           :source="lane.source"
@@ -141,7 +141,7 @@ const onKeyDown = (event: KeyboardEvent) => {
           :rows="3"
           @update:source="emit('update-source', $event)"
         />
-      </label>
+      </div>
     </header>
     <div
       v-show="!collapsed"
@@ -226,13 +226,18 @@ const onKeyDown = (event: KeyboardEvent) => {
   cursor: pointer;
 }
 .source-control {
-  display: flex;
+  display: grid;
+  grid-template-columns: 1fr auto;
   flex: 1 0 100%;
-  align-items: stretch !important;
-  flex-direction: column;
+  align-items: center;
   gap: 0.4rem;
 }
+.gain-control {
+  grid-column: 2;
+  grid-row: 1;
+}
 .source-control .xenpaper-source-editor {
+  grid-column: 1 / -1;
   min-width: 0;
   font-family: monospace;
 }

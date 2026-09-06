@@ -122,11 +122,14 @@ const samples = computed(() => {
   return [...drumSamplesForLane(props.lane)].sort((left, right) => right.localeCompare(left))
 })
 const labelStaggerColumns = computed(() => Math.max(1, Math.ceil(samples.value.length / 8)))
-const sampleLabelStyle = (index: number) => ({
-  top: `${((index + 0.5) * 100) / samples.value.length}%`,
-  left: `${((index % labelStaggerColumns.value) * 100) / labelStaggerColumns.value}%`,
-  width: `${100 / labelStaggerColumns.value}%`,
-})
+const sampleLabelStyle = (index: number) => {
+  const stagger = index % labelStaggerColumns.value
+  return {
+    top: `${((index + 0.5) * 100) / samples.value.length}%`,
+    left: `${stagger * 2.5}rem`,
+    width: `calc(100% - ${stagger * 2.5}rem)`,
+  }
+}
 const eventsByClip = computed(() => {
   let initialization
   try {
