@@ -76,8 +76,13 @@ type AudioParameter = {
   exponentialRampToValueAtTime(value: number, time: number): unknown
   setTargetAtTime(value: number, time: number, constant: number): unknown
   cancelScheduledValues(time: number): unknown
-  cancelAndHoldAtTime(time: number): unknown
+  cancelAndHoldAtTime?(time: number): unknown
 }
+
+type AutomationEvent =
+  | { type: 'set' | 'linear' | 'exponential'; time: number; value: number }
+  | { type: 'hold'; time: number }
+  | { type: 'target'; time: number; value: number; timeConstant: number }
 
 const NATIVE_NODE_KINDS = [
   'Analyser',
@@ -725,6 +730,7 @@ export function createDrumkit(
 export const compilePatch = createPatch
 
 export class PatchRuntime {
+  private readonly automation = new WeakMap<object, AutomationEvent[]>()
   readonly context: BaseAudioContext
   readonly options: RuntimeOptions
   private readonly root: Scope
@@ -1313,6 +1319,79 @@ export class PatchRuntime {
     }
   }
 
+  private automationValueAt(parameter: AudioParameter, time: number): number | undefined {
+    const events = this.automation.get(parameter as object)
+    if (!events?.length) return parameter.value
+
+    let value = parameter.value
+    let valueTime = this.context.currentTime
+    let target: Extract<AutomationEvent, { type: 'target' }> | undefined
+    const advanceTarget = (until: number) => {
+      if (target && value !== undefined) {
+        value =
+          target.value +
+          (value - target.value) * Math.exp(-(until - valueTime) / target.timeConstant)
+      }
+      valueTime = until
+    }
+
+    for (const event of events) {
+      if (event.time > time) {
+        if ((event.type === 'linear' || event.type === 'exponential') && value !== undefined) {
+          advanceTarget(valueTime)
+          const progress = (time - valueTime) / (event.time - valueTime)
+          if (event.type === 'linear') return value + (event.value - value) * progress
+          if (value > 0 && event.value > 0) return value * (event.value / value) ** progress
+        }
+        advanceTarget(time)
+        return value
+      }
+
+      advanceTarget(event.time)
+      if (event.type === 'target') target = event
+      else if (event.type === 'hold') target = undefined
+      else {
+        value = event.value
+        target = undefined
+      }
+    }
+    advanceTarget(time)
+    return value
+  }
+
+  private recordAutomation(parameter: AudioParameter, event: AutomationEvent): void {
+    const events = this.automation.get(parameter as object) ?? []
+    events.push(event)
+    events.sort((a, b) => a.time - b.time)
+    this.automation.set(parameter as object, events)
+  }
+
+  private cancelAutomation(parameter: AudioParameter, time: number): void {
+    const events = this.automation.get(parameter as object)
+    if (events)
+      this.automation.set(
+        parameter as object,
+        events.filter((event) => event.time < time),
+      )
+  }
+
+  private cancelAndHold(parameter: AudioParameter, time: number): void {
+    if (typeof parameter.cancelAndHoldAtTime === 'function') {
+      parameter.cancelAndHoldAtTime(time)
+      this.cancelAutomation(parameter, time)
+      this.recordAutomation(parameter, { type: 'hold', time })
+      return
+    }
+
+    const value = this.automationValueAt(parameter, time)
+    parameter.cancelScheduledValues(time)
+    this.cancelAutomation(parameter, time)
+    if (value !== undefined) {
+      parameter.setValueAtTime(value, time)
+      this.recordAutomation(parameter, { type: 'set', time, value })
+    }
+  }
+
   private scheduled(
     at: Expression,
     automation: Automation | null,
@@ -1324,8 +1403,11 @@ export class PatchRuntime {
       if (statement.type === 'ExpressionStatement') {
         if (automation?.type === 'HoldAutomation' || automation?.type === 'CancelAutomation') {
           const target = this.expression(statement.expression, scope) as AudioParameter
-          if (automation.type === 'HoldAutomation') target.cancelAndHoldAtTime(time)
-          else target.cancelScheduledValues(time)
+          if (automation.type === 'HoldAutomation') this.cancelAndHold(target, time)
+          else {
+            target.cancelScheduledValues(time)
+            this.cancelAutomation(target, time)
+          }
         } else {
           if (automation) throw new Error(`${automation.type} requires an assignment`)
           if (statement.expression.type !== 'CallExpression') {
@@ -1349,21 +1431,29 @@ export class PatchRuntime {
     switch (automation?.type) {
       case 'LinearAutomation':
         target.linearRampToValueAtTime(value, time)
+        this.recordAutomation(target, { type: 'linear', time, value })
         break
       case 'ExponentialAutomation':
         target.exponentialRampToValueAtTime(value, time)
+        this.recordAutomation(target, { type: 'exponential', time, value })
         break
       case 'TargetAutomation':
-        target.setTargetAtTime(value, time, Number(this.expression(automation.timeConstant, scope)))
+        {
+          const timeConstant = Number(this.expression(automation.timeConstant, scope))
+          target.setTargetAtTime(value, time, timeConstant)
+          this.recordAutomation(target, { type: 'target', time, value, timeConstant })
+        }
         break
       case 'HoldAutomation':
-        target.cancelAndHoldAtTime(time)
+        this.cancelAndHold(target, time)
         break
       case 'CancelAutomation':
         target.cancelScheduledValues(time)
+        this.cancelAutomation(target, time)
         break
       default:
         target.setValueAtTime(value, time)
+        this.recordAutomation(target, { type: 'set', time, value })
     }
   }
 

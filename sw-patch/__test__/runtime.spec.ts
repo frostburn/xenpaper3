@@ -1070,6 +1070,70 @@ describe('SW Patch runtime', () => {
     expect(start).toHaveBeenCalledWith(12.5)
   })
 
+  it('falls back when cancelAndHoldAtTime is unavailable', () => {
+    const parameter = {
+      value: 0,
+      cancelScheduledValues: vi.fn<(time: number) => void>(),
+      setValueAtTime: vi.fn<(value: number, time: number) => void>(),
+      setTargetAtTime: vi.fn<(value: number, time: number, timeConstant: number) => void>(),
+    }
+    const patch = createPatch(
+      'fn release(end: Instant):\n' +
+        '    @(1) parameter = 1\n' +
+        '    @(1; target 2) parameter = 0.25\n' +
+        '    @(end; hold) parameter\n',
+      { currentTime: 0 } as BaseAudioContext,
+      { globals: { parameter } },
+    )
+
+    ;(patch.release as PatchFunction)(4.5)
+
+    expect(parameter.cancelScheduledValues).toHaveBeenCalledWith(4.5)
+    expect(parameter.setValueAtTime).toHaveBeenLastCalledWith(0.25 + 0.75 * Math.exp(-1.75), 4.5)
+  })
+
+  it('holds the interpolated value of a future ramp in the fallback', () => {
+    const parameter = {
+      value: 0,
+      cancelScheduledValues: vi.fn<(time: number) => void>(),
+      setValueAtTime: vi.fn<(value: number, time: number) => void>(),
+      linearRampToValueAtTime: vi.fn<(value: number, time: number) => void>(),
+    }
+    const patch = createPatch(
+      'fn release(end: Instant):\n' +
+        '    @(1) parameter = 0\n' +
+        '    @(5; linear) parameter = 1\n' +
+        '    @(end; hold) parameter\n',
+      { currentTime: 0 } as BaseAudioContext,
+      { globals: { parameter } },
+    )
+
+    ;(patch.release as PatchFunction)(3)
+
+    expect(parameter.cancelScheduledValues).toHaveBeenCalledWith(3)
+    expect(parameter.setValueAtTime).toHaveBeenLastCalledWith(0.5, 3)
+  })
+
+  it('uses cancelAndHoldAtTime when the browser provides it', () => {
+    const parameter = {
+      get value(): number {
+        throw new Error('The native path must not calculate the held value')
+      },
+      cancelAndHoldAtTime: vi.fn<(time: number) => void>(),
+      cancelScheduledValues: vi.fn<(time: number) => void>(),
+    }
+    const patch = createPatch(
+      'fn release(end: Instant):\n    @(end; hold) parameter\n',
+      {} as BaseAudioContext,
+      { globals: { parameter } },
+    )
+
+    ;(patch.release as PatchFunction)(4.5)
+
+    expect(parameter.cancelAndHoldAtTime).toHaveBeenCalledWith(4.5)
+    expect(parameter.cancelScheduledValues).not.toHaveBeenCalled()
+  })
+
   it('runs nested branches in until suites and disconnects their connections', () => {
     const emitter = new EventTarget()
     const source = {
