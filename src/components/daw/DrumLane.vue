@@ -5,6 +5,7 @@ import {
   drumSamplesForLane,
   parseDrumClipNotes,
 } from '../../daw/score'
+import type { SourceRange } from '../../daw/score'
 import {
   beatToNumber,
   type ClipDisplayMode,
@@ -21,8 +22,7 @@ const props = defineProps<{
   scrollLeft: number
   displayMode: ClipDisplayMode
   collapsed?: boolean
-  playing?: boolean
-  playhead?: number
+  playingRangesByClip?: Readonly<Record<string, readonly SourceRange[]>>
 }>()
 const emit = defineEmits<{
   insert: [beat: number]
@@ -75,9 +75,7 @@ const eventsByClip = computed(() => {
     :scroll-left="scrollLeft"
     :display-mode="displayMode"
     :collapsed="collapsed"
-    :global-source="globalSource"
-    :playing="playing"
-    :playhead="playhead"
+    :playing-ranges-by-clip="playingRangesByClip"
     lane-label="Drum lane"
     timeline-label="Drum lane"
     editor-label="Drum lane source"

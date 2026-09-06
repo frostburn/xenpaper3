@@ -13,6 +13,8 @@ import {
   parseClipNotes,
   parseDrumClipNotes,
   sourceClipLength,
+  type ScheduledLaneNote,
+  type SourceRange,
 } from '../daw/score'
 import {
   beat,
@@ -40,6 +42,7 @@ const collapsedLaneIds = ref(new Set<string>())
 const grid = ref<Beat>(beat(1, 4))
 const displayMode = ref<ClipDisplayMode>('piano-roll')
 const playing = ref(false)
+const soloClipKey = ref<string>()
 const playbackError = ref('')
 let playTimer: ReturnType<typeof setInterval> | undefined
 let audioEngine: DawAudioEngine | undefined
@@ -70,24 +73,58 @@ const selectedClipDiagnostics = computed(() => {
     return []
   }
 })
+const clipNotes = computed(() => {
+  const notes = new Map<string, readonly ScheduledLaneNote[]>()
+  let global
+  try {
+    global = compileSourceInitialization(project.value.globalTrack.source)
+  } catch {
+    return notes
+  }
+  for (const lane of project.value.instrumentLanes) {
+    let initialization
+    try {
+      initialization = compileSourceInitialization(lane.source, global)
+    } catch {
+      continue
+    }
+    const samples = drumSamplesForLane(lane)
+    for (const clip of lane.clips) {
+      try {
+        notes.set(
+          clipSourceKey(lane.id, clip.id),
+          samples.length
+            ? parseDrumClipNotes(clip.source, samples, beatToNumber(clip.length), initialization)
+            : parseClipNotes(clip.source, beatToNumber(clip.length), initialization),
+        )
+      } catch {
+        // Invalid clip source has no playback highlights while it is being edited.
+      }
+    }
+  }
+  return notes
+})
+const playingRangesByLane = computed(() => {
+  const ranges = new Map<string, Record<string, readonly SourceRange[]>>()
+  if (!playing.value) return ranges
+  for (const lane of project.value.instrumentLanes) {
+    const clips: Record<string, readonly SourceRange[]> = {}
+    for (const clip of lane.clips) {
+      const key = clipSourceKey(lane.id, clip.id)
+      if (soloClipKey.value && soloClipKey.value !== key) continue
+      const relativeBeat = playhead.value - beatToNumber(clip.start)
+      clips[clip.id] = (clipNotes.value.get(key) ?? [])
+        .filter(({ beat, duration }) => beat <= relativeBeat && relativeBeat < beat + duration)
+        .flatMap(({ sourceRanges }) => sourceRanges)
+    }
+    ranges.set(lane.id, clips)
+  }
+  return ranges
+})
 const selectedClipPlayingRanges = computed(() => {
   const lane = selectedLane.value
   const clip = selectedClip.value
-  if (!playing.value || !lane || !clip) return []
-  try {
-    const global = compileSourceInitialization(project.value.globalTrack.source)
-    const initialization = compileSourceInitialization(lane.source, global)
-    const relativeBeat = playhead.value - beatToNumber(clip.start)
-    const samples = drumSamplesForLane(lane)
-    const notes = samples.length
-      ? parseDrumClipNotes(clip.source, samples, beatToNumber(clip.length), initialization)
-      : parseClipNotes(clip.source, beatToNumber(clip.length), initialization)
-    return notes
-      .filter(({ beat, duration }) => beat <= relativeBeat && relativeBeat < beat + duration)
-      .flatMap(({ sourceRanges }) => sourceRanges)
-  } catch {
-    return []
-  }
+  return lane && clip ? (playingRangesByLane.value.get(lane.id)?.[clip.id] ?? []) : []
 })
 const projectEndBeat = computed(() =>
   Math.max(
@@ -140,6 +177,7 @@ const clearPlayTimer = () => {
 
 const finishPlayback = () => {
   playing.value = false
+  soloClipKey.value = undefined
   playhead.value = 0
   clearPlayTimer()
 }
@@ -161,7 +199,11 @@ const selectClip = (lane: InstrumentLane, clip: SourceClip) => {
   playhead.value = beatToNumber(clip.start)
 }
 
-const startPlayback = async (fromBeat: number, playbackProject = project.value) => {
+const startPlayback = async (
+  fromBeat: number,
+  playbackProject = project.value,
+  clipScope?: string,
+) => {
   const requestId = ++playbackRequestId
   playbackError.value = ''
   try {
@@ -170,6 +212,7 @@ const startPlayback = async (fromBeat: number, playbackProject = project.value) 
       clearPlayTimer()
       playhead.value = fromBeat
       playing.value = true
+      soloClipKey.value = clipScope
       playTimer = setInterval(() => (playhead.value += 0.05), 25)
       return
     }
@@ -182,6 +225,7 @@ const startPlayback = async (fromBeat: number, playbackProject = project.value) 
     clearPlayTimer()
     playhead.value = fromBeat
     playing.value = true
+    soloClipKey.value = clipScope
     playTimer = setInterval(() => {
       playhead.value = audioEngine?.positionBeats ?? playhead.value
     }, 25)
@@ -195,6 +239,7 @@ const pausePlayback = () => {
   playbackRequestId += 1
   audioEngine?.stop()
   playing.value = false
+  soloClipKey.value = undefined
   clearPlayTimer()
 }
 
@@ -208,7 +253,11 @@ const playSelectedClip = (solo: boolean) => {
   const fromBeat = beatToNumber(selectedClip.value.start)
   if (!solo) return startPlayback(fromBeat)
   const soloLane = { ...selectedLane.value, clips: [selectedClip.value] }
-  return startPlayback(fromBeat, { ...project.value, instrumentLanes: [soloLane] })
+  return startPlayback(
+    fromBeat,
+    { ...project.value, instrumentLanes: [soloLane] },
+    clipSourceKey(selectedLane.value.id, selectedClip.value.id),
+  )
 }
 
 const toggleLaneCollapse = (laneId: string) => {
@@ -423,8 +472,7 @@ onBeforeUnmount(() => {
         :scroll-left="scrollLeft"
         :display-mode="displayMode"
         :collapsed="collapsedLaneIds.has(lane.id)"
-        :playing="playing"
-        :playhead="playhead"
+        :playing-ranges-by-clip="playingRangesByLane.get(lane.id)"
         @insert="insertClip(lane, $event)"
         @select="selectClip(lane, $event)"
         @place-playhead="playhead = $event"
@@ -445,8 +493,7 @@ onBeforeUnmount(() => {
           :pixels-per-beat="pixelsPerBeat"
           :scroll-left="scrollLeft"
           :display-mode="displayMode"
-          :playing="playing"
-          :playhead="playhead"
+          :playing-ranges-by-clip="playingRangesByLane.get(lane.id)"
           @insert="insertClip(lane, $event)"
           @select="selectClip(lane, $event)"
           @place-playhead="playhead = $event"

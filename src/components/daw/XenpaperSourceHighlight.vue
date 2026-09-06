@@ -151,6 +151,5 @@ const tokenFragments = computed(() =>
   color: var(--xenpaper-bg);
   background: var(--xenpaper-cyan);
   border-radius: 0.12em;
-  box-shadow: 0 0 0 0.08em color-mix(in srgb, var(--xenpaper-cyan) 45%, transparent);
 }
 </style>

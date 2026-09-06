@@ -111,6 +111,24 @@ describe('DAW project model', () => {
     expect(notes[1]!.sourceRanges).toContainEqual({ start: 2, end: 3 })
   })
 
+  it('excludes inherited function bodies from clip-local playback ranges', () => {
+    const initialization = compileSourceInitialization('fn phrase() { ret C D }')
+    const source = 'phrase() # trailing text that must not be highlighted'
+    const notes = parseClipNotes(source, Infinity, initialization)
+
+    expect(notes).toHaveLength(2)
+    const ranges = notes.flatMap(({ sourceRanges }) => sourceRanges)
+    expect(ranges).not.toHaveLength(0)
+    expect(ranges).not.toContainEqual(
+      expect.objectContaining({ start: source.indexOf('trailing') }),
+    )
+    expect(
+      notes.every(({ sourceRanges }) =>
+        sourceRanges.every(({ start, end }) => source.slice(start, end) === 'phrase()'),
+      ),
+    ).toBe(true)
+  })
+
   it('offers periodic and aperiodic oscillator timbres', () => {
     expect(OSCILLATOR_TYPES).toContain('rich')
     expect(OSCILLATOR_TYPES).toContain('piano')

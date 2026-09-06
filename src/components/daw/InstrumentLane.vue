@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
-import { compileSourceInitialization, parseClipNotes, parseDrumClipNotes } from '../../daw/score'
+import { ref } from 'vue'
+import type { SourceRange } from '../../daw/score'
 import {
   beatToNumber,
   pointerXToBeat,
@@ -23,9 +23,7 @@ const props = withDefaults(
     timelineLabel: string
     editorLabel: string
     drumSamples?: string[]
-    globalSource?: string
-    playing?: boolean
-    playhead?: number
+    playingRangesByClip?: Readonly<Record<string, readonly SourceRange[]>>
   }>(),
   { collapsed: false, selectedClipId: undefined, drumSamples: undefined },
 )
@@ -44,35 +42,6 @@ const emit = defineEmits<{
 
 const laneElement = ref<HTMLElement>()
 const dragging = ref<{ clip: SourceClip; pointerOffset: number }>()
-
-const playingRangesByClip = computed(() => {
-  if (!props.playing) return {}
-  try {
-    const global = compileSourceInitialization(props.globalSource ?? '')
-    const initialization = compileSourceInitialization(props.lane.source, global)
-    return Object.fromEntries(
-      props.lane.clips.map((clip) => {
-        const relativeBeat = (props.playhead ?? 0) - beatToNumber(clip.start)
-        const notes = props.drumSamples?.length
-          ? parseDrumClipNotes(
-              clip.source,
-              props.drumSamples,
-              beatToNumber(clip.length),
-              initialization,
-            )
-          : parseClipNotes(clip.source, beatToNumber(clip.length), initialization)
-        return [
-          clip.id,
-          notes
-            .filter(({ beat, duration }) => beat <= relativeBeat && relativeBeat < beat + duration)
-            .flatMap(({ sourceRanges }) => sourceRanges),
-        ]
-      }),
-    )
-  } catch {
-    return {}
-  }
-})
 
 const pointerBeat = (event: MouseEvent) =>
   pointerXToBeat(
@@ -205,7 +174,7 @@ const onKeyDown = (event: KeyboardEvent) => {
         <pre v-if="displayMode === 'source'"><XenpaperSourceHighlight
           :source="clip.source"
           :drum-samples="drumSamples"
-          :playing-ranges="playingRangesByClip[clip.id]"
+          :playing-ranges="playingRangesByClip?.[clip.id]"
         /></pre>
         <slot v-else name="preview" :clip="clip" />
       </button>

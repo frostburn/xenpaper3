@@ -2,6 +2,7 @@
 import { computed } from 'vue'
 import { clamp, frequencyToCentOffset } from 'xen-dev-utils'
 import { compileSourceInitialization, parseClipNotes } from '../../daw/score'
+import type { SourceRange } from '../../daw/score'
 import { easeGlissando } from '../../daw/easing'
 import {
   beatToNumber,
@@ -20,8 +21,7 @@ const props = defineProps<{
   scrollLeft: number
   displayMode: ClipDisplayMode
   collapsed?: boolean
-  playing?: boolean
-  playhead?: number
+  playingRangesByClip?: Readonly<Record<string, readonly SourceRange[]>>
 }>()
 const emit = defineEmits<{
   insert: [beat: number]
@@ -207,9 +207,7 @@ const clipPreview = (clipId: string) => pianoRoll.value.notesByClip[clipId]!
     :scroll-left="scrollLeft"
     :display-mode="displayMode"
     :collapsed="collapsed"
-    :global-source="globalSource"
-    :playing="playing"
-    :playhead="playhead"
+    :playing-ranges-by-clip="playingRangesByClip"
     lane-label="Instrument lane"
     timeline-label="Instrument piano roll"
     editor-label="Instrument lane source"

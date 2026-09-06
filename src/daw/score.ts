@@ -46,10 +46,10 @@ export interface SourceRange {
 
 const eventSourceRanges = (
   event: BeatTimedNoteEvent,
-  sourceLength: number,
+  sourceIdentity: string,
 ): readonly SourceRange[] =>
   event.origins
-    .filter(({ role, location }) => role !== 'generated' && location.end.offset <= sourceLength)
+    .filter(({ role, location }) => role !== 'generated' && location.source === sourceIdentity)
     .map(({ location }) => ({ start: location.start.offset, end: location.end.offset }))
     .filter(({ start, end }) => start < end)
 
@@ -239,7 +239,8 @@ export const parseClipNotes = (
   initialization: SourceInitialization = {},
   clipOffset: Beat = beat(0),
 ): ScheduledLaneNote[] => {
-  const result = expandToBeatEvents(parse(source), {
+  const sourceIdentity = 'xenpaper:clip-source'
+  const result = expandToBeatEvents(parse(source, { grammarSource: sourceIdentity }), {
     directiveExtensions: ENVELOPE_EXTENSIONS,
     ...inheritedScoreOptions(initialization),
     initializationShape: initialization.shape,
@@ -258,7 +259,7 @@ export const parseClipNotes = (
       cents: event.pitch.value.valueOf(),
       velocity: event.dynamic.valueOf(),
       envelope: (event.directiveState.patch as EnvelopeSettings | undefined) ?? DEFAULT_ENVELOPE,
-      sourceRanges: eventSourceRanges(event, source.length),
+      sourceRanges: eventSourceRanges(event, sourceIdentity),
       glissando: event.automation
         ? (
             event.automation.segments ?? [
@@ -306,7 +307,10 @@ export const parseDrumClipNotes = (
   initialization: SourceInitialization = {},
   clipOffset: Beat = beat(0),
 ): ScheduledLaneNote[] => {
-  const program = lowerDrumSamples(parse(source, { drumSamples: samples }))
+  const sourceIdentity = 'xenpaper:clip-source'
+  const program = lowerDrumSamples(
+    parse(source, { drumSamples: samples, grammarSource: sourceIdentity }),
+  )
   const result = expandToBeatEvents(program, {
     directiveExtensions: ENVELOPE_EXTENSIONS,
     ...inheritedScoreOptions(initialization),
@@ -328,7 +332,7 @@ export const parseDrumClipNotes = (
       sample: event.label,
       velocity: event.dynamic.valueOf(),
       envelope: (event.directiveState.patch as EnvelopeSettings | undefined) ?? DEFAULT_ENVELOPE,
-      sourceRanges: eventSourceRanges(event, source.length),
+      sourceRanges: eventSourceRanges(event, sourceIdentity),
     }))
 }
 
