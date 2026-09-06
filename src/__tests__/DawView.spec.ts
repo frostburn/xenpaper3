@@ -950,7 +950,7 @@ describe('DawView', () => {
       'Collapse Percussion',
       'Delete Percussion',
       null,
-      null,
+      'Drum samples',
       null,
       null,
     ])
@@ -961,11 +961,9 @@ describe('DawView', () => {
     )
     await laneSource.setValue('@adsr(10ms, 20ms, 50%, 30ms)')
     expect((laneSource.element as HTMLTextAreaElement).value).toBe('@adsr(10ms, 20ms, 50%, 30ms)')
-    const drumkitSource = lane.get('[aria-label="Drum patch source"]')
-    await drumkitSource.setValue('{')
-    expect(lane.get('[role="alert"]').text()).toBeTruthy()
-    expect(wrapper.getComponent(DrumLane).props('lane').patchSource).toBe('drumkit')
-    await drumkitSource.setValue('drumkit')
+    expect(lane.find('[aria-label="Drum patch source"]').exists()).toBe(false)
+    expect(lane.get('[aria-label="Drum samples"]').text()).toContain('3 samples available')
+    expect(lane.get('[aria-label="Drum samples"]').text()).toContain('sd · hh · bd')
 
     await lane.get('[aria-label="Drum lane"]').trigger('dblclick', { clientX: 64 })
     expect(wrapper.get('[aria-label="Xenpaper clip source"]').element).toHaveProperty(
@@ -976,6 +974,11 @@ describe('DawView', () => {
     expect(notes).toHaveLength(10)
     expect(notes.every((note) => note.text() === '')).toBe(true)
     expect(lane.findAll('.drum-row-label').map((label) => label.text())).toEqual(['sd', 'hh', 'bd'])
+    expect(lane.findAll('.drum-row-label').map((label) => label.attributes('style'))).toEqual([
+      'top: 16.666666666666668%; left: 0%; width: 100%;',
+      'top: 50%; left: 0%; width: 100%;',
+      'top: 83.33333333333333%; left: 0%; width: 100%;',
+    ])
     await wrapper.get('[aria-label="Clip display"]').setValue('source')
     const highlightedDrums = lane
       .findAll('button.clip [data-highlight="identifier"]')
