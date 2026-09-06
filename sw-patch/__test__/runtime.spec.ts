@@ -1116,6 +1116,9 @@ describe('SW Patch runtime', () => {
 
   it('uses cancelAndHoldAtTime when the browser provides it', () => {
     const parameter = {
+      get value(): number {
+        throw new Error('The native path must not calculate the held value')
+      },
       cancelAndHoldAtTime: vi.fn<(time: number) => void>(),
       cancelScheduledValues: vi.fn<(time: number) => void>(),
     }

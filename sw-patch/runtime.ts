@@ -81,6 +81,7 @@ type AudioParameter = {
 
 type AutomationEvent =
   | { type: 'set' | 'linear' | 'exponential'; time: number; value: number }
+  | { type: 'hold'; time: number }
   | { type: 'target'; time: number; value: number; timeConstant: number }
 
 const NATIVE_NODE_KINDS = [
@@ -1348,6 +1349,7 @@ export class PatchRuntime {
 
       advanceTarget(event.time)
       if (event.type === 'target') target = event
+      else if (event.type === 'hold') target = undefined
       else {
         value = event.value
         target = undefined
@@ -1374,14 +1376,14 @@ export class PatchRuntime {
   }
 
   private cancelAndHold(parameter: AudioParameter, time: number): void {
-    const value = this.automationValueAt(parameter, time)
     if (typeof parameter.cancelAndHoldAtTime === 'function') {
       parameter.cancelAndHoldAtTime(time)
       this.cancelAutomation(parameter, time)
-      if (value !== undefined) this.recordAutomation(parameter, { type: 'set', time, value })
+      this.recordAutomation(parameter, { type: 'hold', time })
       return
     }
 
+    const value = this.automationValueAt(parameter, time)
     parameter.cancelScheduledValues(time)
     this.cancelAutomation(parameter, time)
     if (value !== undefined) {
