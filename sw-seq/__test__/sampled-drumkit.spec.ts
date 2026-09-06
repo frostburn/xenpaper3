@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { loadSampledDrumkit } from '../sampled-drumkit'
+import { githubRawUrl, loadSampledDrumkit } from '../sampled-drumkit'
 
 const fn = <T extends (...args: never[]) => unknown>() => vi.fn<T>()
 
@@ -11,6 +11,12 @@ const response = (body: unknown) =>
   }) as Response
 
 describe('sampled drumkits', () => {
+  it('infers raw-content URLs from GitHub blob pages without fetching', () => {
+    expect(
+      githubRawUrl('https://github.com/tidalcycles/uzu-drumkit/blob/main/strudel.json').href,
+    ).toBe('https://raw.githubusercontent.com/tidalcycles/uzu-drumkit/main/strudel.json')
+  })
+
   it('loads a Strudel manifest, resolves _base, and decodes every variant', async () => {
     const decoded = [{ duration: 1 }, { duration: 2 }] as AudioBuffer[]
     const context = {

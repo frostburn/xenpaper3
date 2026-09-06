@@ -54,10 +54,10 @@ transport.scheduleParametricNote({
 
 Call `kit.dispose()` when playback is torn down to stop and disconnect any active samples.
 
-In Xenpaper's DAW, paste the manifest JSON directly into a drum lane's **Drumkit** field, upload a
-JSON file, or load a raw manifest URL. Relative `_base` paths loaded from URLs are made absolute so
-the project remains portable. The manifest's bank names become the lane's drum literals and
-playback is prepared automatically.
+In Xenpaper's DAW, select **Sampled drums**, then upload a JSON file or enter either a raw manifest
+URL or a GitHub `blob` page URL. GitHub pages are converted to raw-content URLs without an initial
+request, avoiding their CORS restriction. Relative `_base` paths are made absolute so the project
+remains portable. The manifest's bank names become the lane's drum literals automatically.
 
 ## Motivation
 

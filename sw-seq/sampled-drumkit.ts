@@ -20,6 +20,17 @@ export interface SampleHitOptions {
 
 type SampleManifestSource = string | URL | StrudelSampleMap
 
+/** Convert a GitHub `blob` page to its equivalent raw-content URL without requesting it. */
+export const githubRawUrl = (source: string | URL, baseUrl?: string | URL): URL => {
+  const url = new URL(source.toString(), baseUrl)
+  if (url.hostname !== 'github.com' && url.hostname !== 'www.github.com') return url
+  const [owner, repository, marker, ref, ...path] = url.pathname.split('/').filter(Boolean)
+  if (!owner || !repository || marker !== 'blob' || !ref || !path.length) return url
+  return new URL(
+    `https://raw.githubusercontent.com/${owner}/${repository}/${ref}/${path.join('/')}`,
+  )
+}
+
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value)
 
@@ -136,7 +147,7 @@ export const loadSampledDrumkit = async (
   let manifest: StrudelSampleMap
   let manifestBase: URL
   if (typeof source === 'string' || source instanceof URL) {
-    const url = new URL(
+    const url = githubRawUrl(
       source.toString(),
       options.baseUrl ?? globalThis.location?.href ?? 'http://localhost/',
     )

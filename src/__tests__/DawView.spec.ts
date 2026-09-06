@@ -961,12 +961,10 @@ describe('DawView', () => {
     )
     await laneSource.setValue('@adsr(10ms, 20ms, 50%, 30ms)')
     expect((laneSource.element as HTMLTextAreaElement).value).toBe('@adsr(10ms, 20ms, 50%, 30ms)')
-    const drumkitSource = lane.get('[aria-label="Drumkit source"]')
+    const drumkitSource = lane.get('[aria-label="Drum patch source"]')
     await drumkitSource.setValue('{')
     expect(lane.get('[role="alert"]').text()).toBeTruthy()
     expect(wrapper.getComponent(DrumLane).props('lane').patchSource).toBe('drumkit')
-    await drumkitSource.setValue('{"kick":["kick.wav"],"snare":["snare.wav"]}')
-    expect((drumkitSource.element as HTMLTextAreaElement).value).toContain('kick.wav')
     await drumkitSource.setValue('drumkit')
 
     await lane.get('[aria-label="Drum lane"]').trigger('dblclick', { clientX: 64 })
@@ -986,6 +984,11 @@ describe('DawView', () => {
     expect(highlightedDrums).toContain('hh')
     expect(lane.find('button.clip [data-highlight^="pitch"]').exists()).toBe(false)
 
+    await lane.get('input[type="radio"][value="samples"]').setValue()
+    expect(lane.find('[aria-label="Drum patch source"]').exists()).toBe(false)
+    expect(lane.get('[aria-label="Sampled drumkit source"]').text()).toContain(
+      'Choose a Strudel JSON manifest',
+    )
     const fetcher = vi.fn<typeof fetch>().mockResolvedValue({
       ok: true,
       text: async () => '{"bd":["bd.wav"]}',
@@ -993,16 +996,22 @@ describe('DawView', () => {
     vi.stubGlobal('fetch', fetcher)
     await lane
       .get('[aria-label="Drumkit JSON URL"]')
-      .setValue('https://example.com/kits/strudel.json')
+      .setValue('https://github.com/tidalcycles/uzu-drumkit/blob/main/strudel.json')
     await lane
       .findAll('button')
       .find((button) => button.text() === 'Load URL')!
       .trigger('click')
     await vi.waitFor(() => expect(fetcher).toHaveBeenCalledOnce())
+    expect(String(fetcher.mock.calls[0]![0])).toBe(
+      'https://raw.githubusercontent.com/tidalcycles/uzu-drumkit/main/strudel.json',
+    )
     await vi.waitFor(() =>
       expect(wrapper.getComponent(DrumLane).props('lane').patchSource).toContain(
-        'https://example.com/kits/',
+        'https://raw.githubusercontent.com/tidalcycles/uzu-drumkit/main/',
       ),
+    )
+    expect(lane.get('[aria-label="Sampled drumkit source"]').text()).toContain(
+      '1 sample banks loaded',
     )
 
     const upload = lane.get('[aria-label="Upload drumkit JSON"]')
