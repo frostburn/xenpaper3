@@ -4,7 +4,7 @@ import { parseProjectScoreNotes, type PitchGlideSegment, type ScheduledLaneNote 
 import { xenpaperPitchToPatchDetune } from './web-audio-automation'
 import { WebAudioPlaybackSession } from './web-audio-playback'
 import { registerMathWorklets } from '../../sw-patch'
-import { loadSampledDrumkit, type SampledDrumkit } from '../../sw-seq'
+import { githubRawUrl, loadSampledDrumkit, type SampledDrumkit } from '../../sw-seq'
 
 // Compatibility exports for non-UI consumers. Pure musical operations live in
 // score/playback-plan/timeline; browser-specific operations live in web-audio-*.
@@ -90,7 +90,9 @@ export class DawAudioEngine extends EventTarget {
           sampledDrumkits.set(
             lane.id,
             await loadSampledDrumkit(this.context, lane.drumkit.strudelJson, {
-              baseUrl: lane.drumkit.url || globalThis.location.href,
+              baseUrl: lane.drumkit.url
+                ? githubRawUrl(lane.drumkit.url, globalThis.location.href)
+                : globalThis.location.href,
             }),
           )
         }),

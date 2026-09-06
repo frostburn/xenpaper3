@@ -34,7 +34,7 @@ describe('DAW playback preparation', () => {
     if (lane.kind !== 'drum') throw new Error('Expected drum lane')
     lane.drumkit = {
       type: 'samples',
-      url: 'https://example.com/strudel.json',
+      url: 'https://github.com/example/drums/blob/main/strudel.json',
       strudelJson: { bd: ['bd.wav'] },
     }
     const sampledKit = { dispose: vi.fn<() => void>() } as unknown as swSeq.SampledDrumkit
@@ -48,7 +48,7 @@ describe('DAW playback preparation', () => {
     expect(load).toHaveBeenCalledWith(
       context,
       { bd: ['bd.wav'] },
-      { baseUrl: 'https://example.com/strudel.json' },
+      { baseUrl: new URL('https://raw.githubusercontent.com/example/drums/main/strudel.json') },
     )
     expect(register).not.toHaveBeenCalled()
     const options = vi.mocked(WebAudioPlaybackSession).mock.calls[0]![2]!
