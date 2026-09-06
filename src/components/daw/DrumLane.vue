@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref, watch } from 'vue'
+import { parseStrudelSampleMap } from '../../../sw-seq'
 import {
   compileSourceInitialization,
   drumSamplesForLane,
@@ -37,6 +38,76 @@ const emit = defineEmits<{
   deleteLane: []
   'toggle-collapse': []
 }>()
+
+const drumkitDraft = ref(props.lane.patchSource)
+const drumkitUrl = ref('')
+const drumkitError = ref('')
+const loadingDrumkit = ref(false)
+
+watch(
+  () => props.lane.patchSource,
+  (source) => {
+    if (source !== drumkitDraft.value) drumkitDraft.value = source
+  },
+)
+
+const commitDrumkitSource = (source: string): boolean => {
+  try {
+    drumSamplesForLane({ ...props.lane, patchSource: source })
+    drumkitError.value = ''
+    emit('update-patch-source', source)
+    return true
+  } catch (error) {
+    drumkitError.value = error instanceof Error ? error.message : String(error)
+    return false
+  }
+}
+
+const editDrumkitSource = (source: string) => {
+  drumkitDraft.value = source
+  commitDrumkitSource(source)
+}
+
+const importDrumkitJson = (source: string, manifestUrl?: string) => {
+  const manifest = parseStrudelSampleMap(JSON.parse(source))
+  const normalized = manifestUrl
+    ? {
+        ...manifest,
+        _base: new URL(manifest._base ?? '.', manifestUrl).href,
+      }
+    : manifest
+  const serialized = JSON.stringify(normalized, null, 2)
+  drumkitDraft.value = serialized
+  commitDrumkitSource(serialized)
+}
+
+const loadDrumkitUrl = async () => {
+  loadingDrumkit.value = true
+  drumkitError.value = ''
+  try {
+    const url = new URL(drumkitUrl.value, globalThis.location.href)
+    const response = await fetch(url)
+    if (!response.ok) throw new Error(`Unable to load drumkit: HTTP ${response.status}`)
+    importDrumkitJson(await response.text(), url.href)
+  } catch (error) {
+    drumkitError.value = error instanceof Error ? error.message : String(error)
+  } finally {
+    loadingDrumkit.value = false
+  }
+}
+
+const uploadDrumkit = async (event: Event) => {
+  const input = event.target as HTMLInputElement
+  const file = input.files?.[0]
+  if (!file) return
+  try {
+    importDrumkitJson(await file.text())
+  } catch (error) {
+    drumkitError.value = error instanceof Error ? error.message : String(error)
+  } finally {
+    input.value = ''
+  }
+}
 
 // Rows run top-to-bottom, so reverse alphabetical order puts alphabetical
 // progression from the bottom of the roll upwards.
@@ -99,9 +170,30 @@ const eventsByClip = computed(() => {
         <textarea
           aria-label="Drumkit source"
           rows="3"
-          :value="lane.patchSource"
-          @input="emit('update-patch-source', ($event.target as HTMLTextAreaElement).value)"
+          :value="drumkitDraft"
+          @input="editDrumkitSource(($event.target as HTMLTextAreaElement).value)"
         />
+        <span class="drumkit-import">
+          <input
+            v-model="drumkitUrl"
+            aria-label="Drumkit JSON URL"
+            type="url"
+            placeholder="https://…/strudel.json"
+          />
+          <button type="button" :disabled="loadingDrumkit || !drumkitUrl" @click="loadDrumkitUrl">
+            {{ loadingDrumkit ? 'Loading…' : 'Load URL' }}
+          </button>
+          <label class="drumkit-upload">
+            Upload JSON
+            <input
+              aria-label="Upload drumkit JSON"
+              type="file"
+              accept="application/json,.json"
+              @change="uploadDrumkit"
+            />
+          </label>
+        </span>
+        <span v-if="drumkitError" class="drumkit-error" role="alert">{{ drumkitError }}</span>
       </label>
     </template>
     <template #preview="{ clip }">
@@ -144,6 +236,26 @@ const eventsByClip = computed(() => {
   min-width: 20rem;
   color: inherit;
   background: var(--xenpaper-bg-control);
+}
+.drumkit-import {
+  display: flex;
+  gap: 0.4rem;
+}
+.drumkit-import input[type='url'] {
+  flex: 1;
+  min-width: 12rem;
+}
+.drumkit-upload {
+  cursor: pointer;
+}
+.drumkit-upload input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  clip-path: inset(50%);
+}
+.drumkit-error {
+  color: var(--xenpaper-light-red);
 }
 .drum-preview {
   position: absolute;

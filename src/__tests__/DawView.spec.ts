@@ -962,6 +962,9 @@ describe('DawView', () => {
     await laneSource.setValue('@adsr(10ms, 20ms, 50%, 30ms)')
     expect((laneSource.element as HTMLTextAreaElement).value).toBe('@adsr(10ms, 20ms, 50%, 30ms)')
     const drumkitSource = lane.get('[aria-label="Drumkit source"]')
+    await drumkitSource.setValue('{')
+    expect(lane.get('[role="alert"]').text()).toBeTruthy()
+    expect(wrapper.getComponent(DrumLane).props('lane').patchSource).toBe('drumkit')
     await drumkitSource.setValue('{"kick":["kick.wav"],"snare":["snare.wav"]}')
     expect((drumkitSource.element as HTMLTextAreaElement).value).toContain('kick.wav')
     await drumkitSource.setValue('drumkit')
@@ -975,7 +978,6 @@ describe('DawView', () => {
     expect(notes).toHaveLength(10)
     expect(notes.every((note) => note.text() === '')).toBe(true)
     expect(lane.findAll('.drum-row-label').map((label) => label.text())).toEqual(['sd', 'hh', 'bd'])
-
     await wrapper.get('[aria-label="Clip display"]').setValue('source')
     const highlightedDrums = lane
       .findAll('button.clip [data-highlight="identifier"]')
@@ -983,6 +985,35 @@ describe('DawView', () => {
     expect(highlightedDrums).toContain('bd')
     expect(highlightedDrums).toContain('hh')
     expect(lane.find('button.clip [data-highlight^="pitch"]').exists()).toBe(false)
+
+    const fetcher = vi.fn<typeof fetch>().mockResolvedValue({
+      ok: true,
+      text: async () => '{"bd":["bd.wav"]}',
+    } as Response)
+    vi.stubGlobal('fetch', fetcher)
+    await lane
+      .get('[aria-label="Drumkit JSON URL"]')
+      .setValue('https://example.com/kits/strudel.json')
+    await lane
+      .findAll('button')
+      .find((button) => button.text() === 'Load URL')!
+      .trigger('click')
+    await vi.waitFor(() => expect(fetcher).toHaveBeenCalledOnce())
+    await vi.waitFor(() =>
+      expect(wrapper.getComponent(DrumLane).props('lane').patchSource).toContain(
+        'https://example.com/kits/',
+      ),
+    )
+
+    const upload = lane.get('[aria-label="Upload drumkit JSON"]')
+    Object.defineProperty(upload.element, 'files', {
+      configurable: true,
+      value: [{ text: async () => '{"clap":["clap.wav"]}' }],
+    })
+    await upload.trigger('change')
+    await vi.waitFor(() =>
+      expect(wrapper.getComponent(DrumLane).props('lane').patchSource).toContain('clap.wav'),
+    )
   })
 
   it('resizes a clip when its source duration changes', async () => {

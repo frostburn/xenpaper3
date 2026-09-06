@@ -1,3 +1,5 @@
+import { mmod } from 'xen-dev-utils/fraction'
+
 export interface StrudelSampleMap {
   readonly _base?: string
   readonly [name: string]: string | readonly string[] | undefined
@@ -76,7 +78,7 @@ export class SampledDrumkit {
     if (!bank) throw new RangeError(`Unknown drum sample "${name}"`)
     const index = options.index ?? 0
     if (!Number.isInteger(index)) throw new RangeError('Sample index must be an integer')
-    const buffer = bank[((index % bank.length) + bank.length) % bank.length]!
+    const buffer = bank[mmod(index, bank.length)]!
     const gainValue = options.gain ?? 1
     if (!Number.isFinite(gainValue) || gainValue < 0)
       throw new RangeError('Sample gain must be finite and non-negative')
