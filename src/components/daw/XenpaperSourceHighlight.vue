@@ -8,6 +8,7 @@ const props = defineProps<{
   stableSource?: string
   drumSamples?: readonly string[]
   diagnostics?: readonly Diagnostic[]
+  playingRanges?: readonly { readonly start: number; readonly end: number }[]
 }>()
 let cachedSource: string | undefined
 let cachedDrumSamples: readonly string[] | undefined
@@ -106,18 +107,49 @@ const tokens = computed<XenpaperHighlightToken[]>(() => {
     return [{ kind: 'unparsed', text: props.source, start: 0, end: props.source.length }]
   }
 })
+
+const tokenFragments = computed(() =>
+  tokens.value.flatMap((token) => {
+    const boundaries = (props.playingRanges ?? [])
+      .flatMap(({ start, end }) => [start, end])
+      .filter((offset) => offset > token.start && offset < token.end)
+    const offsets = [...new Set([token.start, ...boundaries, token.end])].sort(
+      (left, right) => left - right,
+    )
+    return offsets.slice(0, -1).map((start, index) => {
+      const end = offsets[index + 1]!
+      return {
+        ...token,
+        text: props.source.slice(start, end),
+        start,
+        end,
+        playing: (props.playingRanges ?? []).some(
+          (range) => start >= range.start && end <= range.end,
+        ),
+      }
+    })
+  }),
+)
 </script>
 
 <template>
   <code class="xenpaper-source-highlight"
     ><span
-      v-for="token in tokens"
+      v-for="token in tokenFragments"
       :key="`${token.start}-${token.end}`"
-      :class="`syntax-${token.kind}`"
+      :class="[`syntax-${token.kind}`, { 'source-playing': token.playing }]"
       :data-highlight="token.kind"
+      :data-playing="token.playing || undefined"
       >{{ token.text }}</span
     ></code
   >
 </template>
 
 <style scoped src="../../assets/syntax-highlight.css"></style>
+<style scoped>
+.source-playing {
+  color: var(--xenpaper-bg);
+  background: var(--xenpaper-cyan);
+  border-radius: 0.12em;
+}
+</style>

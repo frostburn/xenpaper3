@@ -9,6 +9,7 @@ defineProps<{
   sourceKey?: string
   drumSamples?: readonly string[]
   diagnostics?: readonly Diagnostic[]
+  playingRanges?: readonly { readonly start: number; readonly end: number }[]
 }>()
 const emit = defineEmits<{
   'update-source': [source: string, sourceKey?: string]
@@ -48,6 +49,7 @@ defineExpose({ focus: () => editor.value?.focus() })
       :source-key="sourceKey"
       :drum-samples="drumSamples"
       :diagnostics="diagnostics"
+      :playing-ranges="playingRanges"
       :rows="8"
       @update:source="(source, sourceKey) => emit('update-source', source, sourceKey)"
     />

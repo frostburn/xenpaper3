@@ -11,6 +11,7 @@ const props = withDefaults(
     rows?: number
     drumSamples?: readonly string[]
     diagnostics?: readonly Diagnostic[]
+    playingRanges?: readonly { readonly start: number; readonly end: number }[]
   }>(),
   { rows: 3 },
 )
@@ -63,7 +64,7 @@ onBeforeUnmount(() => {
   <div class="xenpaper-source-editor">
     <pre
       aria-hidden="true"
-    ><XenpaperSourceHighlight :source="draft" :stable-source="updateTimer ? source : undefined" :drum-samples="drumSamples" :diagnostics="diagnostics" :style="{
+    ><XenpaperSourceHighlight :source="draft" :stable-source="updateTimer ? source : undefined" :drum-samples="drumSamples" :diagnostics="diagnostics" :playing-ranges="playingRanges" :style="{
       transform: `translate(${-scroll.left}px, ${-scroll.top}px)`,
     }" /></pre>
     <textarea

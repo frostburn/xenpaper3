@@ -508,6 +508,24 @@ function sequence(
   }
 }
 
+/** Retain the invocation site on every note produced by a function body. */
+function annotateFunctionCall(shape: ScoreShape, callOrigin: SourceOrigin): ScoreShape {
+  if (shape.kind === 'attack') return { ...shape, origins: [...shape.origins, callOrigin] }
+  if (shape.kind === 'sequence')
+    return {
+      ...shape,
+      children: shape.children.map((child) => annotateFunctionCall(child, callOrigin)),
+    }
+  if (shape.kind === 'parallel')
+    return {
+      ...shape,
+      branches: shape.branches.map((branch) => annotateFunctionCall(branch, callOrigin)),
+    }
+  if (shape.kind === 'drone' && shape.template)
+    return { ...shape, template: annotateFunctionCall(shape.template, callOrigin) }
+  return shape
+}
+
 function generatedRest(duration: Fraction): RestShape {
   return { kind: 'rest', duration, generated: true, origins: [] }
 }
@@ -1300,7 +1318,13 @@ export function evaluateScoreSemantics(
           environment: prepared.environment,
           subdivisionBase: currentPulse,
         })
-        return { ...returned, diagnostics: [...prepared.diagnostics, ...returned.diagnostics] }
+        return {
+          ...returned,
+          ...('shape' in returned
+            ? { shape: annotateFunctionCall(returned.shape, origin(current)) }
+            : {}),
+          diagnostics: [...prepared.diagnostics, ...returned.diagnostics],
+        }
       }
     }
     const broadcast = broadcastScalarOperation(current, context, environment)

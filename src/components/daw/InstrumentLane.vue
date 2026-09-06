@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref } from 'vue'
+import type { SourceRange } from '../../daw/score'
 import {
   beatToNumber,
   pointerXToBeat,
@@ -22,6 +23,7 @@ const props = withDefaults(
     timelineLabel: string
     editorLabel: string
     drumSamples?: string[]
+    playingRangesByClip?: Readonly<Record<string, readonly SourceRange[]>>
   }>(),
   { collapsed: false, selectedClipId: undefined, drumSamples: undefined },
 )
@@ -172,6 +174,7 @@ const onKeyDown = (event: KeyboardEvent) => {
         <pre v-if="displayMode === 'source'"><XenpaperSourceHighlight
           :source="clip.source"
           :drum-samples="drumSamples"
+          :playing-ranges="playingRangesByClip?.[clip.id]"
         /></pre>
         <slot v-else name="preview" :clip="clip" />
       </button>

@@ -35,7 +35,23 @@ export interface ScheduledLaneNote {
   readonly velocity: number
   readonly envelope: EnvelopeSettings
   readonly glissando?: readonly PitchGlideSegment[]
+  /** Clip-source spans which contributed to this sounding event. */
+  readonly sourceRanges: readonly SourceRange[]
 }
+
+export interface SourceRange {
+  readonly start: number
+  readonly end: number
+}
+
+const eventSourceRanges = (
+  event: BeatTimedNoteEvent,
+  sourceIdentity: string,
+): readonly SourceRange[] =>
+  event.origins
+    .filter(({ role, location }) => role !== 'generated' && location.source === sourceIdentity)
+    .map(({ location }) => ({ start: location.start.offset, end: location.end.offset }))
+    .filter(({ start, end }) => start < end)
 
 const resolvePatchSource = (source: string): string =>
   source === 'drumkit' ? DRUMKIT_PATCH_SOURCE : source
@@ -223,7 +239,8 @@ export const parseClipNotes = (
   initialization: SourceInitialization = {},
   clipOffset: Beat = beat(0),
 ): ScheduledLaneNote[] => {
-  const result = expandToBeatEvents(parse(source), {
+  const sourceIdentity = 'xenpaper:clip-source'
+  const result = expandToBeatEvents(parse(source, { grammarSource: sourceIdentity }), {
     directiveExtensions: ENVELOPE_EXTENSIONS,
     ...inheritedScoreOptions(initialization),
     initializationShape: initialization.shape,
@@ -234,7 +251,7 @@ export const parseClipNotes = (
   if (!('score' in result)) return []
 
   return result.score.events
-    .filter((event) => event.kind === 'note')
+    .filter((event): event is BeatTimedNoteEvent => event.kind === 'note')
     .filter((event) => event.start.valueOf() < duration)
     .map((event) => ({
       beat: event.start.valueOf(),
@@ -242,6 +259,7 @@ export const parseClipNotes = (
       cents: event.pitch.value.valueOf(),
       velocity: event.dynamic.valueOf(),
       envelope: (event.directiveState.patch as EnvelopeSettings | undefined) ?? DEFAULT_ENVELOPE,
+      sourceRanges: eventSourceRanges(event, sourceIdentity),
       glissando: event.automation
         ? (
             event.automation.segments ?? [
@@ -289,7 +307,10 @@ export const parseDrumClipNotes = (
   initialization: SourceInitialization = {},
   clipOffset: Beat = beat(0),
 ): ScheduledLaneNote[] => {
-  const program = lowerDrumSamples(parse(source, { drumSamples: samples }))
+  const sourceIdentity = 'xenpaper:clip-source'
+  const program = lowerDrumSamples(
+    parse(source, { drumSamples: samples, grammarSource: sourceIdentity }),
+  )
   const result = expandToBeatEvents(program, {
     directiveExtensions: ENVELOPE_EXTENSIONS,
     ...inheritedScoreOptions(initialization),
@@ -311,6 +332,7 @@ export const parseDrumClipNotes = (
       sample: event.label,
       velocity: event.dynamic.valueOf(),
       envelope: (event.directiveState.patch as EnvelopeSettings | undefined) ?? DEFAULT_ENVELOPE,
+      sourceRanges: eventSourceRanges(event, sourceIdentity),
     }))
 }
 

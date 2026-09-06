@@ -94,6 +94,41 @@ describe('DAW project model', () => {
     expect(wrapper.get('[data-highlight="warning"]').text()).toBe('|')
   })
 
+  it('marks only the currently playing parts of a source token', () => {
+    const wrapper = mount(XenpaperSourceHighlight, {
+      props: { source: 'C4 D', playingRanges: [{ start: 0, end: 1 }] },
+    })
+
+    expect(wrapper.get('[data-playing="true"]').text()).toBe('C')
+    expect(wrapper.get('[data-playing="true"]').classes()).toContain('source-playing')
+    expect(wrapper.get('code').text()).toBe('C4 D')
+  })
+
+  it('retains source ranges on compiled clip notes for playback highlighting', () => {
+    const notes = parseClipNotes('C D')
+
+    expect(notes[0]!.sourceRanges).toContainEqual({ start: 0, end: 1 })
+    expect(notes[1]!.sourceRanges).toContainEqual({ start: 2, end: 3 })
+  })
+
+  it('excludes inherited function bodies from clip-local playback ranges', () => {
+    const initialization = compileSourceInitialization('fn phrase() { ret C D }')
+    const source = 'phrase() # trailing text that must not be highlighted'
+    const notes = parseClipNotes(source, Infinity, initialization)
+
+    expect(notes).toHaveLength(2)
+    const ranges = notes.flatMap(({ sourceRanges }) => sourceRanges)
+    expect(ranges).not.toHaveLength(0)
+    expect(ranges).not.toContainEqual(
+      expect.objectContaining({ start: source.indexOf('trailing') }),
+    )
+    expect(
+      notes.every(({ sourceRanges }) =>
+        sourceRanges.every(({ start, end }) => source.slice(start, end) === 'phrase()'),
+      ),
+    ).toBe(true)
+  })
+
   it('offers periodic and aperiodic oscillator timbres', () => {
     expect(OSCILLATOR_TYPES).toContain('rich')
     expect(OSCILLATOR_TYPES).toContain('piano')
