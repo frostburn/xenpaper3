@@ -20,6 +20,7 @@ import {
   parseDawProject,
   serializeDawProject,
   snapBeat,
+  type PitchedInstrumentLane,
 } from '../daw/project'
 import {
   parseProjectNotes,
@@ -154,7 +155,7 @@ describe('DAW project model', () => {
     })
     expect(project.instrumentLanes[0]).toMatchObject({
       id: 'instrument-1',
-      patchSource: 'default',
+      patchPreset: 'default',
       oscillatorType: 'sawtooth',
       source: expect.stringContaining('@adsr(100ms'),
       clips: [],
@@ -178,10 +179,38 @@ describe('DAW project model', () => {
 
     expect(serialized.endsWith('\n')).toBe(true)
     expect(serialized).toContain('\n  "format": "xenpaper3-daw"')
+    expect(serialized).toContain('"patchPreset": "default"')
+    expect(serialized).not.toContain('patchSource')
     expect(parseDawProject(serialized)).toEqual(project)
 
     project.globalTrack.tempoChanges[0]!.bpm = 0
     expect(() => serializeDawProject(project)).toThrow('Invalid Xenpaper project file')
+  })
+
+  it('serializes sampled drum metadata without runtime samples', () => {
+    const project = createDefaultProject()
+    const lane = createDrumLane(project)
+    lane.drumkit = {
+      type: 'samples',
+      url: 'https://example.com/kits/acoustic/strudel.json',
+      strudelJson: { _base: './audio/', bd: ['kick.wav'], sd: ['snare.wav'] },
+    }
+    ;(lane.drumkit as unknown as Record<string, unknown>).samples = ['decoded audio data']
+    project.instrumentLanes = [lane]
+
+    const serialized = serializeDawProject(project)
+    const restored = parseDawProject(serialized).instrumentLanes[0]!
+
+    expect(serialized).not.toContain('decoded audio data')
+    expect(restored).toMatchObject({
+      kind: 'drum',
+      drumkit: {
+        type: 'samples',
+        url: 'https://example.com/kits/acoustic/strudel.json',
+        strudelJson: { _base: './audio/', bd: ['kick.wav'], sd: ['snare.wav'] },
+      },
+    })
+    expect(restored).not.toHaveProperty('oscillatorType')
   })
 
   it('rejects data that is not a Xenpaper project', () => {
@@ -245,10 +274,11 @@ describe('DAW project model', () => {
       numerator: 3,
       denominator: 4,
     })
-    expect(project.instrumentLanes.map(({ oscillatorType }) => oscillatorType)).toEqual([
-      'semisine',
-      'triangle',
-    ])
+    expect(
+      project.instrumentLanes.map((lane) =>
+        lane.kind === 'instrument' ? lane.oscillatorType : undefined,
+      ),
+    ).toEqual(['semisine', 'triangle'])
     expect(project.instrumentLanes.every(({ clips }) => clips.length === 2)).toBe(true)
     expect(project.instrumentLanes.every(({ clips }) => clips[1]!.start.valueOf() === 96)).toBe(
       true,
@@ -272,7 +302,11 @@ describe('DAW project model', () => {
     const clip = createClip(lane, beat(0))
     const samples = drumSamplesForLane(lane)
 
-    expect(lane).toMatchObject({ id: 'drum-1', kind: 'drum', patchSource: 'drumkit' })
+    expect(lane).toMatchObject({
+      id: 'drum-1',
+      kind: 'drum',
+      drumkit: { type: 'patch', patchPreset: 'drumkit' },
+    })
     expect(lane.source).toBe('# Defaults inherited by every clip in this lane\n')
     expect(clip.source).toContain('[bd,hh hh] [hh hh] [sd,hh hh] [hh hh]')
     expect(
@@ -293,11 +327,11 @@ describe('DAW project model', () => {
 
   it('uses Strudel manifest bank names as drum lane samples', () => {
     const lane = createDrumLane(createDefaultProject())
-    lane.patchSource = JSON.stringify({
-      _base: 'https://example.com/kit/',
-      bd: ['bd/one.wav', 'bd/two.wav'],
-      sd: ['sd/one.wav'],
-    })
+    lane.drumkit = {
+      type: 'samples',
+      url: 'https://example.com/kit/strudel.json',
+      strudelJson: { bd: ['bd/one.wav', 'bd/two.wav'], sd: ['sd/one.wav'] },
+    }
 
     expect(drumSamplesForLane(lane)).toEqual(['bd', 'sd'])
     expect(parseDrumClipNotes('[bd sd]', drumSamplesForLane(lane))).toMatchObject([
@@ -427,7 +461,7 @@ describe('DAW project model', () => {
 
   it('uses lane ADSR defaults and keeps clip patch directives as overrides', () => {
     const project = createDefaultProject()
-    const lane = project.instrumentLanes[0]!
+    const lane = project.instrumentLanes[0]! as PitchedInstrumentLane
     lane.source = '@patch(attack: 30ms, decay: 400ms, sustain: 25%, release: 800ms)'
     lane.clips.push({
       id: 'defaults',
@@ -463,7 +497,7 @@ describe('DAW project model', () => {
 
   it('initializes every lane clip from the global and instrument sources', () => {
     const project = createDefaultProject()
-    const lane = project.instrumentLanes[0]!
+    const lane = project.instrumentLanes[0]! as PitchedInstrumentLane
     project.globalTrack.source = '{19edo}'
     lane.source = '@patch(sustain: 25%)'
     lane.clips.push({ id: 'initialized', start: beat(0), length: beat(2), source: 'C D' })
@@ -501,7 +535,7 @@ describe('DAW project model', () => {
 
   it('propagates global function declarations into lane and clip sources', () => {
     const project = createDefaultProject()
-    const lane = project.instrumentLanes[0]!
+    const lane = project.instrumentLanes[0]! as PitchedInstrumentLane
     project.globalTrack.source = 'fn LICC() { ret @2 D E F G E= C D== }'
     lane.source = 'fn phrase() { ret LICC() }'
     lane.clips.push({ id: 'function-call', start: beat(0), length: beat(8), source: 'phrase()' })
@@ -1031,9 +1065,10 @@ describe('DawView', () => {
       'https://raw.githubusercontent.com/tidalcycles/uzu-drumkit/main/strudel.json',
     )
     await vi.waitFor(() =>
-      expect(wrapper.getComponent(DrumLane).props('lane').patchSource).toContain(
-        'https://raw.githubusercontent.com/tidalcycles/uzu-drumkit/main/',
-      ),
+      expect(wrapper.getComponent(DrumLane).props('lane').drumkit).toMatchObject({
+        type: 'samples',
+        url: 'https://github.com/tidalcycles/uzu-drumkit/blob/main/strudel.json',
+      }),
     )
     expect(lane.get('[aria-label="Sampled drumkit source"]').text()).toContain(
       '16 sample banks loaded',
@@ -1052,7 +1087,11 @@ describe('DawView', () => {
     })
     await upload.trigger('change')
     await vi.waitFor(() =>
-      expect(wrapper.getComponent(DrumLane).props('lane').patchSource).toContain('clap.wav'),
+      expect(wrapper.getComponent(DrumLane).props('lane').drumkit).toMatchObject({
+        type: 'samples',
+        url: '',
+        strudelJson: { clap: ['clap.wav'] },
+      }),
     )
   })
 
@@ -1141,7 +1180,7 @@ describe('DawView', () => {
 
   it('clamps notes outside human hearing to contrasting pitch boundaries', () => {
     const project = createDefaultProject()
-    const lane = project.instrumentLanes[0]!
+    const lane = project.instrumentLanes[0]! as PitchedInstrumentLane
     lane.clips = [{ id: 'inaudible', start: beat(0), length: beat(3), source: '10Hz C 30kHz' }]
     const wrapper = mount(PitchedLane, {
       props: { lane, pixelsPerBeat: 64, scrollLeft: 0, displayMode: 'piano-roll' },
@@ -1158,7 +1197,7 @@ describe('DawView', () => {
 
   it('does not let an extreme pitch fold an audible clip out of view', () => {
     const project = createDefaultProject()
-    const lane = project.instrumentLanes[0]!
+    const lane = project.instrumentLanes[0]! as PitchedInstrumentLane
     lane.clips = [
       { id: 'audible', start: beat(0), length: beat(1), source: 'C' },
       { id: 'extreme', start: beat(1), length: beat(1), source: '1000000000Hz' },
@@ -1180,7 +1219,7 @@ describe('DawView', () => {
 
   it('renders glissandi as eased bendy notes in the piano roll', () => {
     const project = createDefaultProject()
-    const lane = project.instrumentLanes[0]!
+    const lane = project.instrumentLanes[0]! as PitchedInstrumentLane
     lane.clips = [
       { id: 'glissando', start: beat(0), length: beat(2), source: '@gliss(ease-in) C G' },
     ]
@@ -1199,7 +1238,7 @@ describe('DawView', () => {
 
   it('stops a bendy note at the audible pitch when its glissando is clipped', () => {
     const project = createDefaultProject()
-    const lane = project.instrumentLanes[0]!
+    const lane = project.instrumentLanes[0]! as PitchedInstrumentLane
     lane.clips = [
       { id: 'clipped-glissando', start: beat(0), length: beat(2), source: "@gliss C=== '''C" },
     ]
@@ -1216,7 +1255,7 @@ describe('DawView', () => {
 
   it('uses a lane-wide pitch scale and renders octave reference guides', () => {
     const project = createDefaultProject()
-    const lane = project.instrumentLanes[0]!
+    const lane = project.instrumentLanes[0]! as PitchedInstrumentLane
     lane.clips = [
       { id: 'ascending', start: beat(0), length: beat(2), source: 'C D' },
       { id: 'descending', start: beat(2), length: beat(2), source: 'B C' },
@@ -1250,7 +1289,7 @@ describe('DawView', () => {
 
   it('folds disparate clip registers into view and labels their octave offset', () => {
     const project = createDefaultProject()
-    const lane = project.instrumentLanes[0]!
+    const lane = project.instrumentLanes[0]! as PitchedInstrumentLane
     lane.clips = [
       { id: 'home-1', start: beat(0), length: beat(1), source: 'C' },
       { id: 'home-2', start: beat(1), length: beat(1), source: 'D' },
@@ -1270,7 +1309,7 @@ describe('DawView', () => {
 
   it('keeps the solid global-zero guide correct in a downward-shifted clip', () => {
     const project = createDefaultProject()
-    const lane = project.instrumentLanes[0]!
+    const lane = project.instrumentLanes[0]! as PitchedInstrumentLane
     lane.clips = [
       { id: 'home-1', start: beat(0), length: beat(1), source: 'C' },
       { id: 'home-2', start: beat(1), length: beat(1), source: 'D' },

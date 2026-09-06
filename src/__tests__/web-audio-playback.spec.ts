@@ -97,7 +97,8 @@ const createPlan = (): PlaybackPlan => ({
     {
       id: 'lead',
       name: 'Lead',
-      patchSource: 'custom patch',
+      kind: 'instrument',
+      patchPreset: 'custom patch',
       oscillatorType: 'triangle',
       gain: 0.5,
       notes: [
@@ -187,9 +188,11 @@ describe('Web Audio playback session', () => {
       ...pitchedPlan,
       lanes: [
         {
-          ...pitchedPlan.lanes[0]!,
+          id: pitchedPlan.lanes[0]!.id,
+          name: pitchedPlan.lanes[0]!.name,
+          gain: pitchedPlan.lanes[0]!.gain,
           kind: 'drum',
-          patchSource: 'drumkit',
+          drumkit: { type: 'patch', patchPreset: 'drumkit' },
           notes: [{ ...pitchedPlan.lanes[0]!.notes[0]!, sample: 'bd' }],
         },
       ],
@@ -219,10 +222,11 @@ describe('Web Audio playback session', () => {
       ...pitchedPlan,
       lanes: [
         {
-          ...pitchedPlan.lanes[0]!,
           id: 'samples',
+          name: pitchedPlan.lanes[0]!.name,
+          gain: pitchedPlan.lanes[0]!.gain,
           kind: 'drum',
-          patchSource: '{"bd":["bd.wav"]}',
+          drumkit: { type: 'samples', url: '', strudelJson: { bd: ['bd.wav'] } },
           notes: [{ ...pitchedPlan.lanes[0]!.notes[0]!, sample: 'bd' }],
         },
       ],

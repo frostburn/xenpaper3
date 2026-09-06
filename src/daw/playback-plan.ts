@@ -1,5 +1,5 @@
 import { easeGlissando } from './easing'
-import type { DawProject, OscillatorType } from './project'
+import type { DawProject, DrumkitSource, OscillatorType } from './project'
 import {
   compileSourceInitialization,
   parseLaneNotes,
@@ -42,15 +42,20 @@ export interface PlaybackNote {
   readonly sample?: string
 }
 
-export interface PlaybackLane {
+interface BasePlaybackLane {
   readonly id: string
   readonly name: string
-  readonly kind?: 'instrument' | 'drum'
-  readonly patchSource: string
-  readonly oscillatorType: OscillatorType
   readonly gain: number
   readonly notes: readonly PlaybackNote[]
 }
+
+export type PlaybackLane =
+  | (BasePlaybackLane & {
+      readonly kind: 'instrument'
+      readonly patchPreset: string
+      readonly oscillatorType: OscillatorType
+    })
+  | (BasePlaybackLane & { readonly kind: 'drum'; readonly drumkit: DrumkitSource })
 
 export interface PlaybackPlan {
   readonly startBeat: number
@@ -195,16 +200,16 @@ export const createPlaybackPlan = (project: DawProject, fromBeat = 0): PlaybackP
       )
     }
     if (!notes.length) continue
+    const common = { id: lane.id, name: lane.name, gain: lane.gain, notes: Object.freeze(notes) }
     lanes.push(
-      Object.freeze({
-        id: lane.id,
-        name: lane.name,
-        kind: lane.kind ?? 'instrument',
-        patchSource: lane.patchSource,
-        oscillatorType: lane.oscillatorType,
-        gain: lane.gain,
-        notes: Object.freeze(notes),
-      }),
+      lane.kind === 'drum'
+        ? Object.freeze({ ...common, kind: 'drum', drumkit: lane.drumkit })
+        : Object.freeze({
+            ...common,
+            kind: 'instrument',
+            patchPreset: lane.patchPreset,
+            oscillatorType: lane.oscillatorType,
+          }),
     )
   }
 
