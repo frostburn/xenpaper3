@@ -950,8 +950,7 @@ describe('DawView', () => {
       'Collapse Percussion',
       'Delete Percussion',
       null,
-      null,
-      null,
+      'Drum samples',
       null,
     ])
     expect(lane.get('[aria-label="Drum lane"]').attributes('aria-label')).toBe('Drum lane')
@@ -961,11 +960,11 @@ describe('DawView', () => {
     )
     await laneSource.setValue('@adsr(10ms, 20ms, 50%, 30ms)')
     expect((laneSource.element as HTMLTextAreaElement).value).toBe('@adsr(10ms, 20ms, 50%, 30ms)')
-    const drumkitSource = lane.get('[aria-label="Drum patch source"]')
-    await drumkitSource.setValue('{')
-    expect(lane.get('[role="alert"]').text()).toBeTruthy()
-    expect(wrapper.getComponent(DrumLane).props('lane').patchSource).toBe('drumkit')
-    await drumkitSource.setValue('drumkit')
+    expect(lane.find('[aria-label="Drum patch source"]').exists()).toBe(false)
+    expect(lane.get('[aria-label="Drum samples"]').text()).toContain('3 samples available')
+    expect(lane.get('[aria-label="Drum samples"]').text()).toContain('sd · hh · bd')
+    expect(lane.get('.source-control > span').text()).toBe('Lane source')
+    expect(lane.get('.gain-control [aria-label="Drum gain"]').attributes('type')).toBe('range')
 
     await lane.get('[aria-label="Drum lane"]').trigger('dblclick', { clientX: 64 })
     expect(wrapper.get('[aria-label="Xenpaper clip source"]').element).toHaveProperty(
@@ -976,6 +975,11 @@ describe('DawView', () => {
     expect(notes).toHaveLength(10)
     expect(notes.every((note) => note.text() === '')).toBe(true)
     expect(lane.findAll('.drum-row-label').map((label) => label.text())).toEqual(['sd', 'hh', 'bd'])
+    expect(lane.findAll('.drum-row-label').map((label) => label.attributes('style'))).toEqual([
+      'top: 16.666666666666668%; left: 0rem; width: calc(100% - 0rem);',
+      'top: 50%; left: 0rem; width: calc(100% - 0rem);',
+      'top: 83.33333333333333%; left: 0rem; width: calc(100% - 0rem);',
+    ])
     await wrapper.get('[aria-label="Clip display"]').setValue('source')
     const highlightedDrums = lane
       .findAll('button.clip [data-highlight="identifier"]')
@@ -989,9 +993,30 @@ describe('DawView', () => {
     expect(lane.get('[aria-label="Sampled drumkit source"]').text()).toContain(
       'Choose a Strudel JSON manifest',
     )
+    const sampleNames = [
+      'tb',
+      'sh',
+      'sd',
+      'rim',
+      'rd',
+      'oh',
+      'mt',
+      'misc',
+      'lt',
+      'ht',
+      'hh',
+      'cr',
+      'cp',
+      'cb',
+      'brk',
+      'bd',
+    ]
     const fetcher = vi.fn<typeof fetch>().mockResolvedValue({
       ok: true,
-      text: async () => '{"bd":["bd.wav"]}',
+      text: async () =>
+        JSON.stringify(
+          Object.fromEntries(sampleNames.map((sample) => [sample, [`${sample}.wav`]])),
+        ),
     } as Response)
     vi.stubGlobal('fetch', fetcher)
     await lane
@@ -1011,8 +1036,14 @@ describe('DawView', () => {
       ),
     )
     expect(lane.get('[aria-label="Sampled drumkit source"]').text()).toContain(
-      '1 sample banks loaded',
+      '16 sample banks loaded',
     )
+    await wrapper.get('[aria-label="Clip display"]').setValue('piano-roll')
+    const denseLabels = lane.findAll('.drum-row-label')
+    expect(denseLabels).toHaveLength(16)
+    expect(denseLabels[0]!.attributes('style')).toContain('left: 0rem')
+    expect(denseLabels[1]!.attributes('style')).toContain('left: 2.5rem')
+    expect(denseLabels[15]!.attributes('style')).toContain('left: 2.5rem')
 
     const upload = lane.get('[aria-label="Upload drumkit JSON"]')
     Object.defineProperty(upload.element, 'files', {

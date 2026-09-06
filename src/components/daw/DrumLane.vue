@@ -45,7 +45,6 @@ const sourceMode = (source: string): DrumkitMode =>
   source.trimStart().startsWith('{') ? 'samples' : 'patch'
 
 const drumkitMode = ref<DrumkitMode>(sourceMode(props.lane.patchSource))
-const patchDraft = ref(drumkitMode.value === 'patch' ? props.lane.patchSource : 'drumkit')
 const drumkitUrl = ref('')
 const drumkitError = ref('')
 const loadingDrumkit = ref(false)
@@ -54,7 +53,6 @@ watch(
   () => props.lane.patchSource,
   (source) => {
     drumkitMode.value = sourceMode(source)
-    if (drumkitMode.value === 'patch' && source !== patchDraft.value) patchDraft.value = source
   },
 )
 
@@ -70,15 +68,10 @@ const commitDrumkitSource = (source: string): boolean => {
   }
 }
 
-const editDrumkitSource = (source: string) => {
-  patchDraft.value = source
-  commitDrumkitSource(source)
-}
-
 const selectDrumkitMode = (mode: DrumkitMode) => {
   drumkitMode.value = mode
   drumkitError.value = ''
-  if (mode === 'patch') commitDrumkitSource(patchDraft.value)
+  if (mode === 'patch') commitDrumkitSource('drumkit')
 }
 
 const importDrumkitJson = (source: string, manifestUrl?: string) => {
@@ -128,6 +121,15 @@ const samples = computed(() => {
   if (drumkitMode.value === 'samples' && sourceMode(props.lane.patchSource) !== 'samples') return []
   return [...drumSamplesForLane(props.lane)].sort((left, right) => right.localeCompare(left))
 })
+const labelStaggerColumns = computed(() => Math.max(1, Math.ceil(samples.value.length / 8)))
+const sampleLabelStyle = (index: number) => {
+  const stagger = index % labelStaggerColumns.value
+  return {
+    top: `${((index + 0.5) * 100) / samples.value.length}%`,
+    left: `${stagger * 2.5}rem`,
+    width: `calc(100% - ${stagger * 2.5}rem)`,
+  }
+}
 const eventsByClip = computed(() => {
   let initialization
   try {
@@ -199,15 +201,10 @@ const eventsByClip = computed(() => {
           Sampled drums
         </label>
       </fieldset>
-      <label v-if="drumkitMode === 'patch'" class="drumkit-source">
-        Drum patch source
-        <textarea
-          aria-label="Drum patch source"
-          rows="3"
-          :value="patchDraft"
-          @input="editDrumkitSource(($event.target as HTMLTextAreaElement).value)"
-        />
-      </label>
+      <section v-if="drumkitMode === 'patch'" class="drumkit-source" aria-label="Drum samples">
+        <strong>{{ samples.length }} samples available</strong>
+        <span class="drum-description">{{ samples.join(' · ') }}</span>
+      </section>
       <section v-else class="drumkit-source" aria-label="Sampled drumkit source">
         <strong>{{
           samples.length
@@ -241,10 +238,10 @@ const eventsByClip = computed(() => {
     <template #preview="{ clip }">
       <span class="drum-preview" aria-label="Drum pattern preview">
         <span
-          v-for="sample in samples"
+          v-for="(sample, index) in samples"
           :key="sample"
           class="drum-row-label"
-          :style="{ height: `${100 / samples.length}%` }"
+          :style="sampleLabelStyle(index)"
           >{{ sample }}</span
         >
         <i
@@ -310,19 +307,20 @@ const eventsByClip = computed(() => {
   inset: 0;
 }
 .drum-row-label {
-  position: relative;
+  position: absolute;
   display: block;
   z-index: 2;
-  padding-left: 0.25rem;
+  overflow: hidden;
+  padding-inline: 0.25rem;
+  transform: translateY(-50%);
   text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   color: white;
+  font-size: 0.7rem;
   font-weight: 700;
-  text-shadow:
-    -1px -1px 0 var(--xenpaper-purple),
-    1px -1px 0 var(--xenpaper-purple),
-    -1px 1px 0 var(--xenpaper-purple),
-    1px 1px 0 var(--xenpaper-purple);
-  border-bottom: 1px solid var(--xenpaper-purple);
+  line-height: 1;
+  text-shadow: 0 1px 2px var(--xenpaper-bg);
   pointer-events: none;
 }
 .drum-preview i {
