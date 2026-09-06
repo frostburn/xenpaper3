@@ -479,6 +479,7 @@ onBeforeUnmount(() => {
         @move="moveClip"
         @delete="deleteClip(lane, $event)"
         @update-source="lane.source = $event"
+        @update-patch-source="lane.patchSource = $event"
         @update-name="lane.name = $event"
         @update-gain="lane.gain = $event"
         @delete-lane="deleteInstrumentLane(lane)"

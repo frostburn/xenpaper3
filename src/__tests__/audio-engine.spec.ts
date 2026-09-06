@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import * as swPatch from '../../sw-patch'
+import * as swSeq from '../../sw-seq'
 import { DawAudioEngine } from '../daw/audio-engine'
 import { beat, createDefaultProject, createDrumLane } from '../daw/project'
 import { WebAudioPlaybackSession } from '../daw/web-audio-playback'
@@ -27,6 +28,30 @@ afterEach(() => {
 })
 
 describe('DAW playback preparation', () => {
+  it('loads sampled drumkits and passes them to the playback session', async () => {
+    const project = drumProject()
+    project.instrumentLanes[0]!.patchSource = JSON.stringify({
+      _base: 'https://example.com/',
+      bd: ['bd.wav'],
+    })
+    const sampledKit = { dispose: vi.fn<() => void>() } as unknown as swSeq.SampledDrumkit
+    const load = vi.spyOn(swSeq, 'loadSampledDrumkit').mockResolvedValue(sampledKit)
+    const register = vi.spyOn(swPatch, 'registerMathWorklets')
+    const context = {} as AudioContext
+    const engine = new DawAudioEngine(context)
+
+    await engine.play(project)
+
+    expect(load).toHaveBeenCalledWith(context, {
+      _base: 'https://example.com/',
+      bd: ['bd.wav'],
+    })
+    expect(register).not.toHaveBeenCalled()
+    const options = vi.mocked(WebAudioPlaybackSession).mock.calls[0]![2]!
+    expect(options.sampledDrumkits?.get('drum-1')).toBe(sampledKit)
+    engine.dispose()
+  })
+
   it('cancels a pending play when stopped during worklet registration', async () => {
     const registration = deferred()
     vi.spyOn(swPatch, 'registerMathWorklets').mockReturnValue(registration.promise)

@@ -15,6 +15,7 @@ import {
   type BeatTimedNoteEvent,
 } from '../../xenpaper-lang'
 import { drumNames } from '../../sw-patch'
+import { parseStrudelSampleMap, strudelSampleNames, type StrudelSampleMap } from '../../sw-seq'
 import DRUMKIT_PATCH_SOURCE from '../patches/drumkit.swpatch?raw'
 import { beat, beatToNumber, type Beat, type DawProject, type InstrumentLane } from './project'
 
@@ -56,8 +57,17 @@ const eventSourceRanges = (
 const resolvePatchSource = (source: string): string =>
   source === 'drumkit' ? DRUMKIT_PATCH_SOURCE : source
 
-export const drumSamplesForLane = (lane: InstrumentLane): readonly string[] =>
-  lane.kind === 'drum' ? drumNames(resolvePatchSource(lane.patchSource)) : []
+/** A JSON object in a drum lane's patch field is interpreted as a Strudel sample manifest. */
+export const sampledDrumkitManifest = (source: string): StrudelSampleMap | undefined => {
+  if (!source.trimStart().startsWith('{')) return undefined
+  return parseStrudelSampleMap(JSON.parse(source))
+}
+
+export const drumSamplesForLane = (lane: InstrumentLane): readonly string[] => {
+  if (lane.kind !== 'drum') return []
+  const manifest = sampledDrumkitManifest(lane.patchSource)
+  return manifest ? strudelSampleNames(manifest) : drumNames(resolvePatchSource(lane.patchSource))
+}
 
 const lowerDrumSamples = (program: Program): Program => {
   const lower = (value: unknown): unknown => {

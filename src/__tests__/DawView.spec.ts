@@ -291,6 +291,21 @@ describe('DAW project model', () => {
     ])
   })
 
+  it('uses Strudel manifest bank names as drum lane samples', () => {
+    const lane = createDrumLane(createDefaultProject())
+    lane.patchSource = JSON.stringify({
+      _base: 'https://example.com/kit/',
+      bd: ['bd/one.wav', 'bd/two.wav'],
+      sd: ['sd/one.wav'],
+    })
+
+    expect(drumSamplesForLane(lane)).toEqual(['bd', 'sd'])
+    expect(parseDrumClipNotes('[bd sd]', drumSamplesForLane(lane))).toMatchObject([
+      { sample: 'bd' },
+      { sample: 'sd' },
+    ])
+  })
+
   it('converts scrolled, zoomed pointer coordinates and snaps exactly', () => {
     expect(pointerXToBeat(96, 32, 64)).toBe(2)
     expect(snapBeat(2.13, beat(1, 4))).toEqual(beat(9, 4))
@@ -930,7 +945,15 @@ describe('DawView', () => {
       Array.from(lane.get('header').element.children).map((element) =>
         element.getAttribute('aria-label'),
       ),
-    ).toEqual(['Drum lane name', 'Collapse Percussion', 'Delete Percussion', null, null, null])
+    ).toEqual([
+      'Drum lane name',
+      'Collapse Percussion',
+      'Delete Percussion',
+      null,
+      null,
+      null,
+      null,
+    ])
     expect(lane.get('[aria-label="Drum lane"]').attributes('aria-label')).toBe('Drum lane')
     const laneSource = lane.get('[aria-label="Drum lane source"]')
     expect((laneSource.element as HTMLTextAreaElement).value).toBe(
@@ -938,6 +961,10 @@ describe('DawView', () => {
     )
     await laneSource.setValue('@adsr(10ms, 20ms, 50%, 30ms)')
     expect((laneSource.element as HTMLTextAreaElement).value).toBe('@adsr(10ms, 20ms, 50%, 30ms)')
+    const drumkitSource = lane.get('[aria-label="Drumkit source"]')
+    await drumkitSource.setValue('{"kick":["kick.wav"],"snare":["snare.wav"]}')
+    expect((drumkitSource.element as HTMLTextAreaElement).value).toContain('kick.wav')
+    await drumkitSource.setValue('drumkit')
 
     await lane.get('[aria-label="Drum lane"]').trigger('dblclick', { clientX: 64 })
     expect(wrapper.get('[aria-label="Xenpaper clip source"]').element).toHaveProperty(

@@ -1,9 +1,15 @@
 import type { DawProject } from './project'
 import { createPlaybackPlan, type PlaybackPlan } from './playback-plan'
-import { parseProjectScoreNotes, type PitchGlideSegment, type ScheduledLaneNote } from './score'
+import {
+  parseProjectScoreNotes,
+  sampledDrumkitManifest,
+  type PitchGlideSegment,
+  type ScheduledLaneNote,
+} from './score'
 import { xenpaperPitchToPatchDetune } from './web-audio-automation'
 import { WebAudioPlaybackSession } from './web-audio-playback'
 import { registerMathWorklets } from '../../sw-patch'
+import { loadSampledDrumkit, type SampledDrumkit } from '../../sw-seq'
 
 // Compatibility exports for non-UI consumers. Pure musical operations live in
 // score/playback-plan/timeline; browser-specific operations live in web-audio-*.
@@ -81,13 +87,38 @@ export class DawAudioEngine extends EventTarget {
     // Invalidate pending preparation before compiling, while delaying stop() so invalid
     // edits still do not tear down a currently audible session.
     const plan = createPlaybackPlan(project, fromBeat)
+    const sampledDrumkits = new Map<string, SampledDrumkit>()
+    try {
+      await Promise.all(
+        plan.lanes.map(async (lane) => {
+          if (lane.kind !== 'drum') return
+          const manifest = sampledDrumkitManifest(lane.patchSource)
+          if (manifest)
+            sampledDrumkits.set(lane.id, await loadSampledDrumkit(this.context, manifest))
+        }),
+      )
+    } catch (error) {
+      for (const drumkit of sampledDrumkits.values()) drumkit.dispose()
+      throw error
+    }
+    if (requestId !== this.playRequestId) {
+      for (const drumkit of sampledDrumkits.values()) drumkit.dispose()
+      return
+    }
     // Drum voices instantiate RandomNode worklets when their scheduled hit begins.
     // Finish module registration before creating or starting the playback session.
-    if (plan.lanes.some(({ kind }) => kind === 'drum')) await registerMathWorklets(this.context)
-    if (requestId !== this.playRequestId) return
+    if (
+      plan.lanes.some((lane) => lane.kind === 'drum' && !sampledDrumkitManifest(lane.patchSource))
+    )
+      await registerMathWorklets(this.context)
+    if (requestId !== this.playRequestId) {
+      for (const drumkit of sampledDrumkits.values()) drumkit.dispose()
+      return
+    }
     this.stop()
 
     const session = new WebAudioPlaybackSession(this.context, plan, {
+      sampledDrumkits,
       onEnded: () => {
         if (this.session !== session) return
         this.session = undefined

@@ -31,6 +31,7 @@ const emit = defineEmits<{
   move: [clip: SourceClip, beat: number]
   delete: [clip: SourceClip]
   'update-source': [source: string]
+  'update-patch-source': [source: string]
   'update-name': [name: string]
   'update-gain': [gain: number]
   deleteLane: []
@@ -92,7 +93,16 @@ const eventsByClip = computed(() => {
     @toggle-collapse="emit('toggle-collapse')"
   >
     <template #settings>
-      <span class="drum-description">{{ samples.join(' · ') }} · drumkit SW Patch</span>
+      <span class="drum-description">{{ samples.join(' · ') }}</span>
+      <label class="drumkit-source">
+        Drumkit (SW Patch or Strudel JSON)
+        <textarea
+          aria-label="Drumkit source"
+          rows="3"
+          :value="lane.patchSource"
+          @input="emit('update-patch-source', ($event.target as HTMLTextAreaElement).value)"
+        />
+      </label>
     </template>
     <template #preview="{ clip }">
       <span class="drum-preview" aria-label="Drum pattern preview">
@@ -124,6 +134,16 @@ const eventsByClip = computed(() => {
 .drum-description {
   flex: 1;
   color: var(--xenpaper-lavender);
+}
+.drumkit-source {
+  display: grid;
+  gap: 0.25rem;
+  flex: 1 1 24rem;
+}
+.drumkit-source textarea {
+  min-width: 20rem;
+  color: inherit;
+  background: var(--xenpaper-bg-control);
 }
 .drum-preview {
   position: absolute;
