@@ -66,6 +66,7 @@ export class DawAudioEngine extends EventTarget {
   private session: WebAudioPlaybackSession | undefined
   private activePlan: PlaybackPlan | undefined
   private disposed = false
+  private playRequestId = 0
 
   constructor(context?: AudioContext) {
     super()
@@ -76,12 +77,14 @@ export class DawAudioEngine extends EventTarget {
   async play(project: DawProject, fromBeat = 0): Promise<void> {
     if (this.disposed) throw new Error('Cannot play a disposed audio engine.')
 
-    // Compile first: invalid edits do not tear down a currently audible session.
+    const requestId = ++this.playRequestId
+    // Invalidate pending preparation before compiling, while delaying stop() so invalid
+    // edits still do not tear down a currently audible session.
     const plan = createPlaybackPlan(project, fromBeat)
     // Drum voices instantiate RandomNode worklets when their scheduled hit begins.
     // Finish module registration before creating or starting the playback session.
     if (plan.lanes.some(({ kind }) => kind === 'drum')) await registerMathWorklets(this.context)
-    if (this.disposed) throw new Error('Cannot play a disposed audio engine.')
+    if (requestId !== this.playRequestId) return
     this.stop()
 
     const session = new WebAudioPlaybackSession(this.context, plan, {
@@ -111,6 +114,7 @@ export class DawAudioEngine extends EventTarget {
   }
 
   stop(): void {
+    this.playRequestId += 1
     const session = this.session
     this.session = undefined
     this.activePlan = undefined

@@ -1,4 +1,5 @@
 import { Fraction } from 'xen-dev-utils'
+import { version } from '../../package.json'
 import { APERIODIC_TIMBRES, BASIC_OSCILLATOR_TYPES, PERIODIC_TIMBRES } from '../../sw-patch'
 
 export type Beat = Fraction
@@ -226,7 +227,7 @@ export const createDefaultProject = (): DawProject => {
     format: 'xenpaper3-daw',
     version: 1,
     createdAt: new Date().toISOString(),
-    xenpaperVersion: '3.0.0-beta.6',
+    xenpaperVersion: version,
     title: 'Untitled project',
     globalTrack: {
       source: DEFAULT_GLOBAL_SOURCE,

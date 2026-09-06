@@ -154,6 +154,10 @@ export class Transport extends EventTarget {
     return position
   }
 
+  private isCurrentRun(runId: number): boolean {
+    return runId === this.runId && this.active
+  }
+
   private scheduleTimeout(callback: () => void, time: number) {
     const delay = Math.max(0, (time - this.context.currentTime) * 1000)
     return setTimeout(callback, delay)
@@ -162,7 +166,7 @@ export class Transport extends EventTarget {
   private scheduleTick(runId: number, time: number, completes: boolean): void {
     const scheduledTime = Math.max(time, this.context.currentTime + 1 / this.context.sampleRate)
     const callback = () => {
-      if (runId !== this.runId || !this.active) return
+      if (!this.isCurrentRun(runId)) return
       if (completes) this.finish(runId)
       else this.onInterval(runId)
     }
@@ -183,7 +187,7 @@ export class Transport extends EventTarget {
 
   /** Fire the next scheduling interval, wrapping through the active loop when necessary. */
   private onInterval(runId = this.runId) {
-    if (runId !== this.runId || !this.active) return
+    if (!this.isCurrentRun(runId)) return
 
     let startTime = this.lastTickTime
     let startPos = this.schedulePosition
@@ -192,11 +196,13 @@ export class Transport extends EventTarget {
       let endPos = startPos + this.interval
       while (endPos > this.loopEndPos) {
         this.fireInRange(runId, startTime, startPos, this.loopEndPos)
+        if (!this.isCurrentRun(runId)) return
         startTime += this.loopEndPos - startPos
         startPos = this.loopStartPos
         endPos -= loopLength
       }
       this.fireInRange(runId, startTime, startPos, endPos)
+      if (!this.isCurrentRun(runId)) return
       this.schedulePosition = endPos
       this.lastTickTime += this.interval
       this.scheduleTick(runId, this.lastTickTime / this.context.sampleRate, false)
@@ -205,6 +211,7 @@ export class Transport extends EventTarget {
 
     const endPos = Math.min(startPos + this.interval, this.endPos)
     this.fireInRange(runId, startTime, startPos, endPos)
+    if (!this.isCurrentRun(runId)) return
     const advance = Math.max(0, endPos - startPos)
     this.schedulePosition = endPos
     this.lastTickTime += advance
@@ -218,6 +225,7 @@ export class Transport extends EventTarget {
     if (endPos <= startPos) return
 
     for (const event of this.parametricEventsById.values()) {
+      if (!this.isCurrentRun(runId)) return
       if (event.when >= startPos && event.when < endPos) {
         event.callback(
           (event.when - startPos + startTime + this._lookAhead) / this.context.sampleRate,
@@ -229,6 +237,7 @@ export class Transport extends EventTarget {
       .filter((event) => event.when >= startPos && event.when < endPos)
       .sort((left, right) => left.when - right.when || left.id - right.id)
     for (const event of notes) {
+      if (!this.isCurrentRun(runId)) return
       const noteOff = event.noteOn(
         (event.when - startPos + startTime + this._lookAhead) / this.context.sampleRate,
       )
@@ -243,6 +252,7 @@ export class Transport extends EventTarget {
     }
 
     for (const event of this.eventsById.values()) {
+      if (!this.isCurrentRun(runId)) return
       if (event.when < startPos || event.when >= endPos) continue
       const eventTime =
         (event.when - startPos + startTime + this._lookAhead) / this.context.sampleRate
@@ -264,7 +274,7 @@ export class Transport extends EventTarget {
   }
 
   private finish(runId: number): void {
-    if (runId !== this.runId || !this.active) return
+    if (!this.isCurrentRun(runId)) return
     this.stoppedPosition = Number.isFinite(this.endPos)
       ? this.endPos
       : this.normalizePosition(this.clockPosition())

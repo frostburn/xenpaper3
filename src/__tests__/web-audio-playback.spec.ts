@@ -244,6 +244,7 @@ describe('Web Audio playback session', () => {
     session.stop()
 
     expect(dispose).toHaveBeenCalledOnce()
+    expect(pitchSource.stops).toEqual([1.7, 0.4])
     expect(pitchSource.disconnected).toBe(true)
     expect(MockGainNode.instances[0]!.disconnected).toBe(true)
     expect(() => session.start()).toThrow(/one-shot/)
@@ -259,7 +260,7 @@ describe('Web Audio playback session', () => {
 
     expect(() => session.start()).toThrow(/finite cutoff/)
 
-    expect(context.sources[0]!.stops).toEqual([1.2])
+    expect(context.sources[0]!.stops).toEqual([1.2, 0])
     expect(context.sources[0]!.disconnected).toBe(true)
     expect(dispose).toHaveBeenCalledOnce()
     expect(MockGainNode.instances[0]!.disconnected).toBe(true)
