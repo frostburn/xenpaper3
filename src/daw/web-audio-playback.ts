@@ -6,7 +6,7 @@ import {
   type PlayableSynthPatch,
   type SynthPatch,
 } from '../../sw-patch'
-import { SampledDrumkit, Transport } from '../../sw-seq'
+import { SampledDrumkit, SampledInstrument, Transport } from '../../sw-seq'
 import { isAppleWebKit } from '../browser'
 import DEFAULT_PATCH_SOURCE from '../patches/default.swpatch?raw'
 import DRUMKIT_PATCH_SOURCE from '../patches/drumkit.swpatch?raw'
@@ -31,6 +31,7 @@ export interface WebAudioPlaybackOptions {
   readonly patchFactory?: PatchFactory
   readonly drumkitFactory?: DrumkitFactory
   readonly sampledDrumkits?: ReadonlyMap<string, SampledDrumkit>
+  readonly sampledInstruments?: ReadonlyMap<string, SampledInstrument>
   readonly resolvePatchSource?: (source: string) => string
   readonly onEnded?: () => void
 }
@@ -59,6 +60,7 @@ export class WebAudioPlaybackSession {
   private readonly synths: PlayableSynthPatch[] = []
   private readonly drumkits: PlayableDrumkitPatch[] = []
   private readonly sampledDrumkits: ReadonlyMap<string, SampledDrumkit>
+  private readonly sampledInstruments: ReadonlyMap<string, SampledInstrument>
   private readonly pitchSignals: ConstantSourceNode[] = []
   private completionTimer: ReturnType<typeof setTimeout> | undefined
   private latestCutoff = 0
@@ -71,6 +73,7 @@ export class WebAudioPlaybackSession {
     this.patchFactory = options.patchFactory ?? createPatch
     this.drumkitFactory = options.drumkitFactory ?? createDrumkit
     this.sampledDrumkits = options.sampledDrumkits ?? new Map()
+    this.sampledInstruments = options.sampledInstruments ?? new Map()
     this.resolvePatchSource = options.resolvePatchSource ?? defaultPatchSource
     this.onEnded = options.onEnded
     this.output = new GainNode(context, { gain: options.outputGain ?? DEFAULT_OUTPUT_GAIN })
@@ -168,6 +171,32 @@ export class WebAudioPlaybackSession {
         }
         continue
       }
+      const sampledInstrument = this.sampledInstruments.get(lane.id)
+      if (sampledInstrument) {
+        for (const note of lane.notes) {
+          this.transport.scheduleParametricNote({
+            when: note.when,
+            duration: note.duration,
+            noteOn: (time) => {
+              const off = sampledInstrument.note(
+                60 + note.pitch.initialValue / 100,
+                this.output,
+                time,
+                {
+                  velocity: note.velocity * lane.gain,
+                  release: note.envelope.release,
+                },
+              )
+              return (end) => {
+                const cutoff = off(end)
+                this.latestCutoff = Math.max(this.latestCutoff, cutoff)
+                return cutoff
+              }
+            },
+          })
+        }
+        continue
+      }
       const patch = this.patchFactory(this.resolvePatchSource(lane.patchPreset), this.context, {
         config: {
           oscillatorType: lane.oscillatorType,
@@ -256,6 +285,7 @@ export class WebAudioPlaybackSession {
     for (const drumkit of this.drumkits) drumkit.dispose()
     this.drumkits.length = 0
     for (const drumkit of this.sampledDrumkits.values()) drumkit.dispose()
+    for (const instrument of this.sampledInstruments.values()) instrument.dispose()
     for (const pitch of this.pitchSignals) {
       pitch.stop(this.context.currentTime)
       pitch.disconnect()

@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import { clamp, frequencyToCentOffset } from 'xen-dev-utils'
+import { githubRawUrl, parseDoughSampleMap } from '../../../sw-seq'
 import { compileSourceInitialization, parseClipNotes } from '../../daw/score'
 import type { SourceRange } from '../../daw/score'
 import { easeGlissando } from '../../daw/easing'
@@ -9,6 +10,7 @@ import {
   OSCILLATOR_TYPES,
   type ClipDisplayMode,
   type PitchedInstrumentLane,
+  type SampledInstrumentSource,
   type SourceClip,
 } from '../../daw/project'
 import InstrumentLaneComponent from './InstrumentLane.vue'
@@ -32,10 +34,54 @@ const emit = defineEmits<{
   'update-source': [source: string]
   'update-name': [name: string]
   'update-oscillator': [type: PitchedInstrumentLane['oscillatorType']]
+  'update-sampled-instrument': [source: SampledInstrumentSource | undefined]
   'update-gain': [gain: number]
   'delete-lane': []
   'toggle-collapse': []
 }>()
+
+const sampleUrl = ref(props.lane.sampledInstrument?.url ?? '')
+const sampleError = ref('')
+const loadingSamples = ref(false)
+
+const importSampleJson = (text: string, url = '') => {
+  const manifest = parseDoughSampleMap(JSON.parse(text))
+  const instruments = Object.keys(manifest).filter((name) => name !== '_base')
+  if (!instruments.length) throw new TypeError('The Dough manifest contains no instruments')
+  emit('update-sampled-instrument', {
+    url,
+    doughJson: manifest,
+    instrument: instruments[0]!,
+  })
+  sampleError.value = ''
+}
+
+const loadSampleUrl = async () => {
+  loadingSamples.value = true
+  sampleError.value = ''
+  try {
+    const response = await fetch(githubRawUrl(sampleUrl.value, globalThis.location.href))
+    if (!response.ok) throw new Error(`Unable to load instrument: HTTP ${response.status}`)
+    importSampleJson(await response.text(), sampleUrl.value)
+  } catch (error) {
+    sampleError.value = error instanceof Error ? error.message : String(error)
+  } finally {
+    loadingSamples.value = false
+  }
+}
+
+const uploadSamples = async (event: Event) => {
+  const input = event.target as HTMLInputElement
+  const file = input.files?.[0]
+  if (!file) return
+  try {
+    importSampleJson(await file.text())
+  } catch (error) {
+    sampleError.value = error instanceof Error ? error.message : String(error)
+  } finally {
+    input.value = ''
+  }
+}
 
 type PreviewNote = ReturnType<typeof parseClipNotes>[number]
 
@@ -223,7 +269,7 @@ const clipPreview = (clipId: string) => pianoRoll.value.notesByClip[clipId]!
     @toggle-collapse="emit('toggle-collapse')"
   >
     <template #settings>
-      <label>
+      <label v-if="!lane.sampledInstrument">
         {{ lane.patchPreset }} SW Patch ·
         <select
           aria-label="Waveform"
@@ -238,6 +284,47 @@ const clipPreview = (clipId: string) => pianoRoll.value.notesByClip[clipId]!
           <option v-for="type in OSCILLATOR_TYPES" :key="type">{{ type }}</option>
         </select>
       </label>
+      <div class="instrument-source">
+        <button
+          v-if="lane.sampledInstrument"
+          type="button"
+          @click="emit('update-sampled-instrument', undefined)"
+        >
+          Use SW Patch
+        </button>
+        <template v-else>
+          <input v-model="sampleUrl" type="url" placeholder="Dough samples.json URL" />
+          <button type="button" :disabled="loadingSamples || !sampleUrl" @click="loadSampleUrl">
+            {{ loadingSamples ? 'Loading…' : 'Load samples' }}
+          </button>
+          <label class="sample-upload">
+            Upload JSON
+            <input type="file" accept="application/json,.json" @change="uploadSamples" />
+          </label>
+        </template>
+        <label v-if="lane.sampledInstrument">
+          Sampled instrument
+          <select
+            :value="lane.sampledInstrument.instrument"
+            @change="
+              emit('update-sampled-instrument', {
+                ...lane.sampledInstrument!,
+                instrument: ($event.target as HTMLSelectElement).value,
+              })
+            "
+          >
+            <option
+              v-for="name in Object.keys(lane.sampledInstrument.doughJson).filter(
+                (name) => name !== '_base',
+              )"
+              :key="name"
+            >
+              {{ name }}
+            </option>
+          </select>
+        </label>
+        <span v-if="sampleError" class="sample-error" role="alert">{{ sampleError }}</span>
+      </div>
     </template>
     <template #preview="{ clip }">
       <span class="piano-roll" aria-label="Piano roll preview">
@@ -286,6 +373,23 @@ const clipPreview = (clipId: string) => pianoRoll.value.notesByClip[clipId]!
 </template>
 
 <style scoped>
+.instrument-source {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+.sample-upload {
+  cursor: pointer;
+}
+.sample-upload input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+}
+.sample-error {
+  color: var(--xenpaper-light-red);
+}
 .piano-roll {
   position: absolute;
   inset: 0;

@@ -213,6 +213,21 @@ describe('DAW project model', () => {
     expect(restored).not.toHaveProperty('oscillatorType')
   })
 
+  it('round-trips sampled instrument metadata', () => {
+    const project = createDefaultProject()
+    const lane = project.instrumentLanes[0]!
+    if (lane.kind !== 'instrument') throw new Error('Expected instrument lane')
+    lane.sampledInstrument = {
+      url: 'https://example.com/piano.json',
+      doughJson: { _base: './piano/', piano: { C4: 'C4.mp3' } },
+      instrument: 'piano',
+    }
+
+    const restored = parseDawProject(serializeDawProject(project)).instrumentLanes[0]!
+
+    expect(restored).toMatchObject({ sampledInstrument: lane.sampledInstrument })
+  })
+
   it('rejects data that is not a Xenpaper project', () => {
     expect(() => parseDawProject('{"version": 2}')).toThrow('Invalid Xenpaper project file')
 

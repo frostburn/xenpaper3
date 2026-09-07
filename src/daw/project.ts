@@ -1,7 +1,12 @@
 import { Fraction } from 'xen-dev-utils'
 import { version } from '../../package.json'
 import { APERIODIC_TIMBRES, BASIC_OSCILLATOR_TYPES, PERIODIC_TIMBRES } from '../../sw-patch'
-import { parseStrudelSampleMap, type StrudelSampleMap } from '../../sw-seq'
+import {
+  parseDoughSampleMap,
+  parseStrudelSampleMap,
+  type DoughSampleMap,
+  type StrudelSampleMap,
+} from '../../sw-seq'
 
 export type Beat = Fraction
 
@@ -53,6 +58,13 @@ export interface PitchedInstrumentLane extends BaseLane {
   kind: 'instrument'
   patchPreset: string
   oscillatorType: OscillatorType
+  sampledInstrument?: SampledInstrumentSource
+}
+
+export interface SampledInstrumentSource {
+  url: string
+  doughJson: DoughSampleMap
+  instrument: string
 }
 
 export type DrumkitSource =
@@ -138,7 +150,19 @@ export const parseDawProject = (source: string): DawProject => {
         (lane.kind === 'instrument'
           ? isString(lane.patchPreset) &&
             isString(lane.oscillatorType) &&
-            OSCILLATOR_TYPES.includes(lane.oscillatorType as OscillatorType)
+            OSCILLATOR_TYPES.includes(lane.oscillatorType as OscillatorType) &&
+            (lane.sampledInstrument === undefined ||
+              (isRecord(lane.sampledInstrument) &&
+                isString(lane.sampledInstrument.url) &&
+                isString(lane.sampledInstrument.instrument) &&
+                (() => {
+                  try {
+                    const manifest = parseDoughSampleMap(lane.sampledInstrument.doughJson)
+                    return isRecord(manifest[lane.sampledInstrument.instrument])
+                  } catch {
+                    return false
+                  }
+                })()))
           : isRecord(lane.drumkit) &&
             ((lane.drumkit.type === 'patch' && isString(lane.drumkit.patchPreset)) ||
               (lane.drumkit.type === 'samples' &&
@@ -190,7 +214,20 @@ export const serializeDawProject = (project: DawProject): string => {
       clips: lane.clips,
     }
     return lane.kind === 'instrument'
-      ? { ...common, patchPreset: lane.patchPreset, oscillatorType: lane.oscillatorType }
+      ? {
+          ...common,
+          patchPreset: lane.patchPreset,
+          oscillatorType: lane.oscillatorType,
+          ...(lane.sampledInstrument
+            ? {
+                sampledInstrument: {
+                  url: lane.sampledInstrument.url,
+                  doughJson: lane.sampledInstrument.doughJson,
+                  instrument: lane.sampledInstrument.instrument,
+                },
+              }
+            : {}),
+        }
       : {
           ...common,
           drumkit:
