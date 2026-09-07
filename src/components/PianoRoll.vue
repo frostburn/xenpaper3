@@ -316,9 +316,9 @@ const selectionBox = computed(() => {
 }
 .scroll {
   overflow-x: auto;
-  border: 1px solid var(--xenpaper-border-strong);
+  border: 1px solid var(--xenpaper-slate-450);
   border-radius: 0.35rem;
-  background: var(--xenpaper-surface);
+  background: var(--xenpaper-gray-50);
 }
 .canvas {
   position: relative;
@@ -343,16 +343,16 @@ svg {
   overflow: visible;
 }
 .ruler-background {
-  fill: var(--xenpaper-surface);
-  stroke: var(--xenpaper-border-strong);
+  fill: var(--xenpaper-gray-50);
+  stroke: var(--xenpaper-slate-450);
   stroke-width: 1;
 }
 .pitch-line {
-  stroke: var(--xenpaper-text-soft);
+  stroke: var(--xenpaper-slate-100);
   stroke-width: 1;
 }
 .beat-line {
-  stroke: var(--xenpaper-border-strong);
+  stroke: var(--xenpaper-slate-450);
   stroke-dasharray: 3 3;
 }
 .note {
@@ -383,7 +383,7 @@ svg {
   stroke-dasharray: 4 2;
 }
 text {
-  fill: var(--xenpaper-ink);
+  fill: var(--xenpaper-gray-600);
   font: 11px sans-serif;
 }
 .beat-label {
@@ -391,7 +391,7 @@ text {
   font-weight: 600;
 }
 .cents-label rect {
-  fill: var(--xenpaper-text);
+  fill: var(--xenpaper-white);
   stroke: var(--xenpaper-pink);
   stroke-width: 1.5;
 }

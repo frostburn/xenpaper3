@@ -1,10 +1,10 @@
 .xenpaper-source-highlight {
-  color: var(--xenpaper-text-soft);
+  color: var(--xenpaper-slate-100);
   font-family: var(--xenpaper-font-mono);
 }
 
 .syntax-comment {
-  color: var(--xenpaper-text-muted);
+  color: var(--xenpaper-slate-400);
   font-style: italic;
 }
 
@@ -41,13 +41,13 @@
 }
 
 .syntax-rest {
-  color: var(--xenpaper-text-soft);
+  color: var(--xenpaper-slate-100);
   font-weight: 600;
 }
 
 .syntax-mos-pattern,
 .syntax-identifier {
-  color: var(--xenpaper-solo);
+  color: var(--xenpaper-yellow);
 }
 
 .syntax-mos-udp,
@@ -60,11 +60,11 @@
 }
 
 .syntax-unparsed {
-  color: var(--xenpaper-text-soft);
+  color: var(--xenpaper-slate-100);
 }
 
 .syntax-warning {
-  color: var(--xenpaper-solo);
+  color: var(--xenpaper-yellow);
   background: color-mix(in srgb, var(--xenpaper-light-red) 22%, transparent);
   text-decoration: underline wavy var(--xenpaper-light-red);
   text-underline-offset: 0.15em;

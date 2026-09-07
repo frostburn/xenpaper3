@@ -191,7 +191,7 @@ const onKeyDown = (event: KeyboardEvent) => {
   align-items: center;
   gap: 1rem;
   padding: 0.6rem;
-  background: var(--xenpaper-bg-light);
+  background: var(--xenpaper-slate-875);
 }
 .instrument-header.collapsed {
   justify-content: flex-start;
@@ -222,7 +222,7 @@ const onKeyDown = (event: KeyboardEvent) => {
   border: 1px solid var(--xenpaper-light-red);
   border-radius: 0.25rem;
   padding: 0.35rem 0.55rem;
-  background: var(--xenpaper-bg);
+  background: var(--xenpaper-slate-950);
   cursor: pointer;
 }
 .source-control {
@@ -246,8 +246,8 @@ const onKeyDown = (event: KeyboardEvent) => {
   overflow: hidden;
   height: 9rem;
   cursor: crosshair;
-  background-color: var(--xenpaper-bg-canvas);
-  background-image: linear-gradient(90deg, var(--xenpaper-border) 1px, transparent 1px);
+  background-color: var(--xenpaper-slate-925);
+  background-image: linear-gradient(90deg, var(--xenpaper-slate-500) 1px, transparent 1px);
   background-position-x: var(--grid-offset);
   background-size: var(--beat-width) 100%;
   user-select: none;
@@ -258,8 +258,8 @@ const onKeyDown = (event: KeyboardEvent) => {
   top: 1rem;
   height: 7rem;
   overflow: hidden;
-  border: 2px solid var(--xenpaper-border-strong);
-  background: var(--xenpaper-focus);
+  border: 2px solid var(--xenpaper-slate-450);
+  background: var(--xenpaper-teal-950);
   color: white;
   text-align: left;
   user-select: none;
@@ -278,7 +278,7 @@ const onKeyDown = (event: KeyboardEvent) => {
   position: absolute;
   inset: 3.5rem 0 auto;
   text-align: center;
-  color: var(--xenpaper-text-muted);
+  color: var(--xenpaper-slate-400);
   pointer-events: none;
 }
 </style>

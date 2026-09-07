@@ -2,25 +2,25 @@
 @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@300;400&display=swap');
 
 :root {
-  --xenpaper-bg: #0e151b;
-  --xenpaper-bg-light: #18232d;
-  --xenpaper-bg-editor: #171b24;
-  --xenpaper-bg-control: #1b2536;
-  --xenpaper-bg-canvas: #151b27;
-  --xenpaper-surface: #fafafa;
-  --xenpaper-text: #ffffff;
-  --xenpaper-text-soft: #e6e9ef;
-  --xenpaper-text-muted: #8b949e;
-  --xenpaper-ink: #555555;
-  --xenpaper-border: #667085;
-  --xenpaper-border-strong: #7184a8;
-  --xenpaper-placeholder: #198c8c;
-  --xenpaper-focus: #073f3f;
+  --xenpaper-slate-950: #0e151b;
+  --xenpaper-slate-875: #18232d;
+  --xenpaper-slate-900: #171b24;
+  --xenpaper-slate-850: #1b2536;
+  --xenpaper-slate-925: #151b27;
+  --xenpaper-gray-50: #fafafa;
+  --xenpaper-white: #ffffff;
+  --xenpaper-slate-100: #e6e9ef;
+  --xenpaper-slate-400: #8b949e;
+  --xenpaper-gray-600: #555555;
+  --xenpaper-slate-500: #667085;
+  --xenpaper-slate-450: #7184a8;
+  --xenpaper-teal-700: #198c8c;
+  --xenpaper-teal-950: #073f3f;
   --xenpaper-cyan: #22cece;
   --xenpaper-blue: #3377ee;
   --xenpaper-green: #62c370;
   --xenpaper-light-green: #a8e6a3;
-  --xenpaper-solo: #ffd166;
+  --xenpaper-yellow: #ffd166;
   --xenpaper-orange: #ff541e;
   --xenpaper-red: #cc0000;
   --xenpaper-light-red: #e57373;
@@ -32,8 +32,8 @@
   --xenpaper-font-mono: 'DM Mono', monospace;
   --xenpaper-font-copy: 'Nunito', sans-serif;
 
-  color: var(--xenpaper-text);
-  background: var(--xenpaper-bg);
+  color: var(--xenpaper-white);
+  background: var(--xenpaper-slate-950);
   font-family: var(--xenpaper-font-mono);
   font-synthesis: none;
   text-rendering: optimizeLegibility;
@@ -54,8 +54,8 @@ body,
 body {
   margin: 0;
   overflow-x: hidden;
-  color: var(--xenpaper-text);
-  background: var(--xenpaper-bg);
+  color: var(--xenpaper-white);
+  background: var(--xenpaper-slate-950);
   font-size: 16px;
   font-weight: 400;
   line-height: 1.5;
@@ -89,7 +89,7 @@ textarea {
 
 input::placeholder,
 textarea::placeholder {
-  color: var(--xenpaper-placeholder);
+  color: var(--xenpaper-teal-700);
 }
 
 a {

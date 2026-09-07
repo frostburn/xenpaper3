@@ -292,7 +292,7 @@ const clipPreview = (clipId: string) => pianoRoll.value.notesByClip[clipId]!
   background: repeating-linear-gradient(
     0deg,
     transparent 0 11%,
-    color-mix(in srgb, var(--xenpaper-text) 7%, transparent) 12% 13%
+    color-mix(in srgb, var(--xenpaper-white) 7%, transparent) 12% 13%
   );
   pointer-events: none;
 }
@@ -313,7 +313,7 @@ const clipPreview = (clipId: string) => pianoRoll.value.notesByClip[clipId]!
   right: 0.25rem;
   padding: 0.08rem 0.25rem;
   border-radius: 2px;
-  background: color-mix(in srgb, var(--xenpaper-bg-control) 87%, transparent);
+  background: color-mix(in srgb, var(--xenpaper-slate-850) 87%, transparent);
   color: var(--xenpaper-light-red);
   font: 0.65rem/1.2 monospace;
 }

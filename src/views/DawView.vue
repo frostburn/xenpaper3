@@ -538,8 +538,8 @@ onBeforeUnmount(() => {
   max-width: 1200px;
   margin: auto;
   padding: 1rem;
-  color: var(--xenpaper-text-soft);
-  background: var(--xenpaper-bg);
+  color: var(--xenpaper-slate-100);
+  background: var(--xenpaper-slate-950);
 }
 .project-header {
   display: flex;
@@ -558,11 +558,11 @@ onBeforeUnmount(() => {
 }
 .project-title input {
   min-width: min(18rem, 45vw);
-  border: 1px solid var(--xenpaper-border-strong);
+  border: 1px solid var(--xenpaper-slate-450);
   border-radius: 0.25rem;
   padding: 0.45rem 0.55rem;
   color: inherit;
-  background: var(--xenpaper-bg-control);
+  background: var(--xenpaper-slate-850);
 }
 .project-file-actions {
   display: flex;
@@ -570,12 +570,12 @@ onBeforeUnmount(() => {
   margin-left: auto;
 }
 .project-file-button {
-  border: 1px solid var(--xenpaper-border-strong);
+  border: 1px solid var(--xenpaper-slate-450);
   border-radius: 0.25rem;
   padding: 0.45rem 0.65rem;
   color: inherit;
   font: inherit;
-  background: var(--xenpaper-bg-control);
+  background: var(--xenpaper-slate-850);
   cursor: pointer;
 }
 .project-file-input {
@@ -620,11 +620,11 @@ onBeforeUnmount(() => {
 .add-lane {
   flex: 1;
   margin: 0.75rem 0;
-  border: 1px dashed var(--xenpaper-border-strong);
+  border: 1px dashed var(--xenpaper-slate-450);
   border-radius: 0.25rem;
   padding: 0.65rem;
-  color: var(--xenpaper-text-soft);
-  background: var(--xenpaper-bg-control);
+  color: var(--xenpaper-slate-100);
+  background: var(--xenpaper-slate-850);
   cursor: pointer;
 }
 .add-lanes {
