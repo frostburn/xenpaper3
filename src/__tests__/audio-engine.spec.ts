@@ -30,10 +30,13 @@ afterEach(() => {
 describe('DAW playback preparation', () => {
   it('loads sampled drumkits and passes them to the playback session', async () => {
     const project = drumProject()
-    project.instrumentLanes[0]!.patchSource = JSON.stringify({
-      _base: 'https://example.com/',
-      bd: ['bd.wav'],
-    })
+    const lane = project.instrumentLanes[0]!
+    if (lane.kind !== 'drum') throw new Error('Expected drum lane')
+    lane.drumkit = {
+      type: 'samples',
+      url: 'https://github.com/example/drums/blob/main/strudel.json',
+      strudelJson: { bd: ['bd.wav'] },
+    }
     const sampledKit = { dispose: vi.fn<() => void>() } as unknown as swSeq.SampledDrumkit
     const load = vi.spyOn(swSeq, 'loadSampledDrumkit').mockResolvedValue(sampledKit)
     const register = vi.spyOn(swPatch, 'registerMathWorklets')
@@ -42,10 +45,11 @@ describe('DAW playback preparation', () => {
 
     await engine.play(project)
 
-    expect(load).toHaveBeenCalledWith(context, {
-      _base: 'https://example.com/',
-      bd: ['bd.wav'],
-    })
+    expect(load).toHaveBeenCalledWith(
+      context,
+      { bd: ['bd.wav'] },
+      { baseUrl: new URL('https://raw.githubusercontent.com/example/drums/main/strudel.json') },
+    )
     expect(register).not.toHaveBeenCalled()
     const options = vi.mocked(WebAudioPlaybackSession).mock.calls[0]![2]!
     expect(options.sampledDrumkits?.get('drum-1')).toBe(sampledKit)

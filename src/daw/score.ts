@@ -57,16 +57,17 @@ const eventSourceRanges = (
 const resolvePatchSource = (source: string): string =>
   source === 'drumkit' ? DRUMKIT_PATCH_SOURCE : source
 
-/** A JSON object in a drum lane's patch field is interpreted as a Strudel sample manifest. */
-export const sampledDrumkitManifest = (source: string): StrudelSampleMap | undefined => {
-  if (!source.trimStart().startsWith('{')) return undefined
-  return parseStrudelSampleMap(JSON.parse(source))
-}
+export const sampledDrumkitManifest = (lane: InstrumentLane): StrudelSampleMap | undefined =>
+  lane.kind === 'drum' && lane.drumkit.type === 'samples'
+    ? parseStrudelSampleMap(lane.drumkit.strudelJson)
+    : undefined
 
 export const drumSamplesForLane = (lane: InstrumentLane): readonly string[] => {
   if (lane.kind !== 'drum') return []
-  const manifest = sampledDrumkitManifest(lane.patchSource)
-  return manifest ? strudelSampleNames(manifest) : drumNames(resolvePatchSource(lane.patchSource))
+  const manifest = sampledDrumkitManifest(lane)
+  if (manifest) return strudelSampleNames(manifest)
+  if (lane.drumkit.type !== 'patch') return []
+  return drumNames(resolvePatchSource(lane.drumkit.patchPreset))
 }
 
 const lowerDrumSamples = (program: Program): Program => {

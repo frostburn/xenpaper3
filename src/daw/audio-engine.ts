@@ -1,15 +1,10 @@
 import type { DawProject } from './project'
 import { createPlaybackPlan, type PlaybackPlan } from './playback-plan'
-import {
-  parseProjectScoreNotes,
-  sampledDrumkitManifest,
-  type PitchGlideSegment,
-  type ScheduledLaneNote,
-} from './score'
+import { parseProjectScoreNotes, type PitchGlideSegment, type ScheduledLaneNote } from './score'
 import { xenpaperPitchToPatchDetune } from './web-audio-automation'
 import { WebAudioPlaybackSession } from './web-audio-playback'
 import { registerMathWorklets } from '../../sw-patch'
-import { loadSampledDrumkit, type SampledDrumkit } from '../../sw-seq'
+import { githubRawUrl, loadSampledDrumkit, type SampledDrumkit } from '../../sw-seq'
 
 // Compatibility exports for non-UI consumers. Pure musical operations live in
 // score/playback-plan/timeline; browser-specific operations live in web-audio-*.
@@ -91,10 +86,15 @@ export class DawAudioEngine extends EventTarget {
     try {
       await Promise.all(
         plan.lanes.map(async (lane) => {
-          if (lane.kind !== 'drum') return
-          const manifest = sampledDrumkitManifest(lane.patchSource)
-          if (manifest)
-            sampledDrumkits.set(lane.id, await loadSampledDrumkit(this.context, manifest))
+          if (lane.kind !== 'drum' || lane.drumkit.type !== 'samples') return
+          sampledDrumkits.set(
+            lane.id,
+            await loadSampledDrumkit(this.context, lane.drumkit.strudelJson, {
+              baseUrl: lane.drumkit.url
+                ? githubRawUrl(lane.drumkit.url, globalThis.location.href)
+                : globalThis.location.href,
+            }),
+          )
         }),
       )
     } catch (error) {
@@ -107,9 +107,7 @@ export class DawAudioEngine extends EventTarget {
     }
     // Drum voices instantiate RandomNode worklets when their scheduled hit begins.
     // Finish module registration before creating or starting the playback session.
-    if (
-      plan.lanes.some((lane) => lane.kind === 'drum' && !sampledDrumkitManifest(lane.patchSource))
-    )
+    if (plan.lanes.some((lane) => lane.kind === 'drum' && lane.drumkit.type === 'patch'))
       await registerMathWorklets(this.context)
     if (requestId !== this.playRequestId) {
       for (const drumkit of sampledDrumkits.values()) drumkit.dispose()

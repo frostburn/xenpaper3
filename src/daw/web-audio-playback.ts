@@ -21,7 +21,7 @@ type PatchFactory = (
   source: string,
   context: BaseAudioContext,
   options: {
-    config: { oscillatorType: PlaybackLane['oscillatorType']; aperiodic: boolean }
+    config: { oscillatorType: import('./project').OscillatorType; aperiodic: boolean }
   },
 ) => SynthPatch
 type DrumkitFactory = typeof createDrumkit
@@ -129,7 +129,12 @@ export class WebAudioPlaybackSession {
           }
           continue
         }
-        const kit = this.drumkitFactory(this.resolvePatchSource(lane.patchSource), this.context)
+        if (lane.drumkit.type !== 'patch')
+          throw new Error(`Sampled drumkit for lane "${lane.name}" was not prepared`)
+        const kit = this.drumkitFactory(
+          this.resolvePatchSource(lane.drumkit.patchPreset),
+          this.context,
+        )
         this.drumkits.push(kit)
         for (const note of lane.notes) {
           if (!note.sample) throw new TypeError(`Drum lane "${lane.name}" contains a pitched note`)
@@ -163,7 +168,7 @@ export class WebAudioPlaybackSession {
         }
         continue
       }
-      const patch = this.patchFactory(this.resolvePatchSource(lane.patchSource), this.context, {
+      const patch = this.patchFactory(this.resolvePatchSource(lane.patchPreset), this.context, {
         config: {
           oscillatorType: lane.oscillatorType,
           aperiodic: isAperiodicTimbre(lane.oscillatorType),

@@ -1,6 +1,7 @@
 import { Fraction } from 'xen-dev-utils'
 import { version } from '../../package.json'
 import { APERIODIC_TIMBRES, BASIC_OSCILLATOR_TYPES, PERIODIC_TIMBRES } from '../../sw-patch'
+import { parseStrudelSampleMap, type StrudelSampleMap } from '../../sw-seq'
 
 export type Beat = Fraction
 
@@ -40,21 +41,34 @@ export interface SourceClip {
   source: string
 }
 
-export interface InstrumentLane {
-  /** Absent on version-1 projects created before drum lanes; interpreted as instrument. */
-  kind?: 'instrument' | 'drum'
+interface BaseLane {
   id: string
   name: string
-  patchSource: string
-  oscillatorType: OscillatorType
   gain: number
   source: string
   clips: SourceClip[]
 }
 
+export interface PitchedInstrumentLane extends BaseLane {
+  kind: 'instrument'
+  patchPreset: string
+  oscillatorType: OscillatorType
+}
+
+export type DrumkitSource =
+  | { type: 'patch'; patchPreset: string }
+  | { type: 'samples'; url: string; strudelJson: StrudelSampleMap }
+
+export interface DrumLane extends BaseLane {
+  kind: 'drum'
+  drumkit: DrumkitSource
+}
+
+export type InstrumentLane = PitchedInstrumentLane | DrumLane
+
 export interface DawProject {
   format: 'xenpaper3-daw'
-  version: 1
+  version: 2
   createdAt: string
   xenpaperVersion: string
   title: string
@@ -119,11 +133,24 @@ export const parseDawProject = (source: string): DawProject => {
     project.instrumentLanes.every(
       (lane) =>
         isRecord(lane) &&
-        (lane.kind === undefined || lane.kind === 'instrument' || lane.kind === 'drum') &&
+        (lane.kind === 'instrument' || lane.kind === 'drum') &&
         isString(lane.name) &&
-        isString(lane.patchSource) &&
-        isString(lane.oscillatorType) &&
-        OSCILLATOR_TYPES.includes(lane.oscillatorType as OscillatorType) &&
+        (lane.kind === 'instrument'
+          ? isString(lane.patchPreset) &&
+            isString(lane.oscillatorType) &&
+            OSCILLATOR_TYPES.includes(lane.oscillatorType as OscillatorType)
+          : isRecord(lane.drumkit) &&
+            ((lane.drumkit.type === 'patch' && isString(lane.drumkit.patchPreset)) ||
+              (lane.drumkit.type === 'samples' &&
+                isString(lane.drumkit.url) &&
+                (() => {
+                  try {
+                    parseStrudelSampleMap(lane.drumkit.strudelJson)
+                    return true
+                  } catch {
+                    return false
+                  }
+                })()))) &&
         isFiniteNumber(lane.gain) &&
         isString(lane.source) &&
         Array.isArray(lane.clips) &&
@@ -139,7 +166,7 @@ export const parseDawProject = (source: string): DawProject => {
 
   if (
     project.format !== 'xenpaper3-daw' ||
-    project.version !== 1 ||
+    project.version !== 2 ||
     !isString(project.createdAt) ||
     !Number.isFinite(Date.parse(project.createdAt)) ||
     !isString(project.xenpaperVersion) ||
@@ -153,7 +180,30 @@ export const parseDawProject = (source: string): DawProject => {
 }
 
 export const serializeDawProject = (project: DawProject): string => {
-  const source = `${JSON.stringify(project, null, 2)}\n`
+  const instrumentLanes = project.instrumentLanes.map((lane) => {
+    const common = {
+      kind: lane.kind,
+      id: lane.id,
+      name: lane.name,
+      gain: lane.gain,
+      source: lane.source,
+      clips: lane.clips,
+    }
+    return lane.kind === 'instrument'
+      ? { ...common, patchPreset: lane.patchPreset, oscillatorType: lane.oscillatorType }
+      : {
+          ...common,
+          drumkit:
+            lane.drumkit.type === 'patch'
+              ? { type: 'patch', patchPreset: lane.drumkit.patchPreset }
+              : {
+                  type: 'samples',
+                  url: lane.drumkit.url,
+                  strudelJson: lane.drumkit.strudelJson,
+                },
+        }
+  })
+  const source = `${JSON.stringify({ ...project, instrumentLanes }, null, 2)}\n`
   parseDawProject(source)
   return source
 }
@@ -190,7 +240,7 @@ export const snapBeat = (value: number, grid: Beat): Beat => {
 export const pointerXToBeat = (pointerX: number, scrollLeft: number, pixelsPerBeat: number) =>
   (pointerX + scrollLeft) / pixelsPerBeat
 
-export const createInstrumentLane = (project: DawProject): InstrumentLane => {
+export const createInstrumentLane = (project: DawProject): PitchedInstrumentLane => {
   const usedIds = new Set(project.instrumentLanes.map((lane) => lane.id))
   let suffix = 1
   while (usedIds.has(`instrument-${suffix}`)) suffix += 1
@@ -198,7 +248,7 @@ export const createInstrumentLane = (project: DawProject): InstrumentLane => {
     id: `instrument-${suffix}`,
     kind: 'instrument',
     name: `Instrument ${suffix}`,
-    patchSource: DEFAULT_SW_PATCH_SOURCE,
+    patchPreset: DEFAULT_SW_PATCH_SOURCE,
     oscillatorType: 'sawtooth',
     gain: 0.8,
     source: DEFAULT_INSTRUMENT_SOURCE,
@@ -206,7 +256,7 @@ export const createInstrumentLane = (project: DawProject): InstrumentLane => {
   }
 }
 
-export const createDrumLane = (project: DawProject): InstrumentLane => {
+export const createDrumLane = (project: DawProject): DrumLane => {
   const usedIds = new Set(project.instrumentLanes.map((lane) => lane.id))
   let suffix = 1
   while (usedIds.has(`drum-${suffix}`)) suffix += 1
@@ -214,8 +264,7 @@ export const createDrumLane = (project: DawProject): InstrumentLane => {
     id: `drum-${suffix}`,
     kind: 'drum',
     name: `Drums ${suffix}`,
-    patchSource: 'drumkit',
-    oscillatorType: 'sine',
+    drumkit: { type: 'patch', patchPreset: 'drumkit' },
     gain: 0.8,
     source: DEFAULT_DRUM_SOURCE,
     clips: [],
@@ -225,7 +274,7 @@ export const createDrumLane = (project: DawProject): InstrumentLane => {
 export const createDefaultProject = (): DawProject => {
   const project: DawProject = {
     format: 'xenpaper3-daw',
-    version: 1,
+    version: 2,
     createdAt: new Date().toISOString(),
     xenpaperVersion: version,
     title: 'Untitled project',

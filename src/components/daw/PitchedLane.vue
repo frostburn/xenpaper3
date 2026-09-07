@@ -8,13 +8,13 @@ import {
   beatToNumber,
   OSCILLATOR_TYPES,
   type ClipDisplayMode,
-  type InstrumentLane,
+  type PitchedInstrumentLane,
   type SourceClip,
 } from '../../daw/project'
 import InstrumentLaneComponent from './InstrumentLane.vue'
 
 const props = defineProps<{
-  lane: InstrumentLane
+  lane: PitchedInstrumentLane
   globalSource?: string
   selectedClipId?: string
   pixelsPerBeat: number
@@ -31,7 +31,7 @@ const emit = defineEmits<{
   delete: [clip: SourceClip]
   'update-source': [source: string]
   'update-name': [name: string]
-  'update-oscillator': [type: InstrumentLane['oscillatorType']]
+  'update-oscillator': [type: PitchedInstrumentLane['oscillatorType']]
   'update-gain': [gain: number]
   'delete-lane': []
   'toggle-collapse': []
@@ -224,14 +224,14 @@ const clipPreview = (clipId: string) => pianoRoll.value.notesByClip[clipId]!
   >
     <template #settings>
       <label>
-        {{ lane.patchSource }} SW Patch ·
+        {{ lane.patchPreset }} SW Patch ·
         <select
           aria-label="Waveform"
           :value="lane.oscillatorType"
           @change="
             emit(
               'update-oscillator',
-              ($event.target as HTMLSelectElement).value as InstrumentLane['oscillatorType'],
+              ($event.target as HTMLSelectElement).value as PitchedInstrumentLane['oscillatorType'],
             )
           "
         >

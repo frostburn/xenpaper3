@@ -10,13 +10,14 @@ import type { SourceRange } from '../../daw/score'
 import {
   beatToNumber,
   type ClipDisplayMode,
-  type InstrumentLane,
+  type DrumkitSource,
+  type DrumLane,
   type SourceClip,
 } from '../../daw/project'
 import InstrumentLaneComponent from './InstrumentLane.vue'
 
 const props = defineProps<{
-  lane: InstrumentLane
+  lane: DrumLane
   globalSource?: string
   selectedClipId?: string
   pixelsPerBeat: number
@@ -32,7 +33,7 @@ const emit = defineEmits<{
   move: [clip: SourceClip, beat: number]
   delete: [clip: SourceClip]
   'update-source': [source: string]
-  'update-patch-source': [source: string]
+  'update-drumkit': [drumkit: DrumkitSource]
   'update-name': [name: string]
   'update-gain': [gain: number]
   deleteLane: []
@@ -41,26 +42,24 @@ const emit = defineEmits<{
 
 type DrumkitMode = 'patch' | 'samples'
 
-const sourceMode = (source: string): DrumkitMode =>
-  source.trimStart().startsWith('{') ? 'samples' : 'patch'
-
-const drumkitMode = ref<DrumkitMode>(sourceMode(props.lane.patchSource))
-const drumkitUrl = ref('')
+const drumkitMode = ref<DrumkitMode>(props.lane.drumkit.type)
+const drumkitUrl = ref(props.lane.drumkit.type === 'samples' ? props.lane.drumkit.url : '')
 const drumkitError = ref('')
 const loadingDrumkit = ref(false)
 
 watch(
-  () => props.lane.patchSource,
-  (source) => {
-    drumkitMode.value = sourceMode(source)
+  () => props.lane.drumkit,
+  (drumkit) => {
+    drumkitMode.value = drumkit.type
+    if (drumkit.type === 'samples') drumkitUrl.value = drumkit.url
   },
 )
 
-const commitDrumkitSource = (source: string): boolean => {
+const commitDrumkitSource = (drumkit: DrumkitSource): boolean => {
   try {
-    drumSamplesForLane({ ...props.lane, patchSource: source })
+    drumSamplesForLane({ ...props.lane, drumkit })
     drumkitError.value = ''
-    emit('update-patch-source', source)
+    emit('update-drumkit', drumkit)
     return true
   } catch (error) {
     drumkitError.value = error instanceof Error ? error.message : String(error)
@@ -71,20 +70,13 @@ const commitDrumkitSource = (source: string): boolean => {
 const selectDrumkitMode = (mode: DrumkitMode) => {
   drumkitMode.value = mode
   drumkitError.value = ''
-  if (mode === 'patch') commitDrumkitSource('drumkit')
+  if (mode === 'patch') commitDrumkitSource({ type: 'patch', patchPreset: 'drumkit' })
 }
 
-const importDrumkitJson = (source: string, manifestUrl?: string) => {
+const importDrumkitJson = (source: string, manifestUrl = '') => {
   const manifest = parseStrudelSampleMap(JSON.parse(source))
-  const normalized = manifestUrl
-    ? {
-        ...manifest,
-        _base: new URL(manifest._base ?? '.', manifestUrl).href,
-      }
-    : manifest
-  const serialized = JSON.stringify(normalized, null, 2)
   drumkitMode.value = 'samples'
-  commitDrumkitSource(serialized)
+  commitDrumkitSource({ type: 'samples', url: manifestUrl, strudelJson: manifest })
 }
 
 const loadDrumkitUrl = async () => {
@@ -94,7 +86,7 @@ const loadDrumkitUrl = async () => {
     const url = githubRawUrl(drumkitUrl.value, globalThis.location.href)
     const response = await fetch(url)
     if (!response.ok) throw new Error(`Unable to load drumkit: HTTP ${response.status}`)
-    importDrumkitJson(await response.text(), url.href)
+    importDrumkitJson(await response.text(), drumkitUrl.value)
   } catch (error) {
     drumkitError.value = error instanceof Error ? error.message : String(error)
   } finally {
@@ -118,7 +110,7 @@ const uploadDrumkit = async (event: Event) => {
 // Rows run top-to-bottom, so reverse alphabetical order puts alphabetical
 // progression from the bottom of the roll upwards.
 const samples = computed(() => {
-  if (drumkitMode.value === 'samples' && sourceMode(props.lane.patchSource) !== 'samples') return []
+  if (drumkitMode.value === 'samples' && props.lane.drumkit.type !== 'samples') return []
   return [...drumSamplesForLane(props.lane)].sort((left, right) => right.localeCompare(left))
 })
 const labelStaggerColumns = computed(() => Math.max(1, Math.ceil(samples.value.length / 8)))
