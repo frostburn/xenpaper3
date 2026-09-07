@@ -25,13 +25,15 @@ export const applyPitchAutomation = (
   target: AudioParamAutomationTarget,
   automation: PitchAutomationPlan,
   startTime: number,
+  referenceOffset = XENPAPER_C_TO_SW_PATCH_DETUNE,
 ): void => {
-  target.setValueAtTime(xenpaperPitchToPatchDetune(automation.initialValue), startTime)
+  const convert = (value: number) => value + referenceOffset
+  target.setValueAtTime(convert(automation.initialValue), startTime)
   for (const curve of automation.curves) {
     const when = startTime + curve.offset
-    target.setValueAtTime(xenpaperPitchToPatchDetune(curve.startValue), when)
+    target.setValueAtTime(convert(curve.startValue), when)
     target.setValueCurveAtTime(
-      Float32Array.from(curve.values, xenpaperPitchToPatchDetune),
+      Float32Array.from(curve.values, convert),
       when,
       glissandoCurveDuration(curve.duration),
     )

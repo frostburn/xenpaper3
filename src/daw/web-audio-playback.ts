@@ -178,15 +178,25 @@ export class WebAudioPlaybackSession {
             when: note.when,
             duration: note.duration,
             noteOn: (time) => {
-              const off = sampledInstrument.note(
-                60 + note.pitch.initialValue / 100,
-                this.output,
-                time,
-                {
-                  velocity: note.velocity * lane.gain,
-                  release: note.envelope.release,
-                },
-              )
+              const initialPitch = note.pitch.initialValue
+              const off = sampledInstrument.note(60 + initialPitch / 100, this.output, time, {
+                velocity: note.velocity * lane.gain,
+                release: note.envelope.release,
+                configureDetune: (detune) =>
+                  applyPitchAutomation(
+                    detune,
+                    {
+                      initialValue: 0,
+                      curves: note.pitch.curves.map((curve) => ({
+                        ...curve,
+                        startValue: curve.startValue - initialPitch,
+                        values: curve.values.map((value) => value - initialPitch),
+                      })),
+                    },
+                    time,
+                    0,
+                  ),
+              })
               return (end) => {
                 const cutoff = off(end)
                 this.latestCutoff = Math.max(this.latestCutoff, cutoff)

@@ -35,6 +35,7 @@ describe('sampled instruments', () => {
 
   it('uses the nearest sample, applies velocity, and returns the release cutoff', async () => {
     const rate = { setValueAtTime: fn<(value: number, time: number) => void>() }
+    const detune = {} as AudioParam
     const gain = {
       setValueAtTime: fn<(value: number, time: number) => void>(),
       linearRampToValueAtTime: fn<(value: number, time: number) => void>(),
@@ -42,6 +43,7 @@ describe('sampled instruments', () => {
     const source = {
       buffer: undefined,
       playbackRate: rate,
+      detune,
       connect: fn<() => AudioNode>().mockReturnThis(),
       disconnect: fn<() => void>(),
       start: fn<(time: number) => void>(),
@@ -64,9 +66,14 @@ describe('sampled instruments', () => {
       release: 0.4,
     })
 
-    const off = instrument.note(72, {} as AudioNode, 2, { velocity: 0.25 })
+    const configureDetune = fn<(parameter: AudioParam) => void>()
+    const off = instrument.note(72, {} as AudioNode, 2, {
+      velocity: 0.25,
+      configureDetune,
+    })
     expect(rate.setValueAtTime).toHaveBeenCalledWith(2, 2)
     expect(gain.setValueAtTime).toHaveBeenCalledWith(0.25, 2)
+    expect(configureDetune).toHaveBeenCalledWith(detune)
     expect(off(3)).toBe(3.4)
     expect(gain.linearRampToValueAtTime).toHaveBeenCalledWith(0, 3.4)
     expect(source.stop).toHaveBeenCalledWith(3.4)

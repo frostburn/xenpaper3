@@ -17,6 +17,8 @@ export interface SampledInstrumentNoteOptions {
   readonly velocity?: number
   /** Override the instrument's note-off fade time, in seconds. */
   readonly release?: number
+  /** Schedule cent offsets relative to `midi` on this voice's detune parameter. */
+  readonly configureDetune?: (detune: AudioParam) => void
 }
 
 type ManifestSource = string | URL | DoughSampleMap
@@ -104,6 +106,7 @@ export class SampledInstrument {
     const envelope = this.context.createGain()
     source.buffer = sample.buffer
     source.playbackRate.setValueAtTime(2 ** ((midi - sample.midi) / 12), time)
+    options.configureDetune?.(source.detune)
     envelope.gain.setValueAtTime(velocity, time)
     source.connect(envelope).connect(destination)
     source.start(time)

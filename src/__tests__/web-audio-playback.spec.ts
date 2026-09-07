@@ -256,10 +256,19 @@ describe('Web Audio playback session', () => {
 
     session.start()
 
-    expect(note).toHaveBeenCalledWith(60, MockGainNode.instances[0], 0.2, {
-      velocity: 0.4,
-      release: 0.3,
-    })
+    expect(note).toHaveBeenCalledWith(
+      60,
+      MockGainNode.instances[0],
+      0.2,
+      expect.objectContaining({ velocity: 0.4, release: 0.3 }),
+    )
+    const detune = new MockAudioParam()
+    note.mock.calls[0]![3]!.configureDetune?.(detune as unknown as AudioParam)
+    expect(detune.values).toEqual([
+      { value: 0, time: 0.2 },
+      { value: 100, time: 0.7 },
+    ])
+    expect(detune.curves[0]!.values).toEqual([100, 200])
     session.stop()
     expect(dispose).toHaveBeenCalledOnce()
   })

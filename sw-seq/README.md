@@ -71,6 +71,8 @@ off(context.currentTime + 1)
 
 The note-off callback returns the end of the release tail, making it directly compatible with
 `Transport.scheduleParametricNote`. Call `piano.dispose()` to stop active voices.
+The optional `configureDetune` note callback exposes the voice's cent-valued `AudioParam` for
+pitch bends and other scheduled pitch automation.
 
 In Xenpaper's DAW, an instrument lane accepts the same raw manifest URLs, GitHub `blob` URLs, and
 local JSON uploads as a sampled drum lane. Select a bank from a multi-instrument manifest after it
