@@ -75,20 +75,20 @@ defineProps<{ inspection: PianoRollInspection }>()
 .inspector {
   margin-top: 0.75rem;
   padding: 0.75rem 1rem;
-  border: 1px solid var(--xenpaper-border-strong);
+  border: 1px solid var(--xenpaper-slate-450);
   border-radius: 0.35rem;
-  background: var(--xenpaper-text);
+  background: var(--xenpaper-white);
 }
 h2,
 p {
   margin: 0 0 0.5rem;
 }
 .empty {
-  color: var(--xenpaper-border);
+  color: var(--xenpaper-slate-500);
 }
 .details-placeholder {
   margin-top: 0.75rem;
-  color: var(--xenpaper-border);
+  color: var(--xenpaper-slate-500);
   font-style: italic;
 }
 summary {
@@ -114,6 +114,6 @@ dd {
 }
 .selected-elements span {
   display: block;
-  color: var(--xenpaper-ink);
+  color: var(--xenpaper-gray-600);
 }
 </style>

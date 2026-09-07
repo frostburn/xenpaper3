@@ -272,7 +272,7 @@ const eventsByClip = computed(() => {
 .drumkit-source textarea {
   min-width: 20rem;
   color: inherit;
-  background: var(--xenpaper-bg-control);
+  background: var(--xenpaper-slate-850);
 }
 .drumkit-import {
   display: flex;
@@ -312,7 +312,7 @@ const eventsByClip = computed(() => {
   font-size: 0.7rem;
   font-weight: 700;
   line-height: 1;
-  text-shadow: 0 1px 2px var(--xenpaper-bg);
+  text-shadow: 0 1px 2px var(--xenpaper-slate-950);
   pointer-events: none;
 }
 .drum-preview i {

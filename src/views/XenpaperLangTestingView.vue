@@ -144,8 +144,8 @@ const logStaffNotation = () => {
   gap: 1rem;
   align-items: start;
   padding: 1rem;
-  color: var(--xenpaper-bg-light);
-  background: var(--xenpaper-surface);
+  color: var(--xenpaper-slate-875);
+  background: var(--xenpaper-gray-50);
   font-family: var(--xenpaper-font-copy);
 }
 
@@ -202,10 +202,10 @@ textarea {
   margin: 0;
   padding: 0.75rem;
   overflow: auto;
-  border: 1px solid var(--xenpaper-border);
+  border: 1px solid var(--xenpaper-slate-500);
   border-radius: 0.25rem;
-  background: var(--xenpaper-bg-editor);
-  color: var(--xenpaper-text-soft);
+  background: var(--xenpaper-slate-900);
+  color: var(--xenpaper-slate-100);
   font-family: var(--xenpaper-font-mono);
   white-space: pre-wrap;
   overflow-wrap: anywhere;
@@ -233,7 +233,7 @@ textarea {
 .highlight-debugger th,
 .highlight-debugger td {
   padding: 0.25rem 0.4rem;
-  border-bottom: 1px solid var(--xenpaper-border);
+  border-bottom: 1px solid var(--xenpaper-slate-500);
   text-align: left;
   vertical-align: top;
 }
@@ -247,7 +247,7 @@ textarea {
   display: inline-block;
   padding: 0.1rem 0.3rem;
   border-radius: 0.2rem;
-  background: var(--xenpaper-bg-editor);
+  background: var(--xenpaper-slate-900);
 }
 
 .actions {

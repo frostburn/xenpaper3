@@ -148,7 +148,7 @@ const tokenFragments = computed(() =>
 <style scoped src="../../assets/syntax-highlight.css"></style>
 <style scoped>
 .source-playing {
-  color: var(--xenpaper-bg);
+  color: var(--xenpaper-slate-950);
   background: var(--xenpaper-cyan);
   border-radius: 0.12em;
 }
