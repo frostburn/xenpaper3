@@ -35,9 +35,12 @@ npm run dev
 The home page links to the DAW, SW Patch, and Xenpaper language test pages. The
 DAW is also available directly at `/daw`. Double-click an instrument or drum
 timeline to add a clip, then edit its Xenpaper source below the lanes. Projects
-can be imported and exported as readable `.xenpaper.json` files; add a
-`?project=URL` query parameter to load one when the editor opens (for example,
-`/daw?project=/minuet.xenpaper.json`).
+can be imported and exported as readable `.xenpaper.json` files. Built-in demos
+are bundled in [`src/demo-projects/`](src/demo-projects/) and loaded by their
+stable IDs with the `demo` query parameter, such as `/daw?demo=minuet` or
+`/daw?demo=lucky-debugger`. To load a project hosted elsewhere, use the
+`?project=URL` query parameter instead (for example,
+`/daw?project=https%3A%2F%2Fexample.com%2Fpiece.xenpaper.json`).
 
 ## Playback architecture
 
