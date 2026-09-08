@@ -56,16 +56,19 @@ interface BaseLane {
 
 export interface PitchedInstrumentLane extends BaseLane {
   kind: 'instrument'
-  patchPreset: string
-  oscillatorType: OscillatorType
-  sampledInstrument?: SampledInstrumentSource
+  instrument: InstrumentSource
 }
 
 export interface SampledInstrumentSource {
+  type: 'samples'
   url: string
   doughJson: DoughSampleMap
   instrument: string
 }
+
+export type InstrumentSource =
+  | { type: 'patch'; patchPreset: string; oscillatorType: OscillatorType }
+  | SampledInstrumentSource
 
 export type DrumkitSource =
   | { type: 'patch'; patchPreset: string }
@@ -80,7 +83,7 @@ export type InstrumentLane = PitchedInstrumentLane | DrumLane
 
 export interface DawProject {
   format: 'xenpaper3-daw'
-  version: 2
+  version: 3
   createdAt: string
   xenpaperVersion: string
   title: string
@@ -148,17 +151,18 @@ export const parseDawProject = (source: string): DawProject => {
         (lane.kind === 'instrument' || lane.kind === 'drum') &&
         isString(lane.name) &&
         (lane.kind === 'instrument'
-          ? isString(lane.patchPreset) &&
-            isString(lane.oscillatorType) &&
-            OSCILLATOR_TYPES.includes(lane.oscillatorType as OscillatorType) &&
-            (lane.sampledInstrument === undefined ||
-              (isRecord(lane.sampledInstrument) &&
-                isString(lane.sampledInstrument.url) &&
-                isString(lane.sampledInstrument.instrument) &&
+          ? isRecord(lane.instrument) &&
+            ((lane.instrument.type === 'patch' &&
+              isString(lane.instrument.patchPreset) &&
+              isString(lane.instrument.oscillatorType) &&
+              OSCILLATOR_TYPES.includes(lane.instrument.oscillatorType as OscillatorType)) ||
+              (lane.instrument.type === 'samples' &&
+                isString(lane.instrument.url) &&
+                isString(lane.instrument.instrument) &&
                 (() => {
                   try {
-                    const manifest = parseDoughSampleMap(lane.sampledInstrument.doughJson)
-                    return isRecord(manifest[lane.sampledInstrument.instrument])
+                    const manifest = parseDoughSampleMap(lane.instrument.doughJson)
+                    return isRecord(manifest[lane.instrument.instrument])
                   } catch {
                     return false
                   }
@@ -190,7 +194,7 @@ export const parseDawProject = (source: string): DawProject => {
 
   if (
     project.format !== 'xenpaper3-daw' ||
-    project.version !== 2 ||
+    project.version !== 3 ||
     !isString(project.createdAt) ||
     !Number.isFinite(Date.parse(project.createdAt)) ||
     !isString(project.xenpaperVersion) ||
@@ -216,17 +220,19 @@ export const serializeDawProject = (project: DawProject): string => {
     return lane.kind === 'instrument'
       ? {
           ...common,
-          patchPreset: lane.patchPreset,
-          oscillatorType: lane.oscillatorType,
-          ...(lane.sampledInstrument
-            ? {
-                sampledInstrument: {
-                  url: lane.sampledInstrument.url,
-                  doughJson: lane.sampledInstrument.doughJson,
-                  instrument: lane.sampledInstrument.instrument,
+          instrument:
+            lane.instrument.type === 'patch'
+              ? {
+                  type: 'patch',
+                  patchPreset: lane.instrument.patchPreset,
+                  oscillatorType: lane.instrument.oscillatorType,
+                }
+              : {
+                  type: 'samples',
+                  url: lane.instrument.url,
+                  doughJson: lane.instrument.doughJson,
+                  instrument: lane.instrument.instrument,
                 },
-              }
-            : {}),
         }
       : {
           ...common,
@@ -285,8 +291,11 @@ export const createInstrumentLane = (project: DawProject): PitchedInstrumentLane
     id: `instrument-${suffix}`,
     kind: 'instrument',
     name: `Instrument ${suffix}`,
-    patchPreset: DEFAULT_SW_PATCH_SOURCE,
-    oscillatorType: 'sawtooth',
+    instrument: {
+      type: 'patch',
+      patchPreset: DEFAULT_SW_PATCH_SOURCE,
+      oscillatorType: 'sawtooth',
+    },
     gain: 0.8,
     source: DEFAULT_INSTRUMENT_SOURCE,
     clips: [],
@@ -311,7 +320,7 @@ export const createDrumLane = (project: DawProject): DrumLane => {
 export const createDefaultProject = (): DawProject => {
   const project: DawProject = {
     format: 'xenpaper3-daw',
-    version: 2,
+    version: 3,
     createdAt: new Date().toISOString(),
     xenpaperVersion: version,
     title: 'Untitled project',

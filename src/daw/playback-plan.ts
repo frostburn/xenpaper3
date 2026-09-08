@@ -1,5 +1,5 @@
 import { easeGlissando } from './easing'
-import type { DawProject, DrumkitSource, OscillatorType, SampledInstrumentSource } from './project'
+import type { DawProject, DrumkitSource, InstrumentSource } from './project'
 import {
   compileSourceInitialization,
   parseLaneNotes,
@@ -52,9 +52,7 @@ interface BasePlaybackLane {
 export type PlaybackLane =
   | (BasePlaybackLane & {
       readonly kind: 'instrument'
-      readonly patchPreset: string
-      readonly oscillatorType: OscillatorType
-      readonly sampledInstrument?: SampledInstrumentSource
+      readonly instrument: InstrumentSource
     })
   | (BasePlaybackLane & { readonly kind: 'drum'; readonly drumkit: DrumkitSource })
 
@@ -208,9 +206,7 @@ export const createPlaybackPlan = (project: DawProject, fromBeat = 0): PlaybackP
         : Object.freeze({
             ...common,
             kind: 'instrument',
-            patchPreset: lane.patchPreset,
-            oscillatorType: lane.oscillatorType,
-            sampledInstrument: lane.sampledInstrument,
+            instrument: lane.instrument,
           }),
     )
   }

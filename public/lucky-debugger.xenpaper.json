@@ -1,6 +1,6 @@
 {
   "format": "xenpaper3-daw",
-  "version": 2,
+  "version": 3,
   "createdAt": "2026-09-03T12:35:51.991Z",
   "xenpaperVersion": "3.0.0-beta.9",
   "title": "Lucky Debugger",
@@ -33,7 +33,11 @@
       "id": "instrument-1",
       "kind": "instrument",
       "name": "Lead",
-      "oscillatorType": "semisine",
+      "instrument": {
+        "type": "patch",
+        "patchPreset": "default",
+        "oscillatorType": "semisine"
+      },
       "gain": 0.9,
       "source": "{root = `0}\n@adsr(20ms, 40ms, 80%, 40ms)\n@2",
       "clips": [
@@ -47,7 +51,7 @@
             "n": 64,
             "d": 1
           },
-          "source": "g ve d c  .. .. |  c= g=   ve= d=   |\na ^c B A  .. .. |  .a .d   =^c B .  |\na c vg d  .. .d |  .d .vg  .d  d D  |\nG g d vb  .. .G |¹  .d .g   G=  a. :|\n                |²  .g .f  ve=  d= ||"
+          "source": "g ve d c  .. .. |  c= g=   ve= d=   |\na ^c B A  .. .. |  .a .d   =^c B .  |\na c vg d  .. .d |  .d .vg  .d  d D  |\nG g d vb  .. .G |\u00b9  .d .g   G=  a. :|\n                |\u00b2  .g .f  ve=  d= ||"
         },
         {
           "id": "clip-2",
@@ -59,7 +63,7 @@
             "n": 64,
             "d": 1
           },
-          "source": "c  G  g=   d ve  d c | .. ..  ..  f  g  |\na  A  e=   B ^c  d e | .. ..  ..  f  g  |\nd  D  A=   e ^f  .vg | .. ..  .^f f vg  |\ng vg ^f f  e ve ^d d |¹.. ..  ..  A  B :|\n                     |².B .A  =G  =  . ||"
+          "source": "c  G  g=   d ve  d c | .. ..  ..  f  g  |\na  A  e=   B ^c  d e | .. ..  ..  f  g  |\nd  D  A=   e ^f  .vg | .. ..  .^f f vg  |\ng vg ^f f  e ve ^d d |\u00b9.. ..  ..  A  B :|\n                     |\u00b2.B .A  =G  =  . ||"
         },
         {
           "id": "clip-3",
@@ -71,16 +75,19 @@
             "n": 68,
             "d": 1
           },
-          "source": "g ve d c  .. .. |  c= g=   ve= d=   |\na ^c B A  .. .. |  .a .d   =^c B .  |\na c vg d  .. .d |  .d .vg  .d  d D  |\nG g d vb  .. .G |¹  .d .g   G=  a. :|\n                |²  .g f=  ve  d==  | c= == .. .'c ||"
+          "source": "g ve d c  .. .. |  c= g=   ve= d=   |\na ^c B A  .. .. |  .a .d   =^c B .  |\na c vg d  .. .d |  .d .vg  .d  d D  |\nG g d vb  .. .G |\u00b9  .d .g   G=  a. :|\n                |\u00b2  .g f=  ve  d==  | c= == .. .'c ||"
         }
-      ],
-      "patchPreset": "default"
+      ]
     },
     {
       "id": "instrument-2",
       "kind": "instrument",
       "name": "Bass",
-      "oscillatorType": "fmsine",
+      "instrument": {
+        "type": "patch",
+        "patchPreset": "default",
+        "oscillatorType": "fmsine"
+      },
       "gain": 0.6,
       "source": "{root = ```0}\n@adsr(20ms, 40ms, 80%, 40ms)\n@2",
       "clips": [
@@ -106,7 +113,7 @@
             "n": 64,
             "d": 1
           },
-          "source": "@ff\n.c  g.   f .  d.  | c`g =  =  Bb. d.  |\nc=  =c   . G  =Bb | . c =  c  . . ..  |\n.'c .bb  g f  .e  |ve^d d vd  .^c c.  |\n.Bb ==   G .  d.  |¹. .ve  e  . f g. :|\n                  |²c ='c  c  . . .. ||"
+          "source": "@ff\n.c  g.   f .  d.  | c`g =  =  Bb. d.  |\nc=  =c   . G  =Bb | . c =  c  . . ..  |\n.'c .bb  g f  .e  |ve^d d vd  .^c c.  |\n.Bb ==   G .  d.  |\u00b9. .ve  e  . f g. :|\n                  |\u00b2c ='c  c  . . .. ||"
         },
         {
           "id": "clip-3",
@@ -120,8 +127,7 @@
           },
           "source": ".G . c  g= g.  | .c .G  g= g.  |\n.A a A  e= e.  | .A e.  a= e.  |\n.d . d  a= .^f | .d .d  a= a.  |\n.G g G  d= d.  | d. c.  B. A. :|\n\nc===    .. G c ||"
         }
-      ],
-      "patchPreset": "default"
+      ]
     },
     {
       "id": "drum-1",
