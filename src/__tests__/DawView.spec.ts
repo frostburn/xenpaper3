@@ -1221,6 +1221,23 @@ describe('DawView', () => {
     expect(wrapper.find('[aria-label="Upload instrument JSON"]').exists()).toBe(true)
   })
 
+  it('preserves patch settings when toggling instrument source modes', async () => {
+    const wrapper = mount(DawView)
+    const waveform = wrapper.get('select[aria-label="Waveform"]')
+
+    await waveform.setValue('triangle')
+    await wrapper.get('input[type="radio"][value="samples"]').setValue()
+    await wrapper.get('input[type="radio"][value="patch"]').setValue()
+
+    const lane = wrapper.getComponent(PitchedLane).props('lane')
+    expect(lane.instrument).toEqual({
+      type: 'patch',
+      patchPreset: 'default',
+      oscillatorType: 'triangle',
+    })
+    expect(wrapper.get('select[aria-label="Waveform"]').element).toHaveProperty('value', 'triangle')
+  })
+
   it('clamps notes outside human hearing to contrasting pitch boundaries', () => {
     const project = createDefaultProject()
     const lane = project.instrumentLanes[0]! as PitchedInstrumentLane

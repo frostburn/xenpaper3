@@ -10,6 +10,7 @@ import {
   OSCILLATOR_TYPES,
   type ClipDisplayMode,
   type OscillatorType,
+  type PatchInstrumentSource,
   type PitchedInstrumentLane,
   type SourceClip,
 } from '../../daw/project'
@@ -44,24 +45,33 @@ const sampleError = ref('')
 const loadingSamples = ref(false)
 type InstrumentMode = 'patch' | 'samples'
 const instrumentMode = ref<InstrumentMode>(props.lane.instrument.type)
+const patchInstrument = ref<PatchInstrumentSource>(
+  props.lane.instrument.type === 'patch'
+    ? { ...props.lane.instrument }
+    : { type: 'patch', patchPreset: 'default', oscillatorType: 'sawtooth' },
+)
 
 watch(
   () => props.lane.instrument,
   (source) => {
     instrumentMode.value = source.type
-    if (source.type === 'samples') sampleUrl.value = source.url
+    if (source.type === 'samples') {
+      sampleUrl.value = source.url
+    } else {
+      patchInstrument.value = { ...source }
+    }
   },
 )
 
 const selectInstrumentMode = (mode: InstrumentMode) => {
   instrumentMode.value = mode
   sampleError.value = ''
-  if (mode === 'patch')
-    emit('update-instrument', {
-      type: 'patch',
-      patchPreset: 'default',
-      oscillatorType: 'sawtooth',
-    })
+  if (mode === 'patch') emit('update-instrument', { ...patchInstrument.value })
+}
+
+const updateOscillator = (oscillatorType: OscillatorType) => {
+  patchInstrument.value = { ...patchInstrument.value, oscillatorType }
+  emit('update-instrument', { ...patchInstrument.value })
 }
 
 const importSampleJson = (text: string, url = '') => {
@@ -326,14 +336,7 @@ const clipPreview = (clipId: string) => pianoRoll.value.notesByClip[clipId]!
           <select
             aria-label="Waveform"
             :value="lane.instrument.type === 'patch' ? lane.instrument.oscillatorType : 'sawtooth'"
-            @change="
-              emit('update-instrument', {
-                type: 'patch',
-                patchPreset:
-                  lane.instrument.type === 'patch' ? lane.instrument.patchPreset : 'default',
-                oscillatorType: ($event.target as HTMLSelectElement).value as OscillatorType,
-              })
-            "
+            @change="updateOscillator(($event.target as HTMLSelectElement).value as OscillatorType)"
           >
             <option v-for="type in OSCILLATOR_TYPES" :key="type">{{ type }}</option>
           </select>

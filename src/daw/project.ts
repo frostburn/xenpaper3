@@ -66,9 +66,13 @@ export interface SampledInstrumentSource {
   instrument: string
 }
 
-export type InstrumentSource =
-  | { type: 'patch'; patchPreset: string; oscillatorType: OscillatorType }
-  | SampledInstrumentSource
+export interface PatchInstrumentSource {
+  type: 'patch'
+  patchPreset: string
+  oscillatorType: OscillatorType
+}
+
+export type InstrumentSource = PatchInstrumentSource | SampledInstrumentSource
 
 export type DrumkitSource =
   | { type: 'patch'; patchPreset: string }
