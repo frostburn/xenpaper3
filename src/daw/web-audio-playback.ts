@@ -172,7 +172,9 @@ export class WebAudioPlaybackSession {
         continue
       }
       const sampledInstrument = this.sampledInstruments.get(lane.id)
-      if (sampledInstrument) {
+      if (lane.instrument.type === 'samples') {
+        if (!sampledInstrument)
+          throw new Error(`Sampled instrument for lane "${lane.name}" was not prepared`)
         for (const note of lane.notes) {
           this.transport.scheduleParametricNote({
             when: note.when,
@@ -207,12 +209,16 @@ export class WebAudioPlaybackSession {
         }
         continue
       }
-      const patch = this.patchFactory(this.resolvePatchSource(lane.patchPreset), this.context, {
-        config: {
-          oscillatorType: lane.oscillatorType,
-          aperiodic: isAperiodicTimbre(lane.oscillatorType),
+      const patch = this.patchFactory(
+        this.resolvePatchSource(lane.instrument.patchPreset),
+        this.context,
+        {
+          config: {
+            oscillatorType: lane.instrument.oscillatorType,
+            aperiodic: isAperiodicTimbre(lane.instrument.oscillatorType),
+          },
         },
-      })
+      )
       const synth = requirePlayableSynth(patch, lane)
       this.synths.push(synth)
 

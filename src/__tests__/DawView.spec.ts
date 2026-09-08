@@ -155,8 +155,7 @@ describe('DAW project model', () => {
     })
     expect(project.instrumentLanes[0]).toMatchObject({
       id: 'instrument-1',
-      patchPreset: 'default',
-      oscillatorType: 'sawtooth',
+      instrument: { type: 'patch', patchPreset: 'default', oscillatorType: 'sawtooth' },
       source: expect.stringContaining('@adsr(100ms'),
       clips: [],
     })
@@ -217,15 +216,26 @@ describe('DAW project model', () => {
     const project = createDefaultProject()
     const lane = project.instrumentLanes[0]!
     if (lane.kind !== 'instrument') throw new Error('Expected instrument lane')
-    lane.sampledInstrument = {
+    lane.instrument = {
+      type: 'samples',
       url: 'https://example.com/piano.json',
       doughJson: { _base: './piano/', piano: { C4: 'C4.mp3' } },
       instrument: 'piano',
     }
+    ;(lane.instrument as unknown as Record<string, unknown>).samples = ['decoded audio data']
 
-    const restored = parseDawProject(serializeDawProject(project)).instrumentLanes[0]!
+    const serialized = serializeDawProject(project)
+    const restored = parseDawProject(serialized).instrumentLanes[0]!
 
-    expect(restored).toMatchObject({ sampledInstrument: lane.sampledInstrument })
+    expect(serialized).not.toContain('decoded audio data')
+    expect(restored).toMatchObject({
+      instrument: {
+        type: 'samples',
+        url: 'https://example.com/piano.json',
+        doughJson: { _base: './piano/', piano: { C4: 'C4.mp3' } },
+        instrument: 'piano',
+      },
+    })
   })
 
   it('rejects data that is not a Xenpaper project', () => {
@@ -291,7 +301,9 @@ describe('DAW project model', () => {
     })
     expect(
       project.instrumentLanes.map((lane) =>
-        lane.kind === 'instrument' ? lane.oscillatorType : undefined,
+        lane.kind === 'instrument' && lane.instrument.type === 'patch'
+          ? lane.instrument.oscillatorType
+          : undefined,
       ),
     ).toEqual(['semisine', 'triangle'])
     expect(project.instrumentLanes.every(({ clips }) => clips.length === 2)).toBe(true)
@@ -1204,9 +1216,26 @@ describe('DawView', () => {
     expect(wrapper.findAll('input[type="radio"]')).toHaveLength(2)
     await wrapper.get('input[type="radio"][value="samples"]').setValue()
 
-    expect(wrapper.get('[aria-label="Sampled instrument source"]').exists()).toBe(true)
-    expect(wrapper.get('[aria-label="Instrument JSON URL"]').exists()).toBe(true)
-    expect(wrapper.get('[aria-label="Upload instrument JSON"]').exists()).toBe(true)
+    expect(wrapper.find('[aria-label="Sampled instrument source"]').exists()).toBe(true)
+    expect(wrapper.find('[aria-label="Instrument JSON URL"]').exists()).toBe(true)
+    expect(wrapper.find('[aria-label="Upload instrument JSON"]').exists()).toBe(true)
+  })
+
+  it('preserves patch settings when toggling instrument source modes', async () => {
+    const wrapper = mount(DawView)
+    const waveform = wrapper.get('select[aria-label="Waveform"]')
+
+    await waveform.setValue('triangle')
+    await wrapper.get('input[type="radio"][value="samples"]').setValue()
+    await wrapper.get('input[type="radio"][value="patch"]').setValue()
+
+    const lane = wrapper.getComponent(PitchedLane).props('lane')
+    expect(lane.instrument).toEqual({
+      type: 'patch',
+      patchPreset: 'default',
+      oscillatorType: 'triangle',
+    })
+    expect(wrapper.get('select[aria-label="Waveform"]').element).toHaveProperty('value', 'triangle')
   })
 
   it('clamps notes outside human hearing to contrasting pitch boundaries', () => {

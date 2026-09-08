@@ -9,8 +9,9 @@ import {
   beatToNumber,
   OSCILLATOR_TYPES,
   type ClipDisplayMode,
+  type OscillatorType,
+  type PatchInstrumentSource,
   type PitchedInstrumentLane,
-  type SampledInstrumentSource,
   type SourceClip,
 } from '../../daw/project'
 import InstrumentLaneComponent from './InstrumentLane.vue'
@@ -33,38 +34,52 @@ const emit = defineEmits<{
   delete: [clip: SourceClip]
   'update-source': [source: string]
   'update-name': [name: string]
-  'update-oscillator': [type: PitchedInstrumentLane['oscillatorType']]
-  'update-sampled-instrument': [source: SampledInstrumentSource | undefined]
+  'update-instrument': [source: PitchedInstrumentLane['instrument']]
   'update-gain': [gain: number]
   'delete-lane': []
   'toggle-collapse': []
 }>()
 
-const sampleUrl = ref(props.lane.sampledInstrument?.url ?? '')
+const sampleUrl = ref(props.lane.instrument.type === 'samples' ? props.lane.instrument.url : '')
 const sampleError = ref('')
 const loadingSamples = ref(false)
 type InstrumentMode = 'patch' | 'samples'
-const instrumentMode = ref<InstrumentMode>(props.lane.sampledInstrument ? 'samples' : 'patch')
+const instrumentMode = ref<InstrumentMode>(props.lane.instrument.type)
+const patchInstrument = ref<PatchInstrumentSource>(
+  props.lane.instrument.type === 'patch'
+    ? { ...props.lane.instrument }
+    : { type: 'patch', patchPreset: 'default', oscillatorType: 'sawtooth' },
+)
 
 watch(
-  () => props.lane.sampledInstrument,
+  () => props.lane.instrument,
   (source) => {
-    instrumentMode.value = source ? 'samples' : 'patch'
-    if (source) sampleUrl.value = source.url
+    instrumentMode.value = source.type
+    if (source.type === 'samples') {
+      sampleUrl.value = source.url
+    } else {
+      patchInstrument.value = { ...source }
+    }
   },
 )
 
 const selectInstrumentMode = (mode: InstrumentMode) => {
   instrumentMode.value = mode
   sampleError.value = ''
-  if (mode === 'patch') emit('update-sampled-instrument', undefined)
+  if (mode === 'patch') emit('update-instrument', { ...patchInstrument.value })
+}
+
+const updateOscillator = (oscillatorType: OscillatorType) => {
+  patchInstrument.value = { ...patchInstrument.value, oscillatorType }
+  emit('update-instrument', { ...patchInstrument.value })
 }
 
 const importSampleJson = (text: string, url = '') => {
   const manifest = parseDoughSampleMap(JSON.parse(text))
   const instruments = Object.keys(manifest).filter((name) => name !== '_base')
   if (!instruments.length) throw new TypeError('The Dough manifest contains no instruments')
-  emit('update-sampled-instrument', {
+  emit('update-instrument', {
+    type: 'samples',
     url,
     doughJson: manifest,
     instrument: instruments[0]!,
@@ -312,19 +327,16 @@ const clipPreview = (clipId: string) => pianoRoll.value.notesByClip[clipId]!
         class="instrument-source"
         aria-label="SW Patch instrument source"
       >
-        <strong>{{ lane.patchPreset }} SW Patch</strong>
+        <strong
+          >{{ lane.instrument.type === 'patch' ? lane.instrument.patchPreset : 'default' }} SW
+          Patch</strong
+        >
         <label
           >Waveform
           <select
             aria-label="Waveform"
-            :value="lane.oscillatorType"
-            @change="
-              emit(
-                'update-oscillator',
-                ($event.target as HTMLSelectElement)
-                  .value as PitchedInstrumentLane['oscillatorType'],
-              )
-            "
+            :value="lane.instrument.type === 'patch' ? lane.instrument.oscillatorType : 'sawtooth'"
+            @change="updateOscillator(($event.target as HTMLSelectElement).value as OscillatorType)"
           >
             <option v-for="type in OSCILLATOR_TYPES" :key="type">{{ type }}</option>
           </select>
@@ -332,7 +344,9 @@ const clipPreview = (clipId: string) => pianoRoll.value.notesByClip[clipId]!
       </section>
       <section v-else class="instrument-source" aria-label="Sampled instrument source">
         <strong>{{
-          lane.sampledInstrument ? 'Dough samples loaded' : 'Choose a Dough JSON manifest'
+          lane.instrument.type === 'samples'
+            ? 'Dough samples loaded'
+            : 'Choose a Dough JSON manifest'
         }}</strong>
         <span class="instrument-import">
           <input
@@ -354,19 +368,19 @@ const clipPreview = (clipId: string) => pianoRoll.value.notesByClip[clipId]!
             />
           </label>
         </span>
-        <label v-if="lane.sampledInstrument"
+        <label v-if="lane.instrument.type === 'samples'"
           >Sample bank
           <select
-            :value="lane.sampledInstrument.instrument"
+            :value="lane.instrument.instrument"
             @change="
-              emit('update-sampled-instrument', {
-                ...lane.sampledInstrument!,
+              emit('update-instrument', {
+                ...lane.instrument,
                 instrument: ($event.target as HTMLSelectElement).value,
               })
             "
           >
             <option
-              v-for="name in Object.keys(lane.sampledInstrument.doughJson).filter(
+              v-for="name in Object.keys(lane.instrument.doughJson).filter(
                 (name) => name !== '_base',
               )"
               :key="name"

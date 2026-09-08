@@ -98,8 +98,7 @@ const createPlan = (): PlaybackPlan => ({
       id: 'lead',
       name: 'Lead',
       kind: 'instrument',
-      patchPreset: 'custom patch',
-      oscillatorType: 'triangle',
+      instrument: { type: 'patch', patchPreset: 'custom patch', oscillatorType: 'triangle' },
       gain: 0.5,
       notes: [
         {
@@ -250,9 +249,26 @@ describe('Web Audio playback session', () => {
     const dispose = vi.fn<() => void>()
     const sampled = { note, dispose } as unknown as SampledInstrument
     const plan = createPlan()
-    const session = new WebAudioPlaybackSession(context as unknown as AudioContext, plan, {
-      sampledInstruments: new Map([['lead', sampled]]),
-    })
+    const lane = plan.lanes[0]!
+    if (lane.kind !== 'instrument') throw new Error('Expected instrument lane')
+    const session = new WebAudioPlaybackSession(
+      context as unknown as AudioContext,
+      {
+        ...plan,
+        lanes: [
+          {
+            ...lane,
+            instrument: {
+              type: 'samples',
+              url: '',
+              doughJson: { piano: { C4: 'C4.mp3' } },
+              instrument: 'piano',
+            },
+          },
+        ],
+      },
+      { sampledInstruments: new Map([['lead', sampled]]) },
+    )
 
     session.start()
 

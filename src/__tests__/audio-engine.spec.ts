@@ -61,7 +61,8 @@ describe('DAW playback preparation', () => {
     const lane = project.instrumentLanes[0]!
     if (lane.kind !== 'instrument') throw new Error('Expected instrument lane')
     lane.clips.push({ id: 'note', start: beat(0), length: beat(1), source: '0' })
-    lane.sampledInstrument = {
+    lane.instrument = {
+      type: 'samples',
       url: 'https://github.com/example/piano/blob/main/samples.json',
       doughJson: { _base: './audio/', piano: { C4: 'C4.mp3' } },
       instrument: 'piano',
@@ -72,7 +73,7 @@ describe('DAW playback preparation', () => {
 
     await engine.play(project)
 
-    expect(load).toHaveBeenCalledWith(engine.context, lane.sampledInstrument.doughJson, 'piano', {
+    expect(load).toHaveBeenCalledWith(engine.context, lane.instrument.doughJson, 'piano', {
       baseUrl: new URL('https://raw.githubusercontent.com/example/piano/main/samples.json'),
     })
     const options = vi.mocked(WebAudioPlaybackSession).mock.calls[0]![2]!

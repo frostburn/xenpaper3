@@ -104,8 +104,8 @@ export class DawAudioEngine extends EventTarget {
           )
         }),
         ...plan.lanes.map(async (lane) => {
-          if (lane.kind !== 'instrument' || !lane.sampledInstrument) return
-          const source = lane.sampledInstrument
+          if (lane.kind !== 'instrument' || lane.instrument.type !== 'samples') return
+          const source = lane.instrument
           sampledInstruments.set(
             lane.id,
             await loadSampledInstrument(this.context, source.doughJson, source.instrument, {
