@@ -8,3 +8,14 @@ export {
   strudelSampleNames,
 } from './sampled-drumkit'
 export type { SampledDrumkitOptions, SampleHitOptions, StrudelSampleMap } from './sampled-drumkit'
+export {
+  doughNoteNumber,
+  loadSampledInstrument,
+  parseDoughSampleMap,
+  SampledInstrument,
+} from './sampled-instrument'
+export type {
+  DoughSampleMap,
+  SampledInstrumentNoteOptions,
+  SampledInstrumentOptions,
+} from './sampled-instrument'

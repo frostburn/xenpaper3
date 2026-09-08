@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { PlayableDrumkitPatch, PlayableSynthPatch } from '../../sw-patch'
-import type { SampledDrumkit } from '../../sw-seq'
+import type { SampledDrumkit, SampledInstrument } from '../../sw-seq'
 import { DawAudioEngine } from '../daw/audio-engine'
 import type { PlaybackPlan } from '../daw/playback-plan'
 import { TempoMap } from '../daw/timeline'
@@ -240,6 +240,35 @@ describe('Web Audio playback session', () => {
 
     expect(hit).toHaveBeenCalledWith('bd', MockGainNode.instances[0], 0.2, { gain: 0.4 })
     expect(drumkitFactory).not.toHaveBeenCalled()
+    session.stop()
+    expect(dispose).toHaveBeenCalledOnce()
+  })
+
+  it('dispatches pitched notes to a sampled instrument with envelope velocity and release', () => {
+    const context = new MockAudioContext()
+    const note = vi.fn<SampledInstrument['note']>(() => (end) => end + 0.3)
+    const dispose = vi.fn<() => void>()
+    const sampled = { note, dispose } as unknown as SampledInstrument
+    const plan = createPlan()
+    const session = new WebAudioPlaybackSession(context as unknown as AudioContext, plan, {
+      sampledInstruments: new Map([['lead', sampled]]),
+    })
+
+    session.start()
+
+    expect(note).toHaveBeenCalledWith(
+      60,
+      MockGainNode.instances[0],
+      0.2,
+      expect.objectContaining({ velocity: 0.4, release: 0.3 }),
+    )
+    const detune = new MockAudioParam()
+    note.mock.calls[0]![3]!.configureDetune?.(detune as unknown as AudioParam)
+    expect(detune.values).toEqual([
+      { value: 0, time: 0.2 },
+      { value: 100, time: 0.7 },
+    ])
+    expect(detune.curves[0]!.values).toEqual([100, 200])
     session.stop()
     expect(dispose).toHaveBeenCalledOnce()
   })

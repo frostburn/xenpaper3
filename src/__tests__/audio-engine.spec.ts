@@ -56,6 +56,30 @@ describe('DAW playback preparation', () => {
     engine.dispose()
   })
 
+  it('loads sampled instruments and passes them to the playback session', async () => {
+    const project = createDefaultProject()
+    const lane = project.instrumentLanes[0]!
+    if (lane.kind !== 'instrument') throw new Error('Expected instrument lane')
+    lane.clips.push({ id: 'note', start: beat(0), length: beat(1), source: '0' })
+    lane.sampledInstrument = {
+      url: 'https://github.com/example/piano/blob/main/samples.json',
+      doughJson: { _base: './audio/', piano: { C4: 'C4.mp3' } },
+      instrument: 'piano',
+    }
+    const sampled = { dispose: vi.fn<() => void>() } as unknown as swSeq.SampledInstrument
+    const load = vi.spyOn(swSeq, 'loadSampledInstrument').mockResolvedValue(sampled)
+    const engine = new DawAudioEngine({} as AudioContext)
+
+    await engine.play(project)
+
+    expect(load).toHaveBeenCalledWith(engine.context, lane.sampledInstrument.doughJson, 'piano', {
+      baseUrl: new URL('https://raw.githubusercontent.com/example/piano/main/samples.json'),
+    })
+    const options = vi.mocked(WebAudioPlaybackSession).mock.calls[0]![2]!
+    expect(options.sampledInstruments?.get(lane.id)).toBe(sampled)
+    engine.dispose()
+  })
+
   it('cancels a pending play when stopped during worklet registration', async () => {
     const registration = deferred()
     vi.spyOn(swPatch, 'registerMathWorklets').mockReturnValue(registration.promise)

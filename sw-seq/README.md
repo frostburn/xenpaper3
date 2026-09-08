@@ -54,6 +54,31 @@ transport.scheduleParametricNote({
 
 Call `kit.dispose()` when playback is torn down to stop and disconnect any active samples.
 
+## Sampled instruments
+
+`loadSampledInstrument` also loads the pitched instrument maps used by Strudel/Dough. Note labels
+use scientific pitch notation and may spell sharps with `s` (for example, `Ds4`). Playback chooses
+the nearest available sample and adjusts its playback rate. The gain envelope is initialized from
+the note velocity and fades for the configurable release time after note-off.
+
+```ts
+const piano = await loadSampledInstrument(context, '/samples/piano.json', 'piano', {
+  release: 0.3,
+})
+const off = piano.note(60, destination, context.currentTime, { velocity: 0.8 })
+off(context.currentTime + 1)
+```
+
+The note-off callback returns the end of the release tail, making it directly compatible with
+`Transport.scheduleParametricNote`. Call `piano.dispose()` to stop active voices.
+The optional `configureDetune` note callback exposes the voice's cent-valued `AudioParam` for
+pitch bends and other scheduled pitch automation.
+
+In Xenpaper's DAW, an instrument lane accepts the same raw manifest URLs, GitHub `blob` URLs, and
+local JSON uploads as a sampled drum lane. Select a bank from a multi-instrument manifest after it
+loads. The lane and note velocity set the sample envelope level, while the lane's `@adsr` release
+value determines the sample's fade time.
+
 In Xenpaper's DAW, select **Sampled drums**, then upload a JSON file or enter either a raw manifest
 URL or a GitHub `blob` page URL. GitHub pages are converted to raw-content URLs without an initial
 request, avoiding their CORS restriction. Relative `_base` paths are made absolute so the project

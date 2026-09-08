@@ -503,6 +503,7 @@ onBeforeUnmount(() => {
           @update-name="lane.name = $event"
           @update-source="lane.source = $event"
           @update-oscillator="lane.oscillatorType = $event"
+          @update-sampled-instrument="lane.sampledInstrument = $event"
           @update-gain="lane.gain = $event"
           @delete-lane="deleteInstrumentLane(lane)"
           @toggle-collapse="toggleLaneCollapse(lane.id)"

@@ -213,6 +213,21 @@ describe('DAW project model', () => {
     expect(restored).not.toHaveProperty('oscillatorType')
   })
 
+  it('round-trips sampled instrument metadata', () => {
+    const project = createDefaultProject()
+    const lane = project.instrumentLanes[0]!
+    if (lane.kind !== 'instrument') throw new Error('Expected instrument lane')
+    lane.sampledInstrument = {
+      url: 'https://example.com/piano.json',
+      doughJson: { _base: './piano/', piano: { C4: 'C4.mp3' } },
+      instrument: 'piano',
+    }
+
+    const restored = parseDawProject(serializeDawProject(project)).instrumentLanes[0]!
+
+    expect(restored).toMatchObject({ sampledInstrument: lane.sampledInstrument })
+  })
+
   it('rejects data that is not a Xenpaper project', () => {
     expect(() => parseDawProject('{"version": 2}')).toThrow('Invalid Xenpaper project file')
 
@@ -1176,6 +1191,22 @@ describe('DawView', () => {
     expect(notes[0]!.attributes('style')).toContain('left: 0%')
     expect(notes[1]!.attributes('style')).toContain('left: 33.333')
     expect(notes[0]!.attributes('data-cents')).not.toBe(notes[1]!.attributes('data-cents'))
+  })
+
+  it('uses the same sound-source radio pattern for pitched lanes as drum lanes', async () => {
+    const project = createDefaultProject()
+    const lane = project.instrumentLanes[0]! as PitchedInstrumentLane
+    const wrapper = mount(PitchedLane, {
+      props: { lane, pixelsPerBeat: 64, scrollLeft: 0, displayMode: 'piano-roll' },
+    })
+
+    expect(wrapper.get('fieldset legend').text()).toBe('Instrument sound source')
+    expect(wrapper.findAll('input[type="radio"]')).toHaveLength(2)
+    await wrapper.get('input[type="radio"][value="samples"]').setValue()
+
+    expect(wrapper.get('[aria-label="Sampled instrument source"]').exists()).toBe(true)
+    expect(wrapper.get('[aria-label="Instrument JSON URL"]').exists()).toBe(true)
+    expect(wrapper.get('[aria-label="Upload instrument JSON"]').exists()).toBe(true)
   })
 
   it('clamps notes outside human hearing to contrasting pitch boundaries', () => {

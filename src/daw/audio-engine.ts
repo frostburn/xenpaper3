@@ -4,7 +4,13 @@ import { parseProjectScoreNotes, type PitchGlideSegment, type ScheduledLaneNote 
 import { xenpaperPitchToPatchDetune } from './web-audio-automation'
 import { WebAudioPlaybackSession } from './web-audio-playback'
 import { registerMathWorklets } from '../../sw-patch'
-import { githubRawUrl, loadSampledDrumkit, type SampledDrumkit } from '../../sw-seq'
+import {
+  githubRawUrl,
+  loadSampledDrumkit,
+  loadSampledInstrument,
+  type SampledDrumkit,
+  type SampledInstrument,
+} from '../../sw-seq'
 
 // Compatibility exports for non-UI consumers. Pure musical operations live in
 // score/playback-plan/timeline; browser-specific operations live in web-audio-*.
@@ -83,9 +89,10 @@ export class DawAudioEngine extends EventTarget {
     // edits still do not tear down a currently audible session.
     const plan = createPlaybackPlan(project, fromBeat)
     const sampledDrumkits = new Map<string, SampledDrumkit>()
+    const sampledInstruments = new Map<string, SampledInstrument>()
     try {
-      await Promise.all(
-        plan.lanes.map(async (lane) => {
+      await Promise.all([
+        ...plan.lanes.map(async (lane) => {
           if (lane.kind !== 'drum' || lane.drumkit.type !== 'samples') return
           sampledDrumkits.set(
             lane.id,
@@ -96,13 +103,27 @@ export class DawAudioEngine extends EventTarget {
             }),
           )
         }),
-      )
+        ...plan.lanes.map(async (lane) => {
+          if (lane.kind !== 'instrument' || !lane.sampledInstrument) return
+          const source = lane.sampledInstrument
+          sampledInstruments.set(
+            lane.id,
+            await loadSampledInstrument(this.context, source.doughJson, source.instrument, {
+              baseUrl: source.url
+                ? githubRawUrl(source.url, globalThis.location.href)
+                : globalThis.location.href,
+            }),
+          )
+        }),
+      ])
     } catch (error) {
       for (const drumkit of sampledDrumkits.values()) drumkit.dispose()
+      for (const instrument of sampledInstruments.values()) instrument.dispose()
       throw error
     }
     if (requestId !== this.playRequestId) {
       for (const drumkit of sampledDrumkits.values()) drumkit.dispose()
+      for (const instrument of sampledInstruments.values()) instrument.dispose()
       return
     }
     // Drum voices instantiate RandomNode worklets when their scheduled hit begins.
@@ -111,12 +132,14 @@ export class DawAudioEngine extends EventTarget {
       await registerMathWorklets(this.context)
     if (requestId !== this.playRequestId) {
       for (const drumkit of sampledDrumkits.values()) drumkit.dispose()
+      for (const instrument of sampledInstruments.values()) instrument.dispose()
       return
     }
     this.stop()
 
     const session = new WebAudioPlaybackSession(this.context, plan, {
       sampledDrumkits,
+      sampledInstruments,
       onEnded: () => {
         if (this.session !== session) return
         this.session = undefined
