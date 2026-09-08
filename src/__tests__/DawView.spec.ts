@@ -1193,6 +1193,22 @@ describe('DawView', () => {
     expect(notes[0]!.attributes('data-cents')).not.toBe(notes[1]!.attributes('data-cents'))
   })
 
+  it('uses the same sound-source radio pattern for pitched lanes as drum lanes', async () => {
+    const project = createDefaultProject()
+    const lane = project.instrumentLanes[0]! as PitchedInstrumentLane
+    const wrapper = mount(PitchedLane, {
+      props: { lane, pixelsPerBeat: 64, scrollLeft: 0, displayMode: 'piano-roll' },
+    })
+
+    expect(wrapper.get('fieldset legend').text()).toBe('Instrument sound source')
+    expect(wrapper.findAll('input[type="radio"]')).toHaveLength(2)
+    await wrapper.get('input[type="radio"][value="samples"]').setValue()
+
+    expect(wrapper.get('[aria-label="Sampled instrument source"]').exists()).toBe(true)
+    expect(wrapper.get('[aria-label="Instrument JSON URL"]').exists()).toBe(true)
+    expect(wrapper.get('[aria-label="Upload instrument JSON"]').exists()).toBe(true)
+  })
+
   it('clamps notes outside human hearing to contrasting pitch boundaries', () => {
     const project = createDefaultProject()
     const lane = project.instrumentLanes[0]! as PitchedInstrumentLane

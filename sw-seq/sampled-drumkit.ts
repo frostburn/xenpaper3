@@ -1,16 +1,20 @@
 import { mmod } from 'xen-dev-utils/fraction'
+import {
+  fetchAudioBuffer,
+  finiteNonNegative,
+  isRecord,
+  loadSampleManifest,
+  type SampleLoadingOptions,
+} from './sampled-util'
+
+export { githubRawUrl } from './sampled-util'
 
 export interface StrudelSampleMap {
   readonly _base?: string
   readonly [name: string]: string | readonly string[] | undefined
 }
 
-export interface SampledDrumkitOptions {
-  /** Fetch implementation, primarily useful outside the browser and in tests. */
-  readonly fetch?: typeof fetch
-  /** Base URL used to resolve `_base` when the manifest is supplied as an object. */
-  readonly baseUrl?: string | URL
-}
+export type SampledDrumkitOptions = SampleLoadingOptions
 
 export interface SampleHitOptions {
   /** Zero-based variant within the named bank. Indices wrap like Strudel's `n`. */
@@ -19,20 +23,6 @@ export interface SampleHitOptions {
 }
 
 type SampleManifestSource = string | URL | StrudelSampleMap
-
-/** Convert a GitHub `blob` page to its equivalent raw-content URL without requesting it. */
-export const githubRawUrl = (source: string | URL, baseUrl?: string | URL): URL => {
-  const url = new URL(source.toString(), baseUrl)
-  if (url.hostname !== 'github.com' && url.hostname !== 'www.github.com') return url
-  const [owner, repository, marker, ref, ...path] = url.pathname.split('/').filter(Boolean)
-  if (!owner || !repository || marker !== 'blob' || !ref || !path.length) return url
-  return new URL(
-    `https://raw.githubusercontent.com/${owner}/${repository}/${ref}/${path.join('/')}`,
-  )
-}
-
-const isRecord = (value: unknown): value is Record<string, unknown> =>
-  typeof value === 'object' && value !== null && !Array.isArray(value)
 
 export const parseStrudelSampleMap = (value: unknown): StrudelSampleMap => {
   if (!isRecord(value)) throw new TypeError('A Strudel sample manifest must be an object')
@@ -57,9 +47,6 @@ const manifestBanks = (manifest: StrudelSampleMap): [string, readonly string[]][
   Object.entries(manifest)
     .filter(([name]) => name !== '_base')
     .map(([name, files]) => [name, typeof files === 'string' ? [files] : files!])
-
-const resolveBase = (manifest: StrudelSampleMap, fallback: URL): URL =>
-  manifest._base ? new URL(manifest._base, fallback) : fallback
 
 /**
  * A preloaded Strudel-compatible sample map.
@@ -91,8 +78,7 @@ export class SampledDrumkit {
     if (!Number.isInteger(index)) throw new RangeError('Sample index must be an integer')
     const buffer = bank[mmod(index, bank.length)]!
     const gainValue = options.gain ?? 1
-    if (!Number.isFinite(gainValue) || gainValue < 0)
-      throw new RangeError('Sample gain must be finite and non-negative')
+    finiteNonNegative(gainValue, 'Sample gain')
 
     const source = this.context.createBufferSource()
     const gain = this.context.createGain()
@@ -141,34 +127,17 @@ export const loadSampledDrumkit = async (
   source: SampleManifestSource,
   options: SampledDrumkitOptions = {},
 ): Promise<SampledDrumkit> => {
-  const fetcher = options.fetch ?? globalThis.fetch
-  if (!fetcher) throw new Error('A fetch implementation is required to load a sampled drumkit')
-
-  let manifest: StrudelSampleMap
-  let manifestBase: URL
-  if (typeof source === 'string' || source instanceof URL) {
-    const url = githubRawUrl(
-      source.toString(),
-      options.baseUrl ?? globalThis.location?.href ?? 'http://localhost/',
-    )
-    const response = await fetcher(url)
-    if (!response.ok) throw new Error(`Unable to load sample manifest ${url}: ${response.status}`)
-    manifest = parseStrudelSampleMap(await response.json())
-    manifestBase = new URL('.', url)
-  } else {
-    manifest = parseStrudelSampleMap(source)
-    manifestBase = new URL(options.baseUrl ?? globalThis.location?.href ?? 'http://localhost/')
-  }
-
-  const base = resolveBase(manifest, manifestBase)
+  const { manifest, base, fetcher } = await loadSampleManifest(
+    source,
+    parseStrudelSampleMap,
+    options,
+  )
   const loadedBanks = await Promise.all(
     manifestBanks(manifest).map(async ([name, files]) => {
       const bank = await Promise.all(
         files.map(async (file) => {
           const url = new URL(file, base)
-          const response = await fetcher(url)
-          if (!response.ok) throw new Error(`Unable to load drum sample ${url}: ${response.status}`)
-          return context.decodeAudioData(await response.arrayBuffer())
+          return fetchAudioBuffer(context, fetcher, url, 'drum sample')
         }),
       )
       return [name, bank] as const

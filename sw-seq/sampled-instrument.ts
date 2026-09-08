@@ -1,13 +1,17 @@
-import { githubRawUrl } from './sampled-drumkit'
+import {
+  fetchAudioBuffer,
+  finiteNonNegative,
+  isRecord,
+  loadSampleManifest,
+  type SampleLoadingOptions,
+} from './sampled-util'
 
 export interface DoughSampleMap {
   readonly _base?: string
   readonly [instrument: string]: string | Readonly<Record<string, string>> | undefined
 }
 
-export interface SampledInstrumentOptions {
-  readonly fetch?: typeof fetch
-  readonly baseUrl?: string | URL
+export interface SampledInstrumentOptions extends SampleLoadingOptions {
   /** Time, in seconds, used to fade a voice after note-off. */
   readonly release?: number
 }
@@ -50,9 +54,6 @@ export const doughNoteNumber = (note: string): number => {
   return (Number(match[3]) + 1) * 12 + semitone
 }
 
-const isRecord = (value: unknown): value is Record<string, unknown> =>
-  typeof value === 'object' && value !== null && !Array.isArray(value)
-
 export const parseDoughSampleMap = (value: unknown): DoughSampleMap => {
   if (!isRecord(value)) throw new TypeError('A Dough sample manifest must be an object')
   if (value._base !== undefined && typeof value._base !== 'string')
@@ -68,12 +69,6 @@ export const parseDoughSampleMap = (value: unknown): DoughSampleMap => {
     }
   }
   return value as DoughSampleMap
-}
-
-const finiteNonNegative = (value: number, label: string): number => {
-  if (!Number.isFinite(value) || value < 0)
-    throw new RangeError(`${label} must be finite and non-negative`)
-  return value
 }
 
 /** A preloaded, chromatically playable Strudel/Dough sampled instrument. */
@@ -155,35 +150,15 @@ export const loadSampledInstrument = async (
   instrument: string,
   options: SampledInstrumentOptions = {},
 ): Promise<SampledInstrument> => {
-  const fetcher = options.fetch ?? globalThis.fetch
-  if (!fetcher) throw new Error('A fetch implementation is required to load a sampled instrument')
-  let manifest: DoughSampleMap
-  let manifestBase: URL
-  if (typeof source === 'string' || source instanceof URL) {
-    const url = githubRawUrl(
-      source,
-      options.baseUrl ?? globalThis.location?.href ?? 'http://localhost/',
-    )
-    const response = await fetcher(url)
-    if (!response.ok) throw new Error(`Unable to load sample manifest ${url}: ${response.status}`)
-    manifest = parseDoughSampleMap(await response.json())
-    manifestBase = new URL('.', url)
-  } else {
-    manifest = parseDoughSampleMap(source)
-    manifestBase = new URL(options.baseUrl ?? globalThis.location?.href ?? 'http://localhost/')
-  }
+  const { manifest, base, fetcher } = await loadSampleManifest(source, parseDoughSampleMap, options)
   const notes = manifest[instrument]
   if (!isRecord(notes)) throw new RangeError(`Unknown sampled instrument "${instrument}"`)
-  const base = manifest._base ? new URL(manifest._base, manifestBase) : manifestBase
   const samples = await Promise.all(
     Object.entries(notes).map(async ([note, file]) => {
       const url = new URL(file as string, base)
-      const response = await fetcher(url)
-      if (!response.ok)
-        throw new Error(`Unable to load instrument sample ${url}: ${response.status}`)
       return {
         midi: doughNoteNumber(note),
-        buffer: await context.decodeAudioData(await response.arrayBuffer()),
+        buffer: await fetchAudioBuffer(context, fetcher, url, 'instrument sample'),
       }
     }),
   )

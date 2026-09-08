@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { clamp, frequencyToCentOffset } from 'xen-dev-utils'
 import { githubRawUrl, parseDoughSampleMap } from '../../../sw-seq'
 import { compileSourceInitialization, parseClipNotes } from '../../daw/score'
@@ -43,6 +43,22 @@ const emit = defineEmits<{
 const sampleUrl = ref(props.lane.sampledInstrument?.url ?? '')
 const sampleError = ref('')
 const loadingSamples = ref(false)
+type InstrumentMode = 'patch' | 'samples'
+const instrumentMode = ref<InstrumentMode>(props.lane.sampledInstrument ? 'samples' : 'patch')
+
+watch(
+  () => props.lane.sampledInstrument,
+  (source) => {
+    instrumentMode.value = source ? 'samples' : 'patch'
+    if (source) sampleUrl.value = source.url
+  },
+)
+
+const selectInstrumentMode = (mode: InstrumentMode) => {
+  instrumentMode.value = mode
+  sampleError.value = ''
+  if (mode === 'patch') emit('update-sampled-instrument', undefined)
+}
 
 const importSampleJson = (text: string, url = '') => {
   const manifest = parseDoughSampleMap(JSON.parse(text))
@@ -53,6 +69,7 @@ const importSampleJson = (text: string, url = '') => {
     doughJson: manifest,
     instrument: instruments[0]!,
   })
+  instrumentMode.value = 'samples'
   sampleError.value = ''
 }
 
@@ -269,41 +286,76 @@ const clipPreview = (clipId: string) => pianoRoll.value.notesByClip[clipId]!
     @toggle-collapse="emit('toggle-collapse')"
   >
     <template #settings>
-      <label v-if="!lane.sampledInstrument">
-        {{ lane.patchPreset }} SW Patch ·
-        <select
-          aria-label="Waveform"
-          :value="lane.oscillatorType"
-          @change="
-            emit(
-              'update-oscillator',
-              ($event.target as HTMLSelectElement).value as PitchedInstrumentLane['oscillatorType'],
-            )
-          "
+      <fieldset class="instrument-kind">
+        <legend>Instrument sound source</legend>
+        <label
+          ><input
+            type="radio"
+            value="patch"
+            :checked="instrumentMode === 'patch'"
+            @change="selectInstrumentMode('patch')"
+          />
+          SW Patch</label
         >
-          <option v-for="type in OSCILLATOR_TYPES" :key="type">{{ type }}</option>
-        </select>
-      </label>
-      <div class="instrument-source">
-        <button
-          v-if="lane.sampledInstrument"
-          type="button"
-          @click="emit('update-sampled-instrument', undefined)"
+        <label
+          ><input
+            type="radio"
+            value="samples"
+            :checked="instrumentMode === 'samples'"
+            @change="selectInstrumentMode('samples')"
+          />
+          Sampled instrument</label
         >
-          Use SW Patch
-        </button>
-        <template v-else>
-          <input v-model="sampleUrl" type="url" placeholder="Dough samples.json URL" />
+      </fieldset>
+      <section
+        v-if="instrumentMode === 'patch'"
+        class="instrument-source"
+        aria-label="SW Patch instrument source"
+      >
+        <strong>{{ lane.patchPreset }} SW Patch</strong>
+        <label
+          >Waveform
+          <select
+            aria-label="Waveform"
+            :value="lane.oscillatorType"
+            @change="
+              emit(
+                'update-oscillator',
+                ($event.target as HTMLSelectElement)
+                  .value as PitchedInstrumentLane['oscillatorType'],
+              )
+            "
+          >
+            <option v-for="type in OSCILLATOR_TYPES" :key="type">{{ type }}</option>
+          </select>
+        </label>
+      </section>
+      <section v-else class="instrument-source" aria-label="Sampled instrument source">
+        <strong>{{
+          lane.sampledInstrument ? 'Dough samples loaded' : 'Choose a Dough JSON manifest'
+        }}</strong>
+        <span class="instrument-import">
+          <input
+            v-model="sampleUrl"
+            aria-label="Instrument JSON URL"
+            type="url"
+            placeholder="https://…/samples.json"
+          />
           <button type="button" :disabled="loadingSamples || !sampleUrl" @click="loadSampleUrl">
-            {{ loadingSamples ? 'Loading…' : 'Load samples' }}
+            {{ loadingSamples ? 'Loading…' : 'Load URL' }}
           </button>
-          <label class="sample-upload">
-            Upload JSON
-            <input type="file" accept="application/json,.json" @change="uploadSamples" />
+          <label class="sample-upload"
+            >Upload JSON
+            <input
+              aria-label="Upload instrument JSON"
+              type="file"
+              accept="application/json,.json"
+              @change="uploadSamples"
+            />
           </label>
-        </template>
-        <label v-if="lane.sampledInstrument">
-          Sampled instrument
+        </span>
+        <label v-if="lane.sampledInstrument"
+          >Sample bank
           <select
             :value="lane.sampledInstrument.instrument"
             @change="
@@ -323,8 +375,8 @@ const clipPreview = (clipId: string) => pianoRoll.value.notesByClip[clipId]!
             </option>
           </select>
         </label>
-        <span v-if="sampleError" class="sample-error" role="alert">{{ sampleError }}</span>
-      </div>
+      </section>
+      <span v-if="sampleError" class="instrument-error" role="alert">{{ sampleError }}</span>
     </template>
     <template #preview="{ clip }">
       <span class="piano-roll" aria-label="Piano roll preview">
@@ -374,9 +426,24 @@ const clipPreview = (clipId: string) => pianoRoll.value.notesByClip[clipId]!
 
 <style scoped>
 .instrument-source {
-  display: flex;
+  display: grid;
   align-items: center;
+  gap: 0.25rem;
+  flex: 1 1 24rem;
+}
+.instrument-kind {
+  display: flex;
+  gap: 0.75rem;
+  border: 0;
+  padding: 0;
+}
+.instrument-import {
+  display: flex;
   gap: 0.4rem;
+}
+.instrument-import input[type='url'] {
+  flex: 1;
+  min-width: 12rem;
 }
 .sample-upload {
   cursor: pointer;
@@ -385,9 +452,9 @@ const clipPreview = (clipId: string) => pianoRoll.value.notesByClip[clipId]!
   position: absolute;
   width: 1px;
   height: 1px;
-  opacity: 0;
+  clip-path: inset(50%);
 }
-.sample-error {
+.instrument-error {
   color: var(--xenpaper-light-red);
 }
 .piano-roll {
