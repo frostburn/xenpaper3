@@ -1,4 +1,5 @@
 import type { DawProject } from './project'
+import audioBufferToWav from 'audiobuffer-to-wav'
 import { createPlaybackPlan, type PlaybackPlan } from './playback-plan'
 import { parseProjectScoreNotes, type PitchGlideSegment, type ScheduledLaneNote } from './score'
 import { xenpaperPitchToPatchDetune } from './web-audio-automation'
@@ -66,6 +67,91 @@ export const parseProjectPatchNotes = (project: DawProject): ScheduledLaneNote[]
 /** @deprecated Use `parseProjectScoreNotes` for musical data or `createPlaybackPlan` for audio. */
 export const parseProjectNotes = parseProjectPatchNotes
 
+const prepareSamples = async (context: BaseAudioContext, plan: PlaybackPlan) => {
+  const sampledDrumkits = new Map<string, SampledDrumkit>()
+  const sampledInstruments = new Map<string, SampledInstrument>()
+  try {
+    await Promise.all([
+      ...plan.lanes.map(async (lane) => {
+        if (lane.kind !== 'drum' || lane.drumkit.type !== 'samples') return
+        sampledDrumkits.set(
+          lane.id,
+          await loadSampledDrumkit(context, lane.drumkit.strudelJson, {
+            baseUrl: lane.drumkit.url
+              ? githubRawUrl(lane.drumkit.url, globalThis.location.href)
+              : globalThis.location.href,
+          }),
+        )
+      }),
+      ...plan.lanes.map(async (lane) => {
+        if (lane.kind !== 'instrument' || lane.instrument.type !== 'samples') return
+        const source = lane.instrument
+        sampledInstruments.set(
+          lane.id,
+          await loadSampledInstrument(context, source.doughJson, source.instrument, {
+            baseUrl: source.url
+              ? githubRawUrl(source.url, globalThis.location.href)
+              : globalThis.location.href,
+          }),
+        )
+      }),
+    ])
+  } catch (error) {
+    for (const drumkit of sampledDrumkits.values()) drumkit.dispose()
+    for (const instrument of sampledInstruments.values()) instrument.dispose()
+    throw error
+  }
+  return { sampledDrumkits, sampledInstruments }
+}
+
+const disposeSamples = (
+  sampledDrumkits: ReadonlyMap<string, SampledDrumkit>,
+  sampledInstruments: ReadonlyMap<string, SampledInstrument>,
+) => {
+  for (const drumkit of sampledDrumkits.values()) drumkit.dispose()
+  for (const instrument of sampledInstruments.values()) instrument.dispose()
+}
+
+export const WAV_MIME_TYPE = 'audio/wav'
+export const DEFAULT_RENDER_SAMPLE_RATE = 48_000
+export const RENDER_CHANNEL_COUNT = 2
+
+/** Render a complete project, plus an optional effect/release tail, into a WAV file. */
+export const renderProjectToWavBlob = async (
+  project: DawProject,
+  tailSeconds: number,
+  sampleRate = DEFAULT_RENDER_SAMPLE_RATE,
+): Promise<Blob> => {
+  if (!Number.isFinite(tailSeconds) || tailSeconds < 0)
+    throw new RangeError('Render tail must be a finite, non-negative number of seconds')
+  if (!Number.isFinite(sampleRate) || sampleRate <= 0)
+    throw new RangeError('Render sample rate must be finite and positive')
+
+  const plan = createPlaybackPlan(project)
+  const duration = plan.endTime + tailSeconds
+  const frameCount = Math.max(1, Math.ceil(duration * sampleRate))
+  const renderDuration = frameCount / sampleRate
+  const context = new OfflineAudioContext(RENDER_CHANNEL_COUNT, frameCount, sampleRate)
+  const samples = await prepareSamples(context, plan)
+  let session: WebAudioPlaybackSession | undefined
+  try {
+    if (plan.lanes.some((lane) => lane.kind === 'drum' && lane.drumkit.type === 'patch'))
+      await registerMathWorklets(context)
+    session = new WebAudioPlaybackSession(context, plan, {
+      ...samples,
+      transportOptions: { interval: renderDuration, lookAhead: 0 },
+    })
+    session.start()
+    const renderedBuffer = await context.startRendering()
+    return new Blob([audioBufferToWav(renderedBuffer)], { type: WAV_MIME_TYPE })
+  } catch (error) {
+    if (!session) disposeSamples(samples.sampledDrumkits, samples.sampledInstruments)
+    throw error
+  } finally {
+    session?.dispose()
+  }
+}
+
 /** Small owner/facade around immutable playback plans and disposable Web Audio sessions. */
 export class DawAudioEngine extends EventTarget {
   readonly context: AudioContext
@@ -88,42 +174,9 @@ export class DawAudioEngine extends EventTarget {
     // Invalidate pending preparation before compiling, while delaying stop() so invalid
     // edits still do not tear down a currently audible session.
     const plan = createPlaybackPlan(project, fromBeat)
-    const sampledDrumkits = new Map<string, SampledDrumkit>()
-    const sampledInstruments = new Map<string, SampledInstrument>()
-    try {
-      await Promise.all([
-        ...plan.lanes.map(async (lane) => {
-          if (lane.kind !== 'drum' || lane.drumkit.type !== 'samples') return
-          sampledDrumkits.set(
-            lane.id,
-            await loadSampledDrumkit(this.context, lane.drumkit.strudelJson, {
-              baseUrl: lane.drumkit.url
-                ? githubRawUrl(lane.drumkit.url, globalThis.location.href)
-                : globalThis.location.href,
-            }),
-          )
-        }),
-        ...plan.lanes.map(async (lane) => {
-          if (lane.kind !== 'instrument' || lane.instrument.type !== 'samples') return
-          const source = lane.instrument
-          sampledInstruments.set(
-            lane.id,
-            await loadSampledInstrument(this.context, source.doughJson, source.instrument, {
-              baseUrl: source.url
-                ? githubRawUrl(source.url, globalThis.location.href)
-                : globalThis.location.href,
-            }),
-          )
-        }),
-      ])
-    } catch (error) {
-      for (const drumkit of sampledDrumkits.values()) drumkit.dispose()
-      for (const instrument of sampledInstruments.values()) instrument.dispose()
-      throw error
-    }
+    const { sampledDrumkits, sampledInstruments } = await prepareSamples(this.context, plan)
     if (requestId !== this.playRequestId) {
-      for (const drumkit of sampledDrumkits.values()) drumkit.dispose()
-      for (const instrument of sampledInstruments.values()) instrument.dispose()
+      disposeSamples(sampledDrumkits, sampledInstruments)
       return
     }
     // Drum voices instantiate RandomNode worklets when their scheduled hit begins.
@@ -131,8 +184,7 @@ export class DawAudioEngine extends EventTarget {
     if (plan.lanes.some((lane) => lane.kind === 'drum' && lane.drumkit.type === 'patch'))
       await registerMathWorklets(this.context)
     if (requestId !== this.playRequestId) {
-      for (const drumkit of sampledDrumkits.values()) drumkit.dispose()
-      for (const instrument of sampledInstruments.values()) instrument.dispose()
+      disposeSamples(sampledDrumkits, sampledInstruments)
       return
     }
     this.stop()
