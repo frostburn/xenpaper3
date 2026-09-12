@@ -950,6 +950,10 @@ export class PatchRuntime {
     const source = this.context.createBufferSource()
     source.buffer = buffer
     source.loop = true
+    const start = source.start.bind(source)
+    Object.defineProperty(source, 'start', {
+      value: (when = this.context.currentTime) => start(when, Math.random() * buffer.duration),
+    })
     this.registerCleanup(() => {
       try {
         source.stop()

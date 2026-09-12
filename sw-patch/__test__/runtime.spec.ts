@@ -367,6 +367,7 @@ describe('SW Patch runtime', () => {
   it('uses one shared native noise buffer when requested for offline rendering', () => {
     const samples = new Float32Array(48_000 * 4.013)
     const buffer = {
+      duration: 4.013,
       getChannelData: vi.fn<(channel: number) => Float32Array>(() => samples),
     } as unknown as AudioBuffer
     const createBuffer = vi.fn<() => AudioBuffer>(() => buffer)
@@ -376,6 +377,8 @@ describe('SW Patch runtime', () => {
       start: vi.fn<() => void>(),
       stop: vi.fn<() => void>(),
     }))
+    const firstStart = sources[0]!.start
+    const secondStart = sources[1]!.start
     const createBufferSource = vi.fn<() => (typeof sources)[number]>(() => sources.shift()!)
     const context = {
       currentTime: 0,
@@ -389,6 +392,9 @@ describe('SW Patch runtime', () => {
 
     const first = (patch.noise as PatchFunction)() as AudioBufferSourceNode
     const second = (patch.noise as PatchFunction)() as AudioBufferSourceNode
+    vi.spyOn(Math, 'random').mockReturnValueOnce(0.25).mockReturnValueOnce(0.75)
+    first.start(1)
+    second.start(2)
 
     expect(createBuffer).toHaveBeenCalledOnce()
     expect(createBufferSource).toHaveBeenCalledTimes(2)
@@ -396,6 +402,8 @@ describe('SW Patch runtime', () => {
     expect(second.buffer).toBe(buffer)
     expect(first.loop).toBe(true)
     expect(samples.some((sample) => sample !== 0)).toBe(true)
+    expect(firstStart).toHaveBeenCalledWith(1, 4.013 * 0.25)
+    expect(secondStart).toHaveBeenCalledWith(2, 4.013 * 0.75)
     patch.dispose()
   })
 
