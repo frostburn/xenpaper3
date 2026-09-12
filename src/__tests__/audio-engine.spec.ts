@@ -56,10 +56,15 @@ describe('DAW playback preparation', () => {
       },
     )
     vi.stubGlobal('OfflineAudioContext', OfflineContext)
+    const register = vi.spyOn(swPatch, 'registerMathWorklets').mockResolvedValue()
 
     const wav = await renderProjectToWavBlob(project, 2, 48_000)
 
     expect(OfflineContext).toHaveBeenCalledWith(2, 120_000, 48_000)
+    expect(register).toHaveBeenCalledWith(OfflineContext.mock.instances[0])
+    expect(register.mock.invocationCallOrder[0]).toBeLessThan(
+      vi.mocked(WebAudioPlaybackSession).mock.invocationCallOrder[0]!,
+    )
     expect(startRendering).toHaveBeenCalledOnce()
     expect(wav.type).toBe('audio/wav')
     expect(wav.size).toBeGreaterThan(44)

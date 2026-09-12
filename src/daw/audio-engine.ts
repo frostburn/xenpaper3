@@ -112,6 +112,11 @@ const disposeSamples = (
   for (const instrument of sampledInstruments.values()) instrument.dispose()
 }
 
+const planUsesPatches = (plan: PlaybackPlan): boolean =>
+  plan.lanes.some((lane) =>
+    lane.kind === 'drum' ? lane.drumkit.type === 'patch' : lane.instrument.type === 'patch',
+  )
+
 export const WAV_MIME_TYPE = 'audio/wav'
 export const DEFAULT_RENDER_SAMPLE_RATE = 48_000
 export const RENDER_CHANNEL_COUNT = 2
@@ -135,8 +140,7 @@ export const renderProjectToWavBlob = async (
   const samples = await prepareSamples(context, plan)
   let session: WebAudioPlaybackSession | undefined
   try {
-    if (plan.lanes.some((lane) => lane.kind === 'drum' && lane.drumkit.type === 'patch'))
-      await registerMathWorklets(context)
+    if (planUsesPatches(plan)) await registerMathWorklets(context)
     session = new WebAudioPlaybackSession(context, plan, {
       ...samples,
       transportOptions: { interval: renderDuration, lookAhead: 0 },
@@ -179,10 +183,9 @@ export class DawAudioEngine extends EventTarget {
       disposeSamples(sampledDrumkits, sampledInstruments)
       return
     }
-    // Drum voices instantiate RandomNode worklets when their scheduled hit begins.
+    // Patch voices can instantiate math/noise worklets when their scheduled note begins.
     // Finish module registration before creating or starting the playback session.
-    if (plan.lanes.some((lane) => lane.kind === 'drum' && lane.drumkit.type === 'patch'))
-      await registerMathWorklets(this.context)
+    if (planUsesPatches(plan)) await registerMathWorklets(this.context)
     if (requestId !== this.playRequestId) {
       disposeSamples(sampledDrumkits, sampledInstruments)
       return
