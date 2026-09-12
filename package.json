@@ -19,6 +19,7 @@
   },
   "dependencies": {
     "aperiodic-oscillator": "^0.3.3",
+    "audiobuffer-to-wav": "^1.0.0",
     "moment-of-symmetry": "^0.10.0",
     "peggy": "^5.1.0",
     "pinia": "^4.0.2",
