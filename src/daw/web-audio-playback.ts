@@ -6,7 +6,7 @@ import {
   type PlayableSynthPatch,
   type SynthPatch,
 } from '../../sw-patch'
-import { SampledDrumkit, SampledInstrument, Transport } from '../../sw-seq'
+import { SampledDrumkit, SampledInstrument, Transport, type TransportOptions } from '../../sw-seq'
 import { isAppleWebKit } from '../browser'
 import DEFAULT_PATCH_SOURCE from '../patches/default.swpatch?raw'
 import DRUMKIT_PATCH_SOURCE from '../patches/drumkit.swpatch?raw'
@@ -33,6 +33,7 @@ export interface WebAudioPlaybackOptions {
   readonly sampledDrumkits?: ReadonlyMap<string, SampledDrumkit>
   readonly sampledInstruments?: ReadonlyMap<string, SampledInstrument>
   readonly resolvePatchSource?: (source: string) => string
+  readonly transportOptions?: TransportOptions
   readonly onEnded?: () => void
 }
 
@@ -48,7 +49,7 @@ const requirePlayableSynth = (patch: SynthPatch, lane: PlaybackLane): PlayableSy
 
 /** One disposable translation of a pure playback plan into Web Audio nodes and events. */
 export class WebAudioPlaybackSession {
-  readonly context: AudioContext
+  readonly context: BaseAudioContext
   readonly plan: PlaybackPlan
   readonly transport: Transport
 
@@ -66,10 +67,17 @@ export class WebAudioPlaybackSession {
   private latestCutoff = 0
   private state: PlaybackState = 'ready'
 
-  constructor(context: AudioContext, plan: PlaybackPlan, options: WebAudioPlaybackOptions = {}) {
+  constructor(
+    context: BaseAudioContext,
+    plan: PlaybackPlan,
+    options: WebAudioPlaybackOptions = {},
+  ) {
     this.context = context
     this.plan = plan
-    this.transport = new Transport(context, { useSetTimeoutFallback: isAppleWebKit() })
+    this.transport = new Transport(context, {
+      useSetTimeoutFallback: isAppleWebKit(),
+      ...options.transportOptions,
+    })
     this.patchFactory = options.patchFactory ?? createPatch
     this.drumkitFactory = options.drumkitFactory ?? createDrumkit
     this.sampledDrumkits = options.sampledDrumkits ?? new Map()

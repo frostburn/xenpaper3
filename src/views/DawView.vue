@@ -5,7 +5,7 @@ import DrumLane from '../components/daw/DrumLane.vue'
 import GlobalLane from '../components/daw/GlobalLane.vue'
 import PitchedLane from '../components/daw/PitchedLane.vue'
 import TransportControls from '../components/daw/TransportControls.vue'
-import { DawAudioEngine } from '../daw/audio-engine'
+import { DawAudioEngine, renderProjectToWavBlob } from '../daw/audio-engine'
 import { demoProjects } from '../demo-projects'
 import {
   clipSourceDiagnostics,
@@ -45,6 +45,8 @@ const displayMode = ref<ClipDisplayMode>('piano-roll')
 const playing = ref(false)
 const soloClipKey = ref<string>()
 const playbackError = ref('')
+const renderTailSeconds = ref(2)
+const rendering = ref(false)
 let playTimer: ReturnType<typeof setInterval> | undefined
 let audioEngine: DawAudioEngine | undefined
 let playbackRequestId = 0
@@ -371,6 +373,34 @@ const exportProject = () => {
   }
 }
 
+const renderProject = async () => {
+  if (rendering.value) return
+  rendering.value = true
+  playbackError.value = ''
+  try {
+    const blob = await renderProjectToWavBlob(
+      project.value,
+      renderTailSeconds.value,
+      audioEngine?.context.sampleRate,
+    )
+    const url = URL.createObjectURL(blob)
+    const anchor = document.createElement('a')
+    const basename =
+      project.value.title
+        .trim()
+        .replace(/[^a-z0-9_-]+/gi, '-')
+        .replace(/^-+|-+$/g, '') || 'untitled-project'
+    anchor.href = url
+    anchor.download = `${basename}.wav`
+    anchor.click()
+    URL.revokeObjectURL(url)
+  } catch (error) {
+    playbackError.value = error instanceof Error ? error.message : String(error)
+  } finally {
+    rendering.value = false
+  }
+}
+
 onMounted(async () => {
   const searchParams = new URL(document.location.href).searchParams
   const demoId = searchParams.get('demo')
@@ -427,6 +457,25 @@ onBeforeUnmount(() => {
         </label>
         <button type="button" class="project-file-button" @click="exportProject">
           Export project
+        </button>
+        <label class="render-tail">
+          Tail
+          <input
+            v-model.number="renderTailSeconds"
+            aria-label="WAV render tail in seconds"
+            type="number"
+            min="0"
+            step="0.5"
+          />
+          s
+        </label>
+        <button
+          type="button"
+          class="project-file-button"
+          :disabled="rendering"
+          @click="renderProject"
+        >
+          {{ rendering ? 'Rendering…' : 'Render WAV' }}
         </button>
       </div>
     </div>
@@ -583,8 +632,23 @@ onBeforeUnmount(() => {
 }
 .project-file-actions {
   display: flex;
+  flex-wrap: wrap;
+  align-items: center;
   gap: 0.5rem;
   margin-left: auto;
+}
+.render-tail {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+.render-tail input {
+  width: 4rem;
+  border: 1px solid var(--xenpaper-slate-450);
+  border-radius: 0.25rem;
+  padding: 0.4rem;
+  color: inherit;
+  background: var(--xenpaper-slate-850);
 }
 .project-file-button {
   border: 1px solid var(--xenpaper-slate-450);

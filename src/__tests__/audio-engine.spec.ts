@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import * as swPatch from '../../sw-patch'
 import * as swSeq from '../../sw-seq'
-import { DawAudioEngine } from '../daw/audio-engine'
+import { DawAudioEngine, renderProjectToWavBlob } from '../daw/audio-engine'
 import { beat, createDefaultProject, createDrumLane } from '../daw/project'
 import { WebAudioPlaybackSession } from '../daw/web-audio-playback'
 import { deferred } from './deferred'
@@ -10,6 +10,7 @@ vi.mock('../daw/web-audio-playback', () => {
   class MockSession {
     start = vi.fn<() => void>()
     stop = vi.fn<() => void>()
+    dispose = vi.fn<() => void>()
   }
   return { WebAudioPlaybackSession: vi.fn<typeof MockSession>(MockSession) }
 })
@@ -28,6 +29,65 @@ afterEach(() => {
 })
 
 describe('DAW playback preparation', () => {
+  it('renders the complete project and requested tail to a stereo WAV blob', async () => {
+    const project = createDefaultProject()
+    project.instrumentLanes[0]!.clips.push({
+      id: 'note',
+      start: beat(0),
+      length: beat(1),
+      source: '0',
+    })
+    const renderedBuffer = {
+      numberOfChannels: 2,
+      length: 120_000,
+      sampleRate: 48_000,
+      getChannelData: () => new Float32Array(120_000),
+    } as unknown as AudioBuffer
+    const startRendering = vi.fn<() => Promise<AudioBuffer>>().mockResolvedValue(renderedBuffer)
+    const OfflineContext = vi.fn<(channels: number, frames: number, sampleRate: number) => void>(
+      function (
+        this: { startRendering: typeof startRendering; sampleRate: number },
+        _channels: number,
+        _frames: number,
+        sampleRate: number,
+      ) {
+        this.startRendering = startRendering
+        this.sampleRate = sampleRate
+      },
+    )
+    vi.stubGlobal('OfflineAudioContext', OfflineContext)
+    const register = vi.spyOn(swPatch, 'registerMathWorklets').mockResolvedValue()
+
+    const wav = await renderProjectToWavBlob(project, 2, 48_000)
+
+    expect(OfflineContext).toHaveBeenCalledWith(2, 120_000, 48_000)
+    expect(register).toHaveBeenCalledWith(OfflineContext.mock.instances[0])
+    expect(register.mock.invocationCallOrder[0]).toBeLessThan(
+      vi.mocked(WebAudioPlaybackSession).mock.invocationCallOrder[0]!,
+    )
+    expect(startRendering).toHaveBeenCalledOnce()
+    expect(wav.type).toBe('audio/wav')
+    expect(wav.size).toBeGreaterThan(44)
+    const session = vi.mocked(WebAudioPlaybackSession).mock.results[0]!.value
+    expect(session.start).toHaveBeenCalledOnce()
+    expect(session.dispose).toHaveBeenCalledOnce()
+    expect(vi.mocked(WebAudioPlaybackSession).mock.calls[0]![2]).toMatchObject({
+      transportOptions: { interval: 2.5, lookAhead: 0 },
+    })
+    vi.unstubAllGlobals()
+  })
+
+  it('rejects an invalid render tail before creating an offline context', async () => {
+    const OfflineContext = vi.fn<() => void>()
+    vi.stubGlobal('OfflineAudioContext', OfflineContext)
+
+    await expect(renderProjectToWavBlob(createDefaultProject(), -1)).rejects.toThrow(
+      'Render tail must be a finite, non-negative number of seconds',
+    )
+    expect(OfflineContext).not.toHaveBeenCalled()
+    vi.unstubAllGlobals()
+  })
+
   it('loads sampled drumkits and passes them to the playback session', async () => {
     const project = drumProject()
     const lane = project.instrumentLanes[0]!
