@@ -73,6 +73,7 @@ describe('DAW playback preparation', () => {
     expect(session.dispose).toHaveBeenCalledOnce()
     expect(vi.mocked(WebAudioPlaybackSession).mock.calls[0]![2]).toMatchObject({
       transportOptions: { interval: 2.5, lookAhead: 0 },
+      nativePatchNoise: true,
     })
     vi.unstubAllGlobals()
   })

@@ -61,6 +61,8 @@ export interface RuntimeOptions {
   config?: Record<string, unknown>
   /** Additional, explicitly whitelisted values/functions available to the patch. */
   globals?: Record<string, unknown>
+  /** Use a native looping AudioBufferSource for white noise instead of an AudioWorklet. */
+  nativeNoise?: boolean
 }
 
 type Scope = Map<string, unknown>
@@ -635,6 +637,7 @@ export function dbtoa(value: unknown): number {
 }
 
 const registeredMathWorklets = new WeakMap<object, Promise<void>>()
+const nativeNoiseBuffers = new WeakMap<object, AudioBuffer>()
 
 /** Registers the inline processors used by SW Patch signal arithmetic. */
 export function registerMathWorklets(context: BaseAudioContext): Promise<void> {
@@ -851,7 +854,11 @@ export class PatchRuntime {
     this.root.set('SoftParabolicNode', (...args: unknown[]) =>
       this.createUtilitySource('sw-patch-soft-parabolic', args),
     )
-    this.root.set('NoiseNode', () => this.createUtilitySource('sw-patch-noise'))
+    this.root.set('NoiseNode', () =>
+      this.options.nativeNoise
+        ? this.createNativeNoiseSource()
+        : this.createUtilitySource('sw-patch-noise'),
+    )
     this.root.set('RandomNode', () => this.createUtilitySource('sw-patch-random'))
     this.root.set('where', (...values: unknown[]) => this.where(values))
     this.root.set('atodb', (value: unknown) => this.convertMath('sw-patch-atodb', atodb, value))
@@ -921,6 +928,41 @@ export class PatchRuntime {
       node.port.postMessage({ type: 'stop', when: this.context.currentTime })
     })
     return node
+  }
+
+  /**
+   * Native scheduled sources are important for offline rendering: an AudioWorklet
+   * scheduled in the future is nevertheless invoked for every render quantum. A
+   * project with many noise-based drum hits would otherwise render every inactive
+   * voice for the entire portion of the song preceding it.
+   */
+  private createNativeNoiseSource(): AudioBufferSourceNode {
+    let buffer = nativeNoiseBuffers.get(this.context as object)
+    if (!buffer) {
+      // A long, non-power-of-two period makes repetition effectively inaudible while
+      // retaining one modest shared allocation per rendering context.
+      const length = Math.max(1, Math.round(this.context.sampleRate * 4.013))
+      buffer = this.context.createBuffer(1, length, this.context.sampleRate)
+      const samples = buffer.getChannelData(0)
+      for (let index = 0; index < samples.length; index += 1) samples[index] = Math.random() * 2 - 1
+      nativeNoiseBuffers.set(this.context as object, buffer)
+    }
+    const source = this.context.createBufferSource()
+    source.buffer = buffer
+    source.loop = true
+    const start = source.start.bind(source)
+    Object.defineProperty(source, 'start', {
+      value: (when = this.context.currentTime) => start(when, Math.random() * buffer.duration),
+    })
+    this.registerCleanup(() => {
+      try {
+        source.stop()
+      } catch {
+        // Stopping an already-ended AudioScheduledSourceNode is harmless by contract,
+        // but older Web Audio implementations may still throw here.
+      }
+    })
+    return source
   }
 
   private where(values: unknown[]): unknown {
