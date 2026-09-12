@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs'
 import { describe, expect, it, vi } from 'vitest'
 import { Fraction } from 'xen-dev-utils'
 import router from '../router'
+import { demoProjects } from '../demo-projects'
 import DawView from '../views/DawView.vue'
 import PitchedLane from '../components/daw/PitchedLane.vue'
 import DrumLane from '../components/daw/DrumLane.vue'
@@ -293,7 +294,7 @@ describe('DAW project model', () => {
   })
 
   it('loads the Minuet example as a playable two-lane project', () => {
-    const project = parseDawProject(readFileSync('public/minuet.xenpaper.json', 'utf8'))
+    const project = parseDawProject(readFileSync('src/demo-projects/minuet.xenpaper.json', 'utf8'))
 
     expect(project.globalTrack.timeSignatureChanges[0]).toMatchObject({
       numerator: 3,
@@ -657,6 +658,68 @@ describe('DAW routing', () => {
 })
 
 describe('DawView', () => {
+  it('parses every bundled demo project through the standard project parser', () => {
+    for (const serializedProject of Object.values(demoProjects)) {
+      expect(() => parseDawProject(serializedProject)).not.toThrow()
+    }
+  })
+
+  it('loads a built-in demo without fetching it', async () => {
+    const fetcher = vi.fn<typeof fetch>()
+    vi.stubGlobal('fetch', fetcher)
+    window.history.replaceState({}, '', '/daw?demo=minuet')
+
+    const wrapper = mount(DawView)
+
+    await vi.waitFor(() =>
+      expect((wrapper.get('[aria-label="Project title"]').element as HTMLInputElement).value).toBe(
+        parseDawProject(demoProjects.minuet!).title,
+      ),
+    )
+    expect(fetcher).not.toHaveBeenCalled()
+    wrapper.unmount()
+    window.history.replaceState({}, '', '/')
+    vi.unstubAllGlobals()
+  })
+
+  it('reports an unknown built-in demo ID without fetching it', async () => {
+    const fetcher = vi.fn<typeof fetch>()
+    vi.stubGlobal('fetch', fetcher)
+    window.history.replaceState({}, '', '/daw?demo=missing')
+
+    const wrapper = mount(DawView)
+
+    await vi.waitFor(() => expect(wrapper.get('[role="alert"]').text()).toContain('missing'))
+    expect(fetcher).not.toHaveBeenCalled()
+    wrapper.unmount()
+    window.history.replaceState({}, '', '/')
+    vi.unstubAllGlobals()
+  })
+
+  it('fetches external project URLs supplied with the project parameter', async () => {
+    const externalProject = createDefaultProject()
+    externalProject.title = 'External project'
+    const fetcher = vi.fn<typeof fetch>().mockResolvedValue({
+      ok: true,
+      text: async () => serializeDawProject(externalProject),
+    } as Response)
+    vi.stubGlobal('fetch', fetcher)
+    window.history.replaceState({}, '', '/daw?project=https%3A%2F%2Fexample.com%2Fpiece.json')
+
+    const wrapper = mount(DawView)
+
+    await vi.waitFor(() => expect(fetcher).toHaveBeenCalledOnce())
+    expect(String(fetcher.mock.calls[0]![0])).toBe('https://example.com/piece.json')
+    await vi.waitFor(() =>
+      expect((wrapper.get('[aria-label="Project title"]').element as HTMLInputElement).value).toBe(
+        'External project',
+      ),
+    )
+    wrapper.unmount()
+    window.history.replaceState({}, '', '/')
+    vi.unstubAllGlobals()
+  })
+
   it('exports the current titled project as a .xenpaper.json download', async () => {
     const createObjectURL = vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:project')
     const revokeObjectURL = vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => {})
@@ -714,7 +777,7 @@ describe('DawView', () => {
 
   it('edits a new lane clip without changing a deserialized clip with the same id', async () => {
     const wrapper = mount(DawView)
-    const imported = parseDawProject(readFileSync('public/minuet.xenpaper.json', 'utf8'))
+    const imported = parseDawProject(readFileSync('src/demo-projects/minuet.xenpaper.json', 'utf8'))
     const originalSource = imported.instrumentLanes[0]!.clips[0]!.source
     const input = wrapper.get<HTMLInputElement>('[aria-label="Import Xenpaper project"]')
     const file = new File([serializeDawProject(imported)], 'minuet.xenpaper.json', {

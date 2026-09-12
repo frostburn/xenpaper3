@@ -6,6 +6,7 @@ import GlobalLane from '../components/daw/GlobalLane.vue'
 import PitchedLane from '../components/daw/PitchedLane.vue'
 import TransportControls from '../components/daw/TransportControls.vue'
 import { DawAudioEngine } from '../daw/audio-engine'
+import { demoProjects } from '../demo-projects'
 import {
   clipSourceDiagnostics,
   compileSourceInitialization,
@@ -371,7 +372,23 @@ const exportProject = () => {
 }
 
 onMounted(async () => {
-  const projectUrl = new URL(document.location.href).searchParams.get('project')
+  const searchParams = new URL(document.location.href).searchParams
+  const demoId = searchParams.get('demo')
+  if (demoId) {
+    const demoProject = demoProjects[demoId]
+    if (!demoProject) {
+      projectLoadError.value = `Unknown demo project: ${demoId}`
+      return
+    }
+    try {
+      replaceProject(demoProject)
+    } catch (error) {
+      projectLoadError.value = error instanceof Error ? error.message : String(error)
+    }
+    return
+  }
+
+  const projectUrl = searchParams.get('project')
   if (!projectUrl) return
   try {
     const response = await fetch(new URL(projectUrl, document.baseURI))
