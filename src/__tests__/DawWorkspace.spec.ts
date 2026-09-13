@@ -108,6 +108,26 @@ describe('DAW workspace', () => {
     wrapper.unmount()
   })
 
+  it('does not move the playhead when Enter edits the already-selected clip', async () => {
+    const wrapper = mountDaw()
+    await wrapper.get('[aria-label="Add clip to Instrument 1"]').trigger('click')
+    await wrapper.get('[aria-label="Add clip to Instrument 1"]').trigger('click')
+    const selectedClip = wrapper.findAll('button.clip')[1]!
+    const selectedClipElement = selectedClip.element as HTMLElement
+    selectedClipElement.focus()
+    await selectedClip.trigger('keydown', { key: 'Home' })
+    expect(wrapper.get('.transport output').text()).toBe('Beat 0.00')
+
+    await selectedClip.trigger('keydown', { key: 'Enter' })
+
+    expect(selectedClip.classes()).toContain('selected')
+    expect(wrapper.get('.transport output').text()).toBe('Beat 0.00')
+    expect(document.activeElement).toBe(
+      wrapper.get('textarea[aria-label="Xenpaper clip source"]').element,
+    )
+    wrapper.unmount()
+  })
+
   it('leaves text editing keys and native text undo alone', async () => {
     const wrapper = mountDaw()
     await wrapper.get('[aria-label="Add clip to Instrument 1"]').trigger('click')

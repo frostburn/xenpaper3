@@ -467,6 +467,7 @@ const renderProject = async () => {
 const onShortcut = (event: KeyboardEvent) => {
   if (event.defaultPrevented || event.repeat || event.isComposing || event.altKey) return
   const target = event.target instanceof Element ? event.target : undefined
+  const clipButton = target?.closest<HTMLButtonElement>('button.clip')
   const editing = target?.closest(
     'input, textarea, select, [contenteditable]:not([contenteditable="false"])',
   )
@@ -507,9 +508,9 @@ const onShortcut = (event: KeyboardEvent) => {
     event.preventDefault()
     seekPlayback(0)
     timeline.value?.reveal(0)
-  } else if (event.key === 'Enter' && target?.closest<HTMLButtonElement>('button.clip')) {
+  } else if (event.key === 'Enter' && clipButton) {
     event.preventDefault()
-    target.closest<HTMLButtonElement>('button.clip')!.click()
+    if (clipButton.getAttribute('aria-pressed') !== 'true') clipButton.click()
     void nextTick(() => editor.value?.focus())
   } else if (event.key === 'Delete' && selectedClip.value) {
     event.preventDefault()
