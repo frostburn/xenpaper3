@@ -1,5 +1,8 @@
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch, watchEffect } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch, watchEffect } from 'vue'
+import { Fraction } from 'xen-dev-utils'
+import ArrangementTimeline from '../components/daw/ArrangementTimeline.vue'
+import { EditorHistory } from '../daw/editor-history'
 import ClipSourceEditor from '../components/daw/ClipSourceEditor.vue'
 import DrumLane from '../components/daw/DrumLane.vue'
 import GlobalLane from '../components/daw/GlobalLane.vue'
@@ -27,7 +30,7 @@ import {
   parseDawProject,
   serializeDawProject,
   snapBeat,
-  type Beat,
+  type DawProject,
   type ClipDisplayMode,
   type InstrumentLane,
   type SourceClip,
@@ -40,7 +43,11 @@ const playhead = ref(0)
 const pixelsPerBeat = ref(64)
 const scrollLeft = ref(0)
 const collapsedLaneIds = ref(new Set<string>())
-const grid = ref<Beat>(beat(1, 4))
+const gridDenominator = ref(4)
+const grid = computed(() => beat(1, gridDenominator.value))
+const followPlayhead = ref(true)
+const timeline = ref<InstanceType<typeof ArrangementTimeline>>()
+const shortcutsOpen = ref(false)
 const displayMode = ref<ClipDisplayMode>('piano-roll')
 const playing = ref(false)
 const soloClipKey = ref<string>()
@@ -137,11 +144,6 @@ const projectEndBeat = computed(() =>
     ),
   ),
 )
-// Four empty bars beyond the last clip make room for extending the arrangement.
-const maxScrollLeft = computed(() => Math.ceil((projectEndBeat.value + 16) * pixelsPerBeat.value))
-watch(maxScrollLeft, (maximum) => {
-  scrollLeft.value = Math.min(scrollLeft.value, maximum)
-})
 watchEffect(() => {
   const signature = project.value.globalTrack.timeSignatureChanges[0]!
   const defaultBar = beat(signature.numerator * 4, signature.denominator)
@@ -173,6 +175,25 @@ watchEffect(() => {
   }
 })
 
+// History contains editable project data only: moving the playhead or selecting a clip
+// is not an edit. Fraction.reviver preserves rational beats without a JSON format change.
+const history = reactive(new EditorHistory(JSON.stringify(project.value)))
+const recordProject = () => history.record(JSON.stringify(project.value))
+watch(() => JSON.stringify(project.value), (snapshot) => history.record(snapshot))
+const beginEdit = () => {
+  recordProject()
+  history.begin()
+}
+const restoreHistory = (redo = false) => {
+  recordProject()
+  const snapshot = redo ? history.redo() : history.undo()
+  if (snapshot === undefined) return
+  stopPlayback()
+  project.value = JSON.parse(snapshot, Fraction.reviver) as DawProject
+  if (!selectedClip.value) selectedClipId.value = undefined
+  if (!selectedLane.value) selectedLaneId.value = undefined
+}
+
 const clearPlayTimer = () => {
   if (playTimer !== undefined) clearInterval(playTimer)
   playTimer = undefined
@@ -186,20 +207,22 @@ const finishPlayback = () => {
 }
 
 const insertClip = async (lane: InstrumentLane, rawBeat: number) => {
+  beginEdit()
   const start = snapBeat(Math.max(0, rawBeat), grid.value)
   const clip = createClip(lane, start)
   lane.clips.push(clip)
   selectedClipId.value = clip.id
   selectedLaneId.value = lane.id
-  playhead.value = rawBeat
+  if (!playing.value) playhead.value = beatToNumber(start)
   await nextTick()
+  timeline.value?.reveal(beatToNumber(start))
   editor.value?.focus()
 }
 
 const selectClip = (lane: InstrumentLane, clip: SourceClip) => {
   selectedClipId.value = clip.id
   selectedLaneId.value = lane.id
-  playhead.value = beatToNumber(clip.start)
+  if (!playing.value) playhead.value = beatToNumber(clip.start)
 }
 
 const startPlayback = async (
@@ -251,6 +274,12 @@ const togglePlayback = async () => {
   await startPlayback(playhead.value)
 }
 
+const seekPlayback = (at: number) => {
+  const position = Math.max(0, at)
+  if (playing.value) void startPlayback(position)
+  else playhead.value = position
+}
+
 const playSelectedClip = (solo: boolean) => {
   if (!selectedLane.value || !selectedClip.value) return
   const fromBeat = beatToNumber(selectedClip.value.start)
@@ -276,11 +305,12 @@ const stopPlayback = () => {
 }
 
 const moveClip = (clip: SourceClip, rawBeat: number) => {
-  clip.start = snapBeat(rawBeat, grid.value)
-  playhead.value = beatToNumber(clip.start)
+  clip.start = snapBeat(Math.max(0, rawBeat), grid.value)
+  if (!playing.value) playhead.value = beatToNumber(clip.start)
 }
 
 const deleteClip = (lane: InstrumentLane, clip: SourceClip) => {
+  beginEdit()
   const index = lane.clips.findIndex(({ id }) => id === clip.id)
   if (index === -1) return
   lane.clips.splice(index, 1)
@@ -290,11 +320,17 @@ const deleteClip = (lane: InstrumentLane, clip: SourceClip) => {
   }
 }
 
-const addInstrumentLane = () =>
+const addInstrumentLane = () => {
+  beginEdit()
   project.value.instrumentLanes.push(createInstrumentLane(project.value))
-const addDrumLane = () => project.value.instrumentLanes.push(createDrumLane(project.value))
+}
+const addDrumLane = () => {
+  beginEdit()
+  project.value.instrumentLanes.push(createDrumLane(project.value))
+}
 
 const deleteInstrumentLane = (lane: InstrumentLane) => {
+  beginEdit()
   const index = project.value.instrumentLanes.findIndex(({ id }) => id === lane.id)
   if (index === -1) return
   project.value.instrumentLanes.splice(index, 1)
@@ -309,6 +345,20 @@ const deleteInstrumentLane = (lane: InstrumentLane) => {
 
 const deleteSelectedClip = () => {
   if (selectedLane.value && selectedClip.value) deleteClip(selectedLane.value, selectedClip.value)
+}
+
+const duplicateSelectedClip = async () => {
+  const lane = selectedLane.value
+  const source = selectedClip.value
+  if (!lane || !source) return
+  beginEdit()
+  const clip = createClip(lane, source.start.add(source.length))
+  clip.source = source.source
+  clip.length = source.length
+  lane.clips.push(clip)
+  selectClip(lane, clip)
+  await nextTick()
+  timeline.value?.reveal(beatToNumber(clip.start))
 }
 
 const updateClipSource = (clip: SourceClip, source: string) => {
@@ -332,6 +382,7 @@ const replaceProject = (source: string) => {
   const importedProject = parseDawProject(source)
   stopPlayback()
   project.value = importedProject
+  history.reset(JSON.stringify(importedProject))
   projectLoadError.value = ''
   selectedClipId.value = undefined
   selectedLaneId.value = undefined
@@ -401,6 +452,58 @@ const renderProject = async () => {
   }
 }
 
+const onShortcut = (event: KeyboardEvent) => {
+  if (event.defaultPrevented || event.repeat || event.isComposing || event.altKey) return
+  const target = event.target instanceof Element ? event.target : undefined
+  const editing = target?.closest('input, textarea, select, [contenteditable]:not([contenteditable="false"])')
+  const command = event.ctrlKey || event.metaKey
+  const key = event.key.toLowerCase()
+  if (command && key === 's') {
+    event.preventDefault()
+    // Source editors flush their drafts earlier in this event. Let derived clip
+    // lengths settle too, before serializing or scheduling the updated score.
+    void nextTick(exportProject)
+    return
+  }
+  if (command && key === 'enter') {
+    event.preventDefault()
+    void nextTick(() => playSelectedClip(event.shiftKey))
+    return
+  }
+  // Native text undo, arrows, spaces, and deletion must remain native.
+  if (editing) return
+  if (command) {
+    if (key === 'z' || key === 'y') {
+      event.preventDefault()
+      restoreHistory(key === 'y' || event.shiftKey)
+    } else if (key === 'd' && selectedClip.value) {
+      event.preventDefault()
+      void duplicateSelectedClip()
+    }
+    return
+  }
+  // Space on a focused toolbar button should activate it once, not also toggle playback.
+  if (target?.closest('button, a, summary') && !target.closest('.clip')) return
+  if (event.key === ' ') {
+    event.preventDefault()
+    void togglePlayback()
+  } else if (event.key === 'Escape') {
+    stopPlayback()
+  } else if (event.key === 'Home') {
+    event.preventDefault()
+    seekPlayback(0)
+    timeline.value?.reveal(0)
+  } else if (event.key === 'Enter' && target?.closest('.clip')) {
+    event.preventDefault()
+    editor.value?.focus()
+  } else if (event.key === 'Delete' && selectedClip.value) {
+    event.preventDefault()
+    beginEdit()
+    deleteSelectedClip()
+  }
+}
+onMounted(() => window.addEventListener('keydown', onShortcut))
+
 onMounted(async () => {
   const searchParams = new URL(document.location.href).searchParams
   const demoId = searchParams.get('demo')
@@ -430,6 +533,7 @@ onMounted(async () => {
 })
 
 onBeforeUnmount(() => {
+  window.removeEventListener('keydown', onShortcut)
   pausePlayback()
   audioEngine?.dispose()
   audioEngine?.removeEventListener('ended', finishPlayback)
@@ -437,12 +541,12 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div class="daw">
-    <div class="project-header">
-      <h1>Xenpaper DAW</h1>
+  <div class="daw" @pointerdown.capture="beginEdit" @focusin="beginEdit">
+    <header class="project-header">
+      <h1>Xenpaper <span>DAW</span></h1>
       <label class="project-title">
-        Project title
-        <input v-model="project.title" aria-label="Project title" />
+        <span class="sr-only">Project title</span>
+        <input v-model="project.title" aria-label="Project title" placeholder="Untitled project" />
       </label>
       <div class="project-file-actions">
         <label class="project-file-button">
@@ -478,238 +582,404 @@ onBeforeUnmount(() => {
           {{ rendering ? 'Rendering…' : 'Render WAV' }}
         </button>
       </div>
-    </div>
-    <p v-if="projectLoadError" class="playback-error" role="alert">{{ projectLoadError }}</p>
-    <TransportControls
-      :playhead="playhead"
-      :playing="playing"
-      @play="togglePlayback"
-      @stop="stopPlayback"
-    />
-    <p v-if="playbackError" class="playback-error" role="alert">{{ playbackError }}</p>
-    <div class="timeline-controls">
-      <label
-        >Zoom
-        <input
-          v-model.number="pixelsPerBeat"
-          aria-label="Timeline zoom"
-          type="range"
-          min="8"
-          max="160"
-      /></label>
-      <label>
-        Clip view
+    </header>
+    <div class="workspace-toolbar">
+      <TransportControls
+        :playhead="playhead"
+        :playing="playing"
+        @play="togglePlayback"
+        @stop="stopPlayback"
+      />
+      <div class="history-controls" aria-label="Edit history">
+        <button type="button" aria-label="Undo" title="Undo (Ctrl/⌘ Z)" :disabled="!history.canUndo" @click="restoreHistory()">↶</button>
+        <button type="button" aria-label="Redo" title="Redo (Ctrl/⌘ Shift Z)" :disabled="!history.canRedo" @click="restoreHistory(true)">↷</button>
+      </div>
+      <label>Snap
+        <select v-model.number="gridDenominator" aria-label="Clip snap grid">
+          <option :value="1">1 beat</option>
+          <option :value="2">½ beat</option>
+          <option :value="3">⅓ beat</option>
+          <option :value="4">¼ beat</option>
+          <option :value="8">⅛ beat</option>
+          <option :value="16">¹⁄₁₆ beat</option>
+        </select>
+      </label>
+      <label>View
         <select v-model="displayMode" aria-label="Clip display">
           <option value="piano-roll">Piano roll</option>
           <option value="source">Source</option>
         </select>
       </label>
-    </div>
-    <div class="scroll-controls">
-      <label>
-        Timeline scroll
-        <input
-          v-model.number="scrollLeft"
-          aria-label="Timeline scroll"
-          type="range"
-          min="0"
-          :max="maxScrollLeft"
-        />
+      <label class="zoom-control">Zoom
+        <input v-model.number="pixelsPerBeat" aria-label="Timeline zoom" type="range" :min="Math.min(8, pixelsPerBeat)" max="160" />
       </label>
+      <button type="button" @click="timeline?.fit()">Fit project</button>
+      <button type="button" :aria-pressed="followPlayhead" title="Keep the playing position visible. Panning turns this off." @click="followPlayhead = !followPlayhead">Follow</button>
     </div>
-    <GlobalLane
-      :track="project.globalTrack"
-      @update-source="project.globalTrack.source = $event"
-      @update-tempo="project.globalTrack.tempoChanges[0]!.bpm = $event"
-      @update-time-signature="
-        (numerator, denominator) => {
-          project.globalTrack.timeSignatureChanges[0]!.numerator = numerator
-          project.globalTrack.timeSignatureChanges[0]!.denominator = denominator
-        }
-      "
-    />
-    <section v-for="lane in project.instrumentLanes" :key="lane.id" class="instrument-lane">
-      <DrumLane
-        v-if="lane.kind === 'drum'"
-        :lane="lane"
-        :global-source="project.globalTrack.source"
-        :selected-clip-id="selectedLaneId === lane.id ? selectedClipId : undefined"
-        :pixels-per-beat="pixelsPerBeat"
-        :scroll-left="scrollLeft"
-        :display-mode="displayMode"
-        :collapsed="collapsedLaneIds.has(lane.id)"
-        :playing-ranges-by-clip="playingRangesByLane.get(lane.id)"
-        @insert="insertClip(lane, $event)"
-        @select="selectClip(lane, $event)"
-        @place-playhead="playhead = $event"
-        @move="moveClip"
-        @delete="deleteClip(lane, $event)"
-        @update-source="lane.source = $event"
-        @update-drumkit="lane.drumkit = $event"
-        @update-name="lane.name = $event"
-        @update-gain="lane.gain = $event"
-        @delete-lane="deleteInstrumentLane(lane)"
-        @toggle-collapse="toggleLaneCollapse(lane.id)"
-      />
-      <template v-else>
-        <PitchedLane
-          :collapsed="collapsedLaneIds.has(lane.id)"
-          :lane="lane"
-          :global-source="project.globalTrack.source"
-          :selected-clip-id="selectedLaneId === lane.id ? selectedClipId : undefined"
-          :pixels-per-beat="pixelsPerBeat"
-          :scroll-left="scrollLeft"
-          :display-mode="displayMode"
-          :playing-ranges-by-clip="playingRangesByLane.get(lane.id)"
-          @insert="insertClip(lane, $event)"
-          @select="selectClip(lane, $event)"
-          @place-playhead="playhead = $event"
-          @move="moveClip"
-          @delete="deleteClip(lane, $event)"
-          @update-name="lane.name = $event"
-          @update-source="lane.source = $event"
-          @update-instrument="lane.instrument = $event"
-          @update-gain="lane.gain = $event"
-          @delete-lane="deleteInstrumentLane(lane)"
-          @toggle-collapse="toggleLaneCollapse(lane.id)"
+    <p v-if="projectLoadError" class="playback-error" role="alert">{{ projectLoadError }}</p>
+    <p v-if="playbackError" class="playback-error" role="alert">{{ playbackError }}</p>
+    <div class="workspace">
+      <section class="arranger" aria-label="Arrangement">
+        <details class="project-settings">
+          <summary>
+            <strong>{{ project.globalTrack.tempoChanges[0]!.bpm }} BPM</strong>
+            <span>{{ project.globalTrack.timeSignatureChanges[0]!.numerator }}/{{ project.globalTrack.timeSignatureChanges[0]!.denominator }}</span>
+            <span>Global tuning &amp; defaults</span>
+          </summary>
+          <GlobalLane
+            :track="project.globalTrack"
+            @update-source="project.globalTrack.source = $event"
+            @update-tempo="project.globalTrack.tempoChanges[0]!.bpm = $event"
+            @update-time-signature="
+              (numerator, denominator) => {
+                project.globalTrack.timeSignatureChanges[0]!.numerator = numerator
+                project.globalTrack.timeSignatureChanges[0]!.denominator = denominator
+              }
+            "
+          />
+
+        </details>
+        <ArrangementTimeline
+          ref="timeline"
+          v-model:scroll-left="scrollLeft"
+          v-model:pixels-per-beat="pixelsPerBeat"
+          v-model:follow="followPlayhead"
+          :end-beat="projectEndBeat"
+          :playhead="playhead"
+          :playing="playing"
+          @seek="seekPlayback"
+        >
+          <section v-for="lane in project.instrumentLanes" :key="lane.id" class="instrument-lane">
+            <DrumLane
+              v-if="lane.kind === 'drum'"
+              :lane="lane"
+              :global-source="project.globalTrack.source"
+              :selected-clip-id="selectedLaneId === lane.id ? selectedClipId : undefined"
+              :pixels-per-beat="pixelsPerBeat"
+              :scroll-left="scrollLeft"
+              :display-mode="displayMode"
+              :collapsed="collapsedLaneIds.has(lane.id)"
+              :playing-ranges-by-clip="playingRangesByLane.get(lane.id)"
+              @insert="insertClip(lane, $event)"
+              @select="selectClip(lane, $event)"
+              @place-playhead="seekPlayback"
+              @move="moveClip"
+              @delete="deleteClip(lane, $event)"
+              @update-source="lane.source = $event"
+              @update-drumkit="lane.drumkit = $event"
+              @update-name="lane.name = $event"
+              @update-gain="lane.gain = $event"
+              @delete-lane="deleteInstrumentLane(lane)"
+              @toggle-collapse="toggleLaneCollapse(lane.id)"
+            />
+            <template v-else>
+              <PitchedLane
+                :collapsed="collapsedLaneIds.has(lane.id)"
+                :lane="lane"
+                :global-source="project.globalTrack.source"
+                :selected-clip-id="selectedLaneId === lane.id ? selectedClipId : undefined"
+                :pixels-per-beat="pixelsPerBeat"
+                :scroll-left="scrollLeft"
+                :display-mode="displayMode"
+                :playing-ranges-by-clip="playingRangesByLane.get(lane.id)"
+                @insert="insertClip(lane, $event)"
+                @select="selectClip(lane, $event)"
+                @place-playhead="seekPlayback"
+                @move="moveClip"
+                @delete="deleteClip(lane, $event)"
+                @update-name="lane.name = $event"
+                @update-source="lane.source = $event"
+                @update-instrument="lane.instrument = $event"
+                @update-gain="lane.gain = $event"
+                @delete-lane="deleteInstrumentLane(lane)"
+                @toggle-collapse="toggleLaneCollapse(lane.id)"
+              />
+            </template>
+          </section>
+
+        </ArrangementTimeline>
+        <div class="add-lanes">
+          <button type="button" class="add-lane" @click="addInstrumentLane">Add instrument lane</button>
+          <button type="button" class="add-lane add-drum-lane" @click="addDrumLane">
+            Add drum lane
+          </button>
+        </div>
+
+      </section>
+      <aside class="clip-inspector" aria-label="Clip editor">
+        <ClipSourceEditor
+          ref="editor"
+          :clip="selectedClip"
+          :lane-name="selectedLane?.name"
+          :source-key="
+            selectedLane && selectedClip ? clipSourceKey(selectedLane.id, selectedClip.id) : undefined
+          "
+          :drum-samples="selectedLane ? drumSamplesForLane(selectedLane) : undefined"
+          :diagnostics="selectedClipDiagnostics"
+          :playing-ranges="selectedClipPlayingRanges"
+          @update-source="updateClipSourceById"
+          @delete="deleteSelectedClip"
+          @duplicate="duplicateSelectedClip"
+          @play="playSelectedClip(false)"
+          @play-solo="playSelectedClip(true)"
+          @stop="stopPlayback"
         />
-      </template>
-    </section>
-    <div class="add-lanes">
-      <button type="button" class="add-lane" @click="addInstrumentLane">Add instrument lane</button>
-      <button type="button" class="add-lane add-drum-lane" @click="addDrumLane">
-        Add drum lane
-      </button>
+      </aside>
     </div>
-    <ClipSourceEditor
-      ref="editor"
-      :clip="selectedClip"
-      :source-key="
-        selectedLane && selectedClip ? clipSourceKey(selectedLane.id, selectedClip.id) : undefined
-      "
-      :drum-samples="selectedLane ? drumSamplesForLane(selectedLane) : undefined"
-      :diagnostics="selectedClipDiagnostics"
-      :playing-ranges="selectedClipPlayingRanges"
-      @update-source="updateClipSourceById"
-      @delete="deleteSelectedClip"
-      @play="playSelectedClip(false)"
-      @play-solo="playSelectedClip(true)"
-      @stop="stopPlayback"
-    />
+    <footer class="workspace-status">
+      <span v-if="selectedClip && selectedLane">{{ selectedLane.name }} · Beat {{ beatToNumber(selectedClip.start) }} · {{ beatToNumber(selectedClip.length) }} beats</span>
+      <span v-else>Double-click a lane to create a clip, or use + Clip.</span>
+      <button type="button" :aria-expanded="shortcutsOpen" @click="shortcutsOpen = !shortcutsOpen">Keyboard shortcuts</button>
+    </footer>
+    <p v-if="shortcutsOpen" class="shortcut-help">
+      Space: play / pause · Escape: stop · Home: start · Delete: delete clip ·
+      Enter on a clip: edit · Ctrl/⌘ D: duplicate · Ctrl/⌘ Z: undo · Ctrl/⌘ Shift Z: redo · Ctrl/⌘ S: export ·
+      Ctrl/⌘ Enter: play from clip (add Shift for solo). Text fields keep their normal editing keys.
+    </p>
   </div>
 </template>
 
 <style scoped>
 .daw {
-  max-width: 1200px;
-  margin: auto;
-  padding: 1rem;
+  --daw-track-width: 14rem;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  height: calc(100dvh - 1rem);
+  min-height: 32rem;
+  padding: 0.5rem;
   color: var(--xenpaper-slate-100);
   background: var(--xenpaper-slate-950);
+  font-size: 0.875rem;
 }
-.project-header {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.75rem 1.25rem;
-  margin-bottom: 0.75rem;
-}
-.project-header h1 {
-  margin: 0;
-}
-.project-title {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-}
-.project-title input {
-  min-width: min(18rem, 45vw);
-  border: 1px solid var(--xenpaper-slate-450);
-  border-radius: 0.25rem;
-  padding: 0.45rem 0.55rem;
-  color: inherit;
-  background: var(--xenpaper-slate-850);
-}
-.project-file-actions {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.5rem;
-  margin-left: auto;
-}
-.render-tail {
-  display: flex;
-  align-items: center;
-  gap: 0.25rem;
-}
-.render-tail input {
-  width: 4rem;
-  border: 1px solid var(--xenpaper-slate-450);
-  border-radius: 0.25rem;
-  padding: 0.4rem;
-  color: inherit;
-  background: var(--xenpaper-slate-850);
-}
-.project-file-button {
-  border: 1px solid var(--xenpaper-slate-450);
-  border-radius: 0.25rem;
-  padding: 0.45rem 0.65rem;
-  color: inherit;
+.daw :deep(button:not(.clip)), .daw :deep(select), .daw :deep(input:not([type='range']):not([type='file'])) {
+  box-sizing: border-box;
+  min-height: 2rem;
+  border: 1px solid var(--xenpaper-slate-500);
+  border-radius: 0.3rem;
+  padding: 0.35rem 0.55rem;
   font: inherit;
+  color: inherit;
   background: var(--xenpaper-slate-850);
+}
+.daw :deep(button), .daw :deep(summary), .project-file-button {
   cursor: pointer;
 }
-.project-file-input {
+.daw :deep(button:not(.clip):hover:not(:disabled)), .project-file-button:hover {
+  border-color: var(--xenpaper-slate-400);
+}
+.daw :deep(button:disabled) {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+.daw :deep(button[aria-pressed='true']) {
+  border-color: var(--xenpaper-cyan);
+  color: var(--xenpaper-cyan);
+}
+.daw :deep(:focus-visible), .project-file-button:focus-within {
+  outline: 2px solid var(--xenpaper-cyan);
+  outline-offset: 2px;
+}
+.daw :deep(input[type='range']) {
+  accent-color: var(--xenpaper-cyan);
+}
+.project-header, .workspace-toolbar, .project-file-actions, .workspace-status {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+.project-header {
+  flex-wrap: wrap;
+  padding: 0.5rem 0.5rem 0.9rem;
+}
+.project-header h1 {
+  margin: 0 0.5rem 0 0;
+  font-size: 1.2rem;
+  white-space: nowrap;
+}
+.project-header h1 span {
+  color: var(--xenpaper-slate-400);
+  font-size: 0.7rem;
+  letter-spacing: 0.12em;
+}
+.project-title {
+  flex: 1;
+  min-width: 10rem;
+}
+.project-title input {
+  width: 100%;
+  max-width: 28rem;
+}
+.project-file-actions {
+  flex-wrap: wrap;
+  margin-left: auto;
+}
+.project-file-button {
+  border: 1px solid var(--xenpaper-slate-500);
+  border-radius: 0.3rem;
+  padding: 0.35rem 0.55rem;
+  background: var(--xenpaper-slate-850);
+}
+.project-file-input, .sr-only {
   position: absolute;
   width: 1px;
   height: 1px;
   overflow: hidden;
   clip-path: inset(50%);
 }
-.timeline-controls {
-  display: flex;
-  gap: 2rem;
-  padding: 0.5rem;
-}
-.timeline-controls label {
+.render-tail, .workspace-toolbar label {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: 0.4rem;
+  white-space: nowrap;
 }
-.timeline-controls input[type='range'] {
-  width: min(28rem, 45vw);
+.render-tail input {
+  width: 3.5rem;
 }
-.scroll-controls {
-  padding: 0 0.5rem 0.75rem;
+.workspace-toolbar {
+  flex-wrap: wrap;
+  padding: 0.55rem;
+  border-block: 1px solid var(--xenpaper-slate-500);
+  background: var(--xenpaper-slate-875);
 }
-.scroll-controls label {
+.history-controls {
   display: flex;
-  align-items: center;
+  gap: 0.25rem;
+  margin-right: 0.5rem;
+}
+.zoom-control {
+  margin-left: auto;
+}
+.zoom-control input {
+  width: 7rem;
+}
+.workspace {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(20rem, 26%);
+}
+.arranger {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
+.arranger > .arrangement-timeline {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  scrollbar-gutter: stable;
+}
+.project-settings {
+  border-bottom: 1px solid var(--xenpaper-slate-500);
+  background: var(--xenpaper-slate-925);
+}
+.project-settings summary {
+  padding: 0.7rem;
+}
+.project-settings summary span {
+  margin-left: 1rem;
+  color: var(--xenpaper-slate-400);
+}
+.project-settings :deep(.global-lane) {
+  flex-wrap: wrap;
   gap: 0.75rem;
 }
-.scroll-controls input {
-  flex: 1;
+.project-settings :deep(.source-control) {
+  min-width: 0;
+  flex-basis: 100%;
+}
+.project-settings :deep(.xenpaper-source-editor) {
   min-width: 0;
 }
-.playback-error {
-  color: var(--xenpaper-light-red);
-  margin: 0 0.75rem;
-}
-.instrument-lane + .instrument-lane {
-  margin-top: 1rem;
-}
-.add-lane {
-  flex: 1;
-  margin: 0.75rem 0;
-  border: 1px dashed var(--xenpaper-slate-450);
-  border-radius: 0.25rem;
-  padding: 0.65rem;
-  color: var(--xenpaper-slate-100);
-  background: var(--xenpaper-slate-850);
-  cursor: pointer;
+.clip-inspector {
+  min-width: 0;
+  overflow-y: auto;
+  padding: 1rem;
+  border-left: 1px solid var(--xenpaper-slate-500);
+  background: var(--xenpaper-slate-925);
 }
 .add-lanes {
   display: flex;
-  gap: 0.75rem;
+  gap: 0.5rem;
+  padding: 0.6rem;
+}
+.add-lanes .add-lane {
+  flex: 1;
+  border-style: dashed;
+  background: transparent;
+}
+.workspace-status {
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.5rem;
+  border-top: 1px solid var(--xenpaper-slate-500);
+  color: var(--xenpaper-slate-400);
+  font-size: 0.75rem;
+}
+.workspace-status > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.workspace-status button {
+  flex: none;
+}
+.shortcut-help {
+  margin: 0;
+  padding: 0.5rem;
+  line-height: 1.6;
+  color: var(--xenpaper-slate-400);
+}
+.playback-error {
+  margin: 0;
+  padding: 0.5rem 0.75rem;
+  color: var(--xenpaper-light-red);
+}
+@media (max-width: 1000px) {
+  .daw {
+    --daw-track-width: 11rem;
+  }
+  .workspace {
+    grid-template-columns: minmax(0, 1fr) 18rem;
+  }
+  .zoom-control {
+    margin-left: 0;
+  }
+}
+@media (max-width: 760px) {
+  .daw {
+    --daw-track-width: 9rem;
+    height: auto;
+    min-height: calc(100dvh - 1rem);
+  }
+  .project-header {
+    gap: 0.4rem;
+  }
+  .project-file-actions {
+    margin: 0;
+    width: 100%;
+  }
+  .workspace {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .arranger > .arrangement-timeline {
+    flex: none;
+    min-height: 12rem;
+    max-height: 50dvh;
+  }
+  .clip-inspector {
+    border-left: 0;
+    border-top: 1px solid var(--xenpaper-slate-500);
+    max-height: 45dvh;
+  }
+  .workspace-toolbar {
+    gap: 0.45rem;
+  }
+  .workspace-status {
+    flex-wrap: wrap;
+  }
 }
 </style>
