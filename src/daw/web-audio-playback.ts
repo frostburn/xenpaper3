@@ -34,6 +34,7 @@ export interface WebAudioPlaybackOptions {
   readonly sampledInstruments?: ReadonlyMap<string, SampledInstrument>
   readonly resolvePatchSource?: (source: string) => string
   readonly transportOptions?: TransportOptions
+  readonly nativePatchNoise?: boolean
   readonly onEnded?: () => void
 }
 
@@ -57,6 +58,7 @@ export class WebAudioPlaybackSession {
   private readonly patchFactory: PatchFactory
   private readonly drumkitFactory: DrumkitFactory
   private readonly resolvePatchSource: (source: string) => string
+  private readonly nativePatchNoise: boolean
   private readonly onEnded?: () => void
   private readonly synths: PlayableSynthPatch[] = []
   private readonly drumkits: PlayableDrumkitPatch[] = []
@@ -83,6 +85,7 @@ export class WebAudioPlaybackSession {
     this.sampledDrumkits = options.sampledDrumkits ?? new Map()
     this.sampledInstruments = options.sampledInstruments ?? new Map()
     this.resolvePatchSource = options.resolvePatchSource ?? defaultPatchSource
+    this.nativePatchNoise = options.nativePatchNoise ?? false
     this.onEnded = options.onEnded
     this.output = new GainNode(context, { gain: options.outputGain ?? DEFAULT_OUTPUT_GAIN })
     this.output.connect(context.destination)
@@ -145,6 +148,7 @@ export class WebAudioPlaybackSession {
         const kit = this.drumkitFactory(
           this.resolvePatchSource(lane.drumkit.patchPreset),
           this.context,
+          ...(this.nativePatchNoise ? [{ nativeNoise: true }] : []),
         )
         this.drumkits.push(kit)
         for (const note of lane.notes) {

@@ -144,6 +144,9 @@ export const renderProjectToWavBlob = async (
     session = new WebAudioPlaybackSession(context, plan, {
       ...samples,
       transportOptions: { interval: renderDuration, lookAhead: 0 },
+      // Native scheduled sources remain dormant until their start time. Worklet-based
+      // noise processes every preceding render quantum for every future drum voice.
+      nativePatchNoise: true,
     })
     session.start()
     const renderedBuffer = await context.startRendering()
