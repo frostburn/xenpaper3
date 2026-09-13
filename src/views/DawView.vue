@@ -507,9 +507,10 @@ const onShortcut = (event: KeyboardEvent) => {
     event.preventDefault()
     seekPlayback(0)
     timeline.value?.reveal(0)
-  } else if (event.key === 'Enter' && target?.closest('.clip')) {
+  } else if (event.key === 'Enter' && target?.closest<HTMLButtonElement>('button.clip')) {
     event.preventDefault()
-    editor.value?.focus()
+    target.closest<HTMLButtonElement>('button.clip')!.click()
+    void nextTick(() => editor.value?.focus())
   } else if (event.key === 'Delete' && selectedClip.value) {
     event.preventDefault()
     beginEdit()
