@@ -153,7 +153,8 @@ const onRulerKey = (event: KeyboardEvent) => {
           :key="mark"
           class="ruler-mark"
           :style="{ left: `${mark * pixelsPerBeat - scrollLeft}px` }"
-        >{{ mark }}</span>
+          >{{ mark }}</span
+        >
         <span
           v-if="playheadX >= 0 && playheadX <= viewportWidth"
           class="playhead-cap"
@@ -188,7 +189,8 @@ const onRulerKey = (event: KeyboardEvent) => {
 .arrangement-timeline {
   min-width: 0;
 }
-.ruler-row, .scroll-row {
+.ruler-row,
+.scroll-row {
   display: grid;
   grid-template-columns: var(--daw-track-width, 14rem) minmax(0, 1fr);
   background: var(--xenpaper-slate-875);
@@ -199,7 +201,8 @@ const onRulerKey = (event: KeyboardEvent) => {
   z-index: 3;
   border-bottom: 1px solid var(--xenpaper-slate-500);
 }
-.track-heading, .scroll-hint {
+.track-heading,
+.scroll-hint {
   padding: 0.55rem 0.75rem;
   font-size: 0.7rem;
   color: var(--xenpaper-slate-400);

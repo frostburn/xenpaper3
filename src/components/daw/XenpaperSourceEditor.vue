@@ -24,13 +24,10 @@ let pendingSourceKey: string | undefined
 
 const EDIT_DEBOUNCE_MS = 200
 
-watch(
-  [() => props.source, () => props.sourceKey],
-  ([source]) => {
-    commitDraft()
-    draft.value = source
-  },
-)
+watch([() => props.source, () => props.sourceKey], ([source]) => {
+  commitDraft()
+  draft.value = source
+})
 
 function commitDraft() {
   if (!updateTimer) return

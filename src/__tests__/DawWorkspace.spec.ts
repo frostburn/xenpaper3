@@ -50,9 +50,7 @@ describe('DAW workspace', () => {
     expect(clips).toHaveLength(2)
     expect(clips[0]!.id).not.toBe(clips[1]!.id)
     expect(clips[1]!.source).toBe(clips[0]!.source)
-    expect(beatToNumber(clips[1]!.start)).toBe(
-      beatToNumber(clips[0]!.start.add(clips[0]!.length)),
-    )
+    expect(beatToNumber(clips[1]!.start)).toBe(beatToNumber(clips[0]!.start.add(clips[0]!.length)))
     await wrapper.get('[aria-label="Delete clip"]').trigger('click')
     expect(wrapper.findAll('button.clip')).toHaveLength(1)
     await wrapper.get('[aria-label="Undo"]').trigger('click')
@@ -113,7 +111,8 @@ describe('DAW workspace', () => {
     vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {})
     await wrapper.get('textarea[aria-label="Xenpaper clip source"]').setValue('C D E')
     await wrapper.get('textarea[aria-label="Xenpaper clip source"]').trigger('keydown', {
-      key: 's', ctrlKey: true,
+      key: 's',
+      ctrlKey: true,
     })
     expect(createURL).toHaveBeenCalledOnce()
     expect(wrapper.getComponent(PitchedLane).props('lane').clips[0]!.source).toBe('C D E')
@@ -148,8 +147,13 @@ describe('DAW workspace', () => {
     lane.clips.push(clip)
     const wrapper = mount(InstrumentLane, {
       props: {
-        lane, pixelsPerBeat: 64, scrollLeft: 0, displayMode: 'source',
-        laneLabel: 'Instrument lane', timelineLabel: 'Test timeline', editorLabel: 'Lane source',
+        lane,
+        pixelsPerBeat: 64,
+        scrollLeft: 0,
+        displayMode: 'source',
+        laneLabel: 'Instrument lane',
+        timelineLabel: 'Test timeline',
+        editorLabel: 'Lane source',
       },
     })
     const clipElement = wrapper.get('button.clip').element
@@ -172,7 +176,12 @@ describe('DAW workspace', () => {
 
 describe('Arrangement timeline', () => {
   const props = {
-    endBeat: 32, playhead: 0, playing: false, pixelsPerBeat: 64, scrollLeft: 0, follow: true,
+    endBeat: 32,
+    playhead: 0,
+    playing: false,
+    pixelsPerBeat: 64,
+    scrollLeft: 0,
+    follow: true,
   }
 
   it('maps native scroll and ruler coordinates to the same beat', async () => {
@@ -183,18 +192,26 @@ describe('Arrangement timeline', () => {
     expect(wrapper.emitted('update:scrollLeft')).toEqual([[128]])
     expect(wrapper.emitted('update:follow')).toEqual([[false]])
     await wrapper.setProps({ scrollLeft: 128 })
-    await wrapper.get('.ruler').trigger('pointerdown', { button: 0, clientX: 64 })
+    wrapper
+      .get('.ruler')
+      .element.dispatchEvent(
+        new MouseEvent('pointerdown', { bubbles: true, button: 0, clientX: 64 }),
+      )
+    await nextTick()
     expect(wrapper.emitted('seek')).toEqual([[3]])
     await wrapper.get('.ruler').trigger('keydown', { key: 'End' })
-    expect(wrapper.emitted('seek')?.at(-1)).toEqual([32])
+    const seekEvents = wrapper.emitted('seek') ?? []
+    expect(seekEvents[seekEvents.length - 1]).toEqual([32])
   })
 
   it('anchors zoom to the left-edge beat and clamps when the viewport is larger than the project', async () => {
     const wrapper = mount(ArrangementTimeline, { props: { ...props, scrollLeft: 128 } })
     await wrapper.setProps({ pixelsPerBeat: 96 })
-    expect(wrapper.emitted('update:scrollLeft')?.at(-1)).toEqual([192])
+    let scrollEvents = wrapper.emitted('update:scrollLeft') ?? []
+    expect(scrollEvents[scrollEvents.length - 1]).toEqual([192])
     await wrapper.setProps({ endBeat: 0, pixelsPerBeat: 8, scrollLeft: 192 })
-    expect(wrapper.emitted('update:scrollLeft')?.at(-1)).toEqual([0])
+    scrollEvents = wrapper.emitted('update:scrollLeft') ?? []
+    expect(scrollEvents[scrollEvents.length - 1]).toEqual([0])
   })
 
   it('fits long scores even when that requires a zoom below eight pixels per beat', async () => {
@@ -219,7 +236,10 @@ describe('Arrangement timeline', () => {
     ruler.dispatchEvent(vertical)
     expect(vertical.defaultPrevented).toBe(false)
     const horizontal = new WheelEvent('wheel', {
-      deltaY: 64, shiftKey: true, bubbles: true, cancelable: true,
+      deltaY: 64,
+      shiftKey: true,
+      bubbles: true,
+      cancelable: true,
     })
     ruler.dispatchEvent(horizontal)
     expect(horizontal.defaultPrevented).toBe(true)

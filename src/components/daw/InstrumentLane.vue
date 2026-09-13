@@ -49,11 +49,20 @@ const dragging = ref<{
   active: boolean
 }>()
 
-const appendClip = () => emit('insert', Math.max(0, ...props.lane.clips.map(
-  (clip) => beatToNumber(clip.start) + beatToNumber(clip.length),
-)))
+const appendClip = () =>
+  emit(
+    'insert',
+    Math.max(
+      0,
+      ...props.lane.clips.map((clip) => beatToNumber(clip.start) + beatToNumber(clip.length)),
+    ),
+  )
 const clipCaption = (clip: SourceClip) =>
-  clip.source.split('\n').find((line) => line.trim())?.replace(/^#\s*/, '').slice(0, 80) || 'Empty clip'
+  clip.source
+    .split('\n')
+    .find((line) => line.trim())
+    ?.replace(/^#\s*/, '')
+    .slice(0, 80) || 'Empty clip'
 
 const pointerBeat = (event: MouseEvent) =>
   pointerXToBeat(
@@ -124,7 +133,9 @@ const onKeyDown = (event: KeyboardEvent) => {
           :aria-expanded="!collapsed"
           :title="collapsed ? 'Expand track' : 'Collapse track'"
           @click="emit('toggle-collapse')"
-        >{{ collapsed ? '▸' : '▾' }}</button>
+        >
+          {{ collapsed ? '▸' : '▾' }}
+        </button>
         <input
           class="lane-name"
           :aria-label="`${laneLabel} name`"
@@ -138,7 +149,9 @@ const onKeyDown = (event: KeyboardEvent) => {
           :aria-label="`Delete ${lane.name}`"
           title="Delete lane (Undo restores it)"
           @click="emit('delete-lane')"
-        >×</button>
+        >
+          ×
+        </button>
       </div>
       <label v-if="!collapsed" class="gain-control">
         Gain
@@ -153,7 +166,16 @@ const onKeyDown = (event: KeyboardEvent) => {
         />
         <output>{{ Math.round(lane.gain * 100) }}%</output>
       </label>
-      <button v-if="!collapsed" type="button" class="append-clip" :aria-label="`Add clip to ${lane.name}`" title="Create a clip after the last clip on this track" @click="appendClip">+ Clip</button>
+      <button
+        v-if="!collapsed"
+        type="button"
+        class="append-clip"
+        :aria-label="`Add clip to ${lane.name}`"
+        title="Create a clip after the last clip on this track"
+        @click="appendClip"
+      >
+        + Clip
+      </button>
       <details v-if="!collapsed" class="lane-settings">
         <summary>Sound &amp; source</summary>
         <slot name="settings" />
@@ -167,7 +189,14 @@ const onKeyDown = (event: KeyboardEvent) => {
             @update:source="emit('update-source', $event)"
           />
         </div>
-        <button type="button" class="delete-lane" :aria-label="`Delete ${lane.name}`" @click="emit('delete-lane')">Delete lane</button>
+        <button
+          type="button"
+          class="delete-lane"
+          :aria-label="`Delete ${lane.name}`"
+          @click="emit('delete-lane')"
+        >
+          Delete lane
+        </button>
       </details>
     </header>
     <div
@@ -210,7 +239,9 @@ const onKeyDown = (event: KeyboardEvent) => {
         /></pre>
         <div v-else class="clip-preview"><slot name="preview" :clip="clip" /></div>
       </button>
-      <span v-if="!lane.clips.length" class="hint">Double-click to create a clip<br />or choose + Clip</span>
+      <span v-if="!lane.clips.length" class="hint"
+        >Double-click to create a clip<br />or choose + Clip</span
+      >
     </div>
   </section>
 </template>
@@ -292,11 +323,14 @@ const onKeyDown = (event: KeyboardEvent) => {
   align-items: center;
   gap: 0.3rem;
 }
-.lane-settings :deep(input:not([type='radio'])), .lane-settings :deep(select) {
+.lane-settings :deep(input:not([type='radio'])),
+.lane-settings :deep(select) {
   min-width: 0;
   max-width: 100%;
 }
-.lane-settings :deep(.instrument-source), .lane-settings :deep(.instrument-import), .lane-settings :deep(.drumkit-source) {
+.lane-settings :deep(.instrument-source),
+.lane-settings :deep(.instrument-import),
+.lane-settings :deep(.drumkit-source) {
   min-width: 0;
   flex-wrap: wrap;
 }
@@ -357,7 +391,8 @@ const onKeyDown = (event: KeyboardEvent) => {
   background: var(--xenpaper-slate-875);
   pointer-events: none;
 }
-.clip pre, .clip-preview {
+.clip pre,
+.clip-preview {
   position: absolute;
   inset: 1.5rem 0.25rem 0.25rem;
   margin: 0;
