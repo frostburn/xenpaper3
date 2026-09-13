@@ -88,6 +88,26 @@ describe('DAW workspace', () => {
     expect(wrapper.get('[aria-label="Play"]').attributes('aria-pressed')).toBe('false')
   })
 
+  it('selects a focused clip before opening its editor with Enter', async () => {
+    const wrapper = mountDaw()
+    await wrapper.get('[aria-label="Add clip to Instrument 1"]').trigger('click')
+    await wrapper.get('textarea[aria-label="Xenpaper clip source"]').setValue('C D E')
+    await wrapper.get('textarea[aria-label="Xenpaper clip source"]').trigger('blur')
+    await wrapper.get('[aria-label="Add clip to Instrument 1"]').trigger('click')
+    const clips = wrapper.findAll('button.clip')
+    const firstClip = clips[0]!
+    const firstClipElement = firstClip.element as HTMLElement
+    firstClipElement.focus()
+
+    await firstClip.trigger('keydown', { key: 'Enter' })
+
+    expect(firstClip.classes()).toContain('selected')
+    const editor = wrapper.get<HTMLTextAreaElement>('textarea[aria-label="Xenpaper clip source"]')
+    expect(editor.element.value).toBe('C D E')
+    expect(document.activeElement).toBe(editor.element)
+    wrapper.unmount()
+  })
+
   it('leaves text editing keys and native text undo alone', async () => {
     const wrapper = mountDaw()
     await wrapper.get('[aria-label="Add clip to Instrument 1"]').trigger('click')
