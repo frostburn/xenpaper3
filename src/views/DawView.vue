@@ -1,5 +1,14 @@
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch, watchEffect } from 'vue'
+import {
+  computed,
+  nextTick,
+  onBeforeUnmount,
+  onMounted,
+  reactive,
+  ref,
+  watch,
+  watchEffect,
+} from 'vue'
 import { Fraction } from 'xen-dev-utils'
 import ArrangementTimeline from '../components/daw/ArrangementTimeline.vue'
 import { EditorHistory } from '../daw/editor-history'
@@ -179,7 +188,10 @@ watchEffect(() => {
 // is not an edit. Fraction.reviver preserves rational beats without a JSON format change.
 const history = reactive(new EditorHistory(JSON.stringify(project.value)))
 const recordProject = () => history.record(JSON.stringify(project.value))
-watch(() => JSON.stringify(project.value), (snapshot) => history.record(snapshot))
+watch(
+  () => JSON.stringify(project.value),
+  (snapshot) => history.record(snapshot),
+)
 const beginEdit = () => {
   recordProject()
   history.begin()
@@ -455,7 +467,9 @@ const renderProject = async () => {
 const onShortcut = (event: KeyboardEvent) => {
   if (event.defaultPrevented || event.repeat || event.isComposing || event.altKey) return
   const target = event.target instanceof Element ? event.target : undefined
-  const editing = target?.closest('input, textarea, select, [contenteditable]:not([contenteditable="false"])')
+  const editing = target?.closest(
+    'input, textarea, select, [contenteditable]:not([contenteditable="false"])',
+  )
   const command = event.ctrlKey || event.metaKey
   const key = event.key.toLowerCase()
   if (command && key === 's') {
@@ -591,10 +605,27 @@ onBeforeUnmount(() => {
         @stop="stopPlayback"
       />
       <div class="history-controls" aria-label="Edit history">
-        <button type="button" aria-label="Undo" title="Undo (Ctrl/⌘ Z)" :disabled="!history.canUndo" @click="restoreHistory()">↶</button>
-        <button type="button" aria-label="Redo" title="Redo (Ctrl/⌘ Shift Z)" :disabled="!history.canRedo" @click="restoreHistory(true)">↷</button>
+        <button
+          type="button"
+          aria-label="Undo"
+          title="Undo (Ctrl/⌘ Z)"
+          :disabled="!history.canUndo"
+          @click="restoreHistory()"
+        >
+          ↶
+        </button>
+        <button
+          type="button"
+          aria-label="Redo"
+          title="Redo (Ctrl/⌘ Shift Z)"
+          :disabled="!history.canRedo"
+          @click="restoreHistory(true)"
+        >
+          ↷
+        </button>
       </div>
-      <label>Snap
+      <label
+        >Snap
         <select v-model.number="gridDenominator" aria-label="Clip snap grid">
           <option :value="1">1 beat</option>
           <option :value="2">½ beat</option>
@@ -604,17 +635,32 @@ onBeforeUnmount(() => {
           <option :value="16">¹⁄₁₆ beat</option>
         </select>
       </label>
-      <label>View
+      <label
+        >View
         <select v-model="displayMode" aria-label="Clip display">
           <option value="piano-roll">Piano roll</option>
           <option value="source">Source</option>
         </select>
       </label>
-      <label class="zoom-control">Zoom
-        <input v-model.number="pixelsPerBeat" aria-label="Timeline zoom" type="range" :min="Math.min(8, pixelsPerBeat)" max="160" />
+      <label class="zoom-control"
+        >Zoom
+        <input
+          v-model.number="pixelsPerBeat"
+          aria-label="Timeline zoom"
+          type="range"
+          :min="Math.min(8, pixelsPerBeat)"
+          max="160"
+        />
       </label>
       <button type="button" @click="timeline?.fit()">Fit project</button>
-      <button type="button" :aria-pressed="followPlayhead" title="Keep the playing position visible. Panning turns this off." @click="followPlayhead = !followPlayhead">Follow</button>
+      <button
+        type="button"
+        :aria-pressed="followPlayhead"
+        title="Keep the playing position visible. Panning turns this off."
+        @click="followPlayhead = !followPlayhead"
+      >
+        Follow
+      </button>
     </div>
     <p v-if="projectLoadError" class="playback-error" role="alert">{{ projectLoadError }}</p>
     <p v-if="playbackError" class="playback-error" role="alert">{{ playbackError }}</p>
@@ -623,7 +669,11 @@ onBeforeUnmount(() => {
         <details class="project-settings">
           <summary>
             <strong>{{ project.globalTrack.tempoChanges[0]!.bpm }} BPM</strong>
-            <span>{{ project.globalTrack.timeSignatureChanges[0]!.numerator }}/{{ project.globalTrack.timeSignatureChanges[0]!.denominator }}</span>
+            <span
+              >{{ project.globalTrack.timeSignatureChanges[0]!.numerator }}/{{
+                project.globalTrack.timeSignatureChanges[0]!.denominator
+              }}</span
+            >
             <span>Global tuning &amp; defaults</span>
           </summary>
           <GlobalLane
@@ -637,7 +687,6 @@ onBeforeUnmount(() => {
               }
             "
           />
-
         </details>
         <ArrangementTimeline
           ref="timeline"
@@ -696,15 +745,15 @@ onBeforeUnmount(() => {
               />
             </template>
           </section>
-
         </ArrangementTimeline>
         <div class="add-lanes">
-          <button type="button" class="add-lane" @click="addInstrumentLane">Add instrument lane</button>
+          <button type="button" class="add-lane" @click="addInstrumentLane">
+            Add instrument lane
+          </button>
           <button type="button" class="add-lane add-drum-lane" @click="addDrumLane">
             Add drum lane
           </button>
         </div>
-
       </section>
       <aside class="clip-inspector" aria-label="Clip editor">
         <ClipSourceEditor
@@ -712,7 +761,9 @@ onBeforeUnmount(() => {
           :clip="selectedClip"
           :lane-name="selectedLane?.name"
           :source-key="
-            selectedLane && selectedClip ? clipSourceKey(selectedLane.id, selectedClip.id) : undefined
+            selectedLane && selectedClip
+              ? clipSourceKey(selectedLane.id, selectedClip.id)
+              : undefined
           "
           :drum-samples="selectedLane ? drumSamplesForLane(selectedLane) : undefined"
           :diagnostics="selectedClipDiagnostics"
@@ -727,14 +778,19 @@ onBeforeUnmount(() => {
       </aside>
     </div>
     <footer class="workspace-status">
-      <span v-if="selectedClip && selectedLane">{{ selectedLane.name }} · Beat {{ beatToNumber(selectedClip.start) }} · {{ beatToNumber(selectedClip.length) }} beats</span>
+      <span v-if="selectedClip && selectedLane"
+        >{{ selectedLane.name }} · Beat {{ beatToNumber(selectedClip.start) }} ·
+        {{ beatToNumber(selectedClip.length) }} beats</span
+      >
       <span v-else>Double-click a lane to create a clip, or use + Clip.</span>
-      <button type="button" :aria-expanded="shortcutsOpen" @click="shortcutsOpen = !shortcutsOpen">Keyboard shortcuts</button>
+      <button type="button" :aria-expanded="shortcutsOpen" @click="shortcutsOpen = !shortcutsOpen">
+        Keyboard shortcuts
+      </button>
     </footer>
     <p v-if="shortcutsOpen" class="shortcut-help">
-      Space: play / pause · Escape: stop · Home: start · Delete: delete clip ·
-      Enter on a clip: edit · Ctrl/⌘ D: duplicate · Ctrl/⌘ Z: undo · Ctrl/⌘ Shift Z: redo · Ctrl/⌘ S: export ·
-      Ctrl/⌘ Enter: play from clip (add Shift for solo). Text fields keep their normal editing keys.
+      Space: play / pause · Escape: stop · Home: start · Delete: delete clip · Enter on a clip: edit
+      · Ctrl/⌘ D: duplicate · Ctrl/⌘ Z: undo · Ctrl/⌘ Shift Z: redo · Ctrl/⌘ S: export · Ctrl/⌘
+      Enter: play from clip (add Shift for solo). Text fields keep their normal editing keys.
     </p>
   </div>
 </template>
@@ -753,7 +809,9 @@ onBeforeUnmount(() => {
   background: var(--xenpaper-slate-950);
   font-size: 0.875rem;
 }
-.daw :deep(button:not(.clip)), .daw :deep(select), .daw :deep(input:not([type='range']):not([type='file'])) {
+.daw :deep(button:not(.clip)),
+.daw :deep(select),
+.daw :deep(input:not([type='range']):not([type='file'])) {
   box-sizing: border-box;
   min-height: 2rem;
   border: 1px solid var(--xenpaper-slate-500);
@@ -763,10 +821,13 @@ onBeforeUnmount(() => {
   color: inherit;
   background: var(--xenpaper-slate-850);
 }
-.daw :deep(button), .daw :deep(summary), .project-file-button {
+.daw :deep(button),
+.daw :deep(summary),
+.project-file-button {
   cursor: pointer;
 }
-.daw :deep(button:not(.clip):hover:not(:disabled)), .project-file-button:hover {
+.daw :deep(button:not(.clip):hover:not(:disabled)),
+.project-file-button:hover {
   border-color: var(--xenpaper-slate-400);
 }
 .daw :deep(button:disabled) {
@@ -777,14 +838,18 @@ onBeforeUnmount(() => {
   border-color: var(--xenpaper-cyan);
   color: var(--xenpaper-cyan);
 }
-.daw :deep(:focus-visible), .project-file-button:focus-within {
+.daw :deep(:focus-visible),
+.project-file-button:focus-within {
   outline: 2px solid var(--xenpaper-cyan);
   outline-offset: 2px;
 }
 .daw :deep(input[type='range']) {
   accent-color: var(--xenpaper-cyan);
 }
-.project-header, .workspace-toolbar, .project-file-actions, .workspace-status {
+.project-header,
+.workspace-toolbar,
+.project-file-actions,
+.workspace-status {
   display: flex;
   align-items: center;
   gap: 0.6rem;
@@ -821,14 +886,16 @@ onBeforeUnmount(() => {
   padding: 0.35rem 0.55rem;
   background: var(--xenpaper-slate-850);
 }
-.project-file-input, .sr-only {
+.project-file-input,
+.sr-only {
   position: absolute;
   width: 1px;
   height: 1px;
   overflow: hidden;
   clip-path: inset(50%);
 }
-.render-tail, .workspace-toolbar label {
+.render-tail,
+.workspace-toolbar label {
   display: flex;
   align-items: center;
   gap: 0.4rem;

@@ -1068,10 +1068,10 @@ describe('DawView', () => {
     expect(wrapper.find('[aria-label="Collapse Percussion"]').exists()).toBe(true)
     expect(lane.get('output').text()).toBe('37%')
     expect(lane.get('[aria-label="Delete Percussion"]').classes()).toContain('delete-lane')
-    expect(lane.get('.track-title [aria-label="Drum lane name"]').exists()).toBe(true)
+    expect(lane.find('.track-title [aria-label="Drum lane name"]').exists()).toBe(true)
     expect(lane.get('[aria-label="Add clip to Percussion"]').text()).toBe('+ Clip')
     expect(lane.get('details.lane-settings').attributes('open')).toBeUndefined()
-    expect(lane.get('.lane-settings [aria-label="Drum samples"]').exists()).toBe(true)
+    expect(lane.find('.lane-settings [aria-label="Drum samples"]').exists()).toBe(true)
     expect(lane.get('[aria-label="Drum lane"]').attributes('aria-label')).toBe('Drum lane')
     const laneSource = lane.get('[aria-label="Drum lane source"]')
     expect((laneSource.element as HTMLTextAreaElement).value).toBe(

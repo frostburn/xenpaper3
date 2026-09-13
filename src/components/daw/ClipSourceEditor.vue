@@ -30,7 +30,9 @@ defineExpose({ focus: () => editor.value?.focus() })
       <div>
         <p class="eyebrow">{{ laneName || 'CLIP EDITOR' }}</p>
         <h2>Clip source</h2>
-        <p v-if="clip" class="clip-position">Beat {{ beatToNumber(clip.start) }} · {{ beatToNumber(clip.length) }} beats</p>
+        <p v-if="clip" class="clip-position">
+          Beat {{ beatToNumber(clip.start) }} · {{ beatToNumber(clip.length) }} beats
+        </p>
       </div>
       <div v-if="clip" class="clip-actions">
         <button type="button" aria-label="Play from clip start" @click="emit('play')">
@@ -44,7 +46,14 @@ defineExpose({ focus: () => editor.value?.focus() })
           ▶ Solo
         </button>
         <button type="button" aria-label="Stop clip playback" @click="emit('stop')">■ Stop</button>
-        <button type="button" aria-label="Duplicate clip" title="Duplicate after this clip (Ctrl/⌘ D)" @click="emit('duplicate')">Duplicate</button>
+        <button
+          type="button"
+          aria-label="Duplicate clip"
+          title="Duplicate after this clip (Ctrl/⌘ D)"
+          @click="emit('duplicate')"
+        >
+          Duplicate
+        </button>
         <button type="button" aria-label="Delete clip" @click="emit('delete')">Delete</button>
       </div>
     </header>
@@ -60,10 +69,16 @@ defineExpose({ focus: () => editor.value?.focus() })
       :rows="14"
       @update:source="(source, sourceKey) => emit('update-source', source, sourceKey)"
     />
-    <p v-if="clip" class="source-help">The source determines this clip’s length. Ctrl/⌘ Enter plays from the clip; add Shift to hear it solo.</p>
+    <p v-if="clip" class="source-help">
+      The source determines this clip’s length. Ctrl/⌘ Enter plays from the clip; add Shift to hear
+      it solo.
+    </p>
     <div v-else class="editor-empty">
       <strong>Make room for an idea.</strong>
-      <p>Select or create a clip to edit its source here. Double-click a track or choose + Clip to start a new one.</p>
+      <p>
+        Select or create a clip to edit its source here. Double-click a track or choose + Clip to
+        start a new one.
+      </p>
       <p>Drag clips to arrange them. Switch View to Source to read your score on the timeline.</p>
     </div>
   </section>
@@ -89,7 +104,8 @@ defineExpose({ focus: () => editor.value?.focus() })
   color: var(--xenpaper-cyan);
   overflow-wrap: anywhere;
 }
-.clip-position, .source-help {
+.clip-position,
+.source-help {
   color: var(--xenpaper-slate-400);
   font-size: 0.75rem;
   line-height: 1.6;

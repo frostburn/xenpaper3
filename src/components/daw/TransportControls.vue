@@ -5,10 +5,23 @@ defineEmits<{ play: []; stop: [] }>()
 
 <template>
   <div class="transport" aria-label="Transport controls">
-    <button type="button" aria-label="Play" :title="playing ? 'Pause (Space)' : 'Play (Space)'" :aria-pressed="playing" @click="$emit('play')">
+    <button
+      type="button"
+      aria-label="Play"
+      :title="playing ? 'Pause (Space)' : 'Play (Space)'"
+      :aria-pressed="playing"
+      @click="$emit('play')"
+    >
       {{ playing ? '❚❚ Pause' : '▶ Play' }}
     </button>
-    <button type="button" aria-label="Stop" title="Stop and return to the beginning (Escape)" @click="$emit('stop')">■ Stop</button>
+    <button
+      type="button"
+      aria-label="Stop"
+      title="Stop and return to the beginning (Escape)"
+      @click="$emit('stop')"
+    >
+      ■ Stop
+    </button>
     <output>Beat {{ playhead.toFixed(2) }}</output>
   </div>
 </template>
