@@ -159,7 +159,7 @@ defineExpose({ focus: () => editor.value?.focus() })
   width: 0.5rem;
   height: 0.5rem;
   border-radius: 50%;
-  background: var(--xenpaper-slate-300);
+  background: var(--xenpaper-teal-700);
   transition: transform 120ms ease;
 }
 .solo-toggle[aria-pressed='true'] .toggle-track {
