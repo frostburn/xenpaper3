@@ -1,11 +1,12 @@
 <script setup lang="ts">
 import { ref } from 'vue'
-import type { SourceClip } from '../../daw/project'
+import { beatToNumber, type SourceClip } from '../../daw/project'
 import type { Diagnostic } from '../../../xenpaper-lang'
 import XenpaperSourceEditor from './XenpaperSourceEditor.vue'
 
 defineProps<{
   clip?: SourceClip
+  laneName?: string
   sourceKey?: string
   drumSamples?: readonly string[]
   diagnostics?: readonly Diagnostic[]
@@ -14,6 +15,7 @@ defineProps<{
 const emit = defineEmits<{
   'update-source': [source: string, sourceKey?: string]
   delete: []
+  duplicate: []
   play: []
   'play-solo': []
   stop: []
@@ -25,7 +27,13 @@ defineExpose({ focus: () => editor.value?.focus() })
 <template>
   <section class="source-editor">
     <header>
-      <h2>Clip source</h2>
+      <div>
+        <p class="eyebrow">{{ laneName || 'CLIP EDITOR' }}</p>
+        <h2>Clip source</h2>
+        <p v-if="clip" class="clip-position">
+          Beat {{ beatToNumber(clip.start) }} · {{ beatToNumber(clip.length) }} beats
+        </p>
+      </div>
       <div v-if="clip" class="clip-actions">
         <button type="button" aria-label="Play from clip start" @click="emit('play')">
           ▶ Play
@@ -38,6 +46,14 @@ defineExpose({ focus: () => editor.value?.focus() })
           ▶ Solo
         </button>
         <button type="button" aria-label="Stop clip playback" @click="emit('stop')">■ Stop</button>
+        <button
+          type="button"
+          aria-label="Duplicate clip"
+          title="Duplicate after this clip (Ctrl/⌘ D)"
+          @click="emit('duplicate')"
+        >
+          Duplicate
+        </button>
         <button type="button" aria-label="Delete clip" @click="emit('delete')">Delete</button>
       </div>
     </header>
@@ -50,18 +66,52 @@ defineExpose({ focus: () => editor.value?.focus() })
       :drum-samples="drumSamples"
       :diagnostics="diagnostics"
       :playing-ranges="playingRanges"
-      :rows="8"
+      :rows="14"
       @update:source="(source, sourceKey) => emit('update-source', source, sourceKey)"
     />
-    <p v-else>Select or create a clip to edit its Xenpaper source.</p>
+    <p v-if="clip" class="source-help">
+      The source determines this clip’s length. Ctrl/⌘ Enter plays from the clip; add Shift to hear
+      it solo.
+    </p>
+    <div v-else class="editor-empty">
+      <strong>Make room for an idea.</strong>
+      <p>
+        Select or create a clip to edit its source here. Double-click a track or choose + Clip to
+        start a new one.
+      </p>
+      <p>Drag clips to arrange them. Switch View to Source to read your score on the timeline.</p>
+    </div>
   </section>
 </template>
 
 <style scoped>
+.source-editor {
+  min-width: 0;
+}
 .source-editor header {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
+  flex-direction: column;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+.source-editor h2 {
+  margin: 0.15rem 0;
+  font-size: 1.15rem;
+}
+.eyebrow {
+  margin: 0;
+  font-size: 0.7rem;
+  color: var(--xenpaper-cyan);
+  overflow-wrap: anywhere;
+}
+.clip-position,
+.source-help {
+  color: var(--xenpaper-slate-400);
+  font-size: 0.75rem;
+  line-height: 1.6;
+}
+.clip-position {
+  margin: 0.3rem 0 0;
 }
 .clip-actions {
   display: flex;
@@ -72,5 +122,13 @@ defineExpose({ focus: () => editor.value?.focus() })
   box-sizing: border-box;
   width: 100%;
   font-family: monospace;
+}
+.editor-empty {
+  padding-block: 1rem;
+  color: var(--xenpaper-slate-400);
+  line-height: 1.7;
+}
+.editor-empty strong {
+  color: var(--xenpaper-slate-100);
 }
 </style>

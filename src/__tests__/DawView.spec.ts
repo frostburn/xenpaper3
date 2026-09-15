@@ -945,28 +945,31 @@ describe('DawView', () => {
   it('keeps the visual grid aligned with zoom and scroll', async () => {
     const wrapper = mount(DawView)
     await wrapper.get('[aria-label="Timeline zoom"]').setValue('96')
-    await wrapper.get('[aria-label="Timeline scroll"]').setValue('32')
+    const scroll = wrapper.get<HTMLElement>('[aria-label="Timeline scroll"]')
+    scroll.element.scrollLeft = 32
+    await scroll.trigger('scroll')
 
     const style = wrapper.get('[aria-label="Instrument piano roll"]').attributes('style')
     expect(style).toContain('--beat-width: 96px')
     expect(style).toContain('--grid-offset: -32px')
   })
 
-  it('offers a wide project-aware scroll range and a lower minimum zoom', async () => {
+  it('uses a native project-aware scrollbar and clamps it when zooming out', async () => {
     const wrapper = mount(DawView)
     const zoom = wrapper.get('[aria-label="Timeline zoom"]')
-    const scroll = wrapper.get('[aria-label="Timeline scroll"]')
+    const scroll = wrapper.get<HTMLElement>('[aria-label="Timeline scroll"]')
 
     expect(zoom.attributes('min')).toBe('8')
-    expect(scroll.element.parentElement?.parentElement?.className).toBe('scroll-controls')
-    expect(Number(scroll.attributes('max'))).toBe(16 * 64)
+    expect(scroll.classes()).toContain('native-scroll')
+    expect(scroll.get('div').attributes('style')).toContain(`width: ${16 * 64}px`)
 
     await wrapper.getComponent(PitchedLane).trigger('dblclick', { clientX: 1280 })
-    expect(Number(scroll.attributes('max'))).toBe((24 + 16) * 64)
+    expect(scroll.get('div').attributes('style')).toContain(`width: ${(24 + 8) * 64}px`)
 
-    await scroll.setValue('2000')
+    scroll.element.scrollLeft = 1000
+    await scroll.trigger('scroll')
     await zoom.setValue('8')
-    expect((scroll.element as HTMLInputElement).value).toBe(String((24 + 16) * 8))
+    expect(scroll.element.scrollLeft).toBe(0)
   })
 
   it('collapses and expands instrument and drum lanes', async () => {
@@ -1065,18 +1068,10 @@ describe('DawView', () => {
     expect(wrapper.find('[aria-label="Collapse Percussion"]').exists()).toBe(true)
     expect(lane.get('output').text()).toBe('37%')
     expect(lane.get('[aria-label="Delete Percussion"]').classes()).toContain('delete-lane')
-    expect(
-      Array.from(lane.get('header').element.children).map((element) =>
-        element.getAttribute('aria-label'),
-      ),
-    ).toEqual([
-      'Drum lane name',
-      'Collapse Percussion',
-      'Delete Percussion',
-      null,
-      'Drum samples',
-      null,
-    ])
+    expect(lane.find('.track-title [aria-label="Drum lane name"]').exists()).toBe(true)
+    expect(lane.get('[aria-label="Add clip to Percussion"]').text()).toBe('+ Clip')
+    expect(lane.get('details.lane-settings').attributes('open')).toBeUndefined()
+    expect(lane.find('.lane-settings [aria-label="Drum samples"]').exists()).toBe(true)
     expect(lane.get('[aria-label="Drum lane"]').attributes('aria-label')).toBe('Drum lane')
     const laneSource = lane.get('[aria-label="Drum lane source"]')
     expect((laneSource.element as HTMLTextAreaElement).value).toBe(

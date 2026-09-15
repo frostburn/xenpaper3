@@ -24,13 +24,10 @@ let pendingSourceKey: string | undefined
 
 const EDIT_DEBOUNCE_MS = 200
 
-watch(
-  () => props.source,
-  (source) => {
-    commitDraft()
-    draft.value = source
-  },
-)
+watch([() => props.source, () => props.sourceKey], ([source]) => {
+  commitDraft()
+  draft.value = source
+})
 
 function commitDraft() {
   if (!updateTimer) return
@@ -47,6 +44,13 @@ const updateDraft = (event: Event) => {
   // the textarea responsive and let that work happen once after a burst of typing.
   pendingSourceKey = props.sourceKey
   updateTimer = setTimeout(commitDraft, EDIT_DEBOUNCE_MS)
+}
+
+// Flush before the DAW's window-level save/play shortcut sees the event. Do not
+// consume it here: the source editor also appears outside the DAW.
+const commitBeforeCommand = (event: KeyboardEvent) => {
+  if (event.isComposing || !(event.ctrlKey || event.metaKey)) return
+  if (event.key.toLowerCase() === 's' || event.key === 'Enter') commitDraft()
 }
 
 const syncScroll = (event: Event) => {
@@ -77,6 +81,7 @@ onBeforeUnmount(() => {
       autocapitalize="off"
       spellcheck="false"
       @input="updateDraft"
+      @keydown="commitBeforeCommand"
       @blur="commitDraft"
       @scroll="syncScroll"
     />
