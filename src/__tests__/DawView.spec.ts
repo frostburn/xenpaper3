@@ -40,6 +40,7 @@ import {
   clipSourceDiagnostics,
   compileSourceInitialization,
   drumSamplesForLane,
+  sourceLineCarets,
 } from '../daw/score'
 
 describe('DAW project model', () => {
@@ -111,6 +112,15 @@ describe('DAW project model', () => {
 
     expect(notes[0]!.sourceRanges).toContainEqual({ start: 0, end: 1 })
     expect(notes[1]!.sourceRanges).toContainEqual({ start: 2, end: 3 })
+  })
+
+  it('places a playback caret at the first note beat on each source line', () => {
+    const source = 'C D\nE F'
+
+    expect(sourceLineCarets(source, parseClipNotes(source))).toEqual([
+      { line: 0, beat: 0 },
+      { line: 1, beat: 2 },
+    ])
   })
 
   it('excludes inherited function bodies from clip-local playback ranges', () => {
@@ -1005,15 +1015,25 @@ describe('DawView', () => {
     )
   })
 
-  it('adds play, solo, and stop actions to the selected clip header', async () => {
+  it('uses the solo toggle for clip and source-line playback', async () => {
     const wrapper = mount(DawView)
     await wrapper.getComponent(PitchedLane).trigger('dblclick', { clientX: 64 })
+    const sourceEditor = wrapper.get('[aria-label="Xenpaper clip source"]')
+    await sourceEditor.setValue('C\nD')
+    await sourceEditor.trigger('blur')
 
+    const solo = wrapper.get('[aria-label="Solo clip playback"]')
+    expect(solo.attributes('aria-pressed')).toBe('false')
+    await solo.trigger('click')
+    expect(solo.attributes('aria-pressed')).toBe('true')
+    expect(wrapper.find('[aria-label="Play clip solo from clip start"]').exists()).toBe(false)
+
+    await wrapper.get('[aria-label="Play from line 2"]').trigger('click')
+    expect(wrapper.get('[aria-label="Play"]').attributes('aria-pressed')).toBe('true')
+    expect(wrapper.get('output').text()).toBe('Beat 2.00')
     await wrapper.get('[aria-label="Play from clip start"]').trigger('click')
     expect(wrapper.get('[aria-label="Play"]').attributes('aria-pressed')).toBe('true')
     expect(wrapper.get('output').text()).toBe('Beat 1.00')
-    await wrapper.get('[aria-label="Play clip solo from clip start"]').trigger('click')
-    expect(wrapper.get('[aria-label="Play"]').attributes('aria-pressed')).toBe('true')
     await wrapper.get('[aria-label="Stop clip playback"]').trigger('click')
     expect(wrapper.get('output').text()).toBe('Beat 0.00')
     wrapper.unmount()

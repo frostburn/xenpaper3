@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { onBeforeUnmount, ref, watch } from 'vue'
 import type { Diagnostic } from '../../../xenpaper-lang'
+import type { SourceLineCaret } from '../../daw/score'
 import XenpaperSourceHighlight from './XenpaperSourceHighlight.vue'
 
 const props = withDefaults(
@@ -12,10 +13,14 @@ const props = withDefaults(
     drumSamples?: readonly string[]
     diagnostics?: readonly Diagnostic[]
     playingRanges?: readonly { readonly start: number; readonly end: number }[]
+    lineCarets?: readonly SourceLineCaret[]
   }>(),
   { rows: 3 },
 )
-const emit = defineEmits<{ 'update:source': [source: string, sourceKey?: string] }>()
+const emit = defineEmits<{
+  'update:source': [source: string, sourceKey?: string]
+  'play-from': [beat: number]
+}>()
 const textarea = ref<HTMLTextAreaElement>()
 const scroll = ref({ left: 0, top: 0 })
 const draft = ref(props.source)
@@ -66,6 +71,22 @@ onBeforeUnmount(() => {
 
 <template>
   <div class="xenpaper-source-editor">
+    <div v-if="lineCarets?.length" class="line-carets" aria-label="Play from source line">
+      <button
+        v-for="lineCaret in lineCarets"
+        :key="lineCaret.line"
+        type="button"
+        class="line-caret"
+        :style="{
+          top: `calc(0.35rem + ${lineCaret.line * 1.2}em - ${scroll.top}px)`,
+        }"
+        :aria-label="`Play from line ${lineCaret.line + 1}`"
+        :title="`Play from line ${lineCaret.line + 1}`"
+        @click="emit('play-from', lineCaret.beat)"
+      >
+        <span aria-hidden="true">▶</span>
+      </button>
+    </div>
     <pre
       aria-hidden="true"
     ><XenpaperSourceHighlight :source="draft" :stable-source="updateTimer ? source : undefined" :drum-samples="drumSamples" :diagnostics="diagnostics" :playing-ranges="playingRanges" :style="{
@@ -100,7 +121,7 @@ onBeforeUnmount(() => {
   width: 100%;
   min-height: 100%;
   margin: 0;
-  padding: 0.35rem;
+  padding: 0.35rem 0.35rem 0.35rem 1.65rem;
   border: 1px solid var(--xenpaper-slate-500);
   border-radius: 0.2rem;
   font: inherit;
@@ -108,6 +129,38 @@ onBeforeUnmount(() => {
   line-height: 1.2;
   tab-size: 2;
   white-space: pre;
+}
+.line-carets {
+  position: absolute;
+  z-index: 2;
+  inset: 0 auto 0 0;
+  width: 1.5rem;
+  overflow: hidden;
+  border-radius: 0.2rem 0 0 0.2rem;
+  pointer-events: none;
+}
+.line-caret {
+  position: absolute;
+  left: 0.35rem;
+  box-sizing: border-box;
+  width: 0.8rem;
+  height: 1.2em;
+  padding: 0;
+  border: 0;
+  color: var(--xenpaper-cyan);
+  font: inherit;
+  line-height: 1.2;
+  background: transparent;
+  cursor: pointer;
+  pointer-events: auto;
+}
+.line-caret span {
+  font-size: 0.75em;
+}
+.line-caret:hover,
+.line-caret:focus-visible {
+  color: var(--xenpaper-white);
+  filter: drop-shadow(0 0 0.2rem var(--xenpaper-cyan));
 }
 .xenpaper-source-editor pre {
   position: absolute;
