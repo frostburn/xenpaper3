@@ -823,7 +823,7 @@ onBeforeUnmount(() => {
   background: var(--xenpaper-slate-950);
   font-size: 0.875rem;
 }
-.daw :deep(button:not(.clip)),
+.daw :deep(button:not(.clip):not(.line-caret)),
 .daw :deep(select),
 .daw :deep(input:not([type='range']):not([type='file'])) {
   box-sizing: border-box;
@@ -840,7 +840,7 @@ onBeforeUnmount(() => {
 .project-file-button {
   cursor: pointer;
 }
-.daw :deep(button:not(.clip):hover:not(:disabled)),
+.daw :deep(button:not(.clip):not(.line-caret):hover:not(:disabled)),
 .project-file-button:hover {
   border-color: var(--xenpaper-slate-400);
 }

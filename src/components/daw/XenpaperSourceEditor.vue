@@ -71,23 +71,20 @@ onBeforeUnmount(() => {
 
 <template>
   <div class="xenpaper-source-editor">
-    <div
-      v-if="lineCarets?.length"
-      class="line-carets"
-      aria-label="Play from source line"
-      :style="{ transform: `translateY(${-scroll.top}px)` }"
-    >
+    <div v-if="lineCarets?.length" class="line-carets" aria-label="Play from source line">
       <button
         v-for="lineCaret in lineCarets"
         :key="lineCaret.line"
         type="button"
         class="line-caret"
-        :style="{ top: `calc(0.35rem + ${lineCaret.line * 1.2}em)` }"
+        :style="{
+          top: `calc(0.35rem + ${lineCaret.line * 1.2}em - ${scroll.top}px)`,
+        }"
         :aria-label="`Play from line ${lineCaret.line + 1}`"
         :title="`Play from line ${lineCaret.line + 1}`"
         @click="emit('play-from', lineCaret.beat)"
       >
-        ▶
+        <span aria-hidden="true">▶</span>
       </button>
     </div>
     <pre
@@ -136,9 +133,10 @@ onBeforeUnmount(() => {
 .line-carets {
   position: absolute;
   z-index: 2;
-  top: 0;
-  left: 0;
+  inset: 0 auto 0 0;
   width: 1.5rem;
+  overflow: hidden;
+  border-radius: 0.2rem 0 0 0.2rem;
   pointer-events: none;
 }
 .line-caret {
@@ -151,11 +149,13 @@ onBeforeUnmount(() => {
   border: 0;
   color: var(--xenpaper-cyan);
   font: inherit;
-  font-size: 0.75em;
   line-height: 1.2;
   background: transparent;
   cursor: pointer;
   pointer-events: auto;
+}
+.line-caret span {
+  font-size: 0.75em;
 }
 .line-caret:hover,
 .line-caret:focus-visible {

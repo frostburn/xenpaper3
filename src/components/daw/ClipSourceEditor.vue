@@ -33,7 +33,20 @@ defineExpose({ focus: () => editor.value?.focus() })
     <header>
       <div>
         <p class="eyebrow">{{ laneName || 'CLIP EDITOR' }}</p>
-        <h2>Clip source</h2>
+        <div class="clip-title">
+          <h2>Clip source</h2>
+          <button
+            v-if="clip"
+            type="button"
+            class="solo-toggle"
+            aria-label="Solo clip playback"
+            :aria-pressed="solo || false"
+            @click="emit('update:solo', !solo)"
+          >
+            <span class="toggle-track" aria-hidden="true"><span /></span>
+            Solo
+          </button>
+        </div>
         <p v-if="clip" class="clip-position">
           Beat {{ beatToNumber(clip.start) }} · {{ beatToNumber(clip.length) }} beats
         </p>
@@ -41,15 +54,6 @@ defineExpose({ focus: () => editor.value?.focus() })
       <div v-if="clip" class="clip-actions">
         <button type="button" aria-label="Play from clip start" @click="emit('play')">
           ▶ Play
-        </button>
-        <button
-          type="button"
-          class="solo-toggle"
-          aria-label="Solo clip playback"
-          :aria-pressed="solo || false"
-          @click="emit('update:solo', !solo)"
-        >
-          Solo
         </button>
         <button type="button" aria-label="Stop clip playback" @click="emit('stop')">■ Stop</button>
         <button
@@ -106,6 +110,11 @@ defineExpose({ focus: () => editor.value?.focus() })
   margin: 0.15rem 0;
   font-size: 1.15rem;
 }
+.clip-title {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+}
 .eyebrow {
   margin: 0;
   font-size: 0.7rem;
@@ -126,9 +135,40 @@ defineExpose({ focus: () => editor.value?.focus() })
   flex-wrap: wrap;
   gap: 0.4rem;
 }
-.solo-toggle[aria-pressed='true'] {
-  color: var(--xenpaper-slate-950);
+.solo-toggle {
+  display: inline-flex;
+  align-items: center;
+  min-height: 1.6rem;
+  padding: 0.15rem 0.45rem;
+  gap: 0.35rem;
+  font-size: 0.75rem;
+}
+.toggle-track {
+  position: relative;
+  display: inline-block;
+  width: 1.5rem;
+  height: 0.8rem;
+  border: 1px solid var(--xenpaper-slate-400);
+  border-radius: 999px;
+  background: var(--xenpaper-slate-900);
+}
+.toggle-track span {
+  position: absolute;
+  top: 0.1rem;
+  left: 0.1rem;
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 50%;
+  background: var(--xenpaper-slate-300);
+  transition: transform 120ms ease;
+}
+.solo-toggle[aria-pressed='true'] .toggle-track {
+  border-color: var(--xenpaper-cyan);
+  background: color-mix(in srgb, var(--xenpaper-cyan) 35%, var(--xenpaper-slate-900));
+}
+.solo-toggle[aria-pressed='true'] .toggle-track span {
   background: var(--xenpaper-cyan);
+  transform: translateX(0.7rem);
 }
 .source-editor .xenpaper-source-editor {
   box-sizing: border-box;
