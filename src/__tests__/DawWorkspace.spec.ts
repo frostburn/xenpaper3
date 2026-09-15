@@ -23,6 +23,29 @@ afterEach(() => {
 const mountDaw = () => mount(DawView, { attachTo: document.body })
 
 describe('DAW workspace', () => {
+  it('resizes the clip inspector with pointer and keyboard controls', async () => {
+    const wrapper = mountDaw()
+    const workspace = wrapper.get('.workspace')
+    const inspector = wrapper.get('.clip-inspector')
+    vi.spyOn(workspace.element, 'getBoundingClientRect').mockReturnValue({
+      width: 1200,
+    } as DOMRect)
+    vi.spyOn(inspector.element, 'getBoundingClientRect').mockReturnValue({
+      width: 360,
+    } as DOMRect)
+
+    const divider = wrapper.get('[role="separator"][aria-label="Resize clip editor"]')
+    divider.element.dispatchEvent(new PointerEvent('pointerdown', { button: 0, clientX: 840 }))
+    window.dispatchEvent(new PointerEvent('pointermove', { clientX: 780 }))
+    window.dispatchEvent(new PointerEvent('pointerup'))
+    await nextTick()
+    expect(workspace.attributes('style')).toContain('--clip-inspector-width: 420px')
+
+    await divider.trigger('keydown', { key: 'ArrowRight' })
+    expect(workspace.attributes('style')).toContain('--clip-inspector-width: 396px')
+    expect(divider.attributes('aria-valuenow')).toBe('396')
+  })
+
   it('adds a clip without a double-click and keeps the editor in its own dock', async () => {
     const wrapper = mountDaw()
     expect(wrapper.get('.lane-settings').attributes('open')).toBeUndefined()
