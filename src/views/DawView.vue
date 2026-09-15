@@ -26,6 +26,7 @@ import {
   parseClipNotes,
   parseDrumClipNotes,
   sourceClipLength,
+  sourceLineCarets,
   type ScheduledLaneNote,
   type SourceRange,
 } from '../daw/score'
@@ -60,6 +61,7 @@ const shortcutsOpen = ref(false)
 const displayMode = ref<ClipDisplayMode>('piano-roll')
 const playing = ref(false)
 const soloClipKey = ref<string>()
+const soloSelectedClip = ref(false)
 const playbackError = ref('')
 const renderTailSeconds = ref(2)
 const rendering = ref(false)
@@ -144,6 +146,12 @@ const selectedClipPlayingRanges = computed(() => {
   const lane = selectedLane.value
   const clip = selectedClip.value
   return lane && clip ? (playingRangesByLane.value.get(lane.id)?.[clip.id] ?? []) : []
+})
+const selectedClipLineCarets = computed(() => {
+  const lane = selectedLane.value
+  const clip = selectedClip.value
+  if (!lane || !clip) return []
+  return sourceLineCarets(clip.source, clipNotes.value.get(clipSourceKey(lane.id, clip.id)) ?? [])
 })
 const projectEndBeat = computed(() =>
   Math.max(
@@ -292,10 +300,10 @@ const seekPlayback = (at: number) => {
   else playhead.value = position
 }
 
-const playSelectedClip = (solo: boolean) => {
+const playSelectedClip = (relativeBeat = 0) => {
   if (!selectedLane.value || !selectedClip.value) return
-  const fromBeat = beatToNumber(selectedClip.value.start)
-  if (!solo) return startPlayback(fromBeat)
+  const fromBeat = beatToNumber(selectedClip.value.start) + relativeBeat
+  if (!soloSelectedClip.value) return startPlayback(fromBeat)
   const soloLane = { ...selectedLane.value, clips: [selectedClip.value] }
   return startPlayback(
     fromBeat,
@@ -482,7 +490,7 @@ const onShortcut = (event: KeyboardEvent) => {
   }
   if (command && key === 'enter') {
     event.preventDefault()
-    void nextTick(() => playSelectedClip(event.shiftKey))
+    void nextTick(() => playSelectedClip())
     return
   }
   // Native text undo, arrows, spaces, and deletion must remain native.
@@ -770,11 +778,14 @@ onBeforeUnmount(() => {
           :drum-samples="selectedLane ? drumSamplesForLane(selectedLane) : undefined"
           :diagnostics="selectedClipDiagnostics"
           :playing-ranges="selectedClipPlayingRanges"
+          :line-carets="selectedClipLineCarets"
+          :solo="soloSelectedClip"
           @update-source="updateClipSourceById"
           @delete="deleteSelectedClip"
           @duplicate="duplicateSelectedClip"
-          @play="playSelectedClip(false)"
-          @play-solo="playSelectedClip(true)"
+          @play="playSelectedClip()"
+          @play-from="playSelectedClip"
+          @update:solo="soloSelectedClip = $event"
           @stop="stopPlayback"
         />
       </aside>
@@ -792,7 +803,8 @@ onBeforeUnmount(() => {
     <p v-if="shortcutsOpen" class="shortcut-help">
       Space: play / pause · Escape: stop · Home: start · Delete: delete clip · Enter on a clip: edit
       · Ctrl/⌘ D: duplicate · Ctrl/⌘ Z: undo · Ctrl/⌘ Shift Z: redo · Ctrl/⌘ S: export · Ctrl/⌘
-      Enter: play from clip (add Shift for solo). Text fields keep their normal editing keys.
+      Enter: play from clip. The Solo toggle also applies to line wedges. Text fields keep their
+      normal editing keys.
     </p>
   </div>
 </template>

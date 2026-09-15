@@ -2,6 +2,7 @@
 import { ref } from 'vue'
 import { beatToNumber, type SourceClip } from '../../daw/project'
 import type { Diagnostic } from '../../../xenpaper-lang'
+import type { SourceLineCaret } from '../../daw/score'
 import XenpaperSourceEditor from './XenpaperSourceEditor.vue'
 
 defineProps<{
@@ -11,13 +12,16 @@ defineProps<{
   drumSamples?: readonly string[]
   diagnostics?: readonly Diagnostic[]
   playingRanges?: readonly { readonly start: number; readonly end: number }[]
+  lineCarets?: readonly SourceLineCaret[]
+  solo?: boolean
 }>()
 const emit = defineEmits<{
   'update-source': [source: string, sourceKey?: string]
   delete: []
   duplicate: []
   play: []
-  'play-solo': []
+  'play-from': [beat: number]
+  'update:solo': [solo: boolean]
   stop: []
 }>()
 const editor = ref<InstanceType<typeof XenpaperSourceEditor>>()
@@ -40,10 +44,12 @@ defineExpose({ focus: () => editor.value?.focus() })
         </button>
         <button
           type="button"
-          aria-label="Play clip solo from clip start"
-          @click="emit('play-solo')"
+          class="solo-toggle"
+          aria-label="Solo clip playback"
+          :aria-pressed="solo || false"
+          @click="emit('update:solo', !solo)"
         >
-          ▶ Solo
+          Solo
         </button>
         <button type="button" aria-label="Stop clip playback" @click="emit('stop')">■ Stop</button>
         <button
@@ -66,12 +72,14 @@ defineExpose({ focus: () => editor.value?.focus() })
       :drum-samples="drumSamples"
       :diagnostics="diagnostics"
       :playing-ranges="playingRanges"
+      :line-carets="lineCarets"
       :rows="14"
       @update:source="(source, sourceKey) => emit('update-source', source, sourceKey)"
+      @play-from="emit('play-from', $event)"
     />
     <p v-if="clip" class="source-help">
-      The source determines this clip’s length. Ctrl/⌘ Enter plays from the clip; add Shift to hear
-      it solo.
+      The source determines this clip’s length. Use a line wedge to play from its notes. Ctrl/⌘
+      Enter plays from the clip; Solo applies to both.
     </p>
     <div v-else class="editor-empty">
       <strong>Make room for an idea.</strong>
@@ -117,6 +125,10 @@ defineExpose({ focus: () => editor.value?.focus() })
   display: flex;
   flex-wrap: wrap;
   gap: 0.4rem;
+}
+.solo-toggle[aria-pressed='true'] {
+  color: var(--xenpaper-slate-950);
+  background: var(--xenpaper-cyan);
 }
 .source-editor .xenpaper-source-editor {
   box-sizing: border-box;

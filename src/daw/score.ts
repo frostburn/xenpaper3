@@ -45,6 +45,35 @@ export interface SourceRange {
   readonly end: number
 }
 
+export interface SourceLineCaret {
+  /** Zero-based source line containing the authored note. */
+  readonly line: number
+  /** Earliest clip-relative beat contributed by that line. */
+  readonly beat: number
+}
+
+/** Locate the first sounding event authored on each source line. */
+export const sourceLineCarets = (
+  source: string,
+  notes: readonly ScheduledLaneNote[],
+): SourceLineCaret[] => {
+  const lineAtOffset: number[] = Array.from({ length: source.length + 1 })
+  let line = 0
+  for (let offset = 0; offset <= source.length; offset++) {
+    lineAtOffset[offset] = line
+    if (source[offset] === '\n') line++
+  }
+
+  const beats = new Map<number, number>()
+  for (const note of notes) {
+    for (const range of note.sourceRanges) {
+      const sourceLine = lineAtOffset[Math.min(range.start, source.length)] ?? 0
+      beats.set(sourceLine, Math.min(beats.get(sourceLine) ?? Infinity, note.beat))
+    }
+  }
+  return [...beats].map(([sourceLine, beat]) => ({ line: sourceLine, beat }))
+}
+
 const eventSourceRanges = (
   event: BeatTimedNoteEvent,
   sourceIdentity: string,
