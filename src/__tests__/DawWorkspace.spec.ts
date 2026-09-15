@@ -27,9 +27,10 @@ describe('DAW workspace', () => {
     const wrapper = mountDaw()
     const workspace = wrapper.get('.workspace')
     const inspector = wrapper.get('.clip-inspector')
-    vi.spyOn(workspace.element, 'getBoundingClientRect').mockReturnValue({
-      width: 1200,
-    } as DOMRect)
+    let workspaceWidth = 1200
+    vi.spyOn(workspace.element, 'getBoundingClientRect').mockImplementation(
+      () => ({ width: workspaceWidth }) as DOMRect,
+    )
     vi.spyOn(inspector.element, 'getBoundingClientRect').mockReturnValue({
       width: 360,
     } as DOMRect)
@@ -44,6 +45,28 @@ describe('DAW workspace', () => {
     await divider.trigger('keydown', { key: 'ArrowRight' })
     expect(workspace.attributes('style')).toContain('--clip-inspector-width: 396px')
     expect(divider.attributes('aria-valuenow')).toBe('396')
+    expect(divider.attributes('aria-valuemax')).toBe('872')
+
+    workspaceWidth = 700
+    window.dispatchEvent(new Event('resize'))
+    await nextTick()
+    expect(workspace.attributes('style')).toContain('--clip-inspector-width: 372px')
+    expect(divider.attributes('aria-valuemax')).toBe('372')
+  })
+
+  it('uses the responsive inspector minimum when resizing the medium layout', async () => {
+    vi.stubGlobal('innerWidth', 900)
+    const wrapper = mountDaw()
+    const workspace = wrapper.get('.workspace')
+    const inspector = wrapper.get('.clip-inspector')
+    vi.spyOn(workspace.element, 'getBoundingClientRect').mockReturnValue({ width: 900 } as DOMRect)
+    vi.spyOn(inspector.element, 'getBoundingClientRect').mockReturnValue({ width: 288 } as DOMRect)
+
+    window.dispatchEvent(new Event('resize'))
+    await wrapper.get('[role="separator"]').trigger('keydown', { key: 'ArrowRight' })
+
+    expect(workspace.attributes('style')).toContain('--clip-inspector-width: 288px')
+    expect(wrapper.get('[role="separator"]').attributes('aria-valuemin')).toBe('288')
   })
 
   it('adds a clip without a double-click and keeps the editor in its own dock', async () => {

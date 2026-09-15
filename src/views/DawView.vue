@@ -9,7 +9,7 @@ import {
   watch,
   watchEffect,
 } from 'vue'
-import { Fraction } from 'xen-dev-utils'
+import { clamp, Fraction } from 'xen-dev-utils'
 import ArrangementTimeline from '../components/daw/ArrangementTimeline.vue'
 import { EditorHistory } from '../daw/editor-history'
 import ClipSourceEditor from '../components/daw/ClipSourceEditor.vue'
@@ -73,18 +73,30 @@ const workspace = ref<HTMLElement>()
 const clipInspector = ref<HTMLElement>()
 const clipInspectorWidth = ref<number>()
 let inspectorResizeStart: { x: number; width: number } | undefined
-const inspectorMinWidth = 320
+let workspaceResizeObserver: ResizeObserver | undefined
+const compactInspector = ref(false)
+const inspectorMinWidth = computed(() => (compactInspector.value ? 288 : 320))
+const inspectorMaxWidth = ref(320)
+const inspectorCurrentWidth = computed(() => clipInspectorWidth.value ?? inspectorMinWidth.value)
 const arrangerMinWidth = 320
 const inspectorDividerWidth = 8
 const inspectorResizeStep = 24
 
 const setClipInspectorWidth = (width: number) => {
   const workspaceWidth = workspace.value?.getBoundingClientRect().width ?? 0
-  const maximum = Math.max(
-    inspectorMinWidth,
+  inspectorMaxWidth.value = Math.max(
+    inspectorMinWidth.value,
     workspaceWidth - arrangerMinWidth - inspectorDividerWidth,
   )
-  clipInspectorWidth.value = Math.round(Math.min(maximum, Math.max(inspectorMinWidth, width)))
+  clipInspectorWidth.value = Math.round(
+    clamp(inspectorMinWidth.value, inspectorMaxWidth.value, width),
+  )
+}
+
+const measureClipInspector = () => {
+  compactInspector.value = window.innerWidth <= 1000
+  const renderedWidth = clipInspector.value?.getBoundingClientRect().width ?? 0
+  setClipInspectorWidth(clipInspectorWidth.value ?? (renderedWidth || inspectorMinWidth.value))
 }
 
 const resizeClipInspector = (event: PointerEvent) => {
@@ -104,7 +116,7 @@ const startClipInspectorResize = (event: PointerEvent) => {
   event.preventDefault()
   inspectorResizeStart = {
     x: event.clientX,
-    width: clipInspector.value?.getBoundingClientRect().width ?? inspectorMinWidth,
+    width: clipInspector.value?.getBoundingClientRect().width ?? inspectorMinWidth.value,
   }
   window.addEventListener('pointermove', resizeClipInspector)
   window.addEventListener('pointerup', stopClipInspectorResize)
@@ -117,7 +129,7 @@ const resizeClipInspectorWithKeyboard = (event: KeyboardEvent) => {
   const width =
     clipInspectorWidth.value ??
     clipInspector.value?.getBoundingClientRect().width ??
-    inspectorMinWidth
+    inspectorMinWidth.value
   setClipInspectorWidth(
     width + (event.key === 'ArrowLeft' ? inspectorResizeStep : -inspectorResizeStep),
   )
@@ -581,6 +593,15 @@ const onShortcut = (event: KeyboardEvent) => {
 }
 onMounted(() => window.addEventListener('keydown', onShortcut))
 
+onMounted(() => {
+  measureClipInspector()
+  window.addEventListener('resize', measureClipInspector)
+  if (typeof ResizeObserver !== 'undefined') {
+    workspaceResizeObserver = new ResizeObserver(measureClipInspector)
+    if (workspace.value) workspaceResizeObserver.observe(workspace.value)
+  }
+})
+
 onMounted(async () => {
   const searchParams = new URL(document.location.href).searchParams
   const demoId = searchParams.get('demo')
@@ -611,6 +632,8 @@ onMounted(async () => {
 
 onBeforeUnmount(() => {
   window.removeEventListener('keydown', onShortcut)
+  window.removeEventListener('resize', measureClipInspector)
+  workspaceResizeObserver?.disconnect()
   stopClipInspectorResize()
   pausePlayback()
   audioEngine?.dispose()
@@ -833,7 +856,8 @@ onBeforeUnmount(() => {
         aria-label="Resize clip editor"
         aria-orientation="vertical"
         :aria-valuemin="inspectorMinWidth"
-        :aria-valuenow="clipInspectorWidth"
+        :aria-valuemax="inspectorMaxWidth"
+        :aria-valuenow="inspectorCurrentWidth"
         tabindex="0"
         @pointerdown="startClipInspectorResize"
         @keydown="resizeClipInspectorWithKeyboard"
