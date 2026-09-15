@@ -23,6 +23,52 @@ afterEach(() => {
 const mountDaw = () => mount(DawView, { attachTo: document.body })
 
 describe('DAW workspace', () => {
+  it('resizes the clip inspector with pointer and keyboard controls', async () => {
+    const wrapper = mountDaw()
+    const workspace = wrapper.get('.workspace')
+    const inspector = wrapper.get('.clip-inspector')
+    let workspaceWidth = 1200
+    vi.spyOn(workspace.element, 'getBoundingClientRect').mockImplementation(
+      () => ({ width: workspaceWidth }) as DOMRect,
+    )
+    vi.spyOn(inspector.element, 'getBoundingClientRect').mockReturnValue({
+      width: 360,
+    } as DOMRect)
+
+    const divider = wrapper.get('[role="separator"][aria-label="Resize clip editor"]')
+    divider.element.dispatchEvent(new PointerEvent('pointerdown', { button: 0, clientX: 840 }))
+    window.dispatchEvent(new PointerEvent('pointermove', { clientX: 780 }))
+    window.dispatchEvent(new PointerEvent('pointerup'))
+    await nextTick()
+    expect(workspace.attributes('style')).toContain('--clip-inspector-width: 420px')
+
+    await divider.trigger('keydown', { key: 'ArrowRight' })
+    expect(workspace.attributes('style')).toContain('--clip-inspector-width: 396px')
+    expect(divider.attributes('aria-valuenow')).toBe('396')
+    expect(divider.attributes('aria-valuemax')).toBe('872')
+
+    workspaceWidth = 700
+    window.dispatchEvent(new Event('resize'))
+    await nextTick()
+    expect(workspace.attributes('style')).toContain('--clip-inspector-width: 372px')
+    expect(divider.attributes('aria-valuemax')).toBe('372')
+  })
+
+  it('uses the responsive inspector minimum when resizing the medium layout', async () => {
+    vi.stubGlobal('innerWidth', 900)
+    const wrapper = mountDaw()
+    const workspace = wrapper.get('.workspace')
+    const inspector = wrapper.get('.clip-inspector')
+    vi.spyOn(workspace.element, 'getBoundingClientRect').mockReturnValue({ width: 900 } as DOMRect)
+    vi.spyOn(inspector.element, 'getBoundingClientRect').mockReturnValue({ width: 288 } as DOMRect)
+
+    window.dispatchEvent(new Event('resize'))
+    await wrapper.get('[role="separator"]').trigger('keydown', { key: 'ArrowRight' })
+
+    expect(workspace.attributes('style')).toContain('--clip-inspector-width: 288px')
+    expect(wrapper.get('[role="separator"]').attributes('aria-valuemin')).toBe('288')
+  })
+
   it('adds a clip without a double-click and keeps the editor in its own dock', async () => {
     const wrapper = mountDaw()
     expect(wrapper.get('.lane-settings').attributes('open')).toBeUndefined()

@@ -9,7 +9,7 @@ import {
   watch,
   watchEffect,
 } from 'vue'
-import { Fraction } from 'xen-dev-utils'
+import { clamp, Fraction } from 'xen-dev-utils'
 import ArrangementTimeline from '../components/daw/ArrangementTimeline.vue'
 import { EditorHistory } from '../daw/editor-history'
 import ClipSourceEditor from '../components/daw/ClipSourceEditor.vue'
@@ -69,6 +69,71 @@ let playTimer: ReturnType<typeof setInterval> | undefined
 let audioEngine: DawAudioEngine | undefined
 let playbackRequestId = 0
 const editor = ref<InstanceType<typeof ClipSourceEditor>>()
+const workspace = ref<HTMLElement>()
+const clipInspector = ref<HTMLElement>()
+const clipInspectorWidth = ref<number>()
+let inspectorResizeStart: { x: number; width: number } | undefined
+let workspaceResizeObserver: ResizeObserver | undefined
+const compactInspector = ref(false)
+const inspectorMinWidth = computed(() => (compactInspector.value ? 288 : 320))
+const inspectorMaxWidth = ref(320)
+const inspectorCurrentWidth = computed(() => clipInspectorWidth.value ?? inspectorMinWidth.value)
+const arrangerMinWidth = 320
+const inspectorDividerWidth = 8
+const inspectorResizeStep = 24
+
+const setClipInspectorWidth = (width: number) => {
+  const workspaceWidth = workspace.value?.getBoundingClientRect().width ?? 0
+  inspectorMaxWidth.value = Math.max(
+    inspectorMinWidth.value,
+    workspaceWidth - arrangerMinWidth - inspectorDividerWidth,
+  )
+  clipInspectorWidth.value = Math.round(
+    clamp(inspectorMinWidth.value, inspectorMaxWidth.value, width),
+  )
+}
+
+const measureClipInspector = () => {
+  compactInspector.value = window.innerWidth <= 1000
+  const renderedWidth = clipInspector.value?.getBoundingClientRect().width ?? 0
+  setClipInspectorWidth(clipInspectorWidth.value ?? (renderedWidth || inspectorMinWidth.value))
+}
+
+const resizeClipInspector = (event: PointerEvent) => {
+  if (!inspectorResizeStart) return
+  setClipInspectorWidth(inspectorResizeStart.width + inspectorResizeStart.x - event.clientX)
+}
+
+const stopClipInspectorResize = () => {
+  inspectorResizeStart = undefined
+  window.removeEventListener('pointermove', resizeClipInspector)
+  window.removeEventListener('pointerup', stopClipInspectorResize)
+  window.removeEventListener('pointercancel', stopClipInspectorResize)
+}
+
+const startClipInspectorResize = (event: PointerEvent) => {
+  if (event.button !== 0) return
+  event.preventDefault()
+  inspectorResizeStart = {
+    x: event.clientX,
+    width: clipInspector.value?.getBoundingClientRect().width ?? inspectorMinWidth.value,
+  }
+  window.addEventListener('pointermove', resizeClipInspector)
+  window.addEventListener('pointerup', stopClipInspectorResize)
+  window.addEventListener('pointercancel', stopClipInspectorResize)
+}
+
+const resizeClipInspectorWithKeyboard = (event: KeyboardEvent) => {
+  if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return
+  event.preventDefault()
+  const width =
+    clipInspectorWidth.value ??
+    clipInspector.value?.getBoundingClientRect().width ??
+    inspectorMinWidth.value
+  setClipInspectorWidth(
+    width + (event.key === 'ArrowLeft' ? inspectorResizeStep : -inspectorResizeStep),
+  )
+}
 const selectedLaneId = ref<string>()
 const selectedLane = computed(() =>
   project.value.instrumentLanes.find(({ id }) => id === selectedLaneId.value),
@@ -528,6 +593,15 @@ const onShortcut = (event: KeyboardEvent) => {
 }
 onMounted(() => window.addEventListener('keydown', onShortcut))
 
+onMounted(() => {
+  measureClipInspector()
+  window.addEventListener('resize', measureClipInspector)
+  if (typeof ResizeObserver !== 'undefined') {
+    workspaceResizeObserver = new ResizeObserver(measureClipInspector)
+    if (workspace.value) workspaceResizeObserver.observe(workspace.value)
+  }
+})
+
 onMounted(async () => {
   const searchParams = new URL(document.location.href).searchParams
   const demoId = searchParams.get('demo')
@@ -558,6 +632,9 @@ onMounted(async () => {
 
 onBeforeUnmount(() => {
   window.removeEventListener('keydown', onShortcut)
+  window.removeEventListener('resize', measureClipInspector)
+  workspaceResizeObserver?.disconnect()
+  stopClipInspectorResize()
   pausePlayback()
   audioEngine?.dispose()
   audioEngine?.removeEventListener('ended', finishPlayback)
@@ -674,7 +751,15 @@ onBeforeUnmount(() => {
     </div>
     <p v-if="projectLoadError" class="playback-error" role="alert">{{ projectLoadError }}</p>
     <p v-if="playbackError" class="playback-error" role="alert">{{ playbackError }}</p>
-    <div class="workspace">
+    <div
+      ref="workspace"
+      class="workspace"
+      :style="
+        clipInspectorWidth === undefined
+          ? undefined
+          : { '--clip-inspector-width': `${clipInspectorWidth}px` }
+      "
+    >
       <section class="arranger" aria-label="Arrangement">
         <details class="project-settings">
           <summary>
@@ -765,7 +850,19 @@ onBeforeUnmount(() => {
           </button>
         </div>
       </section>
-      <aside class="clip-inspector" aria-label="Clip editor">
+      <div
+        class="clip-inspector-divider"
+        role="separator"
+        aria-label="Resize clip editor"
+        aria-orientation="vertical"
+        :aria-valuemin="inspectorMinWidth"
+        :aria-valuemax="inspectorMaxWidth"
+        :aria-valuenow="inspectorCurrentWidth"
+        tabindex="0"
+        @pointerdown="startClipInspectorResize"
+        @keydown="resizeClipInspectorWithKeyboard"
+      />
+      <aside ref="clipInspector" class="clip-inspector" aria-label="Clip editor">
         <ClipSourceEditor
           ref="editor"
           :clip="selectedClip"
@@ -936,10 +1033,11 @@ onBeforeUnmount(() => {
   width: 7rem;
 }
 .workspace {
+  --clip-inspector-width: 26%;
   flex: 1;
   min-height: 0;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(20rem, 26%);
+  grid-template-columns: minmax(0, 1fr) 0.5rem minmax(20rem, var(--clip-inspector-width));
 }
 .arranger {
   display: flex;
@@ -979,8 +1077,26 @@ onBeforeUnmount(() => {
   min-width: 0;
   overflow-y: auto;
   padding: 1rem;
-  border-left: 1px solid var(--xenpaper-slate-500);
   background: var(--xenpaper-slate-925);
+}
+.clip-inspector-divider {
+  position: relative;
+  z-index: 1;
+  cursor: col-resize;
+  touch-action: none;
+  background: var(--xenpaper-slate-500);
+}
+.clip-inspector-divider::after {
+  position: absolute;
+  inset: 0 0 0 50%;
+  width: 1px;
+  content: '';
+  background: var(--xenpaper-slate-400);
+}
+.clip-inspector-divider:hover,
+.clip-inspector-divider:focus-visible {
+  outline: none;
+  background: color-mix(in srgb, var(--xenpaper-cyan) 45%, var(--xenpaper-slate-700));
 }
 .add-lanes {
   display: flex;
@@ -1024,7 +1140,8 @@ onBeforeUnmount(() => {
     --daw-track-width: 11rem;
   }
   .workspace {
-    grid-template-columns: minmax(0, 1fr) 18rem;
+    --clip-inspector-width: 18rem;
+    grid-template-columns: minmax(0, 1fr) 0.5rem minmax(18rem, var(--clip-inspector-width));
   }
   .zoom-control {
     margin-left: 0;
@@ -1045,6 +1162,9 @@ onBeforeUnmount(() => {
   }
   .workspace {
     grid-template-columns: minmax(0, 1fr);
+  }
+  .clip-inspector-divider {
+    display: none;
   }
   .arranger > .arrangement-timeline {
     flex: none;
