@@ -1,11 +1,12 @@
 import { flushPromises, mount } from '@vue/test-utils'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import PitchedLane from '../components/daw/PitchedLane.vue'
 import DawView from '../views/DawView.vue'
 import { deferred } from './deferred'
 
 const controls = vi.hoisted(() => ({
   resume: vi.fn<() => Promise<void>>(),
-  play: vi.fn<() => Promise<void>>(),
+  play: vi.fn<(_project: unknown, _fromBeat?: number) => Promise<void>>(),
 }))
 
 vi.mock('../daw/audio-engine', () => ({
@@ -25,6 +26,80 @@ afterEach(() => {
 })
 
 describe('DAW asynchronous playback controls', () => {
+  it('applies clip solo while playback is waiting for the audio context', async () => {
+    vi.stubGlobal('AudioContext', class {})
+    const resumed = deferred()
+    controls.resume.mockReturnValueOnce(resumed.promise).mockResolvedValue(undefined)
+    controls.play.mockResolvedValue(undefined)
+    const wrapper = mount(DawView)
+    await wrapper.getComponent(PitchedLane).trigger('dblclick', { clientX: 64 })
+    await wrapper.get('button.add-lane').trigger('click')
+
+    await wrapper.get('[aria-label="Play"]').trigger('click')
+    await wrapper.get('[aria-label="Solo clip playback"]').trigger('click')
+    await flushPromises()
+
+    expect(controls.resume).toHaveBeenCalledTimes(2)
+    expect(controls.play).toHaveBeenCalledOnce()
+    const soloProject = controls.play.mock.calls[0]![0] as {
+      instrumentLanes: Array<{ clips: unknown[] }>
+    }
+    expect(soloProject.instrumentLanes).toHaveLength(1)
+    expect(soloProject.instrumentLanes[0]!.clips).toHaveLength(1)
+
+    resumed.resolve()
+    await flushPromises()
+    expect(controls.play).toHaveBeenCalledOnce()
+    wrapper.unmount()
+  })
+
+  it('applies clip solo while the audio engine is preparing playback', async () => {
+    vi.stubGlobal('AudioContext', class {})
+    const prepared = deferred()
+    controls.resume.mockResolvedValue(undefined)
+    controls.play.mockReturnValueOnce(prepared.promise).mockResolvedValue(undefined)
+    const wrapper = mount(DawView)
+    await wrapper.getComponent(PitchedLane).trigger('dblclick', { clientX: 64 })
+    await wrapper.get('button.add-lane').trigger('click')
+
+    await wrapper.get('[aria-label="Play"]').trigger('click')
+    await flushPromises()
+    await wrapper.get('[aria-label="Solo clip playback"]').trigger('click')
+    await flushPromises()
+
+    expect(controls.play).toHaveBeenCalledTimes(2)
+    const soloProject = controls.play.mock.calls[1]![0] as { instrumentLanes: unknown[] }
+    expect(soloProject.instrumentLanes).toHaveLength(1)
+
+    prepared.resolve()
+    await flushPromises()
+    expect(wrapper.get('[aria-label="Play"]').attributes('aria-pressed')).toBe('true')
+    wrapper.unmount()
+  })
+
+  it('restarts running playback when clip solo is enabled or disabled', async () => {
+    vi.stubGlobal('AudioContext', class {})
+    controls.resume.mockResolvedValue(undefined)
+    controls.play.mockResolvedValue(undefined)
+    const wrapper = mount(DawView)
+    await wrapper.getComponent(PitchedLane).trigger('dblclick', { clientX: 64 })
+
+    await wrapper.get('[aria-label="Play"]').trigger('click')
+    await flushPromises()
+    const fullProject = controls.play.mock.calls[0]![0]
+
+    await wrapper.get('[aria-label="Solo clip playback"]').trigger('click')
+    await flushPromises()
+    expect(controls.play).toHaveBeenCalledTimes(2)
+    expect(controls.play.mock.calls[1]![0]).not.toBe(fullProject)
+
+    await wrapper.get('[aria-label="Solo clip playback"]').trigger('click')
+    await flushPromises()
+    expect(controls.play).toHaveBeenCalledTimes(3)
+    expect(controls.play.mock.calls[2]![0]).toBe(fullProject)
+    wrapper.unmount()
+  })
+
   it.each(['stop', 'unmount'])('cancels context resume after %s', async (action) => {
     vi.stubGlobal('AudioContext', class {})
     const resumed = deferred()

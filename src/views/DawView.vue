@@ -65,6 +65,7 @@ const soloSelectedClip = ref(false)
 const playbackError = ref('')
 const renderTailSeconds = ref(2)
 const rendering = ref(false)
+const playbackPending = ref(false)
 let playTimer: ReturnType<typeof setInterval> | undefined
 let audioEngine: DawAudioEngine | undefined
 let playbackRequestId = 0
@@ -286,6 +287,7 @@ const clearPlayTimer = () => {
 
 const finishPlayback = () => {
   playing.value = false
+  playbackPending.value = false
   soloClipKey.value = undefined
   playhead.value = 0
   clearPlayTimer()
@@ -316,6 +318,7 @@ const startPlayback = async (
   clipScope?: string,
 ) => {
   const requestId = ++playbackRequestId
+  playbackPending.value = true
   playbackError.value = ''
   try {
     // Keep the transport usable in SSR/test environments; browsers take the audio path below.
@@ -343,11 +346,14 @@ const startPlayback = async (
   } catch (error) {
     if (requestId !== playbackRequestId) return
     playbackError.value = error instanceof Error ? error.message : String(error)
+  } finally {
+    if (requestId === playbackRequestId) playbackPending.value = false
   }
 }
 
 const pausePlayback = () => {
   playbackRequestId += 1
+  playbackPending.value = false
   audioEngine?.stop()
   playing.value = false
   soloClipKey.value = undefined
@@ -374,6 +380,25 @@ const playSelectedClip = (relativeBeat = 0) => {
     fromBeat,
     { ...project.value, instrumentLanes: [soloLane] },
     clipSourceKey(selectedLane.value.id, selectedClip.value.id),
+  )
+}
+
+const updateSoloSelectedClip = (solo: boolean) => {
+  soloSelectedClip.value = solo
+  if (!playing.value && !playbackPending.value) return
+
+  const lane = selectedLane.value
+  const clip = selectedClip.value
+  if (!solo || !lane || !clip) {
+    void startPlayback(playhead.value)
+    return
+  }
+
+  const soloLane = { ...lane, clips: [clip] }
+  void startPlayback(
+    playhead.value,
+    { ...project.value, instrumentLanes: [soloLane] },
+    clipSourceKey(lane.id, clip.id),
   )
 }
 
@@ -882,7 +907,7 @@ onBeforeUnmount(() => {
           @duplicate="duplicateSelectedClip"
           @play="playSelectedClip()"
           @play-from="playSelectedClip"
-          @update:solo="soloSelectedClip = $event"
+          @update:solo="updateSoloSelectedClip"
           @stop="stopPlayback"
         />
       </aside>
