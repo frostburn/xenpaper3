@@ -377,6 +377,25 @@ const playSelectedClip = (relativeBeat = 0) => {
   )
 }
 
+const updateSoloSelectedClip = (solo: boolean) => {
+  soloSelectedClip.value = solo
+  if (!playing.value) return
+
+  const lane = selectedLane.value
+  const clip = selectedClip.value
+  if (!solo || !lane || !clip) {
+    void startPlayback(playhead.value)
+    return
+  }
+
+  const soloLane = { ...lane, clips: [clip] }
+  void startPlayback(
+    playhead.value,
+    { ...project.value, instrumentLanes: [soloLane] },
+    clipSourceKey(lane.id, clip.id),
+  )
+}
+
 const toggleLaneCollapse = (laneId: string) => {
   const next = new Set(collapsedLaneIds.value)
   if (next.has(laneId)) next.delete(laneId)
@@ -882,7 +901,7 @@ onBeforeUnmount(() => {
           @duplicate="duplicateSelectedClip"
           @play="playSelectedClip()"
           @play-from="playSelectedClip"
-          @update:solo="soloSelectedClip = $event"
+          @update:solo="updateSoloSelectedClip"
           @stop="stopPlayback"
         />
       </aside>
