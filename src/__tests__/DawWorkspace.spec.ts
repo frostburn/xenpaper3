@@ -94,6 +94,20 @@ describe('DAW workspace', () => {
     expect(wrapper.find('.lane-settings').exists()).toBe(false)
   })
 
+  it('returns to the clip inspector when undo removes the lane being edited', async () => {
+    const wrapper = mountDaw()
+    await wrapper.get('button.add-lane').trigger('click')
+    await wrapper.get('[aria-label="Edit sound and source for Instrument 2"]').trigger('click')
+
+    expect(wrapper.get('.clip-inspector').attributes('aria-label')).toBe('Lane editor')
+    await wrapper.get('[aria-label="Undo"]').trigger('click')
+
+    expect(wrapper.find('[aria-label="Instrument lane name"]').exists()).toBe(true)
+    expect(wrapper.findAll('[aria-label="Instrument lane name"]')).toHaveLength(1)
+    expect(wrapper.get('.clip-inspector').attributes('aria-label')).toBe('Clip editor')
+    expect(wrapper.get('.clip-inspector').text()).toContain('Select or create a clip')
+  })
+
   it('uses the chosen rational snap grid when inserting clips', async () => {
     const wrapper = mountDaw()
     await wrapper.get('[aria-label="Clip snap grid"]').setValue('3')

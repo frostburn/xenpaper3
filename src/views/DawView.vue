@@ -280,6 +280,9 @@ const restoreHistory = (redo = false) => {
   project.value = JSON.parse(snapshot, Fraction.reviver) as DawProject
   if (!selectedClip.value) selectedClipId.value = undefined
   if (!selectedLane.value) selectedLaneId.value = undefined
+  if (!project.value.instrumentLanes.some(({ id }) => id === settingsLaneId.value)) {
+    settingsLaneId.value = undefined
+  }
 }
 
 const clearPlayTimer = () => {
