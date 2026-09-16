@@ -5,8 +5,6 @@ import { highlightXenpaper, type XenpaperHighlightToken } from '../../xenpaperSy
 
 const props = defineProps<{
   source: string
-  startOffset?: number
-  endOffset?: number
   stableSource?: string
   drumSamples?: readonly string[]
   diagnostics?: readonly Diagnostic[]
@@ -118,22 +116,17 @@ const tokenFragments = computed(() =>
     const offsets = [...new Set([token.start, ...boundaries, token.end])].sort(
       (left, right) => left - right,
     )
-    return offsets.slice(0, -1).flatMap((start, index) => {
+    return offsets.slice(0, -1).map((start, index) => {
       const end = offsets[index + 1]!
-      const visibleStart = Math.max(start, props.startOffset ?? 0)
-      const visibleEnd = Math.min(end, props.endOffset ?? props.source.length)
-      if (visibleStart >= visibleEnd) return []
-      return [
-        {
-          ...token,
-          text: props.source.slice(visibleStart, visibleEnd),
-          start: visibleStart,
-          end: visibleEnd,
-          playing: (props.playingRanges ?? []).some(
-            (range) => visibleStart >= range.start && visibleEnd <= range.end,
-          ),
-        },
-      ]
+      return {
+        ...token,
+        text: props.source.slice(start, end),
+        start,
+        end,
+        playing: (props.playingRanges ?? []).some(
+          (range) => start >= range.start && end <= range.end,
+        ),
+      }
     })
   }),
 )

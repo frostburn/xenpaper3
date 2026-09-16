@@ -4,10 +4,10 @@ import { parse } from '../../../xenpaper-lang'
 import type { SourceRange } from '../../daw/score'
 import { highlightXenpaper, type XenpaperHighlightToken } from '../../xenpaperSyntaxHighlight'
 
-const COLUMNS_PER_PAGE = 24
+const LINES_PER_PAGE = 6
 const CHARACTER_WIDTH_PX = 8
 const PAGE_HORIZONTAL_PADDING_PX = 12
-const MIN_PAGE_WIDTH_PX = 128
+const MIN_PAGE_WIDTH_PX = 256
 
 const props = defineProps<{
   source: string
@@ -30,26 +30,23 @@ const tokens = computed<XenpaperHighlightToken[]>(() => {
 const lines = computed(() => {
   let start = 0
   return props.source.split('\n').map((text) => {
-    const line = { start, length: text.length }
+    const line = { start, end: start + text.length, length: text.length }
     start += text.length + 1
     return line
   })
 })
 
 const sourcePages = computed(() => {
-  const count = Math.max(
-    1,
-    Math.ceil(Math.max(...lines.value.map(({ length }) => length)) / COLUMNS_PER_PAGE),
-  )
+  const count = Math.max(1, Math.ceil(lines.value.length / LINES_PER_PAGE))
   return Array.from({ length: count }, (_, pageIndex) => {
-    const pageLines = lines.value.map((line) => ({
-      start: line.start + Math.min(line.length, pageIndex * COLUMNS_PER_PAGE),
-      end: line.start + Math.min(line.length, (pageIndex + 1) * COLUMNS_PER_PAGE),
-    }))
-    const columns = Math.max(...pageLines.map(({ start, end }) => end - start))
+    const pageLines = lines.value.slice(
+      pageIndex * LINES_PER_PAGE,
+      (pageIndex + 1) * LINES_PER_PAGE,
+    )
+    const columns = Math.max(...pageLines.map(({ length }) => length))
     return {
       pageIndex,
-      lines: pageLines,
+      lines: pageLines.map(({ start, end }) => ({ start, end })),
       width: Math.max(MIN_PAGE_WIDTH_PX, columns * CHARACTER_WIDTH_PX + PAGE_HORIZONTAL_PADDING_PX),
     }
   })

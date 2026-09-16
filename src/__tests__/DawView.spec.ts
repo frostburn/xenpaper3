@@ -46,22 +46,23 @@ import {
 
 describe('DAW project model', () => {
   it('paginates clip source sideways and repeats it across the clip', () => {
-    const source = `${'C'.repeat(48)}.\n${'D'.repeat(49)}`
+    const firstPage = [`${'C'.repeat(48)}.`, 'D', 'E', 'F', 'G', 'A']
+    const source = [...firstPage, 'B'].join('\n')
     const wrapper = mount(ClipSourcePreview, {
       props: { source, width: 1200, visibleWidth: 1200 },
     })
     const pages = wrapper.findAll('.source-page')
 
-    expect(pages).toHaveLength(7)
-    expect(pages[0]!.text()).toBe(`${'C'.repeat(24)}${'D'.repeat(24)}`)
-    expect(pages[2]!.text()).toBe('.D')
+    expect(pages).toHaveLength(4)
+    expect(pages[0]!.findAll('.source-line').map((line) => line.text())).toEqual(firstPage)
+    expect(pages[1]!.text()).toBe('B')
     expect(pages.filter((page) => page.classes('cycle-end'))).toHaveLength(2)
     expect(pages[0]!.classes()).not.toContain('cycle-end')
-    expect(pages[2]!.classes()).toContain('cycle-end')
-    expect(pages[3]!.text()).toBe(pages[0]!.text())
-    expect(pages[0]!.attributes('style')).toContain('width: 204px')
-    expect(pages[2]!.attributes('style')).toContain('width: 128px')
-    expect(pages[3]!.attributes('style')).toContain('left: 536px')
+    expect(pages[1]!.classes()).toContain('cycle-end')
+    expect(pages[2]!.text()).toBe(pages[0]!.text())
+    expect(pages[0]!.attributes('style')).toContain('width: 404px')
+    expect(pages[1]!.attributes('style')).toContain('width: 256px')
+    expect(pages[2]!.attributes('style')).toContain('left: 660px')
   })
 
   it('only renders source pages around the visible part of a very long clip', () => {
@@ -69,7 +70,7 @@ describe('DAW project model', () => {
       props: { source: 'C', width: 1_000_000, visibleStart: 500_000, visibleWidth: 800 },
     })
 
-    expect(wrapper.findAll('.source-page')).toHaveLength(7)
+    expect(wrapper.findAll('.source-page')).toHaveLength(4)
     expect(wrapper.get('.source-page').attributes('style')).toContain('left: 499968px')
   })
 
