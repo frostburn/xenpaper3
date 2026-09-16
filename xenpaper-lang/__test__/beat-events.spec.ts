@@ -20,14 +20,7 @@ const audibleResult = (source: string) => {
         kind: event.kind,
         start: event.start.toFraction(),
         duration: event.duration.toFraction(),
-        pitch: [
-          event.pitch.kind,
-          event.pitch.kind === 'frequency'
-            ? event.pitch.frequency.valueOf()
-            : event.pitch.kind === 'absolutePitch'
-              ? event.pitch.rootOffset.valueOf()
-              : event.pitch.value.valueOf(),
-        ],
+        pitch: [event.pitch.kind, event.pitch.value.valueOf()],
         ...('label' in event ? { label: event.label } : {}),
         ...('dynamic' in event ? { dynamic: event.dynamic.toFraction() } : {}),
       })),
@@ -35,6 +28,10 @@ const audibleResult = (source: string) => {
 }
 
 describe('beat event expansion', () => {
+  it('compares the sounding value of root-relative absolute pitches', () => {
+    expect(audibleResult('C')).not.toEqual(audibleResult('{root = D} C'))
+  })
+
   it('scales every note when a normalized slot is continued', () => {
     const result = score('[0 2 7] [0 2 7]= [0 2 7]===')
     const notes = result.events.filter((event) => event.kind === 'note')
