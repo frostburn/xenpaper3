@@ -119,10 +119,39 @@ ParallelExpression
 // its lexical sequence. Keeping this behavior in the scoped productions lets
 // explicit repeat bodies continue to reserve their own `:|` delimiter.
 ScopedParallelExpression
-  = first:ScopedSequenceExpression
-    rest:(Spacing "," Spacing branch:ScopedSequenceExpression { return branch; })* {
-      return parallel([first, ...rest]);
+  = repeated:ParallelExpression Spacing ":|"
+    remainder:(Spacing item:ScopedParallelExpression { return item; })? {
+      if (containsDeclaration(repeated)) {
+        error('Variable and function declarations are not allowed inside repeats.');
+      }
+      const repeat = node('Repeat', {
+        count: null,
+        body: [repeated],
+        endings: [],
+        terminal: ":|",
+        incompleteEndings: false,
+      });
+      implicitRepeats.add(repeat);
+      if (remainder) prependImplicitRepeatScope(remainder, [repeat]);
+      return sequence(remainder ? [repeat, remainder] : [repeat]);
     }
+  / body:ParallelExpression result:RepeatEndings
+    remainder:(Spacing item:ScopedParallelExpression { return item; })? {
+      if (containsDeclaration(body) || containsDeclaration(result.endings)) {
+        error('Variable and function declarations are not allowed inside repeats.');
+      }
+      const repeat = node('Repeat', {
+        count: null,
+        body: [body],
+        endings: result.endings,
+        terminal: result.terminal,
+        incompleteEndings: result.incomplete,
+      });
+      implicitRepeats.add(repeat);
+      if (remainder) prependImplicitRepeatScope(remainder, [repeat]);
+      return sequence(remainder ? [repeat, remainder] : [repeat]);
+    }
+  / ParallelExpression
 
 ScopedSequenceExpression
   = repeated:SequenceExpression Spacing ":|" remainder:(Spacing item:ScopedSequenceExpression { return item; })? {

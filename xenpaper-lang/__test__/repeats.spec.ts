@@ -26,6 +26,80 @@ describe('repeat expansion', () => {
     expect(implicit.map((node) => node.type)).toEqual(explicit.map((node) => node.type))
   })
 
+  it('repeats every branch of the current parallel scope', () => {
+    const implicit = parse('0 1, 2 3 :|').body[0]
+    const explicit = parse('|: 0 1, 2 3 :|').body[0]
+
+    expect(implicit).toMatchObject({
+      type: 'Repeat',
+      body: [{ type: 'Parallel', branches: [{ type: 'Sequence' }, { type: 'Sequence' }] }],
+    })
+    expect(implicit).toMatchObject({
+      type: explicit.type,
+      body: [{ type: explicit.body[0]!.type }],
+      terminal: explicit.terminal,
+    })
+    expect(body('0 1, 2 3 :|').map((node) => node.type)).toEqual(
+      body('|: 0 1, 2 3 :|').map((node) => node.type),
+    )
+  })
+
+  it('limits a parallel implicit repeat to its containing group', () => {
+    const program = parse('(0 1, 2 3 :|) 4')
+
+    expect(program.body[0]).toMatchObject({
+      type: 'Sequence',
+      items: [
+        {
+          type: 'Group',
+          expression: { type: 'Repeat', body: [{ type: 'Parallel' }] },
+        },
+        { type: 'DegreeLiteral', degree: '4' },
+      ],
+    })
+  })
+
+  it('applies implicit alternate endings to every parallel branch', () => {
+    const source = '0 1, 2 3 |¹ 4, 5 :|² 6, 7 ||'
+
+    expect(parse(source).body[0]).toMatchObject({
+      type: 'Repeat',
+      body: [{ type: 'Parallel' }],
+      endings: [
+        { number: { value: '1' }, body: [{ type: 'Parallel' }] },
+        { number: { value: '2' }, body: [{ type: 'Parallel' }] },
+      ],
+    })
+    expect(body(source).map((node) => node.type)).toEqual([
+      'Parallel',
+      'Parallel',
+      'Parallel',
+      'Parallel',
+    ])
+  })
+
+  it('does not include material following a parallel repeat end in its body', () => {
+    expect(parse('0 1, 2 3 :| 4 5').body[0]).toMatchObject({
+      type: 'Sequence',
+      items: [
+        { type: 'Repeat', body: [{ type: 'Parallel' }] },
+        { type: 'Sequence', items: [{ degree: '4' }, { degree: '5' }] },
+      ],
+    })
+  })
+
+  it('keeps multiple implicit parallel repeats separated by barlines', () => {
+    const program = parse('0 1, 2 3 :| | 4 5, 6 7 :|')
+
+    expect(program.body[0]).toMatchObject({
+      type: 'Sequence',
+      items: [
+        { type: 'Repeat', body: [{ type: 'Parallel' }] },
+        { type: 'Repeat', body: [{ type: 'Parallel' }] },
+      ],
+    })
+  })
+
   it('uses the containing group and parallel branch as implicit repeat scopes', () => {
     const expanded = body('(C D :|) E, F G :|')
 
