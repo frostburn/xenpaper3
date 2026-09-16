@@ -60,9 +60,9 @@ describe('DAW project model', () => {
     expect(pages[0]!.classes()).not.toContain('cycle-end')
     expect(pages[1]!.classes()).toContain('cycle-end')
     expect(pages[2]!.text()).toBe(pages[0]!.text())
-    expect(pages[0]!.attributes('style')).toContain('width: 404px')
+    expect(pages[0]!.attributes('style')).toContain('width: 408px')
     expect(pages[1]!.attributes('style')).toContain('width: 256px')
-    expect(pages[2]!.attributes('style')).toContain('left: 660px')
+    expect(pages[2]!.attributes('style')).toContain('left: 664px')
   })
 
   it('only renders source pages around the visible part of a very long clip', () => {
@@ -72,6 +72,19 @@ describe('DAW project model', () => {
 
     expect(wrapper.findAll('.source-page')).toHaveLength(4)
     expect(wrapper.get('.source-page').attributes('style')).toContain('left: 499968px')
+  })
+
+  it('measures the rendered monospace font when sizing source pages', async () => {
+    const bounds = vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue({
+      width: 100,
+    } as DOMRect)
+    const wrapper = mount(ClipSourcePreview, {
+      props: { source: 'C'.repeat(49), width: 1000, visibleWidth: 1000 },
+    })
+    await wrapper.vm.$nextTick()
+
+    expect(wrapper.get('.source-page').attributes('style')).toContain('width: 506px')
+    bounds.mockRestore()
   })
 
   it('debounces parsing work while a large source is being edited', async () => {

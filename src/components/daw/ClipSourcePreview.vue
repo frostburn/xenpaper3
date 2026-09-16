@@ -1,12 +1,12 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { parse } from '../../../xenpaper-lang'
 import type { SourceRange } from '../../daw/score'
 import { highlightXenpaper, type XenpaperHighlightToken } from '../../xenpaperSyntaxHighlight'
 
 const LINES_PER_PAGE = 6
-const CHARACTER_WIDTH_PX = 8
-const PAGE_HORIZONTAL_PADDING_PX = 12
+const FALLBACK_CHARACTER_WIDTH_PX = 8
+const PAGE_HORIZONTAL_PADDING_PX = 16
 const MIN_PAGE_WIDTH_PX = 256
 
 const props = defineProps<{
@@ -17,6 +17,13 @@ const props = defineProps<{
   drumSamples?: readonly string[]
   playingRanges?: readonly SourceRange[]
 }>()
+
+const characterProbe = ref<HTMLElement>()
+const characterWidth = ref(FALLBACK_CHARACTER_WIDTH_PX)
+onMounted(() => {
+  const measuredWidth = characterProbe.value?.getBoundingClientRect().width ?? 0
+  if (measuredWidth) characterWidth.value = measuredWidth / 10
+})
 
 const tokens = computed<XenpaperHighlightToken[]>(() => {
   if (!props.source) return []
@@ -47,7 +54,10 @@ const sourcePages = computed(() => {
     return {
       pageIndex,
       lines: pageLines.map(({ start, end }) => ({ start, end })),
-      width: Math.max(MIN_PAGE_WIDTH_PX, columns * CHARACTER_WIDTH_PX + PAGE_HORIZONTAL_PADDING_PX),
+      width: Math.max(
+        MIN_PAGE_WIDTH_PX,
+        Math.ceil(columns * characterWidth.value + PAGE_HORIZONTAL_PADDING_PX),
+      ),
     }
   })
 })
@@ -108,6 +118,7 @@ const renderedPages = computed(() => {
 <template>
   <span class="clip-source-preview">
     <span class="source-full-text">{{ source }}</span>
+    <span ref="characterProbe" class="character-probe" aria-hidden="true">0000000000</span>
     <span
       v-for="page in renderedPages"
       :key="page.key"
@@ -136,7 +147,8 @@ const renderedPages = computed(() => {
   display: block;
   height: 100%;
 }
-.source-full-text {
+.source-full-text,
+.character-probe {
   position: absolute;
   width: 1px;
   height: 1px;
@@ -163,10 +175,13 @@ const renderedPages = computed(() => {
   height: 1.2em;
   overflow: hidden;
   white-space: pre;
+  isolation: isolate;
 }
 .source-playing {
+  position: relative;
   color: var(--xenpaper-slate-950);
   background: var(--xenpaper-cyan);
   border-radius: 0.12em;
+  box-decoration-break: clone;
 }
 </style>

@@ -397,6 +397,7 @@ const onKeyDown = (event: KeyboardEvent) => {
   white-space: nowrap;
   background: var(--xenpaper-slate-875);
   pointer-events: none;
+  z-index: 1;
 }
 .clip pre,
 .clip-preview {
