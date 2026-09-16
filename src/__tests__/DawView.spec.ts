@@ -7,6 +7,7 @@ import { demoProjects } from '../demo-projects'
 import DawView from '../views/DawView.vue'
 import PitchedLane from '../components/daw/PitchedLane.vue'
 import DrumLane from '../components/daw/DrumLane.vue'
+import ClipSourcePreview from '../components/daw/ClipSourcePreview.vue'
 import XenpaperSourceHighlight from '../components/daw/XenpaperSourceHighlight.vue'
 import XenpaperSourceEditor from '../components/daw/XenpaperSourceEditor.vue'
 import {
@@ -44,6 +45,73 @@ import {
 } from '../daw/score'
 
 describe('DAW project model', () => {
+  it('paginates clip source sideways and repeats it across the clip', () => {
+    const firstPage = [`${'C'.repeat(48)}.`, 'D', 'E', 'F', 'G', 'A']
+    const source = [...firstPage, 'B'].join('\n')
+    const wrapper = mount(ClipSourcePreview, {
+      props: { source, width: 1200, visibleWidth: 1200 },
+    })
+    const pages = wrapper.findAll('.source-page')
+
+    expect(pages).toHaveLength(4)
+    expect(pages[0]!.findAll('.source-line').map((line) => line.text())).toEqual(firstPage)
+    expect(pages[1]!.text()).toBe('B')
+    expect(pages.filter((page) => page.classes('cycle-end'))).toHaveLength(2)
+    expect(pages[0]!.classes()).not.toContain('cycle-end')
+    expect(pages[1]!.classes()).toContain('cycle-end')
+    expect(pages[2]!.text()).toBe(pages[0]!.text())
+    expect(pages[0]!.attributes('style')).toContain('width: 408px')
+    expect(pages[1]!.attributes('style')).toContain('width: 256px')
+    expect(pages[2]!.attributes('style')).toContain('left: 664px')
+  })
+
+  it('only renders source pages around the visible part of a very long clip', () => {
+    const wrapper = mount(ClipSourcePreview, {
+      props: { source: 'C', width: 1_000_000, visibleStart: 500_000, visibleWidth: 800 },
+    })
+
+    expect(wrapper.findAll('.source-page')).toHaveLength(4)
+    expect(wrapper.get('.source-page').attributes('style')).toContain('left: 499968px')
+  })
+
+  it('measures the rendered monospace font when sizing source pages', async () => {
+    const bounds = vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue({
+      width: 100,
+    } as DOMRect)
+    const wrapper = mount(ClipSourcePreview, {
+      props: { source: 'C'.repeat(49), width: 1000, visibleWidth: 1000 },
+    })
+    await wrapper.vm.$nextTick()
+
+    expect(wrapper.get('.source-page').attributes('style')).toContain('width: 506px')
+    bounds.mockRestore()
+  })
+
+  it('paginates at the number of source rows that fit in the preview', async () => {
+    const bounds = vi
+      .spyOn(HTMLElement.prototype, 'getBoundingClientRect')
+      .mockImplementation(function (this: HTMLElement) {
+        if (this.classList.contains('character-probe')) return { width: 80 } as DOMRect
+        if (this.classList.contains('row-probe')) return { height: 12 } as DOMRect
+        if (this.classList.contains('clip-source-preview')) return { height: 50 } as DOMRect
+        return {} as DOMRect
+      })
+    const wrapper = mount(ClipSourcePreview, {
+      props: { source: 'C\nD\nE\nF\nG', width: 1000, visibleWidth: 1000 },
+    })
+    await wrapper.vm.$nextTick()
+
+    const pages = wrapper.findAll('.source-page')
+    expect(pages[0]!.findAll('.source-line').map((line) => line.text())).toEqual([
+      'C',
+      'D',
+      'E',
+      'F',
+    ])
+    expect(pages[1]!.text()).toBe('G')
+    bounds.mockRestore()
+  })
+
   it('debounces parsing work while a large source is being edited', async () => {
     vi.useFakeTimers()
     const source = 'C '.repeat(20)
