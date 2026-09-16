@@ -7,6 +7,7 @@ import { demoProjects } from '../demo-projects'
 import DawView from '../views/DawView.vue'
 import PitchedLane from '../components/daw/PitchedLane.vue'
 import DrumLane from '../components/daw/DrumLane.vue'
+import ClipSourcePreview from '../components/daw/ClipSourcePreview.vue'
 import XenpaperSourceHighlight from '../components/daw/XenpaperSourceHighlight.vue'
 import XenpaperSourceEditor from '../components/daw/XenpaperSourceEditor.vue'
 import {
@@ -44,6 +45,22 @@ import {
 } from '../daw/score'
 
 describe('DAW project model', () => {
+  it('paginates clip source sideways and repeats it across the clip', () => {
+    const source = 'C\nD\nE\nF\nG\nA\nB'
+    const wrapper = mount(ClipSourcePreview, { props: { source, width: 800 } })
+    const pages = wrapper.findAll('.source-page')
+
+    expect(pages).toHaveLength(6)
+    expect(pages.slice(0, 2).map((page) => page.text())).toEqual([
+      'C\nD\nE\nF\nG\nA',
+      'B',
+    ])
+    expect(pages.filter((page) => page.classes('cycle-end'))).toHaveLength(3)
+    expect(pages[0]!.classes()).not.toContain('cycle-end')
+    expect(pages[1]!.classes()).toContain('cycle-end')
+    expect(pages[2]!.text()).toBe(pages[0]!.text())
+  })
+
   it('debounces parsing work while a large source is being edited', async () => {
     vi.useFakeTimers()
     const source = 'C '.repeat(20)

@@ -9,7 +9,7 @@ import {
   type SourceClip,
 } from '../../daw/project'
 import XenpaperSourceEditor from './XenpaperSourceEditor.vue'
-import XenpaperSourceHighlight from './XenpaperSourceHighlight.vue'
+import ClipSourcePreview from './ClipSourcePreview.vue'
 
 const props = withDefaults(
   defineProps<{
@@ -232,8 +232,9 @@ const onKeyDown = (event: KeyboardEvent) => {
         @pointerdown.prevent="startDrag($event, clip)"
       >
         <span class="clip-caption">{{ clipCaption(clip) }}</span>
-        <pre v-if="displayMode === 'source'"><XenpaperSourceHighlight
+        <pre v-if="displayMode === 'source'"><ClipSourcePreview
           :source="clip.source"
+          :width="beatToNumber(clip.length) * pixelsPerBeat"
           :drum-samples="drumSamples"
           :playing-ranges="playingRangesByClip?.[clip.id]"
         /></pre>
