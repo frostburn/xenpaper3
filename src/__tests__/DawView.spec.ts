@@ -59,6 +59,9 @@ describe('DAW project model', () => {
     expect(pages[0]!.classes()).not.toContain('cycle-end')
     expect(pages[2]!.classes()).toContain('cycle-end')
     expect(pages[3]!.text()).toBe(pages[0]!.text())
+    expect(pages[0]!.attributes('style')).toContain('width: 204px')
+    expect(pages[2]!.attributes('style')).toContain('width: 128px')
+    expect(pages[3]!.attributes('style')).toContain('left: 536px')
   })
 
   it('only renders source pages around the visible part of a very long clip', () => {
@@ -66,7 +69,7 @@ describe('DAW project model', () => {
       props: { source: 'C', width: 1_000_000, visibleStart: 500_000, visibleWidth: 800 },
     })
 
-    expect(wrapper.findAll('.source-page')).toHaveLength(6)
+    expect(wrapper.findAll('.source-page')).toHaveLength(7)
     expect(wrapper.get('.source-page').attributes('style')).toContain('left: 499968px')
   })
 

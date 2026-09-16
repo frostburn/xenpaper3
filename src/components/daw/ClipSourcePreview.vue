@@ -5,7 +5,9 @@ import type { SourceRange } from '../../daw/score'
 import { highlightXenpaper, type XenpaperHighlightToken } from '../../xenpaperSyntaxHighlight'
 
 const COLUMNS_PER_PAGE = 24
-const PAGE_WIDTH_PX = 192
+const CHARACTER_WIDTH_PX = 8
+const PAGE_HORIZONTAL_PADDING_PX = 12
+const MIN_PAGE_WIDTH_PX = 128
 
 const props = defineProps<{
   source: string
@@ -28,7 +30,7 @@ const tokens = computed<XenpaperHighlightToken[]>(() => {
 const lines = computed(() => {
   let start = 0
   return props.source.split('\n').map((text) => {
-    const line = { start, end: start + text.length, length: text.length }
+    const line = { start, length: text.length }
     start += text.length + 1
     return line
   })
@@ -39,13 +41,18 @@ const sourcePages = computed(() => {
     1,
     Math.ceil(Math.max(...lines.value.map(({ length }) => length)) / COLUMNS_PER_PAGE),
   )
-  return Array.from({ length: count }, (_, pageIndex) => ({
-    pageIndex,
-    lines: lines.value.map((line) => ({
+  return Array.from({ length: count }, (_, pageIndex) => {
+    const pageLines = lines.value.map((line) => ({
       start: line.start + Math.min(line.length, pageIndex * COLUMNS_PER_PAGE),
       end: line.start + Math.min(line.length, (pageIndex + 1) * COLUMNS_PER_PAGE),
-    })),
-  }))
+    }))
+    const columns = Math.max(...pageLines.map(({ start, end }) => end - start))
+    return {
+      pageIndex,
+      lines: pageLines,
+      width: Math.max(MIN_PAGE_WIDTH_PX, columns * CHARACTER_WIDTH_PX + PAGE_HORIZONTAL_PADDING_PX),
+    }
+  })
 })
 
 const fragments = (range: SourceRange) =>
@@ -67,24 +74,37 @@ const fragments = (range: SourceRange) =>
   })
 
 const renderedPages = computed(() => {
-  const pageCount = sourcePages.value.length
-  const totalPages = Math.max(1, Math.ceil(props.width / PAGE_WIDTH_PX))
-  const firstPage = Math.max(0, Math.floor((props.visibleStart ?? 0) / PAGE_WIDTH_PX))
+  const cycleWidth = sourcePages.value.reduce((total, page) => total + page.width, 0)
+  const visibleStart = props.visibleStart ?? 0
   const visibleWidth = props.visibleWidth ?? props.width
-  const lastPage = Math.min(
-    totalPages,
-    Math.ceil(((props.visibleStart ?? 0) + visibleWidth) / PAGE_WIDTH_PX) + 1,
-  )
-  return Array.from({ length: Math.max(0, lastPage - firstPage) }, (_, offset) => {
-    const absoluteIndex = firstPage + offset
-    const sourcePage = sourcePages.value[absoluteIndex % pageCount]!
-    return {
-      ...sourcePage,
-      key: absoluteIndex,
-      left: absoluteIndex * PAGE_WIDTH_PX,
-      cycleEnd: sourcePage.pageIndex === pageCount - 1,
+  const visibleEnd = Math.min(props.width, visibleStart + visibleWidth)
+  let cycle = Math.floor(visibleStart / cycleWidth)
+  let left = cycle * cycleWidth
+  let pageIndex = 0
+  while (left + sourcePages.value[pageIndex]!.width <= visibleStart) {
+    left += sourcePages.value[pageIndex]!.width
+    if (++pageIndex === sourcePages.value.length) {
+      pageIndex = 0
+      cycle++
     }
-  })
+  }
+
+  const result = []
+  while (left < visibleEnd) {
+    const sourcePage = sourcePages.value[pageIndex]!
+    result.push({
+      ...sourcePage,
+      key: `${cycle}-${pageIndex}`,
+      left,
+      cycleEnd: pageIndex === sourcePages.value.length - 1,
+    })
+    left += sourcePage.width
+    if (++pageIndex === sourcePages.value.length) {
+      pageIndex = 0
+      cycle++
+    }
+  }
+  return result
 })
 </script>
 
@@ -96,7 +116,7 @@ const renderedPages = computed(() => {
       :key="page.key"
       class="source-page"
       :class="{ 'cycle-end': page.cycleEnd }"
-      :style="{ left: `${page.left}px` }"
+      :style="{ left: `${page.left}px`, width: `${page.width}px` }"
       aria-hidden="true"
       ><span v-for="(line, lineIndex) in page.lines" :key="lineIndex" class="source-line"
         ><span
@@ -134,7 +154,6 @@ const renderedPages = computed(() => {
   top: 0;
   bottom: 0;
   box-sizing: border-box;
-  width: 12rem;
   padding: 0 0.35rem;
   overflow: hidden;
   border-right: 1px dashed var(--xenpaper-slate-450);
