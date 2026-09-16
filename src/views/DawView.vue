@@ -49,6 +49,7 @@ import {
 const project = ref(createDefaultProject())
 const projectLoadError = ref('')
 const selectedClipId = ref<string>()
+const settingsLaneId = ref<string>()
 const playhead = ref(0)
 const pixelsPerBeat = ref(64)
 const scrollLeft = ref(0)
@@ -72,6 +73,7 @@ let playbackRequestId = 0
 const editor = ref<InstanceType<typeof ClipSourceEditor>>()
 const workspace = ref<HTMLElement>()
 const clipInspector = ref<HTMLElement>()
+const laneSettingsInspector = ref<HTMLElement>()
 const clipInspectorWidth = ref<number>()
 let inspectorResizeStart: { x: number; width: number } | undefined
 let workspaceResizeObserver: ResizeObserver | undefined
@@ -295,6 +297,7 @@ const finishPlayback = () => {
 
 const insertClip = async (lane: InstrumentLane, rawBeat: number) => {
   beginEdit()
+  settingsLaneId.value = undefined
   const start = snapBeat(Math.max(0, rawBeat), grid.value)
   const clip = createClip(lane, start)
   lane.clips.push(clip)
@@ -307,9 +310,16 @@ const insertClip = async (lane: InstrumentLane, rawBeat: number) => {
 }
 
 const selectClip = (lane: InstrumentLane, clip: SourceClip) => {
+  settingsLaneId.value = undefined
   selectedClipId.value = clip.id
   selectedLaneId.value = lane.id
   if (!playing.value) playhead.value = beatToNumber(clip.start)
+}
+
+const editLaneSettings = (lane: InstrumentLane) => {
+  settingsLaneId.value = lane.id
+  selectedClipId.value = undefined
+  selectedLaneId.value = lane.id
 }
 
 const startPlayback = async (
@@ -447,6 +457,7 @@ const deleteInstrumentLane = (lane: InstrumentLane) => {
   const nextCollapsedLaneIds = new Set(collapsedLaneIds.value)
   nextCollapsedLaneIds.delete(lane.id)
   collapsedLaneIds.value = nextCollapsedLaneIds
+  if (settingsLaneId.value === lane.id) settingsLaneId.value = undefined
   if (selectedLaneId.value === lane.id) {
     selectedClipId.value = undefined
     selectedLaneId.value = undefined
@@ -496,6 +507,7 @@ const replaceProject = (source: string) => {
   projectLoadError.value = ''
   selectedClipId.value = undefined
   selectedLaneId.value = undefined
+  settingsLaneId.value = undefined
   collapsedLaneIds.value = new Set()
   scrollLeft.value = 0
 }
@@ -829,6 +841,8 @@ onBeforeUnmount(() => {
               :display-mode="displayMode"
               :collapsed="collapsedLaneIds.has(lane.id)"
               :playing-ranges-by-clip="playingRangesByLane.get(lane.id)"
+              :settings-open="settingsLaneId === lane.id"
+              :settings-target="laneSettingsInspector"
               @insert="insertClip(lane, $event)"
               @select="selectClip(lane, $event)"
               @place-playhead="seekPlayback"
@@ -840,6 +854,7 @@ onBeforeUnmount(() => {
               @update-gain="lane.gain = $event"
               @delete-lane="deleteInstrumentLane(lane)"
               @toggle-collapse="toggleLaneCollapse(lane.id)"
+              @edit-settings="editLaneSettings(lane)"
             />
             <template v-else>
               <PitchedLane
@@ -851,6 +866,8 @@ onBeforeUnmount(() => {
                 :scroll-left="scrollLeft"
                 :display-mode="displayMode"
                 :playing-ranges-by-clip="playingRangesByLane.get(lane.id)"
+                :settings-open="settingsLaneId === lane.id"
+                :settings-target="laneSettingsInspector"
                 @insert="insertClip(lane, $event)"
                 @select="selectClip(lane, $event)"
                 @place-playhead="seekPlayback"
@@ -862,6 +879,7 @@ onBeforeUnmount(() => {
                 @update-gain="lane.gain = $event"
                 @delete-lane="deleteInstrumentLane(lane)"
                 @toggle-collapse="toggleLaneCollapse(lane.id)"
+                @edit-settings="editLaneSettings(lane)"
               />
             </template>
           </section>
@@ -887,8 +905,14 @@ onBeforeUnmount(() => {
         @pointerdown="startClipInspectorResize"
         @keydown="resizeClipInspectorWithKeyboard"
       />
-      <aside ref="clipInspector" class="clip-inspector" aria-label="Clip editor">
+      <aside
+        ref="clipInspector"
+        class="clip-inspector"
+        :aria-label="settingsLaneId ? 'Lane editor' : 'Clip editor'"
+      >
+        <div id="lane-settings-inspector" ref="laneSettingsInspector" />
         <ClipSourceEditor
+          v-if="!settingsLaneId"
           ref="editor"
           :clip="selectedClip"
           :lane-name="selectedLane?.name"

@@ -71,12 +71,27 @@ describe('DAW workspace', () => {
 
   it('adds a clip without a double-click and keeps the editor in its own dock', async () => {
     const wrapper = mountDaw()
-    expect(wrapper.get('.lane-settings').attributes('open')).toBeUndefined()
+    expect(wrapper.find('.lane-settings').exists()).toBe(false)
     await wrapper.get('[aria-label="Add clip to Instrument 1"]').trigger('click')
     expect(wrapper.findAll('button.clip')).toHaveLength(1)
     const editor = wrapper.get('.clip-inspector textarea')
     expect(document.activeElement).toBe(editor.element)
     expect(wrapper.get('[aria-label="Undo"]').attributes('disabled')).toBeUndefined()
+  })
+
+  it('uses the inspector dock for lane sound and source settings', async () => {
+    const wrapper = mountDaw()
+
+    await wrapper.get('[aria-label="Edit sound and source for Instrument 1"]').trigger('click')
+
+    const inspector = wrapper.get('[aria-label="Lane editor"]')
+    expect(inspector.get('h2').text()).toBe('Sound & source')
+    expect(inspector.get('[aria-label="Instrument lane source"]').attributes('rows')).toBe('10')
+    expect(wrapper.find('[aria-label="Xenpaper clip source"]').exists()).toBe(false)
+
+    await wrapper.get('[aria-label="Add clip to Instrument 1"]').trigger('click')
+    expect(wrapper.get('.clip-inspector').attributes('aria-label')).toBe('Clip editor')
+    expect(wrapper.find('.lane-settings').exists()).toBe(false)
   })
 
   it('uses the chosen rational snap grid when inserting clips', async () => {

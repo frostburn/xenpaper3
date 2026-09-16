@@ -25,6 +25,8 @@ const props = defineProps<{
   displayMode: ClipDisplayMode
   collapsed?: boolean
   playingRangesByClip?: Readonly<Record<string, readonly SourceRange[]>>
+  settingsOpen?: boolean
+  settingsTarget?: HTMLElement
 }>()
 const emit = defineEmits<{
   insert: [beat: number]
@@ -38,6 +40,7 @@ const emit = defineEmits<{
   'update-gain': [gain: number]
   'delete-lane': []
   'toggle-collapse': []
+  'edit-settings': []
 }>()
 
 const sampleUrl = ref(props.lane.instrument.type === 'samples' ? props.lane.instrument.url : '')
@@ -286,6 +289,8 @@ const clipPreview = (clipId: string) => pianoRoll.value.notesByClip[clipId]!
     :display-mode="displayMode"
     :collapsed="collapsed"
     :playing-ranges-by-clip="playingRangesByClip"
+    :settings-open="settingsOpen"
+    :settings-target="settingsTarget"
     lane-label="Instrument lane"
     timeline-label="Instrument piano roll"
     editor-label="Instrument lane source"
@@ -299,6 +304,7 @@ const clipPreview = (clipId: string) => pianoRoll.value.notesByClip[clipId]!
     @update-gain="emit('update-gain', $event)"
     @delete-lane="emit('delete-lane')"
     @toggle-collapse="emit('toggle-collapse')"
+    @edit-settings="emit('edit-settings')"
   >
     <template #settings>
       <fieldset class="instrument-kind">

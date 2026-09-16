@@ -894,10 +894,12 @@ describe('DawView', () => {
     expect(lanes[0]!.find('button.clip').exists()).toBe(false)
     expect(lanes[1]!.find('button.clip').exists()).toBe(true)
 
+    await wrapper.get('[aria-label="Edit sound and source for Instrument 2"]').trigger('click')
     await wrapper.get('button[aria-label="Delete Instrument 2"]').trigger('click')
     expect(wrapper.findAll('.instrument-header')).toHaveLength(1)
     expect(wrapper.find('textarea[aria-label="Xenpaper clip source"]').exists()).toBe(false)
 
+    await wrapper.get('[aria-label="Edit sound and source for Instrument 1"]').trigger('click')
     await wrapper.get('button[aria-label="Delete Instrument 1"]').trigger('click')
     expect(wrapper.findAll('.instrument-header')).toHaveLength(0)
     await wrapper.get('button.add-lane').trigger('click')
@@ -939,7 +941,8 @@ describe('DawView', () => {
     const wrapper = mount(DawView)
 
     expect(wrapper.get('.global-lane [data-highlight="comment"]').text()).toContain('Shared tuning')
-    expect(wrapper.get('.instrument-header [data-highlight="directive"]').text()).toContain('@adsr')
+    await wrapper.get('[aria-label="Edit sound and source for Instrument 1"]').trigger('click')
+    expect(wrapper.get('.lane-settings [data-highlight="directive"]').text()).toContain('@adsr')
 
     await wrapper.getComponent(PitchedLane).trigger('dblclick', { clientX: 64 })
     await wrapper.get('textarea[aria-label="Xenpaper clip source"]').setValue('C (')
@@ -1113,6 +1116,7 @@ describe('DawView', () => {
     await wrapper.get('[aria-label="Tempo in BPM"]').setValue('144')
     await wrapper.get('[aria-label="Time signature numerator"]').setValue('7')
     await wrapper.get('[aria-label="Time signature denominator"]').setValue('8')
+    await wrapper.get('[aria-label="Edit sound and source for Lead"]').trigger('click')
     await wrapper.get('[aria-label="Waveform"]').setValue('triangle')
     await wrapper.get('[aria-label="Instrument gain"]').setValue('0.42')
     await wrapper.get('[aria-label="Global source"]').setValue('{31edo}')
@@ -1155,22 +1159,23 @@ describe('DawView', () => {
     await lane.get('[aria-label="Drum gain"]').setValue('0.37')
     expect(wrapper.find('[aria-label="Collapse Percussion"]').exists()).toBe(true)
     expect(lane.get('output').text()).toBe('37%')
-    expect(lane.get('[aria-label="Delete Percussion"]').classes()).toContain('delete-lane')
     expect(lane.find('.track-title [aria-label="Drum lane name"]').exists()).toBe(true)
     expect(lane.get('[aria-label="Add clip to Percussion"]').text()).toBe('+ Clip')
-    expect(lane.get('details.lane-settings').attributes('open')).toBeUndefined()
-    expect(lane.find('.lane-settings [aria-label="Drum samples"]').exists()).toBe(true)
+    expect(wrapper.find('.lane-settings').exists()).toBe(false)
+    await lane.get('[aria-label="Edit sound and source for Percussion"]').trigger('click')
+    expect(wrapper.get('[aria-label="Delete Percussion"]').classes()).toContain('delete-lane')
+    expect(wrapper.find('.lane-settings [aria-label="Drum samples"]').exists()).toBe(true)
     expect(lane.get('[aria-label="Drum lane"]').attributes('aria-label')).toBe('Drum lane')
-    const laneSource = lane.get('[aria-label="Drum lane source"]')
+    const laneSource = wrapper.get('[aria-label="Drum lane source"]')
     expect((laneSource.element as HTMLTextAreaElement).value).toBe(
       '# Defaults inherited by every clip in this lane\n',
     )
     await laneSource.setValue('@adsr(10ms, 20ms, 50%, 30ms)')
     expect((laneSource.element as HTMLTextAreaElement).value).toBe('@adsr(10ms, 20ms, 50%, 30ms)')
-    expect(lane.find('[aria-label="Drum patch source"]').exists()).toBe(false)
-    expect(lane.get('[aria-label="Drum samples"]').text()).toContain('3 samples available')
-    expect(lane.get('[aria-label="Drum samples"]').text()).toContain('sd · hh · bd')
-    expect(lane.get('.source-control > span').text()).toBe('Lane source')
+    expect(wrapper.find('[aria-label="Drum patch source"]').exists()).toBe(false)
+    expect(wrapper.get('[aria-label="Drum samples"]').text()).toContain('3 samples available')
+    expect(wrapper.get('[aria-label="Drum samples"]').text()).toContain('sd · hh · bd')
+    expect(wrapper.get('.source-control > span').text()).toBe('Lane source')
     expect(lane.get('.gain-control [aria-label="Drum gain"]').attributes('type')).toBe('range')
 
     await lane.get('[aria-label="Drum lane"]').trigger('dblclick', { clientX: 64 })
@@ -1195,9 +1200,10 @@ describe('DawView', () => {
     expect(highlightedDrums).toContain('hh')
     expect(lane.find('button.clip [data-highlight^="pitch"]').exists()).toBe(false)
 
-    await lane.get('input[type="radio"][value="samples"]').setValue()
-    expect(lane.find('[aria-label="Drum patch source"]').exists()).toBe(false)
-    expect(lane.get('[aria-label="Sampled drumkit source"]').text()).toContain(
+    await lane.get('[aria-label="Edit sound and source for Percussion"]').trigger('click')
+    await wrapper.get('input[type="radio"][value="samples"]').setValue()
+    expect(wrapper.find('[aria-label="Drum patch source"]').exists()).toBe(false)
+    expect(wrapper.get('[aria-label="Sampled drumkit source"]').text()).toContain(
       'Choose a Strudel JSON manifest',
     )
     const sampleNames = [
@@ -1226,10 +1232,10 @@ describe('DawView', () => {
         ),
     } as Response)
     vi.stubGlobal('fetch', fetcher)
-    await lane
+    await wrapper
       .get('[aria-label="Drumkit JSON URL"]')
       .setValue('https://github.com/tidalcycles/uzu-drumkit/blob/main/strudel.json')
-    await lane
+    await wrapper
       .findAll('button')
       .find((button) => button.text() === 'Load URL')!
       .trigger('click')
@@ -1243,7 +1249,7 @@ describe('DawView', () => {
         url: 'https://github.com/tidalcycles/uzu-drumkit/blob/main/strudel.json',
       }),
     )
-    expect(lane.get('[aria-label="Sampled drumkit source"]').text()).toContain(
+    expect(wrapper.get('[aria-label="Sampled drumkit source"]').text()).toContain(
       '16 sample banks loaded',
     )
     await wrapper.get('[aria-label="Clip display"]').setValue('piano-roll')
@@ -1253,7 +1259,7 @@ describe('DawView', () => {
     expect(denseLabels[1]!.attributes('style')).toContain('left: 2.5rem')
     expect(denseLabels[15]!.attributes('style')).toContain('left: 2.5rem')
 
-    const upload = lane.get('[aria-label="Upload drumkit JSON"]')
+    const upload = wrapper.get('[aria-label="Upload drumkit JSON"]')
     Object.defineProperty(upload.element, 'files', {
       configurable: true,
       value: [{ text: async () => '{"clap":["clap.wav"]}' }],
@@ -1352,11 +1358,8 @@ describe('DawView', () => {
   })
 
   it('uses the same sound-source radio pattern for pitched lanes as drum lanes', async () => {
-    const project = createDefaultProject()
-    const lane = project.instrumentLanes[0]! as PitchedInstrumentLane
-    const wrapper = mount(PitchedLane, {
-      props: { lane, pixelsPerBeat: 64, scrollLeft: 0, displayMode: 'piano-roll' },
-    })
+    const wrapper = mount(DawView)
+    await wrapper.get('[aria-label="Edit sound and source for Instrument 1"]').trigger('click')
 
     expect(wrapper.get('fieldset legend').text()).toBe('Instrument sound source')
     expect(wrapper.findAll('input[type="radio"]')).toHaveLength(2)
@@ -1369,6 +1372,7 @@ describe('DawView', () => {
 
   it('preserves patch settings when toggling instrument source modes', async () => {
     const wrapper = mount(DawView)
+    await wrapper.get('[aria-label="Edit sound and source for Instrument 1"]').trigger('click')
     const waveform = wrapper.get('select[aria-label="Waveform"]')
 
     await waveform.setValue('triangle')
