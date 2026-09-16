@@ -41,6 +41,7 @@ const emit = defineEmits<{
 }>()
 
 const laneElement = ref<HTMLElement>()
+const viewportWidth = window.innerWidth
 const dragging = ref<{
   clip: SourceClip
   pointerOffset: number
@@ -70,6 +71,9 @@ const pointerBeat = (event: MouseEvent) =>
     props.scrollLeft,
     props.pixelsPerBeat,
   )
+
+const clipVisibleStart = (clip: SourceClip) =>
+  Math.max(0, props.scrollLeft - beatToNumber(clip.start) * props.pixelsPerBeat)
 
 const onClick = (event: MouseEvent) => {
   if ((event.target as HTMLElement).closest('.clip')) return
@@ -235,6 +239,8 @@ const onKeyDown = (event: KeyboardEvent) => {
         <pre v-if="displayMode === 'source'"><ClipSourcePreview
           :source="clip.source"
           :width="beatToNumber(clip.length) * pixelsPerBeat"
+          :visible-start="clipVisibleStart(clip)"
+          :visible-width="viewportWidth"
           :drum-samples="drumSamples"
           :playing-ranges="playingRangesByClip?.[clip.id]"
         /></pre>

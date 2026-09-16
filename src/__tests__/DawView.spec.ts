@@ -46,19 +46,28 @@ import {
 
 describe('DAW project model', () => {
   it('paginates clip source sideways and repeats it across the clip', () => {
-    const source = 'C\nD\nE\nF\nG\nA\nB'
-    const wrapper = mount(ClipSourcePreview, { props: { source, width: 800 } })
+    const source = `${'C'.repeat(48)}.\n${'D'.repeat(49)}`
+    const wrapper = mount(ClipSourcePreview, {
+      props: { source, width: 1200, visibleWidth: 1200 },
+    })
     const pages = wrapper.findAll('.source-page')
 
-    expect(pages).toHaveLength(6)
-    expect(pages.slice(0, 2).map((page) => page.text())).toEqual([
-      'C\nD\nE\nF\nG\nA',
-      'B',
-    ])
-    expect(pages.filter((page) => page.classes('cycle-end'))).toHaveLength(3)
+    expect(pages).toHaveLength(7)
+    expect(pages[0]!.text()).toBe(`${'C'.repeat(24)}${'D'.repeat(24)}`)
+    expect(pages[2]!.text()).toBe('.D')
+    expect(pages.filter((page) => page.classes('cycle-end'))).toHaveLength(2)
     expect(pages[0]!.classes()).not.toContain('cycle-end')
-    expect(pages[1]!.classes()).toContain('cycle-end')
-    expect(pages[2]!.text()).toBe(pages[0]!.text())
+    expect(pages[2]!.classes()).toContain('cycle-end')
+    expect(pages[3]!.text()).toBe(pages[0]!.text())
+  })
+
+  it('only renders source pages around the visible part of a very long clip', () => {
+    const wrapper = mount(ClipSourcePreview, {
+      props: { source: 'C', width: 1_000_000, visibleStart: 500_000, visibleWidth: 800 },
+    })
+
+    expect(wrapper.findAll('.source-page')).toHaveLength(6)
+    expect(wrapper.get('.source-page').attributes('style')).toContain('left: 499968px')
   })
 
   it('debounces parsing work while a large source is being edited', async () => {
