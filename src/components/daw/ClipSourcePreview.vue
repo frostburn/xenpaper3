@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { parse } from '../../../xenpaper-lang'
 import type { SourceRange } from '../../daw/score'
 import { highlightXenpaper, type XenpaperHighlightToken } from '../../xenpaperSyntaxHighlight'
@@ -19,11 +19,28 @@ const props = defineProps<{
 }>()
 
 const characterProbe = ref<HTMLElement>()
+const rowProbe = ref<HTMLElement>()
+const previewElement = ref<HTMLElement>()
 const characterWidth = ref(FALLBACK_CHARACTER_WIDTH_PX)
-onMounted(() => {
+const linesPerPage = ref(LINES_PER_PAGE)
+let resizeObserver: ResizeObserver | undefined
+
+const measureLayout = () => {
   const measuredWidth = characterProbe.value?.getBoundingClientRect().width ?? 0
   if (measuredWidth) characterWidth.value = measuredWidth / 10
+  const previewHeight = previewElement.value?.getBoundingClientRect().height ?? 0
+  const rowHeight = rowProbe.value?.getBoundingClientRect().height ?? 0
+  if (previewHeight && rowHeight)
+    linesPerPage.value = Math.max(1, Math.floor(previewHeight / rowHeight))
+}
+onMounted(() => {
+  measureLayout()
+  if (typeof ResizeObserver !== 'undefined' && previewElement.value) {
+    resizeObserver = new ResizeObserver(measureLayout)
+    resizeObserver.observe(previewElement.value)
+  }
 })
+onBeforeUnmount(() => resizeObserver?.disconnect())
 
 const tokens = computed<XenpaperHighlightToken[]>(() => {
   if (!props.source) return []
@@ -44,11 +61,11 @@ const lines = computed(() => {
 })
 
 const sourcePages = computed(() => {
-  const count = Math.max(1, Math.ceil(lines.value.length / LINES_PER_PAGE))
+  const count = Math.max(1, Math.ceil(lines.value.length / linesPerPage.value))
   return Array.from({ length: count }, (_, pageIndex) => {
     const pageLines = lines.value.slice(
-      pageIndex * LINES_PER_PAGE,
-      (pageIndex + 1) * LINES_PER_PAGE,
+      pageIndex * linesPerPage.value,
+      (pageIndex + 1) * linesPerPage.value,
     )
     const columns = Math.max(...pageLines.map(({ length }) => length))
     return {
@@ -116,9 +133,10 @@ const renderedPages = computed(() => {
 </script>
 
 <template>
-  <span class="clip-source-preview">
+  <span ref="previewElement" class="clip-source-preview">
     <span class="source-full-text">{{ source }}</span>
     <span ref="characterProbe" class="character-probe" aria-hidden="true">0000000000</span>
+    <span ref="rowProbe" class="row-probe" aria-hidden="true">M</span>
     <span
       v-for="page in renderedPages"
       :key="page.key"
@@ -163,6 +181,13 @@ const renderedPages = computed(() => {
   height: auto;
   visibility: hidden;
   white-space: pre;
+  pointer-events: none;
+}
+.row-probe {
+  position: absolute;
+  height: 1.2em;
+  line-height: 1.2em;
+  visibility: hidden;
   pointer-events: none;
 }
 .source-page {

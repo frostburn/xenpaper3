@@ -87,6 +87,31 @@ describe('DAW project model', () => {
     bounds.mockRestore()
   })
 
+  it('paginates at the number of source rows that fit in the preview', async () => {
+    const bounds = vi
+      .spyOn(HTMLElement.prototype, 'getBoundingClientRect')
+      .mockImplementation(function (this: HTMLElement) {
+        if (this.classList.contains('character-probe')) return { width: 80 } as DOMRect
+        if (this.classList.contains('row-probe')) return { height: 12 } as DOMRect
+        if (this.classList.contains('clip-source-preview')) return { height: 50 } as DOMRect
+        return {} as DOMRect
+      })
+    const wrapper = mount(ClipSourcePreview, {
+      props: { source: 'C\nD\nE\nF\nG', width: 1000, visibleWidth: 1000 },
+    })
+    await wrapper.vm.$nextTick()
+
+    const pages = wrapper.findAll('.source-page')
+    expect(pages[0]!.findAll('.source-line').map((line) => line.text())).toEqual([
+      'C',
+      'D',
+      'E',
+      'F',
+    ])
+    expect(pages[1]!.text()).toBe('G')
+    bounds.mockRestore()
+  })
+
   it('debounces parsing work while a large source is being edited', async () => {
     vi.useFakeTimers()
     const source = 'C '.repeat(20)
