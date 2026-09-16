@@ -10,6 +10,30 @@ const score = (source: string) => {
   return result.score
 }
 
+const audibleResult = (source: string) => {
+  const result = score(source)
+  return {
+    duration: result.duration.toFraction(),
+    events: result.events
+      .filter((event) => event.kind !== 'marker')
+      .map((event) => ({
+        kind: event.kind,
+        start: event.start.toFraction(),
+        duration: event.duration.toFraction(),
+        pitch: [
+          event.pitch.kind,
+          event.pitch.kind === 'frequency'
+            ? event.pitch.frequency.valueOf()
+            : event.pitch.kind === 'absolutePitch'
+              ? event.pitch.rootOffset.valueOf()
+              : event.pitch.value.valueOf(),
+        ],
+        ...('label' in event ? { label: event.label } : {}),
+        ...('dynamic' in event ? { dynamic: event.dynamic.toFraction() } : {}),
+      })),
+  }
+}
+
 describe('beat event expansion', () => {
   it('scales every note when a normalized slot is continued', () => {
     const result = score('[0 2 7] [0 2 7]= [0 2 7]===')
@@ -115,6 +139,25 @@ describe('beat event expansion', () => {
 
     expect(timing(repeated)).toEqual(timing(expanded))
     expect(timing(repeated).at(-1)?.[1]).toBe(duration)
+  })
+
+  it.each([
+    ['plain notes', '', 'C D E', 'F'],
+    ['rests and continuations', 'A', 'C= . D', 'E'],
+    ['normalized slots', '', '[C D] E', 'F'],
+    ['explicit groups', 'A', '(C D) E', 'F'],
+    ['parallel groups', '', '(C, E G) D', 'F'],
+    ['subdivision changes', '@3', 'C @2 D E', 'F'],
+    ['articulation shorthand', '', 'C D E F @. G', 'A'],
+    ['dynamics', '@p', 'C @ff D', 'E'],
+    ['pitch-context changes', '', '{root = D} C E', 'G'],
+    ['hard boundaries', 'A', 'C || D E', 'F'],
+    ['nested repeats', '', 'C |:@x2 D :| E', 'F'],
+  ])('matches authored copies for %s', (_description, prefix, repeatedBody, suffix) => {
+    const repeated = `${prefix} |: ${repeatedBody} :| ${suffix}`
+    const authored = `${prefix} ${repeatedBody} ${repeatedBody} ${suffix}`
+
+    expect(audibleResult(repeated)).toEqual(audibleResult(authored))
   })
 
   it('carries directives from a common repeat body into alternate endings', () => {
