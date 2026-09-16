@@ -44,6 +44,16 @@ describe('repeat expansion', () => {
     )
   })
 
+  it.each(['C :|, D', '(C :|, D)'])('preserves a branch-local implicit repeat in %s', (source) => {
+    const expression = parse(source).body[0]
+    const parallel = expression.type === 'Group' ? expression.expression : expression
+
+    expect(parallel).toMatchObject({
+      type: 'Parallel',
+      branches: [{ type: 'Repeat', body: [{ type: 'PitchLiteral', raw: 'C' }] }, { raw: 'D' }],
+    })
+  })
+
   it('limits a parallel implicit repeat to its containing group', () => {
     const program = parse('(0 1, 2 3 :|) 4')
 

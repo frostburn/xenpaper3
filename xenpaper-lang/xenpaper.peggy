@@ -119,7 +119,7 @@ ParallelExpression
 // its lexical sequence. Keeping this behavior in the scoped productions lets
 // explicit repeat bodies continue to reserve their own `:|` delimiter.
 ScopedParallelExpression
-  = repeated:ParallelExpression Spacing ":|"
+  = repeated:ParallelExpression Spacing ":|" !(Spacing ",")
     remainder:(Spacing item:ScopedParallelExpression { return item; })? {
       if (containsDeclaration(repeated)) {
         error('Variable and function declarations are not allowed inside repeats.');
@@ -135,7 +135,7 @@ ScopedParallelExpression
       if (remainder) prependImplicitRepeatScope(remainder, [repeat]);
       return sequence(remainder ? [repeat, remainder] : [repeat]);
     }
-  / body:ParallelExpression result:RepeatEndings
+  / body:ParallelExpression result:RepeatEndings !(Spacing ",")
     remainder:(Spacing item:ScopedParallelExpression { return item; })? {
       if (containsDeclaration(body) || containsDeclaration(result.endings)) {
         error('Variable and function declarations are not allowed inside repeats.');
@@ -151,7 +151,10 @@ ScopedParallelExpression
       if (remainder) prependImplicitRepeatScope(remainder, [repeat]);
       return sequence(remainder ? [repeat, remainder] : [repeat]);
     }
-  / ParallelExpression
+  / first:ScopedSequenceExpression
+    rest:(Spacing "," Spacing branch:ScopedSequenceExpression { return branch; })* {
+      return parallel([first, ...rest]);
+    }
 
 ScopedSequenceExpression
   = repeated:SequenceExpression Spacing ":|" remainder:(Spacing item:ScopedSequenceExpression { return item; })? {
