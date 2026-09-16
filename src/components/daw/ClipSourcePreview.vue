@@ -147,8 +147,7 @@ const renderedPages = computed(() => {
   display: block;
   height: 100%;
 }
-.source-full-text,
-.character-probe {
+.source-full-text {
   position: absolute;
   width: 1px;
   height: 1px;
@@ -158,6 +157,14 @@ const renderedPages = computed(() => {
   white-space: pre;
   border: 0;
 }
+.character-probe {
+  position: absolute;
+  width: max-content;
+  height: auto;
+  visibility: hidden;
+  white-space: pre;
+  pointer-events: none;
+}
 .source-page {
   position: absolute;
   top: 0;
@@ -166,6 +173,7 @@ const renderedPages = computed(() => {
   padding: 0 0.35rem;
   overflow: hidden;
   border-right: 1px dashed var(--xenpaper-slate-450);
+  line-height: 0;
 }
 .source-page.cycle-end {
   border-right-style: solid;
@@ -173,15 +181,14 @@ const renderedPages = computed(() => {
 .source-line {
   display: block;
   height: 1.2em;
+  line-height: 1.2em;
   overflow: hidden;
   white-space: pre;
-  isolation: isolate;
+  contain: paint;
 }
 .source-playing {
-  position: relative;
   color: var(--xenpaper-slate-950);
   background: var(--xenpaper-cyan);
   border-radius: 0.12em;
-  box-decoration-break: clone;
 }
 </style>
