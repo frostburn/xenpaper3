@@ -11,6 +11,7 @@ import {
 } from 'vue'
 import { clamp, Fraction } from 'xen-dev-utils'
 import ArrangementTimeline from '../components/daw/ArrangementTimeline.vue'
+import ToggleSwitch from '../components/ToggleSwitch.vue'
 import { EditorHistory } from '../daw/editor-history'
 import ClipSourceEditor from '../components/daw/ClipSourceEditor.vue'
 import DrumLane from '../components/daw/DrumLane.vue'
@@ -780,14 +781,13 @@ onBeforeUnmount(() => {
         />
       </label>
       <button type="button" @click="timeline?.fit()">Fit project</button>
-      <button
-        type="button"
-        :aria-pressed="followPlayhead"
+      <ToggleSwitch
+        v-model="followPlayhead"
+        aria-label="Follow playhead"
         title="Keep the playing position visible. Panning turns this off."
-        @click="followPlayhead = !followPlayhead"
       >
         Follow
-      </button>
+      </ToggleSwitch>
     </div>
     <p v-if="projectLoadError" class="playback-error" role="alert">{{ projectLoadError }}</p>
     <p v-if="playbackError" class="playback-error" role="alert">{{ playbackError }}</p>
