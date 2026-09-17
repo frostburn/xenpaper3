@@ -24,6 +24,8 @@ const props = withDefaults(
     editorLabel: string
     drumSamples?: string[]
     playingRangesByClip?: Readonly<Record<string, readonly SourceRange[]>>
+    settingsOpen?: boolean
+    settingsTarget?: HTMLElement
   }>(),
   { collapsed: false, selectedClipId: undefined, drumSamples: undefined },
 )
@@ -38,6 +40,7 @@ const emit = defineEmits<{
   'update-gain': [gain: number]
   'delete-lane': []
   'toggle-collapse': []
+  'edit-settings': []
 }>()
 
 const laneElement = ref<HTMLElement>()
@@ -180,28 +183,43 @@ const onKeyDown = (event: KeyboardEvent) => {
       >
         + Clip
       </button>
-      <details v-if="!collapsed" class="lane-settings">
-        <summary>Sound &amp; source</summary>
-        <slot name="settings" />
-        <div class="source-control">
-          <span>Lane source</span>
-          <XenpaperSourceEditor
-            :editor-label="editorLabel"
-            :source="lane.source"
-            :drum-samples="drumSamples"
-            :rows="3"
-            @update:source="emit('update-source', $event)"
-          />
-        </div>
-        <button
-          type="button"
-          class="delete-lane"
-          :aria-label="`Delete ${lane.name}`"
-          @click="emit('delete-lane')"
-        >
-          Delete lane
-        </button>
-      </details>
+      <button
+        v-if="!collapsed"
+        type="button"
+        class="edit-lane-settings"
+        :aria-expanded="settingsOpen || false"
+        :aria-label="`Edit sound and source for ${lane.name}`"
+        @click="emit('edit-settings')"
+      >
+        Sound &amp; source
+      </button>
+      <Teleport v-if="settingsOpen && settingsTarget" :to="settingsTarget">
+        <section class="lane-settings" :aria-label="`${lane.name} sound and source`">
+          <header>
+            <p class="settings-eyebrow">{{ lane.name }}</p>
+            <h2>Sound &amp; source</h2>
+          </header>
+          <slot name="settings" />
+          <div class="source-control">
+            <span>Lane source</span>
+            <XenpaperSourceEditor
+              :editor-label="editorLabel"
+              :source="lane.source"
+              :drum-samples="drumSamples"
+              :rows="10"
+              @update:source="emit('update-source', $event)"
+            />
+          </div>
+          <button
+            type="button"
+            class="delete-lane"
+            :aria-label="`Delete ${lane.name}`"
+            @click="emit('delete-lane')"
+          >
+            Delete lane
+          </button>
+        </section>
+      </Teleport>
     </header>
     <div
       v-show="!collapsed"
@@ -307,17 +325,25 @@ const onKeyDown = (event: KeyboardEvent) => {
   width: 100%;
   margin-bottom: 0.45rem;
 }
+.edit-lane-settings {
+  width: 100%;
+}
 .lane-settings {
   font-size: 0.75rem;
   min-width: 0;
 }
-.lane-settings summary {
-  padding: 0.2rem 0;
-  cursor: pointer;
-  color: var(--xenpaper-slate-400);
+.lane-settings header {
+  margin-bottom: 1rem;
 }
-.lane-settings[open] summary {
-  margin-bottom: 0.5rem;
+.lane-settings h2 {
+  margin: 0.15rem 0;
+  font-size: 1.15rem;
+}
+.settings-eyebrow {
+  margin: 0;
+  color: var(--xenpaper-cyan);
+  font-size: 0.7rem;
+  overflow-wrap: anywhere;
 }
 .lane-settings :deep(fieldset) {
   min-width: 0;
