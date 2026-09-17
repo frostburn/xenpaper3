@@ -1693,7 +1693,9 @@ export function evaluateScoreSemantics(
         // derived solely from the target expression when the chain is first established.
         if (
           (item.type === 'DetachedContinue' ||
-            (item.type === 'PostfixExpression' && item.expression.type === 'Barline')) &&
+            (item.type === 'PostfixExpression' &&
+              (item.expression.type === 'DetachedContinue' ||
+                item.expression.type === 'Barline'))) &&
           gliss?.sourceShape &&
           gliss.indices.length === 1 &&
           'shape' in result
