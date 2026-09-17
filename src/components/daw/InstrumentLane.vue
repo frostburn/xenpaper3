@@ -26,6 +26,8 @@ const props = withDefaults(
     playingRangesByClip?: Readonly<Record<string, readonly SourceRange[]>>
     settingsOpen?: boolean
     settingsTarget?: HTMLElement
+    canMoveUp?: boolean
+    canMoveDown?: boolean
   }>(),
   { collapsed: false, selectedClipId: undefined, drumSamples: undefined },
 )
@@ -41,6 +43,8 @@ const emit = defineEmits<{
   'delete-lane': []
   'toggle-collapse': []
   'edit-settings': []
+  'move-up': []
+  'move-down': []
 }>()
 
 const laneElement = ref<HTMLElement>()
@@ -149,6 +153,26 @@ const onKeyDown = (event: KeyboardEvent) => {
           :value="lane.name"
           @input="emit('update-name', ($event.target as HTMLInputElement).value)"
         />
+        <div class="lane-order-controls" aria-label="Lane order">
+          <button
+            type="button"
+            :disabled="!canMoveUp"
+            :aria-label="`Move ${lane.name} up`"
+            title="Move lane up"
+            @click="emit('move-up')"
+          >
+            ↑
+          </button>
+          <button
+            type="button"
+            :disabled="!canMoveDown"
+            :aria-label="`Move ${lane.name} down`"
+            title="Move lane down"
+            @click="emit('move-down')"
+          >
+            ↓
+          </button>
+        </div>
         <button
           v-if="collapsed"
           type="button"
@@ -300,6 +324,14 @@ const onKeyDown = (event: KeyboardEvent) => {
 }
 .collapse-lane {
   flex: none;
+}
+.lane-order-controls {
+  display: flex;
+  flex: none;
+}
+.lane-order-controls button {
+  min-width: 1.75rem;
+  padding-inline: 0.35rem;
 }
 .collapsed .track-title {
   margin-bottom: 0;
