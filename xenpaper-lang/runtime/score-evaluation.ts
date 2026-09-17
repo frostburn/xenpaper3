@@ -1687,6 +1687,18 @@ export function evaluateScoreSemantics(
           if (gliss) gliss.indices.push(index)
         }
         results.push(result)
+        // A chained gliss uses the previous target as the source of its next segment. Keep
+        // detached continuations in that source span just as attached postfix continuations
+        // already are. Barlines can separate the target and continuation, so this cannot be
+        // derived solely from the target expression when the chain is first established.
+        if (
+          (item.type === 'DetachedContinue' ||
+            (item.type === 'PostfixExpression' && item.expression.type === 'Barline')) &&
+          gliss?.sourceShape &&
+          gliss.indices.length === 1 &&
+          'shape' in result
+        )
+          gliss.sourceShape = sequence([gliss.sourceShape, result.shape], gliss.sourceShape.origins)
         if (grace && grace.indices.length === grace.count + 1) {
           const targetIndex = grace.indices[grace.indices.length - 1]!
           const stolen = grace.duration.mul(grace.count)

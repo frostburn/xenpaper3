@@ -339,6 +339,26 @@ describe('directive runtime', () => {
     expect(extendedGlide[0]!.automation?.duration.valueOf()).toBe(2)
   })
 
+  it('treats a detached continuation after a barline like an attached gliss continuation', () => {
+    const attached = notes('@gliss 0 @gliss 7= 2')
+    const detached = notes('@gliss 0 @gliss 7|= 2')
+
+    expect(detached.map(({ duration }) => duration.toFraction())).toEqual(
+      attached.map(({ duration }) => duration.toFraction()),
+    )
+    expect(
+      detached[0]!.automation?.segments?.map(({ start, duration }) => [
+        start.toFraction(),
+        duration.toFraction(),
+      ]),
+    ).toEqual(
+      attached[0]!.automation?.segments?.map(({ start, duration }) => [
+        start.toFraction(),
+        duration.toFraction(),
+      ]),
+    )
+  })
+
   it('chains adjacent gliss directives into one held note', () => {
     const chained = notes('@gliss E @gliss F G')
 
