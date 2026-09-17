@@ -3,6 +3,7 @@ import { ref } from 'vue'
 import { beatToNumber, type SourceClip } from '../../daw/project'
 import type { Diagnostic } from '../../../xenpaper-lang'
 import type { SourceLineCaret } from '../../daw/score'
+import ToggleSwitch from '../ToggleSwitch.vue'
 import XenpaperSourceEditor from './XenpaperSourceEditor.vue'
 
 defineProps<{
@@ -35,17 +36,15 @@ defineExpose({ focus: () => editor.value?.focus() })
         <p class="eyebrow">{{ laneName || 'CLIP EDITOR' }}</p>
         <div class="clip-title">
           <h2>Clip source</h2>
-          <button
+          <ToggleSwitch
             v-if="clip"
-            type="button"
             class="solo-toggle"
             aria-label="Solo clip playback"
-            :aria-pressed="solo || false"
-            @click="emit('update:solo', !solo)"
+            :model-value="solo"
+            @update:model-value="emit('update:solo', $event)"
           >
-            <span class="toggle-track" aria-hidden="true"><span /></span>
             Solo
-          </button>
+          </ToggleSwitch>
         </div>
         <p v-if="clip" class="clip-position">
           Beat {{ beatToNumber(clip.start) }} · {{ beatToNumber(clip.length) }} beats
@@ -136,39 +135,9 @@ defineExpose({ focus: () => editor.value?.focus() })
   gap: 0.4rem;
 }
 .solo-toggle {
-  display: inline-flex;
-  align-items: center;
   min-height: 1.6rem;
   padding: 0.15rem 0.45rem;
-  gap: 0.35rem;
   font-size: 0.75rem;
-}
-.toggle-track {
-  position: relative;
-  display: inline-block;
-  width: 1.5rem;
-  height: 0.8rem;
-  border: 1px solid var(--xenpaper-slate-400);
-  border-radius: 999px;
-  background: var(--xenpaper-slate-900);
-}
-.toggle-track span {
-  position: absolute;
-  top: 0.1rem;
-  left: 0.1rem;
-  width: 0.5rem;
-  height: 0.5rem;
-  border-radius: 50%;
-  background: var(--xenpaper-teal-700);
-  transition: transform 120ms ease;
-}
-.solo-toggle[aria-pressed='true'] .toggle-track {
-  border-color: var(--xenpaper-cyan);
-  background: color-mix(in srgb, var(--xenpaper-cyan) 35%, var(--xenpaper-slate-900));
-}
-.solo-toggle[aria-pressed='true'] .toggle-track span {
-  background: var(--xenpaper-cyan);
-  transform: translateX(0.7rem);
 }
 .source-editor .xenpaper-source-editor {
   box-sizing: border-box;

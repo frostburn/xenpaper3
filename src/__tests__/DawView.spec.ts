@@ -1086,6 +1086,16 @@ describe('DawView', () => {
     )
   })
 
+  it('toggles playhead following with the shared switch control', async () => {
+    const wrapper = mount(DawView)
+    const follow = wrapper.get('[aria-label="Follow playhead"]')
+
+    expect(follow.attributes('role')).toBe('switch')
+    expect(follow.attributes('aria-checked')).toBe('true')
+    await follow.trigger('click')
+    expect(follow.attributes('aria-checked')).toBe('false')
+  })
+
   it('uses the solo toggle for clip and source-line playback', async () => {
     const wrapper = mount(DawView)
     await wrapper.getComponent(PitchedLane).trigger('dblclick', { clientX: 64 })
@@ -1094,9 +1104,10 @@ describe('DawView', () => {
     await sourceEditor.trigger('blur')
 
     const solo = wrapper.get('[aria-label="Solo clip playback"]')
-    expect(solo.attributes('aria-pressed')).toBe('false')
+    expect(solo.attributes('role')).toBe('switch')
+    expect(solo.attributes('aria-checked')).toBe('false')
     await solo.trigger('click')
-    expect(solo.attributes('aria-pressed')).toBe('true')
+    expect(solo.attributes('aria-checked')).toBe('true')
     expect(wrapper.find('[aria-label="Play clip solo from clip start"]').exists()).toBe(false)
 
     await wrapper.get('[aria-label="Play from line 2"]').trigger('click')
