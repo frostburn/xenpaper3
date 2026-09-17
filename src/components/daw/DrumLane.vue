@@ -27,6 +27,8 @@ const props = defineProps<{
   playingRangesByClip?: Readonly<Record<string, readonly SourceRange[]>>
   settingsOpen?: boolean
   settingsTarget?: HTMLElement
+  canMoveUp?: boolean
+  canMoveDown?: boolean
 }>()
 const emit = defineEmits<{
   insert: [beat: number]
@@ -41,6 +43,8 @@ const emit = defineEmits<{
   deleteLane: []
   'toggle-collapse': []
   'edit-settings': []
+  'move-up': []
+  'move-down': []
 }>()
 
 type DrumkitMode = 'patch' | 'samples'
@@ -161,6 +165,8 @@ const eventsByClip = computed(() => {
     :playing-ranges-by-clip="playingRangesByClip"
     :settings-open="settingsOpen"
     :settings-target="settingsTarget"
+    :can-move-up="canMoveUp"
+    :can-move-down="canMoveDown"
     lane-label="Drum lane"
     timeline-label="Drum lane"
     editor-label="Drum lane source"
@@ -176,6 +182,8 @@ const eventsByClip = computed(() => {
     @delete-lane="emit('deleteLane')"
     @toggle-collapse="emit('toggle-collapse')"
     @edit-settings="emit('edit-settings')"
+    @move-up="emit('move-up')"
+    @move-down="emit('move-down')"
   >
     <template #settings>
       <fieldset class="drumkit-kind">

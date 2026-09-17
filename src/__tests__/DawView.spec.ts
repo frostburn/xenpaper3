@@ -1073,6 +1073,32 @@ describe('DawView', () => {
     expect(wrapper.find('[aria-label="Drum gain"]').exists()).toBe(false)
   })
 
+  it('reorders lanes with accessible controls and supports undo', async () => {
+    const wrapper = mount(DawView)
+    await wrapper.get('button.add-drum-lane').trigger('click')
+
+    const laneNames = () =>
+      wrapper
+        .findAll<HTMLInputElement>('.instrument-lane .lane-name')
+        .map((name) => name.element.value)
+    expect(laneNames()).toEqual(['Instrument 1', 'Drums 1'])
+    expect(wrapper.get('[aria-label="Move Instrument 1 up"]').attributes()).toHaveProperty(
+      'disabled',
+    )
+    expect(wrapper.get('[aria-label="Move Drums 1 down"]').attributes()).toHaveProperty('disabled')
+
+    await wrapper.get('[aria-label="Move Drums 1 up"]').trigger('click')
+
+    expect(laneNames()).toEqual(['Drums 1', 'Instrument 1'])
+    expect(wrapper.get('[aria-label="Move Drums 1 up"]').attributes()).toHaveProperty('disabled')
+    expect(wrapper.get('[aria-label="Move Drums 1 down"]').attributes()).not.toHaveProperty(
+      'disabled',
+    )
+
+    await wrapper.get('[aria-label="Undo"]').trigger('click')
+    expect(laneNames()).toEqual(['Instrument 1', 'Drums 1'])
+  })
+
   it('does not reuse the collapsed state of a deleted lane', async () => {
     const wrapper = mount(DawView)
 

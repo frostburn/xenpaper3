@@ -453,6 +453,15 @@ const addDrumLane = () => {
   project.value.instrumentLanes.push(createDrumLane(project.value))
 }
 
+const moveInstrumentLane = (lane: InstrumentLane, offset: -1 | 1) => {
+  const lanes = project.value.instrumentLanes
+  const index = lanes.findIndex(({ id }) => id === lane.id)
+  const destination = index + offset
+  if (index === -1 || destination < 0 || destination >= lanes.length) return
+  beginEdit()
+  lanes.splice(destination, 0, ...lanes.splice(index, 1))
+}
+
 const deleteInstrumentLane = (lane: InstrumentLane) => {
   beginEdit()
   const index = project.value.instrumentLanes.findIndex(({ id }) => id === lane.id)
@@ -833,7 +842,11 @@ onBeforeUnmount(() => {
           :playing="playing"
           @seek="seekPlayback"
         >
-          <section v-for="lane in project.instrumentLanes" :key="lane.id" class="instrument-lane">
+          <section
+            v-for="(lane, laneIndex) in project.instrumentLanes"
+            :key="lane.id"
+            class="instrument-lane"
+          >
             <DrumLane
               v-if="lane.kind === 'drum'"
               :lane="lane"
@@ -846,6 +859,8 @@ onBeforeUnmount(() => {
               :playing-ranges-by-clip="playingRangesByLane.get(lane.id)"
               :settings-open="settingsLaneId === lane.id"
               :settings-target="laneSettingsInspector"
+              :can-move-up="laneIndex > 0"
+              :can-move-down="laneIndex < project.instrumentLanes.length - 1"
               @insert="insertClip(lane, $event)"
               @select="selectClip(lane, $event)"
               @place-playhead="seekPlayback"
@@ -858,6 +873,8 @@ onBeforeUnmount(() => {
               @delete-lane="deleteInstrumentLane(lane)"
               @toggle-collapse="toggleLaneCollapse(lane.id)"
               @edit-settings="editLaneSettings(lane)"
+              @move-up="moveInstrumentLane(lane, -1)"
+              @move-down="moveInstrumentLane(lane, 1)"
             />
             <template v-else>
               <PitchedLane
@@ -871,6 +888,8 @@ onBeforeUnmount(() => {
                 :playing-ranges-by-clip="playingRangesByLane.get(lane.id)"
                 :settings-open="settingsLaneId === lane.id"
                 :settings-target="laneSettingsInspector"
+                :can-move-up="laneIndex > 0"
+                :can-move-down="laneIndex < project.instrumentLanes.length - 1"
                 @insert="insertClip(lane, $event)"
                 @select="selectClip(lane, $event)"
                 @place-playhead="seekPlayback"
@@ -883,6 +902,8 @@ onBeforeUnmount(() => {
                 @delete-lane="deleteInstrumentLane(lane)"
                 @toggle-collapse="toggleLaneCollapse(lane.id)"
                 @edit-settings="editLaneSettings(lane)"
+                @move-up="moveInstrumentLane(lane, -1)"
+                @move-down="moveInstrumentLane(lane, 1)"
               />
             </template>
           </section>
