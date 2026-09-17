@@ -359,6 +359,25 @@ describe('directive runtime', () => {
     )
   })
 
+  it('treats a detached continuation cluster like attached gliss continuations', () => {
+    const attached = notes(
+      'MOS{4L5s<3>} @gliss Q @gliss Q= @gliss j@==== @gliss j@ @gliss P== @gliss P k',
+    )
+    const detached = notes(
+      'MOS{4L5s<3>} @gliss Q @gliss Q= @gliss j@ ==== @gliss j@ @gliss P== @gliss P k',
+    )
+    const glissTiming = (events: ReturnType<typeof notes>) =>
+      events.map(({ duration, automation }) => ({
+        duration: duration.toFraction(),
+        segments: automation?.segments?.map(({ start, duration: segmentDuration }) => [
+          start.toFraction(),
+          segmentDuration.toFraction(),
+        ]),
+      }))
+
+    expect(glissTiming(detached)).toEqual(glissTiming(attached))
+  })
+
   it('chains adjacent gliss directives into one held note', () => {
     const chained = notes('@gliss E @gliss F G')
 
