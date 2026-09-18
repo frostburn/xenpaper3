@@ -113,7 +113,7 @@ describe('SW Patch runtime', () => {
   })
 
   it('exposes the bundled drumkit voices', () => {
-    expect(drumNames(DRUMKIT_SOURCE)).toEqual(['bd', 'sd', 'hh'])
+    expect(drumNames(DRUMKIT_SOURCE)).toEqual(['bd', 'sd', 'hh', 'ht', 'mt', 'lt'])
   })
 
   it('evaluates augmented assignments and not expressions with Python-style precedence', () => {
