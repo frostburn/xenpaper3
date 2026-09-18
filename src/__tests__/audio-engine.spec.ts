@@ -142,6 +142,28 @@ describe('DAW playback preparation', () => {
     engine.dispose()
   })
 
+  it('disposes prepared samples when worklet registration fails', async () => {
+    const project = drumProject()
+    const sampledLane = createDrumLane(project)
+    sampledLane.id = 'samples'
+    sampledLane.clips.push({ id: 'sample', start: beat(0), length: beat(1), source: 'bd' })
+    sampledLane.drumkit = {
+      type: 'samples',
+      url: '',
+      strudelJson: { bd: ['bd.wav'] },
+    }
+    project.instrumentLanes.push(sampledLane)
+    const sampledKit = { dispose: vi.fn<() => void>() } as unknown as swSeq.SampledDrumkit
+    vi.spyOn(swSeq, 'loadSampledDrumkit').mockResolvedValue(sampledKit)
+    vi.spyOn(swPatch, 'registerMathWorklets').mockRejectedValue(new Error('worklet failed'))
+    const engine = new DawAudioEngine({} as AudioContext)
+
+    await expect(engine.play(project)).rejects.toThrow('worklet failed')
+
+    expect(sampledKit.dispose).toHaveBeenCalledOnce()
+    expect(WebAudioPlaybackSession).not.toHaveBeenCalled()
+  })
+
   it('cancels a pending play when stopped during worklet registration', async () => {
     const registration = deferred()
     vi.spyOn(swPatch, 'registerMathWorklets').mockReturnValue(registration.promise)

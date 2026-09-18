@@ -182,39 +182,43 @@ export class DawAudioEngine extends EventTarget {
     // edits still do not tear down a currently audible session.
     const plan = createPlaybackPlan(project, fromBeat)
     const { sampledDrumkits, sampledInstruments } = await prepareSamples(this.context, plan)
-    if (requestId !== this.playRequestId) {
-      disposeSamples(sampledDrumkits, sampledInstruments)
-      return
-    }
-    // Patch voices can instantiate math/noise worklets when their scheduled note begins.
-    // Finish module registration before creating or starting the playback session.
-    if (planUsesPatches(plan)) await registerMathWorklets(this.context)
-    if (requestId !== this.playRequestId) {
-      disposeSamples(sampledDrumkits, sampledInstruments)
-      return
-    }
-    this.stop()
-
-    const session = new WebAudioPlaybackSession(this.context, plan, {
-      sampledDrumkits,
-      sampledInstruments,
-      onEnded: () => {
-        if (this.session !== session) return
-        this.session = undefined
-        this.activePlan = undefined
-        this.dispatchEvent(new Event('ended'))
-      },
-    })
-    this.session = session
-    this.activePlan = plan
+    let samplesTransferred = false
     try {
-      session.start()
-    } catch (error) {
-      if (this.session === session) {
-        this.session = undefined
-        this.activePlan = undefined
+      if (requestId !== this.playRequestId) return
+      // Patch voices can instantiate math/noise worklets when their scheduled note begins.
+      // Finish module registration before creating or starting the playback session.
+      if (planUsesPatches(plan)) await registerMathWorklets(this.context)
+      if (requestId !== this.playRequestId) return
+      this.stop()
+
+      const session = new WebAudioPlaybackSession(this.context, plan, {
+        sampledDrumkits,
+        sampledInstruments,
+        onEnded: () => {
+          if (this.session !== session) return
+          this.session = undefined
+          this.activePlan = undefined
+          this.dispatchEvent(new Event('ended'))
+        },
+      })
+      // A constructed session owns its sample players and releases them on stop/dispose.
+      samplesTransferred = true
+      this.session = session
+      this.activePlan = plan
+      try {
+        session.start()
+      } catch (error) {
+        if (this.session === session) {
+          this.session = undefined
+          this.activePlan = undefined
+        }
+        session.dispose()
+        throw error
       }
-      throw error
+    } finally {
+      // Preparation can be superseded or fail before a session takes ownership. In either
+      // case, release decoded sample players rather than leaving their buffers and voices alive.
+      if (!samplesTransferred) disposeSamples(sampledDrumkits, sampledInstruments)
     }
   }
 
