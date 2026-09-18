@@ -1210,8 +1210,10 @@ describe('DawView', () => {
     await laneSource.setValue('@adsr(10ms, 20ms, 50%, 30ms)')
     expect((laneSource.element as HTMLTextAreaElement).value).toBe('@adsr(10ms, 20ms, 50%, 30ms)')
     expect(wrapper.find('[aria-label="Drum patch source"]').exists()).toBe(false)
-    expect(wrapper.get('[aria-label="Drum samples"]').text()).toContain('3 samples available')
-    expect(wrapper.get('[aria-label="Drum samples"]').text()).toContain('sd · hh · bd')
+    expect(wrapper.get('[aria-label="Drum samples"]').text()).toContain('6 samples available')
+    expect(wrapper.get('[aria-label="Drum samples"]').text()).toContain(
+      'sd · mt · lt · ht · hh · bd',
+    )
     expect(wrapper.get('.source-control > span').text()).toBe('Lane source')
     expect(lane.get('.gain-control [aria-label="Drum gain"]').attributes('type')).toBe('range')
 
@@ -1223,11 +1225,21 @@ describe('DawView', () => {
     const notes = lane.findAll('[aria-label="Drum pattern preview"] i')
     expect(notes).toHaveLength(10)
     expect(notes.every((note) => note.text() === '')).toBe(true)
-    expect(lane.findAll('.drum-row-label').map((label) => label.text())).toEqual(['sd', 'hh', 'bd'])
+    expect(lane.findAll('.drum-row-label').map((label) => label.text())).toEqual([
+      'sd',
+      'mt',
+      'lt',
+      'ht',
+      'hh',
+      'bd',
+    ])
     expect(lane.findAll('.drum-row-label').map((label) => label.attributes('style'))).toEqual([
-      'top: 16.666666666666668%; left: 0rem; width: calc(100% - 0rem);',
-      'top: 50%; left: 0rem; width: calc(100% - 0rem);',
-      'top: 83.33333333333333%; left: 0rem; width: calc(100% - 0rem);',
+      'top: 8.333333333333334%; left: 0rem; width: calc(100% - 0rem);',
+      'top: 25%; left: 0rem; width: calc(100% - 0rem);',
+      'top: 41.666666666666664%; left: 0rem; width: calc(100% - 0rem);',
+      'top: 58.333333333333336%; left: 0rem; width: calc(100% - 0rem);',
+      'top: 75%; left: 0rem; width: calc(100% - 0rem);',
+      'top: 91.66666666666667%; left: 0rem; width: calc(100% - 0rem);',
     ])
     await wrapper.get('[aria-label="Clip display"]').setValue('source')
     const highlightedDrums = lane

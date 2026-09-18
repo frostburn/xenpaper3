@@ -8,11 +8,11 @@ fn bd(destination: AudioNode, start: Instant, velocity: Level):
     osc.start(start)
     @(start) env.gain = velocity * 1.7
     @(start) osc.detune = 0c
-    @(start + 100ms) osc.detune = -550c
+    @(start + 100ms; linear) osc.detune = -550c
     @(start + 180ms; exponential) env.gain = 0.0001
 
     ret once fn off(end: Instant):
-        cutOff = end + 20ms
+        cutOff = end + 100ms
         osc.stop(cutOff)
         ret cutOff
 
@@ -30,11 +30,14 @@ fn sd(destination: AudioNode, start: Instant, velocity: Level):
     noise.start(start)
     @(start) env.gain = velocity
     @(start) osc.detune = 0c
-    @(start + 100ms) osc.detune = -100c
+    @(start + 100ms; linear) osc.detune = -100c
     @(start + 140ms; exponential) env.gain = 0.0001
 
     ret once fn off(end: Instant):
-        cutOff = end + 20ms
+        @(end; hold) env.gain
+
+        cutOff = end + 30ms
+        @(cutOff; exponential) env.gain = 0.0001
         osc.stop(cutOff)
         noise.stop(cutOff)
         ret cutOff
@@ -52,6 +55,111 @@ fn hh(destination: AudioNode, start: Instant, velocity: Level):
     @(start + 50ms; exponential) env.gain = 0.0001
 
     ret once fn off(end: Instant):
-        cutOff = end + 10ms
+        cutOff = end + 20ms
         noise.stop(cutOff)
+        ret cutOff
+
+fn ht(destination: AudioNode, start: Instant, velocity: Level):
+    oscA = OscillatorNode(type = 'sine', frequency = 222Hz)
+    oscB = OscillatorNode(type = 'sine', frequency = 307Hz)
+    oscC = OscillatorNode(type = 'triangle', frequency = 432Hz)
+    filter = BiquadFilterNode(type = 'highpass', frequency = 900Hz)
+    env = GainNode(gain = 0)
+
+    until oscA:ended:
+        oscA * 3 -> filter -> env -> destination
+        oscB -> filter
+        oscC * 0.08-> filter
+
+    oscA.start(start)
+    oscB.start(start)
+    oscC.start(start)
+
+    @(start) env.gain = 1.5 * velocity
+    @(start) oscA.detune = 700c * velocity
+    @(start) oscB.detune = 800c * velocity
+    @(start) oscC.detune = 900c * velocity
+    @(start + 100ms; exponential) oscC.detune = 10c
+    @(start + 100ms; exponential) oscB.detune = 10c
+    @(start + 150ms; exponential) oscA.detune = 10c
+    @(start + 800ms; exponential) env.gain = 0.0001
+
+    ret once fn off(end: Instant):
+        @(end; hold) env.gain
+
+        cutOff = end + 30ms
+        @(cutOff; exponential) env.gain = 0.0001
+        oscA.stop(cutOff)
+        oscB.stop(cutOff)
+        oscC.stop(cutOff)
+        ret cutOff
+
+fn mt(destination: AudioNode, start: Instant, velocity: Level):
+    oscA = OscillatorNode(type = 'sine', frequency = 181Hz)
+    oscB = OscillatorNode(type = 'sine', frequency = 255Hz)
+    oscC = OscillatorNode(type = 'triangle', frequency = 350Hz)
+    filter = BiquadFilterNode(type = 'highpass', frequency = 800Hz)
+    env = GainNode(gain = 0)
+
+    until oscA:ended:
+        oscA * 3 -> filter -> env -> destination
+        oscB -> filter
+        oscC * 0.08 -> filter
+
+    oscA.start(start)
+    oscB.start(start)
+    oscC.start(start)
+
+    @(start) env.gain = 1.5 * velocity
+    @(start) oscA.detune = 600c * velocity
+    @(start) oscB.detune = 700c * velocity
+    @(start) oscC.detune = 800c * velocity
+    @(start + 110ms; exponential) oscC.detune = 10c
+    @(start + 110ms; exponential) oscB.detune = 10c
+    @(start + 160ms; exponential) oscA.detune = 10c
+    @(start + 900ms; exponential) env.gain = 0.0001
+
+    ret once fn off(end: Instant):
+        @(end; hold) env.gain
+
+        cutOff = end + 30ms
+        @(cutOff; exponential) env.gain = 0.0001
+        oscA.stop(cutOff)
+        oscB.stop(cutOff)
+        oscC.stop(cutOff)
+        ret cutOff
+
+fn lt(destination: AudioNode, start: Instant, velocity: Level):
+    oscA = OscillatorNode(type = 'sine', frequency = 152Hz)
+    oscB = OscillatorNode(type = 'sine', frequency = 211Hz)
+    oscC = OscillatorNode(type = 'triangle', frequency = 290Hz)
+    filter = BiquadFilterNode(type = 'highpass', frequency = 700Hz)
+    env = GainNode(gain = 0)
+
+    until oscA:ended:
+        oscA * 3 -> filter -> env -> destination
+        oscB -> filter
+        oscC * 0.08 -> filter
+
+    oscA.start(start)
+    oscB.start(start)
+    oscC.start(start)
+
+    @(start) env.gain = 1.5 * velocity
+    @(start) oscA.detune = 500c * velocity
+    @(start) oscB.detune = 600c * velocity
+    @(start) oscC.detune = 700c * velocity
+    @(start + 150ms; exponential) oscC.detune = 10c
+    @(start + 150ms; exponential) oscB.detune = 10c
+    @(start + 190ms; exponential) oscA.detune = 10c
+    @(start + 1000ms; exponential) env.gain = 0.0001
+
+    ret once fn off(end: Instant):
+        @(end; hold) env.gain
+
+        cutOff = end + 30ms
+        @(cutOff; exponential) env.gain = 0.0001
+        oscA.stop(cutOff)
+        oscB.stop(cutOff)
+        oscC.stop(cutOff)
         ret cutOff
