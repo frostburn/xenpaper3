@@ -1431,6 +1431,10 @@ describe('DawView', () => {
       oscillatorType: 'sawtooth',
     })
     expect(wrapper.find('[aria-label="SW Patch instrument source"]').exists()).toBe(false)
+    expect(wrapper.find('[aria-label="Sampled instrument source"]').exists()).toBe(false)
+    expect(wrapper.get('[aria-label="Driven noise instrument source"]').text()).toBe(
+      'Driven noise SW Patch',
+    )
   })
 
   it('preserves patch settings when toggling instrument source modes', async () => {

@@ -376,7 +376,11 @@ const clipPreview = (clipId: string) => pianoRoll.value.notesByClip[clipId]!
           </select>
         </label>
       </section>
-      <section v-else class="instrument-source" aria-label="Sampled instrument source">
+      <section
+        v-else-if="instrumentMode === 'samples'"
+        class="instrument-source"
+        aria-label="Sampled instrument source"
+      >
         <strong>{{
           lane.instrument.type === 'samples'
             ? 'Dough samples loaded'
@@ -423,6 +427,9 @@ const clipPreview = (clipId: string) => pianoRoll.value.notesByClip[clipId]!
             </option>
           </select>
         </label>
+      </section>
+      <section v-else class="instrument-source" aria-label="Driven noise instrument source">
+        <strong>Driven noise SW Patch</strong>
       </section>
       <span v-if="sampleError" class="instrument-error" role="alert">{{ sampleError }}</span>
     </template>
