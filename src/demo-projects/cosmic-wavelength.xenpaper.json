@@ -1,0 +1,268 @@
+{
+  "format": "xenpaper3-daw",
+  "version": 3,
+  "createdAt": "2026-09-12T09:42:06.336Z",
+  "xenpaperVersion": "3.0.0-beta.9",
+  "title": "Cosmic Wavelength",
+  "globalTrack": {
+    "source": "# Bohlen-Pierce (Lambda 13edt) Aurigan mode\nMOS{4L5s<3> 7|1}\n{root = 300Hz}\n# CC BY 4.0: Lumi Pakkanen\n# https://creativecommons.org/licenses/by/4.0/",
+    "tempoChanges": [
+      {
+        "id": "tempo-1",
+        "beat": {
+          "n": 0,
+          "d": 1
+        },
+        "bpm": 120
+      }
+    ],
+    "timeSignatureChanges": [
+      {
+        "id": "time-signature-1",
+        "beat": {
+          "n": 0,
+          "d": 1
+        },
+        "numerator": 5,
+        "denominator": 4
+      }
+    ]
+  },
+  "instrumentLanes": [
+    {
+      "kind": "instrument",
+      "id": "instrument-1",
+      "name": "Lead",
+      "gain": 0.68,
+      "source": "@adsr(100ms, 200ms, 70%, 200ms)\n@2\n",
+      "clips": [
+        {
+          "id": "clip-1",
+          "start": {
+            "n": 0,
+            "d": 1
+          },
+          "length": {
+            "n": 40,
+            "d": 1
+          },
+          "source": "[Q N] M [O N] M [P O] [. N] [L .] [K L]  M    = |\n =    .  .    K  =     L     M     =     N    . |\n .    j  P    =  Q    [. O] [R .]  K     =    = |\n =    R [Q P] . [Q P] [M O] [P J] [P R] [Q O] . |\n\nN M [O N] M [P O] [. N] [L .] [K L]  M     =    |\n= .  .    L  =     O     M     =     N     .    |\n. j  P    =  Q    [. O] [R .]  K     =     =    |\n= R [Q P] . [Q P] [M O] [P J] [P R] [Q P] [O N] |"
+        },
+        {
+          "id": "clip-2",
+          "start": {
+            "n": 40,
+            "d": 1
+          },
+          "length": {
+            "n": 40,
+            "d": 1
+          },
+          "source": "M@ M===.[N L K]=[.J][.@.k@]  |\nJ====  .[J L K]= .   .       |\n. [P O [M K J]=]====\n@gliss Q @gliss Q= @gliss j@ |\n==== @gliss j@ P==.  .       |\n\nM@ M===.[N L K]=[.J][.@.Q]            |\nJ====  .[J L K]= .   .                |\n. [[O P M]= J K]====\n@gliss Q @gliss Q= @gliss j@          |\n==== @gliss j@ @gliss P= @gliss P k?..|"
+        },
+        {
+          "id": "clip-3",
+          "start": {
+            "n": 150,
+            "d": 1
+          },
+          "length": {
+            "n": 20,
+            "d": 1
+          },
+          "source": "[Q N] M [O N] M [P O] [. N] [L .] [K L]  M    = |\n =    .  .    K  =     L     M     =     N    . |\n.     j  P    =  Q    [. O] [R .]  K     =    = |\n=     R [Q P] . [Q P] [M O] [P J] [P R] [Q O] . ||"
+        }
+      ],
+      "instrument": {
+        "type": "patch",
+        "patchPreset": "default",
+        "oscillatorType": "triangle"
+      }
+    },
+    {
+      "kind": "instrument",
+      "id": "instrument-2",
+      "name": "Pad",
+      "gain": 0.21,
+      "source": "# Defaults inherited by every clip in this lane\n@adsr(100ms, 200ms, 70%, 300ms)\n{root = `J}\n@1/5\n\n",
+      "clips": [
+        {
+          "id": "clip-1",
+          "start": {
+            "n": 0,
+            "d": 1
+          },
+          "length": {
+            "n": 40,
+            "d": 1
+          },
+          "source": "[J,M,Q] | [K,O,Q]  |\n[K,O,R] | [M,O,R] :|"
+        },
+        {
+          "id": "clip-2",
+          "start": {
+            "n": 40,
+            "d": 1
+          },
+          "length": {
+            "n": 40,
+            "d": 1
+          },
+          "source": " J         L        K =   ,\n M         N        M N   ,\n O         =        = P   ,\n[k=== k@] [j=== Q&] Q j@ :|"
+        },
+        {
+          "id": "clip-3",
+          "start": {
+            "n": 115,
+            "d": 1
+          },
+          "length": {
+            "n": 30,
+            "d": 1
+          },
+          "source": "@5\n(O==.M, ..k==) |\n(N==.., .j==.) |\n(O=..., Q===.) |\n\n(O@ O==., ..j==) |\n(N==.., .Q==.) |\n(..O==, P====) |\n"
+        },
+        {
+          "id": "clip-4",
+          "start": {
+            "n": 80,
+            "d": 1
+          },
+          "length": {
+            "n": 5,
+            "d": 1
+          },
+          "source": "@gliss N J? |\n"
+        }
+      ],
+      "instrument": {
+        "type": "patch",
+        "patchPreset": "default",
+        "oscillatorType": "bohlen"
+      }
+    },
+    {
+      "kind": "drum",
+      "id": "drum-1",
+      "name": "Drums",
+      "gain": 0.8,
+      "source": "# Defaults inherited by every clip in this lane\n",
+      "clips": [
+        {
+          "id": "clip-1",
+          "start": {
+            "n": 0,
+            "d": 1
+          },
+          "length": {
+            "n": 40,
+            "d": 1
+          },
+          "source": "[bd,hh hh]    [hh hh]    [hh hh hh] [sd,hh hh] [hh hh]     |\n[bd,hh hh]    [hh hh hh] [hh hh]    [sd,hh hh] [hh hh]     |\n[bd,hh hh hh] [hh hh]    [hh hh]    [sd,hh hh] [hh hh]     |\n[bd,hh hh]    [hh hh hh hh hh]=     [sd,hh hh] [hh hh hh] :|"
+        },
+        {
+          "id": "clip-2",
+          "start": {
+            "n": 40,
+            "d": 1
+          },
+          "length": {
+            "n": 40,
+            "d": 1
+          },
+          "source": "[bd,hh hh]    [hh hh]    [sd,hh hh]          [lt mt,hh hh] [ht,hh hh hh]       |\n[bd,hh hh hh] [hh hh]    [sd,hh]             [ht mt,hh hh]  hh                 |\n[bd,hh hh hh hh hh]=     [sd,hh hh]          [ht,hh]       [mt lt,hh hh hh hh] |\n[bd,hh]       [hh hh hh] [sd,hh hh hh hh hh] [mt lt ht,hh] [hh . hh]          :|"
+        },
+        {
+          "id": "clip-3",
+          "start": {
+            "n": 85,
+            "d": 1
+          },
+          "length": {
+            "n": 60,
+            "d": 1
+          },
+          "source": "|:@x4\n[hh hh] [sd, hh hh hh] bd [hh hh hh] [bd,sd]     |\n[hh hh] [sd, hh hh hh] bd [hh hh hh] [bd,sd]     |\n[hh hh] [sd, hh hh hh] bd [hh hh hh] [bd,sd hh] :|"
+        },
+        {
+          "id": "clip-4",
+          "start": {
+            "n": 80,
+            "d": 1
+          },
+          "length": {
+            "n": 6,
+            "d": 1
+          },
+          "source": "[bd,hh [hh sd hh] hh,ht [ht ht]] =\n[bd, hh hh sd hh bd,mt mt mt]    =\n[sd,hh hh,lt]                      |\nht\n"
+        },
+        {
+          "id": "clip-5",
+          "start": {
+            "n": 145,
+            "d": 1
+          },
+          "length": {
+            "n": 5,
+            "d": 1
+          },
+          "source": "bd hh sd [ht mt lt,hh] [sd sd] |"
+        }
+      ],
+      "drumkit": {
+        "type": "patch",
+        "patchPreset": "drumkit"
+      }
+    },
+    {
+      "kind": "instrument",
+      "id": "instrument-3",
+      "name": "Bass",
+      "gain": 0.41,
+      "source": "# Defaults inherited by every clip in this lane\n@adsr(10ms, 20ms, 60%, 30ms)\n{root = ``J}\n@:",
+      "clips": [
+        {
+          "id": "clip-1",
+          "start": {
+            "n": 84,
+            "d": 1
+          },
+          "length": {
+            "n": 1,
+            "d": 1
+          },
+          "source": "[J@ J]"
+        },
+        {
+          "id": "clip-2",
+          "start": {
+            "n": 85,
+            "d": 1
+          },
+          "length": {
+            "n": 63,
+            "d": 1
+          },
+          "source": "[K N] K      .     [M P] M |\n[Q Q] O     [. M M] .    N |\n[J j] [P O Q] @gliss L=  K |\n\n[L M] M&          .     [O Q] O  |\n[Q Q] O          [. M N] .    N& |¹\n[J j] [P O Q k j@] @gliss K=  L :|²\n[J j] [P O Q k j@] @gliss K=  =  |\n=== L?"
+        },
+        {
+          "id": "clip-3",
+          "start": {
+            "n": 150,
+            "d": 1
+          },
+          "length": {
+            "n": 20,
+            "d": 1
+          },
+          "source": " M  M . L M |\n`Q  J . K J |\n P  . j N . |\n K@ K . J K ||"
+        }
+      ],
+      "instrument": {
+        "type": "patch",
+        "patchPreset": "default",
+        "oscillatorType": "square"
+      }
+    }
+  ]
+}
