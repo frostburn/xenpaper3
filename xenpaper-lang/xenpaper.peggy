@@ -466,8 +466,9 @@ EndingParallelExpression
 
 EndingSequenceExpression
   // A detached single bar (or one at EOF) terminates the final alternate
-  // ending. An attached bar remains a sequence item, as in `D|E`.
-  = first:SequenceItem rest:(Spacing !("|" (RequiredSpacing / !.)) item:SequenceItem { return item; })* {
+  // ending. An attached bar remains a sequence item, as in `D|E`, and a
+  // continuation after the bar remains attached regardless of whitespace.
+  = first:SequenceItem rest:(Spacing !("|" (RequiredSpacing !("=") / !.)) item:SequenceItem { return item; })* {
       return sequence([first, ...rest]);
     }
 

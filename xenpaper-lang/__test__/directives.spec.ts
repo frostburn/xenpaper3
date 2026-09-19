@@ -378,6 +378,28 @@ describe('directive runtime', () => {
     expect(glissTiming(detached)).toEqual(glissTiming(attached))
   })
 
+  it('keeps alternate-ending gliss continuations attached across a newline', () => {
+    const inline = notes(
+      'MOS{4L5s<3>} @time(5/4) [L M] M& . [O Q] O | [Q Q] O [. M N] . N& |¹ ' +
+        '[J j] [P O Q k j@] @gliss K= L :|² [J j] [P O Q k j@] @gliss K= = |=== L?',
+    )
+    const wrapped = notes(
+      'MOS{4L5s<3>} @time(5/4) [L M] M& . [O Q] O | [Q Q] O [. M N] . N& |¹ ' +
+        '[J j] [P O Q k j@] @gliss K= L :|² [J j] [P O Q k j@] @gliss K= = |\n=== L?',
+    )
+
+    const timing = (events: ReturnType<typeof notes>) =>
+      events.map(({ start, duration, automation }) => ({
+        start: start.toFraction(),
+        duration: duration.toFraction(),
+        segments: automation?.segments?.map(({ start: segmentStart, duration: segmentDuration }) =>
+          [segmentStart.toFraction(), segmentDuration.toFraction()],
+        ),
+      }))
+
+    expect(timing(wrapped)).toEqual(timing(inline))
+  })
+
   it('chains adjacent gliss directives into one held note', () => {
     const chained = notes('@gliss E @gliss F G')
 
