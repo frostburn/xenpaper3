@@ -9,6 +9,7 @@ import {
 import { SampledDrumkit, SampledInstrument, Transport, type TransportOptions } from '../../sw-seq'
 import { isAppleWebKit } from '../browser'
 import DEFAULT_PATCH_SOURCE from '../patches/default.swpatch?raw'
+import DRIVEN_NOISE_PATCH_SOURCE from '../patches/driven-noise.swpatch?raw'
 import DRUMKIT_PATCH_SOURCE from '../patches/drumkit.swpatch?raw'
 import type { PlaybackLane, PlaybackPlan } from './playback-plan'
 import { applyPitchAutomation } from './web-audio-automation'
@@ -21,7 +22,7 @@ type PatchFactory = (
   source: string,
   context: BaseAudioContext,
   options: {
-    config: { oscillatorType: import('./project').OscillatorType; aperiodic: boolean }
+    config: Record<string, unknown>
   },
 ) => SynthPatch
 type DrumkitFactory = typeof createDrumkit
@@ -39,7 +40,13 @@ export interface WebAudioPlaybackOptions {
 }
 
 const defaultPatchSource = (source: string): string =>
-  source === 'default' ? DEFAULT_PATCH_SOURCE : source === 'drumkit' ? DRUMKIT_PATCH_SOURCE : source
+  source === 'default'
+    ? DEFAULT_PATCH_SOURCE
+    : source === 'driven-noise'
+      ? DRIVEN_NOISE_PATCH_SOURCE
+      : source === 'drumkit'
+        ? DRUMKIT_PATCH_SOURCE
+        : source
 
 const requirePlayableSynth = (patch: SynthPatch, lane: PlaybackLane): PlayableSynthPatch => {
   if (typeof (patch as Partial<PlayableSynthPatch>).on === 'function')
@@ -225,10 +232,16 @@ export class WebAudioPlaybackSession {
         this.resolvePatchSource(lane.instrument.patchPreset),
         this.context,
         {
-          config: {
-            oscillatorType: lane.instrument.oscillatorType,
-            aperiodic: isAperiodicTimbre(lane.instrument.oscillatorType),
-          },
+          config:
+            lane.instrument.patchPreset === 'driven-noise'
+              ? {
+                  color: lane.instrument.color ?? 'white',
+                  interpolation: lane.instrument.interpolation ?? 'constant',
+                }
+              : {
+                  oscillatorType: lane.instrument.oscillatorType,
+                  aperiodic: isAperiodicTimbre(lane.instrument.oscillatorType),
+                },
         },
       )
       const synth = requirePlayableSynth(patch, lane)

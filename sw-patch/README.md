@@ -124,15 +124,23 @@ node API. `TimeNode()` outputs elapsed seconds after `start()`, `PhaserNode()`
 outputs an unfiltered sawtooth phase from zero up to one and exposes an
 automatable `frequency` parameter and an OscillatorNode-style `detune`
 parameter measured in cents. Like `OscillatorNode`, its default frequency is
-440 Hz. `NoiseNode()` produces independent white-noise samples in the range
-from -1 through +1, while `RandomNode()` retains its zero-to-one range. Each
+440 Hz. `NoiseNode()` retains its simple stream of independent white-noise
+samples from -1 through +1. `DrivenNoiseNode()` is frequency-driven and exposes
+`frequency` (440 Hz by default) and `detune` (0 cents by default). Its effective
+frequency is silently capped at the context's sample rate. `color` selects
+`'brown'`, `'pink'`, `'white'`, `'blue'`, or `'violet'` noise, and `interpolation`
+selects `'impulse'`, `'constant'`, or `'linear'` transitions between generated
+values. Both options default to white, constant noise. Brown noise is
+leaky-integrated white noise; pink noise is octave-built with chunkwise DC
+blocking; violet and blue noise are the differentiated forms of white and pink
+noise respectively. `RandomNode()` retains its zero-to-one range. Each source
 accepts an optional AudioContext
 timestamp in `start()` and `stop()`:
 
 ```swpatch
 t = TimeNode()
 phase = PhaserNode(frequency = 2Hz, detune = 100c)
-noise = NoiseNode()
+noise = DrivenNoiseNode(color = 'pink', interpolation = 'linear', frequency = 2kHz)
 t.start(start)
 phase.start(start)
 noise.start(start)

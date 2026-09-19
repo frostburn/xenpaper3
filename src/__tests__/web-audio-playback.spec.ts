@@ -289,6 +289,33 @@ describe('Web Audio playback session', () => {
     expect(dispose).toHaveBeenCalledOnce()
   })
 
+  it('passes driven-noise settings to the bundled patch', () => {
+    const context = new MockAudioContext()
+    const plan = createPlan()
+    plan.lanes[0]!.instrument = {
+      type: 'patch',
+      patchPreset: 'driven-noise',
+      oscillatorType: 'sawtooth',
+      color: 'blue',
+      interpolation: 'impulse',
+    }
+    const patchFactory = vi.fn<() => PlayableSynthPatch>(() => ({
+      on: () => (end) => end,
+      dispose: vi.fn<() => void>(),
+      ready: Promise.resolve(),
+    }))
+    const session = new WebAudioPlaybackSession(context as unknown as AudioContext, plan, {
+      patchFactory,
+    })
+
+    session.start()
+
+    expect(patchFactory.mock.calls[0]?.[0]).toContain("config color: string = 'white'")
+    expect(patchFactory.mock.calls[0]?.[2]).toEqual({
+      config: { color: 'blue', interpolation: 'impulse' },
+    })
+  })
+
   it('translates one pure plan into a disposable SW Patch voice', () => {
     const context = new MockAudioContext()
     const noteOff = vi.fn<(end: number) => number>((end) => end + 0.5)
