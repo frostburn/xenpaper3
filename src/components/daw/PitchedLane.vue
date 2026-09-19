@@ -7,8 +7,12 @@ import type { SourceRange } from '../../daw/score'
 import { easeGlissando } from '../../daw/easing'
 import {
   beatToNumber,
+  NOISE_COLORS,
+  NOISE_INTERPOLATIONS,
   OSCILLATOR_TYPES,
   type ClipDisplayMode,
+  type NoiseColor,
+  type NoiseInterpolation,
   type OscillatorType,
   type PatchInstrumentSource,
   type PitchedInstrumentLane,
@@ -56,6 +60,20 @@ const instrumentModeFor = (instrument: PitchedInstrumentLane['instrument']): Ins
     ? 'driven-noise'
     : instrument.type
 const instrumentMode = ref<InstrumentMode>(instrumentModeFor(props.lane.instrument))
+const drivenNoiseInstrument = ref<PatchInstrumentSource>({
+  type: 'patch',
+  patchPreset: 'driven-noise',
+  oscillatorType:
+    props.lane.instrument.type === 'patch' ? props.lane.instrument.oscillatorType : 'sawtooth',
+  color:
+    props.lane.instrument.type === 'patch' && props.lane.instrument.patchPreset === 'driven-noise'
+      ? (props.lane.instrument.color ?? 'white')
+      : 'white',
+  interpolation:
+    props.lane.instrument.type === 'patch' && props.lane.instrument.patchPreset === 'driven-noise'
+      ? (props.lane.instrument.interpolation ?? 'constant')
+      : 'constant',
+})
 const patchInstrument = ref<PatchInstrumentSource>(
   props.lane.instrument.type === 'patch' && props.lane.instrument.patchPreset !== 'driven-noise'
     ? { ...props.lane.instrument }
@@ -68,7 +86,13 @@ watch(
     instrumentMode.value = instrumentModeFor(source)
     if (source.type === 'samples') {
       sampleUrl.value = source.url
-    } else if (source.patchPreset !== 'driven-noise') {
+    } else if (source.patchPreset === 'driven-noise') {
+      drivenNoiseInstrument.value = {
+        ...source,
+        color: source.color ?? 'white',
+        interpolation: source.interpolation ?? 'constant',
+      }
+    } else {
       patchInstrument.value = { ...source }
     }
   },
@@ -79,17 +103,19 @@ const selectInstrumentMode = (mode: InstrumentMode) => {
   sampleError.value = ''
   if (mode === 'patch') emit('update-instrument', { ...patchInstrument.value })
   if (mode === 'driven-noise') {
-    emit('update-instrument', {
-      type: 'patch',
-      patchPreset: 'driven-noise',
-      oscillatorType: patchInstrument.value.oscillatorType,
-    })
+    drivenNoiseInstrument.value.oscillatorType = patchInstrument.value.oscillatorType
+    emit('update-instrument', { ...drivenNoiseInstrument.value })
   }
 }
 
 const updateOscillator = (oscillatorType: OscillatorType) => {
   patchInstrument.value = { ...patchInstrument.value, oscillatorType }
   emit('update-instrument', { ...patchInstrument.value })
+}
+
+const updateDrivenNoise = (updates: { color?: NoiseColor; interpolation?: NoiseInterpolation }) => {
+  drivenNoiseInstrument.value = { ...drivenNoiseInstrument.value, ...updates }
+  emit('update-instrument', { ...drivenNoiseInstrument.value })
 }
 
 const importSampleJson = (text: string, url = '') => {
@@ -430,6 +456,34 @@ const clipPreview = (clipId: string) => pianoRoll.value.notesByClip[clipId]!
       </section>
       <section v-else class="instrument-source" aria-label="Driven noise instrument source">
         <strong>Driven noise SW Patch</strong>
+        <label
+          >Color
+          <select
+            aria-label="Noise color"
+            :value="drivenNoiseInstrument.color"
+            @change="
+              updateDrivenNoise({ color: ($event.target as HTMLSelectElement).value as NoiseColor })
+            "
+          >
+            <option v-for="color in NOISE_COLORS" :key="color">{{ color }}</option>
+          </select>
+        </label>
+        <label
+          >Interpolation
+          <select
+            aria-label="Noise interpolation"
+            :value="drivenNoiseInstrument.interpolation"
+            @change="
+              updateDrivenNoise({
+                interpolation: ($event.target as HTMLSelectElement).value as NoiseInterpolation,
+              })
+            "
+          >
+            <option v-for="interpolation in NOISE_INTERPOLATIONS" :key="interpolation">
+              {{ interpolation }}
+            </option>
+          </select>
+        </label>
       </section>
       <span v-if="sampleError" class="instrument-error" role="alert">{{ sampleError }}</span>
     </template>

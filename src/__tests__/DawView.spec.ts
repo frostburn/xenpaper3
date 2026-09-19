@@ -1429,12 +1429,23 @@ describe('DawView', () => {
       type: 'patch',
       patchPreset: 'driven-noise',
       oscillatorType: 'sawtooth',
+      color: 'white',
+      interpolation: 'constant',
     })
     expect(wrapper.find('[aria-label="SW Patch instrument source"]').exists()).toBe(false)
     expect(wrapper.find('[aria-label="Sampled instrument source"]').exists()).toBe(false)
-    expect(wrapper.get('[aria-label="Driven noise instrument source"]').text()).toBe(
+    expect(wrapper.get('[aria-label="Driven noise instrument source"] strong').text()).toBe(
       'Driven noise SW Patch',
     )
+    await wrapper.get('select[aria-label="Noise color"]').setValue('pink')
+    await wrapper.get('select[aria-label="Noise interpolation"]').setValue('linear')
+    expect(wrapper.getComponent(PitchedLane).props('lane').instrument).toEqual({
+      type: 'patch',
+      patchPreset: 'driven-noise',
+      oscillatorType: 'sawtooth',
+      color: 'pink',
+      interpolation: 'linear',
+    })
   })
 
   it('preserves patch settings when toggling instrument source modes', async () => {

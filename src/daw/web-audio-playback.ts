@@ -22,7 +22,7 @@ type PatchFactory = (
   source: string,
   context: BaseAudioContext,
   options: {
-    config: { oscillatorType: import('./project').OscillatorType; aperiodic: boolean }
+    config: Record<string, unknown>
   },
 ) => SynthPatch
 type DrumkitFactory = typeof createDrumkit
@@ -232,10 +232,16 @@ export class WebAudioPlaybackSession {
         this.resolvePatchSource(lane.instrument.patchPreset),
         this.context,
         {
-          config: {
-            oscillatorType: lane.instrument.oscillatorType,
-            aperiodic: isAperiodicTimbre(lane.instrument.oscillatorType),
-          },
+          config:
+            lane.instrument.patchPreset === 'driven-noise'
+              ? {
+                  color: lane.instrument.color ?? 'white',
+                  interpolation: lane.instrument.interpolation ?? 'constant',
+                }
+              : {
+                  oscillatorType: lane.instrument.oscillatorType,
+                  aperiodic: isAperiodicTimbre(lane.instrument.oscillatorType),
+                },
         },
       )
       const synth = requirePlayableSynth(patch, lane)
