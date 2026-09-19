@@ -392,8 +392,11 @@ describe('directive runtime', () => {
       events.map(({ start, duration, automation }) => ({
         start: start.toFraction(),
         duration: duration.toFraction(),
-        segments: automation?.segments?.map(({ start: segmentStart, duration: segmentDuration }) =>
-          [segmentStart.toFraction(), segmentDuration.toFraction()],
+        segments: automation?.segments?.map(
+          ({ start: segmentStart, duration: segmentDuration }) => [
+            segmentStart.toFraction(),
+            segmentDuration.toFraction(),
+          ],
         ),
       }))
 
