@@ -9,6 +9,7 @@ import {
 import { SampledDrumkit, SampledInstrument, Transport, type TransportOptions } from '../../sw-seq'
 import { isAppleWebKit } from '../browser'
 import DEFAULT_PATCH_SOURCE from '../patches/default.swpatch?raw'
+import DRIVEN_NOISE_PATCH_SOURCE from '../patches/driven-noise.swpatch?raw'
 import DRUMKIT_PATCH_SOURCE from '../patches/drumkit.swpatch?raw'
 import type { PlaybackLane, PlaybackPlan } from './playback-plan'
 import { applyPitchAutomation } from './web-audio-automation'
@@ -39,7 +40,13 @@ export interface WebAudioPlaybackOptions {
 }
 
 const defaultPatchSource = (source: string): string =>
-  source === 'default' ? DEFAULT_PATCH_SOURCE : source === 'drumkit' ? DRUMKIT_PATCH_SOURCE : source
+  source === 'default'
+    ? DEFAULT_PATCH_SOURCE
+    : source === 'driven-noise'
+      ? DRIVEN_NOISE_PATCH_SOURCE
+      : source === 'drumkit'
+        ? DRUMKIT_PATCH_SOURCE
+        : source
 
 const requirePlayableSynth = (patch: SynthPatch, lane: PlaybackLane): PlayableSynthPatch => {
   if (typeof (patch as Partial<PlayableSynthPatch>).on === 'function')

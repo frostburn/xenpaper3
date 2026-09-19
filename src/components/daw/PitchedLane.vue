@@ -50,10 +50,14 @@ const emit = defineEmits<{
 const sampleUrl = ref(props.lane.instrument.type === 'samples' ? props.lane.instrument.url : '')
 const sampleError = ref('')
 const loadingSamples = ref(false)
-type InstrumentMode = 'patch' | 'samples'
-const instrumentMode = ref<InstrumentMode>(props.lane.instrument.type)
+type InstrumentMode = 'patch' | 'driven-noise' | 'samples'
+const instrumentModeFor = (instrument: PitchedInstrumentLane['instrument']): InstrumentMode =>
+  instrument.type === 'patch' && instrument.patchPreset === 'driven-noise'
+    ? 'driven-noise'
+    : instrument.type
+const instrumentMode = ref<InstrumentMode>(instrumentModeFor(props.lane.instrument))
 const patchInstrument = ref<PatchInstrumentSource>(
-  props.lane.instrument.type === 'patch'
+  props.lane.instrument.type === 'patch' && props.lane.instrument.patchPreset !== 'driven-noise'
     ? { ...props.lane.instrument }
     : { type: 'patch', patchPreset: 'default', oscillatorType: 'sawtooth' },
 )
@@ -61,10 +65,10 @@ const patchInstrument = ref<PatchInstrumentSource>(
 watch(
   () => props.lane.instrument,
   (source) => {
-    instrumentMode.value = source.type
+    instrumentMode.value = instrumentModeFor(source)
     if (source.type === 'samples') {
       sampleUrl.value = source.url
-    } else {
+    } else if (source.patchPreset !== 'driven-noise') {
       patchInstrument.value = { ...source }
     }
   },
@@ -74,6 +78,13 @@ const selectInstrumentMode = (mode: InstrumentMode) => {
   instrumentMode.value = mode
   sampleError.value = ''
   if (mode === 'patch') emit('update-instrument', { ...patchInstrument.value })
+  if (mode === 'driven-noise') {
+    emit('update-instrument', {
+      type: 'patch',
+      patchPreset: 'driven-noise',
+      oscillatorType: patchInstrument.value.oscillatorType,
+    })
+  }
 }
 
 const updateOscillator = (oscillatorType: OscillatorType) => {
@@ -325,6 +336,15 @@ const clipPreview = (clipId: string) => pianoRoll.value.notesByClip[clipId]!
             @change="selectInstrumentMode('patch')"
           />
           SW Patch</label
+        >
+        <label
+          ><input
+            type="radio"
+            value="driven-noise"
+            :checked="instrumentMode === 'driven-noise'"
+            @change="selectInstrumentMode('driven-noise')"
+          />
+          Driven noise</label
         >
         <label
           ><input

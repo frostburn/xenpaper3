@@ -1411,12 +1411,26 @@ describe('DawView', () => {
     await wrapper.get('[aria-label="Edit sound and source for Instrument 1"]').trigger('click')
 
     expect(wrapper.get('fieldset legend').text()).toBe('Instrument sound source')
-    expect(wrapper.findAll('input[type="radio"]')).toHaveLength(2)
+    expect(wrapper.findAll('input[type="radio"]')).toHaveLength(3)
     await wrapper.get('input[type="radio"][value="samples"]').setValue()
 
     expect(wrapper.find('[aria-label="Sampled instrument source"]').exists()).toBe(true)
     expect(wrapper.find('[aria-label="Instrument JSON URL"]').exists()).toBe(true)
     expect(wrapper.find('[aria-label="Upload instrument JSON"]').exists()).toBe(true)
+  })
+
+  it('selects the driven-noise patch from a pitched lane', async () => {
+    const wrapper = mount(DawView)
+    await wrapper.get('[aria-label="Edit sound and source for Instrument 1"]').trigger('click')
+
+    await wrapper.get('input[type="radio"][value="driven-noise"]').setValue()
+
+    expect(wrapper.getComponent(PitchedLane).props('lane').instrument).toEqual({
+      type: 'patch',
+      patchPreset: 'driven-noise',
+      oscillatorType: 'sawtooth',
+    })
+    expect(wrapper.find('[aria-label="SW Patch instrument source"]').exists()).toBe(false)
   })
 
   it('preserves patch settings when toggling instrument source modes', async () => {
