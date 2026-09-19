@@ -14,6 +14,9 @@ import TheFooter from './components/TheFooter.vue'
         <RouterLink :to="{ path: '/daw', query: { demo: 'lucky-debugger' } }">
           Open "Lucky Debugger"
         </RouterLink>
+        <RouterLink :to="{ path: '/daw', query: { demo: 'cosmic-wavelength' } }">
+          Open "Cosmic Wavelength"
+        </RouterLink>
         <RouterLink to="/xenpaper-lang-testing"
           >xenpaper-lang debugging/development view</RouterLink
         >
