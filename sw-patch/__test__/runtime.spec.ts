@@ -364,7 +364,7 @@ describe('SW Patch runtime', () => {
     expect(worklets.at(-4)?.port.postMessage).toHaveBeenCalledTimes(completedSourceMessages!)
   })
 
-  it('configures frequency-driven colored noise worklets', () => {
+  it('configures driven colored noise worklets without replacing simple noise', () => {
     const worklets: Array<{
       name: string
       options: AudioWorkletNodeOptions
@@ -388,13 +388,13 @@ describe('SW Patch runtime', () => {
     }
     vi.stubGlobal('AudioWorkletNode', MockAudioWorkletNode)
     const patch = createPatch(
-      "fn noise():\n    ret NoiseNode(color = 'pink', interpolation = 'linear', frequency = 2kHz, detune = 100c)\n",
+      "fn noise():\n    ret DrivenNoiseNode(color = 'pink', interpolation = 'linear', frequency = 2kHz, detune = 100c)\n",
       { currentTime: 0 } as BaseAudioContext,
     )
 
     const noise = (patch.noise as PatchFunction)() as MockAudioWorkletNode
 
-    expect(noise.name).toBe('sw-patch-noise')
+    expect(noise.name).toBe('sw-patch-driven-noise')
     expect(noise.options).toEqual({
       numberOfInputs: 0,
       processorOptions: { color: 'pink', interpolation: 'linear' },

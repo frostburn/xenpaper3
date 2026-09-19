@@ -639,10 +639,13 @@ export class PatchRuntime {
     this.root.set('SoftParabolicNode', (...args: unknown[]) =>
       this.createUtilitySource('sw-patch-soft-parabolic', args),
     )
-    this.root.set('NoiseNode', (...args: unknown[]) =>
-      this.options.nativeNoise && args.length === 0
+    this.root.set('NoiseNode', () =>
+      this.options.nativeNoise
         ? this.createNativeNoiseSource()
-        : this.createUtilitySource('sw-patch-noise', args),
+        : this.createUtilitySource('sw-patch-noise'),
+    )
+    this.root.set('DrivenNoiseNode', (...args: unknown[]) =>
+      this.createUtilitySource('sw-patch-driven-noise', args),
     )
     this.root.set('RandomNode', () => this.createUtilitySource('sw-patch-random'))
     this.root.set('where', (...values: unknown[]) => this.where(values))
@@ -683,7 +686,7 @@ export class PatchRuntime {
   private createUtilitySource(name: string, args: unknown[] = []): AudioWorkletNode {
     const options = (args[0] ?? {}) as Record<string, unknown>
     const nodeOptions: AudioWorkletNodeOptions = { numberOfInputs: 0 }
-    if (name === 'sw-patch-noise') {
+    if (name === 'sw-patch-driven-noise') {
       nodeOptions.processorOptions = {
         color: options.color ?? 'white',
         interpolation: options.interpolation ?? 'constant',

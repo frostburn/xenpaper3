@@ -201,6 +201,9 @@ class SwPatchSoftParabolicProcessor extends SwPatchSoftOscillatorProcessor {
   }
 }
 class SwPatchNoiseProcessor extends SwPatchScheduledSourceProcessor {
+  valueAt() { return Math.random() * 2 - 1 }
+}
+class SwPatchDrivenNoiseProcessor extends SwPatchScheduledSourceProcessor {
   static get parameterDescriptors() {
     return [
       { name: 'frequency', defaultValue: 440, minValue: 0 },
@@ -304,5 +307,6 @@ registerProcessor('sw-patch-soft-sawtooth', SwPatchSoftSawtoothProcessor)
 registerProcessor('sw-patch-soft-square', SwPatchSoftSquareProcessor)
 registerProcessor('sw-patch-soft-parabolic', SwPatchSoftParabolicProcessor)
 registerProcessor('sw-patch-noise', SwPatchNoiseProcessor)
+registerProcessor('sw-patch-driven-noise', SwPatchDrivenNoiseProcessor)
 registerProcessor('sw-patch-random', SwPatchRandomProcessor)
 `
