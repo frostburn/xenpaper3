@@ -20,6 +20,7 @@ export interface Comment extends Node {
 
 export type Expression =
   | Barline
+  | BarRest
   | BinaryExpression
   | CallExpression
   | ContextAssignment
@@ -68,6 +69,11 @@ export type Expression =
 export interface Barline extends Node {
   type: 'Barline'
   raw: '|'
+}
+
+export interface BarRest extends Node {
+  type: 'BarRest'
+  raw: ';'
 }
 
 export interface DrumSampleLiteral extends Node {

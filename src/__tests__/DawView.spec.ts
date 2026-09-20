@@ -165,6 +165,17 @@ describe('DAW project model', () => {
     expect(wrapper.get('[data-highlight="warning"]').text()).toBe('|')
   })
 
+  it('uses the global time signature for bar rests in DAW clips', () => {
+    const source = '0;|1;|2;|'
+    const signature = { numerator: 4, denominator: 4 }
+
+    expect(
+      parseClipNotes(source, Infinity, {}, beat(0), signature).map(({ beat }) => beat),
+    ).toEqual([0, 4, 8])
+    expect(clipSourceDiagnostics(source, [], {}, beat(0), signature)).toEqual([])
+    expect(sourceClipLength(source, beat(4), [], {}, signature)).toEqual(beat(12))
+  })
+
   it('marks only the currently playing parts of a source token', () => {
     const wrapper = mount(XenpaperSourceHighlight, {
       props: { source: 'C4 D', playingRanges: [{ start: 0, end: 1 }] },

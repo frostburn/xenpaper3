@@ -28,6 +28,41 @@ const audibleResult = (source: string) => {
 }
 
 describe('beat event expansion', () => {
+  it.each([
+    ['@time(4/4)1;|2', '@time(4/4)1...|2'],
+    ['@time(5/4)1;|2', '@time(5/4)1....|2'],
+    ['@time(2/4);;;', '@time(2/4).. .. ..'],
+  ])('advances bar rests to the next measure boundary in %s', (actual, expected) => {
+    expect(audibleResult(actual)).toEqual(audibleResult(expected))
+  })
+
+  it('warns and gives a bar rest no duration when no time signature prevails', () => {
+    const result = expandToBeatEvents(parse('1;2'))
+
+    expect(result.diagnostics).toMatchObject([
+      {
+        code: 'XP_BAR_REST_WITHOUT_TIME_SIGNATURE',
+        severity: 'warning',
+        locations: [{ start: { offset: 1 }, end: { offset: 2 } }],
+      },
+    ])
+    expect('score' in result && result.score.duration.toFraction()).toBe('2')
+  })
+
+  it('recomputes parallel padding after resolving bar rests', () => {
+    expect(score('@time(4/4)(1;, 1 2 3 4 5)').duration.toFraction()).toBe('5')
+  })
+
+  it('resolves an inherited bar rest from the absolute clip offset', () => {
+    const result = expandToBeatEvents(parse(';'), {
+      beatOffset: new Fraction(1),
+      timeSignature: { numerator: 4, denominator: 4 },
+    })
+
+    expect(result.diagnostics).toEqual([])
+    expect('score' in result && result.score.duration.toFraction()).toBe('3')
+  })
+
   it('compares the sounding value of root-relative absolute pitches', () => {
     expect(audibleResult('C')).not.toEqual(audibleResult('{root = D} C'))
   })

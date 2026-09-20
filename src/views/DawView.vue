@@ -186,8 +186,21 @@ const clipNotes = computed(() => {
         notes.set(
           clipSourceKey(lane.id, clip.id),
           samples.length
-            ? parseDrumClipNotes(clip.source, samples, beatToNumber(clip.length), initialization)
-            : parseClipNotes(clip.source, beatToNumber(clip.length), initialization),
+            ? parseDrumClipNotes(
+                clip.source,
+                samples,
+                beatToNumber(clip.length),
+                initialization,
+                clip.start,
+                project.value.globalTrack.timeSignatureChanges[0],
+              )
+            : parseClipNotes(
+                clip.source,
+                beatToNumber(clip.length),
+                initialization,
+                clip.start,
+                project.value.globalTrack.timeSignatureChanges[0],
+              ),
         )
       } catch {
         // Invalid clip source has no playback highlights while it is being edited.
@@ -253,7 +266,14 @@ watchEffect(() => {
     const samples = drumSamplesForLane(lane)
     for (const clip of lane.clips) {
       try {
-        clip.length = sourceClipLength(clip.source, defaultBar, samples, initialization)
+        clip.length = sourceClipLength(
+          clip.source,
+          defaultBar,
+          samples,
+          initialization,
+          signature,
+          clip.start,
+        )
       } catch {
         // A clip may contain incomplete syntax while it is being edited. Isolate that
         // failure so initialization changes still resize every other clip in the project.
@@ -863,6 +883,7 @@ onBeforeUnmount(() => {
               v-if="lane.kind === 'drum'"
               :lane="lane"
               :global-source="project.globalTrack.source"
+              :time-signature="project.globalTrack.timeSignatureChanges[0]"
               :selected-clip-id="selectedLaneId === lane.id ? selectedClipId : undefined"
               :pixels-per-beat="pixelsPerBeat"
               :scroll-left="scrollLeft"
@@ -893,6 +914,7 @@ onBeforeUnmount(() => {
                 :collapsed="collapsedLaneIds.has(lane.id)"
                 :lane="lane"
                 :global-source="project.globalTrack.source"
+                :time-signature="project.globalTrack.timeSignatureChanges[0]"
                 :selected-clip-id="selectedLaneId === lane.id ? selectedClipId : undefined"
                 :pixels-per-beat="pixelsPerBeat"
                 :scroll-left="scrollLeft"

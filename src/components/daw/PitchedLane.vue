@@ -23,6 +23,7 @@ import InstrumentLaneComponent from './InstrumentLane.vue'
 const props = defineProps<{
   lane: PitchedInstrumentLane
   globalSource?: string
+  timeSignature?: { readonly numerator: number; readonly denominator: number }
   selectedClipId?: string
   pixelsPerBeat: number
   scrollLeft: number
@@ -197,7 +198,13 @@ const pianoRoll = computed(() => {
       if (!initialization) throw new Error('Invalid initialization source')
       return {
         clip,
-        notes: parseClipNotes(clip.source, beatToNumber(clip.length), initialization),
+        notes: parseClipNotes(
+          clip.source,
+          beatToNumber(clip.length),
+          initialization,
+          clip.start,
+          props.timeSignature,
+        ),
       }
     } catch {
       // Invalid source is expected while the user is editing; show an empty preview.

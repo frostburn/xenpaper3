@@ -18,10 +18,6 @@ import type {
 export interface BeatEventExpansionOptions extends ScoreShapeOptions, RepeatExpansionOptions {
   /** Pre-evaluated, zero-duration state annotations applied before the program. */
   initializationShape?: ScoreShape
-  /** Absolute beat of this score's start. DAW clips use this to align measures to the project. */
-  beatOffset?: Fraction
-  /** Prevailing signature before the score starts, aligned to absolute beat zero. */
-  timeSignature?: { readonly numerator: number; readonly denominator: number }
 }
 
 export type BeatEventExpansionResult =
