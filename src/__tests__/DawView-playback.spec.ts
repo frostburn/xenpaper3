@@ -12,6 +12,7 @@ const controls = vi.hoisted(() => ({
 vi.mock('../daw/audio-engine', () => ({
   DawAudioEngine: class extends EventTarget {
     context = { state: 'suspended', resume: controls.resume }
+    analyser = null
     play = controls.play
     stop = vi.fn<() => void>()
     dispose = vi.fn<() => void>()

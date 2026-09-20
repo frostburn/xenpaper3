@@ -29,6 +29,31 @@ afterEach(() => {
 })
 
 describe('DAW playback preparation', () => {
+  it('routes playback through an analyser connected to the audio destination', async () => {
+    const destination = {} as AudioDestinationNode
+    const analyser = {
+      connect: vi.fn<() => void>(),
+      disconnect: vi.fn<() => void>(),
+      fftSize: 0,
+    } as unknown as AnalyserNode
+    const context = {
+      createAnalyser: vi.fn<() => AnalyserNode>(() => analyser),
+      destination,
+    } as unknown as AudioContext
+    const engine = new DawAudioEngine(context)
+
+    await engine.play(createDefaultProject())
+
+    expect(engine.analyser).toBe(analyser)
+    expect(analyser.fftSize).toBe(2048)
+    expect(analyser.connect).toHaveBeenCalledWith(destination)
+    expect(vi.mocked(WebAudioPlaybackSession).mock.calls[0]![2]).toMatchObject({
+      output: analyser,
+    })
+    engine.dispose()
+    expect(analyser.disconnect).toHaveBeenCalledOnce()
+  })
+
   it('renders the complete project and requested tail to a stereo WAV blob', async () => {
     const project = createDefaultProject()
     project.instrumentLanes[0]!.clips.push({
