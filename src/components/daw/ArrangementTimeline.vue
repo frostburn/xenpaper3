@@ -9,6 +9,7 @@ const props = defineProps<{
   pixelsPerBeat: number
   scrollLeft: number
   follow: boolean
+  barlines?: readonly number[]
 }>()
 const emit = defineEmits<{
   'update:scrollLeft': [pixels: number]
@@ -165,6 +166,14 @@ const onRulerKey = (event: KeyboardEvent) => {
     </div>
     <div class="track-stack">
       <slot />
+      <div class="barline-clipper" aria-hidden="true">
+        <div
+          v-for="barline in barlines"
+          :key="barline"
+          class="measure-barline"
+          :style="{ left: `${barline * pixelsPerBeat - scrollLeft}px` }"
+        />
+      </div>
       <div class="playhead-clipper" aria-hidden="true">
         <div v-if="playheadX >= 0" class="playhead" :style="{ left: `${playheadX}px` }" />
       </div>
@@ -237,12 +246,23 @@ const onRulerKey = (event: KeyboardEvent) => {
   position: relative;
   min-height: 9rem;
 }
-.playhead-clipper {
+.playhead-clipper,
+.barline-clipper {
   position: absolute;
   inset: 0 0 0 var(--daw-track-width, 14rem);
   overflow: hidden;
   pointer-events: none;
   z-index: 2;
+}
+.barline-clipper {
+  z-index: 1;
+}
+.measure-barline {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: color-mix(in srgb, var(--xenpaper-slate-400) 65%, transparent);
 }
 .playhead {
   position: absolute;

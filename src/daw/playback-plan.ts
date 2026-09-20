@@ -173,7 +173,7 @@ const assertPlaybackStart = (fromBeat: number): void => {
 export const createPlaybackPlan = (project: DawProject, fromBeat = 0): PlaybackPlan => {
   assertPlaybackStart(fromBeat)
   const tempoMap = TempoMap.fromProject(project)
-  const globalInitialization = compileSourceInitialization(project.globalTrack.source)
+  const globalInitialization = compileSourceInitialization(project.globalTrack.source, {}, true)
   let endBeat = fromBeat
   const lanes: PlaybackLane[] = []
 

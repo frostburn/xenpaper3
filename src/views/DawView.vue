@@ -20,6 +20,7 @@ import PitchedLane from '../components/daw/PitchedLane.vue'
 import TransportControls from '../components/daw/TransportControls.vue'
 import TimeDomainVisualiser from '../components/TimeDomainVisualiser.vue'
 import { DawAudioEngine, renderProjectToWavBlob } from '../daw/audio-engine'
+import { globalTimeSignatureChanges, measureBoundaries } from '../daw/timeline'
 import { demoProjects } from '../demo-projects'
 import {
   clipSourceDiagnostics,
@@ -152,7 +153,7 @@ const selectedClipDiagnostics = computed(() => {
   const clip = selectedClip.value
   if (!lane || !clip) return []
   try {
-    const global = compileSourceInitialization(project.value.globalTrack.source)
+    const global = compileSourceInitialization(project.value.globalTrack.source, {}, true)
     const initialization = compileSourceInitialization(lane.source, global)
     return clipSourceDiagnostics(
       clip.source,
@@ -169,7 +170,7 @@ const clipNotes = computed(() => {
   const notes = new Map<string, readonly ScheduledLaneNote[]>()
   let global
   try {
-    global = compileSourceInitialization(project.value.globalTrack.source)
+    global = compileSourceInitialization(project.value.globalTrack.source, {}, true)
   } catch {
     return notes
   }
@@ -245,12 +246,21 @@ const projectEndBeat = computed(() =>
     ),
   ),
 )
+const globalMeterChanges = computed(() =>
+  globalTimeSignatureChanges(
+    project.value.globalTrack.source,
+    project.value.globalTrack.timeSignatureChanges[0]!,
+  ),
+)
+const timelineBarlines = computed(() =>
+  measureBoundaries(globalMeterChanges.value, projectEndBeat.value + 8),
+)
 watchEffect(() => {
   const signature = project.value.globalTrack.timeSignatureChanges[0]!
   const defaultBar = beat(signature.numerator * 4, signature.denominator)
   let globalInitialization
   try {
-    globalInitialization = compileSourceInitialization(project.value.globalTrack.source)
+    globalInitialization = compileSourceInitialization(project.value.globalTrack.source, {}, true)
   } catch {
     // Keep independently valid clips usable while an initialization source is being edited.
     globalInitialization = undefined
@@ -872,6 +882,7 @@ onBeforeUnmount(() => {
           :end-beat="projectEndBeat"
           :playhead="playhead"
           :playing="playing"
+          :barlines="timelineBarlines"
           @seek="seekPlayback"
         >
           <section

@@ -246,6 +246,7 @@ const inheritedScoreOptions = (initialization: SourceInitialization) => ({
 export const compileSourceInitialization = (
   source: string,
   parent: SourceInitialization = {},
+  allowDuration = false,
 ): SourceInitialization => {
   const result = evaluateProgramSemantics(parse(source), {
     directiveExtensions: ENVELOPE_EXTENSIONS,
@@ -254,21 +255,26 @@ export const compileSourceInitialization = (
   const errors = result.diagnostics.filter(({ severity }) => severity === 'error')
   if (errors.length) throw new Error(errors.map(({ message }) => message).join('\n'))
   if (!('shape' in result)) return parent
-  if (result.shape.duration.n)
+  const containsAttack = (shape: ScoreShape): boolean =>
+    shape.kind === 'attack' ||
+    ('children' in shape && shape.children.some((child) => containsAttack(child)))
+  if (result.shape.duration.n && (!allowDuration || containsAttack(result.shape)))
     throw new Error('Initialization sources cannot contain duration-bearing expressions.')
   return {
     pitchContext: result.pitchContext,
     directiveState: result.directiveState,
     lexicalEnvironment: result.lexicalEnvironment,
     visitorContext: result.visitorContext,
-    shape: parent.shape
-      ? {
-          kind: 'sequence',
-          duration: result.shape.duration,
-          origins: [...parent.shape.origins, ...result.shape.origins],
-          children: [parent.shape, result.shape],
-        }
-      : result.shape,
+    shape: result.shape.duration.n
+      ? parent.shape
+      : parent.shape
+        ? {
+            kind: 'sequence',
+            duration: result.shape.duration,
+            origins: [...parent.shape.origins, ...result.shape.origins],
+            children: [parent.shape, result.shape],
+          }
+        : result.shape,
   }
 }
 
@@ -439,7 +445,7 @@ export const parseLaneNotes = (
 
 /** Compile every lane without applying any synthesizer- or tuning-reference conversion. */
 export const parseProjectScoreNotes = (project: DawProject): ScheduledLaneNote[] => {
-  const globalInitialization = compileSourceInitialization(project.globalTrack.source)
+  const globalInitialization = compileSourceInitialization(project.globalTrack.source, {}, true)
   const timeSignature = project.globalTrack.timeSignatureChanges[0]
   return project.instrumentLanes
     .flatMap((lane) => parseLaneNotes(lane, globalInitialization, timeSignature))
