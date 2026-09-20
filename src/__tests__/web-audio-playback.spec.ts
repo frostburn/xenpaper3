@@ -292,21 +292,41 @@ describe('Web Audio playback session', () => {
   it('passes driven-noise settings to the bundled patch', () => {
     const context = new MockAudioContext()
     const plan = createPlan()
-    plan.lanes[0]!.instrument = {
-      type: 'patch',
-      patchPreset: 'driven-noise',
-      oscillatorType: 'sawtooth',
-      color: 'blue',
-      interpolation: 'impulse',
+    const lane = plan.lanes[0]!
+    if (lane.kind !== 'instrument') throw new Error('Expected instrument lane')
+    const drivenNoisePlan: PlaybackPlan = {
+      ...plan,
+      lanes: [
+        {
+          ...lane,
+          instrument: {
+            type: 'patch',
+            patchPreset: 'driven-noise',
+            oscillatorType: 'sawtooth',
+            color: 'blue',
+            interpolation: 'impulse',
+          },
+        },
+      ],
     }
-    const patchFactory = vi.fn<() => PlayableSynthPatch>(() => ({
+    const patchFactory = vi.fn<
+      (
+        source: string,
+        context: BaseAudioContext,
+        options: { config: Record<string, unknown> },
+      ) => PlayableSynthPatch
+    >(() => ({
       on: () => (end) => end,
       dispose: vi.fn<() => void>(),
       ready: Promise.resolve(),
     }))
-    const session = new WebAudioPlaybackSession(context as unknown as AudioContext, plan, {
-      patchFactory,
-    })
+    const session = new WebAudioPlaybackSession(
+      context as unknown as AudioContext,
+      drivenNoisePlan,
+      {
+        patchFactory,
+      },
+    )
 
     session.start()
 
