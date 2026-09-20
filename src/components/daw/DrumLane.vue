@@ -19,6 +19,7 @@ import InstrumentLaneComponent from './InstrumentLane.vue'
 const props = defineProps<{
   lane: DrumLane
   globalSource?: string
+  timeSignature?: { readonly numerator: number; readonly denominator: number }
   selectedClipId?: string
   pixelsPerBeat: number
   scrollLeft: number
@@ -143,7 +144,14 @@ const eventsByClip = computed(() => {
         if (!initialization) throw new Error('Invalid initialization source')
         return [
           clip.id,
-          parseDrumClipNotes(clip.source, samples.value, beatToNumber(clip.length), initialization),
+          parseDrumClipNotes(
+            clip.source,
+            samples.value,
+            beatToNumber(clip.length),
+            initialization,
+            clip.start,
+            props.timeSignature,
+          ),
         ]
       } catch {
         return [clip.id, []]

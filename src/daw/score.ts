@@ -278,6 +278,7 @@ export const parseClipNotes = (
   duration = Number.POSITIVE_INFINITY,
   initialization: SourceInitialization = {},
   clipOffset: Beat = beat(0),
+  timeSignature?: { readonly numerator: number; readonly denominator: number },
 ): ScheduledLaneNote[] => {
   const sourceIdentity = 'xenpaper:clip-source'
   const result = expandToBeatEvents(parse(source, { grammarSource: sourceIdentity }), {
@@ -285,6 +286,7 @@ export const parseClipNotes = (
     ...inheritedScoreOptions(initialization),
     initializationShape: initialization.shape,
     beatOffset: clipOffset,
+    timeSignature,
   })
   const errors = result.diagnostics.filter(({ severity }) => severity === 'error')
   if (errors.length) throw new Error(errors.map(({ message }) => message).join('\n'))
@@ -346,6 +348,7 @@ export const parseDrumClipNotes = (
   duration = Number.POSITIVE_INFINITY,
   initialization: SourceInitialization = {},
   clipOffset: Beat = beat(0),
+  timeSignature?: { readonly numerator: number; readonly denominator: number },
 ): ScheduledLaneNote[] => {
   const sourceIdentity = 'xenpaper:clip-source'
   const program = lowerDrumSamples(
@@ -356,6 +359,7 @@ export const parseDrumClipNotes = (
     ...inheritedScoreOptions(initialization),
     initializationShape: initialization.shape,
     beatOffset: clipOffset,
+    timeSignature,
   })
   const errors = result.diagnostics.filter(({ severity }) => severity === 'error')
   if (errors.length) throw new Error(errors.map(({ message }) => message).join('\n'))
@@ -382,6 +386,8 @@ export const sourceClipLength = (
   defaultBar = beat(4),
   samples: readonly string[] = [],
   initialization: SourceInitialization = {},
+  timeSignature?: { readonly numerator: number; readonly denominator: number },
+  clipOffset: Beat = beat(0),
 ): Beat => {
   const program = samples.length
     ? lowerDrumSamples(parse(source, { drumSamples: samples }))
@@ -390,6 +396,8 @@ export const sourceClipLength = (
     directiveExtensions: ENVELOPE_EXTENSIONS,
     ...inheritedScoreOptions(initialization),
     initializationShape: initialization.shape,
+    timeSignature,
+    beatOffset: clipOffset,
   })
   if (!('score' in result) || result.diagnostics.some(({ severity }) => severity === 'error'))
     return defaultBar
@@ -402,6 +410,7 @@ export const sourceClipLength = (
 export const parseLaneNotes = (
   lane: InstrumentLane,
   globalInitialization: SourceInitialization = {},
+  timeSignature?: { readonly numerator: number; readonly denominator: number },
 ): ScheduledLaneNote[] => {
   const samples = drumSamplesForLane(lane)
   const laneInitialization = compileSourceInitialization(lane.source, globalInitialization)
@@ -414,8 +423,15 @@ export const parseLaneNotes = (
           beatToNumber(clip.length),
           laneInitialization,
           clip.start,
+          timeSignature,
         )
-      : parseClipNotes(clip.source, beatToNumber(clip.length), laneInitialization, clip.start)
+      : parseClipNotes(
+          clip.source,
+          beatToNumber(clip.length),
+          laneInitialization,
+          clip.start,
+          timeSignature,
+        )
     return clipNotes.map((event) => ({ ...event, beat: clipStart + event.beat }))
   })
   return notes.sort((left, right) => left.beat - right.beat)
@@ -424,7 +440,8 @@ export const parseLaneNotes = (
 /** Compile every lane without applying any synthesizer- or tuning-reference conversion. */
 export const parseProjectScoreNotes = (project: DawProject): ScheduledLaneNote[] => {
   const globalInitialization = compileSourceInitialization(project.globalTrack.source)
+  const timeSignature = project.globalTrack.timeSignatureChanges[0]
   return project.instrumentLanes
-    .flatMap((lane) => parseLaneNotes(lane, globalInitialization))
+    .flatMap((lane) => parseLaneNotes(lane, globalInitialization, timeSignature))
     .sort((left, right) => left.beat - right.beat)
 }
