@@ -62,6 +62,8 @@ export interface ScoreShapeOptions {
   readonly pitchContext?: PitchContext
   readonly directiveState?: DirectiveExtensionState
   readonly directiveExtensions?: readonly DirectiveExtension[]
+  /** Prevailing signature before the score starts, aligned to its first beat. */
+  readonly timeSignature?: { readonly numerator: number; readonly denominator: number }
   /** Lexical declarations inherited from an enclosing source. */
   readonly lexicalEnvironment?: LexicalEnvironment
 }
@@ -431,6 +433,8 @@ export interface AttackAppearance {
 export interface RestShape extends ShapeBase {
   readonly kind: 'rest'
   readonly generated: boolean
+  /** A semicolon whose duration is resolved from the prevailing measure. */
+  readonly barRest?: boolean
 }
 
 export interface ContinueShape extends ShapeBase {

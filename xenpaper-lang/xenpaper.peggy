@@ -305,6 +305,7 @@ PrimaryExpression
   / NormalizedGroup
   / ParenthesizedExpression
   / Rest
+  / BarRest
   / DetachedContinue
   / Barline
   / EnumeratedChord
@@ -411,6 +412,9 @@ MonzoSubgroupComponent
 
 Rest
   = raw:$("."+) { return node('Rest', { raw }); }
+
+BarRest
+  = ";" { return node('BarRest', { raw: ";" }); }
 
 DetachedContinue
   = "=" { return node('DetachedContinue', { raw: "=" }); }

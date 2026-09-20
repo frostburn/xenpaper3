@@ -71,6 +71,7 @@ function mapScoreConstruction(
     }
     if (
       item.type === 'Rest' ||
+      item.type === 'BarRest' ||
       item.type === 'DetachedContinue' ||
       item.type === 'Barline' ||
       item.type === 'HardBoundary' ||
@@ -122,6 +123,7 @@ function isScalarOperand(node: Expression): boolean {
   if (node.type === 'Group') return isScalarOperand(node.expression)
   return ![
     'Rest',
+    'BarRest',
     'DetachedContinue',
     'Barline',
     'HardBoundary',
@@ -1361,6 +1363,18 @@ export function evaluateScoreSemantics(
         diagnostics: [],
       }
     }
+    if (current.type === 'BarRest') {
+      return {
+        shape: {
+          kind: 'rest',
+          duration: new Fraction(0),
+          generated: false,
+          barRest: true,
+          origins: [origin(current, 'duration')],
+        },
+        diagnostics: [],
+      }
+    }
     if (current.type === 'DetachedContinue') {
       const shape: ContinueShape = {
         kind: 'continue',
@@ -2049,10 +2063,73 @@ export function evaluateScoreSemantics(
   })
   const result = visitor.visit(node)
   if (!('shape' in result)) return result
-  const prevailingVisitor = visitorAfter(node, visitor)
-  const lexicalEnvironment = result.lexicalEnvironment ?? options.lexicalEnvironment
-  return {
+  const barRestDiagnostics: Diagnostic[] = []
+  type MeasureState = { offset: Fraction; length?: Fraction; origin?: Fraction }
+  const resolveBarRests = (shape: ScoreShape, state: MeasureState): ScoreShape => {
+    const saved = shape.isolatedDirectiveScope ? { ...state } : undefined
+    let resolved: ScoreShape
+    if (shape.kind === 'time-signature') {
+      state.length = new Fraction(shape.numerator * 4, shape.denominator)
+      state.origin = new Fraction(state.offset)
+      resolved = shape
+    } else if (shape.kind === 'rest' && shape.barRest) {
+      let duration = new Fraction(0)
+      if (state.length && state.origin) {
+        const elapsed = state.offset.sub(state.origin)
+        const completedMeasures = elapsed.div(state.length).floor()
+        duration = state.origin.add(state.length.mul(completedMeasures.add(1))).sub(state.offset)
+      } else {
+        barRestDiagnostics.push({
+          code: 'XP_BAR_REST_WITHOUT_TIME_SIGNATURE',
+          severity: 'warning',
+          message: 'A bar rest has no effect without a prevailing time signature.',
+          locations: shape.origins.map(({ location }) => location),
+        })
+      }
+      resolved = { ...shape, duration, barRest: undefined }
+    } else if (shape.kind === 'sequence') {
+      const children = shape.children.map((child) => {
+        const result = resolveBarRests(child, state)
+        state.offset = state.offset.add(result.duration)
+        return result
+      })
+      resolved = {
+        ...shape,
+        children,
+        duration: children.reduce((sum, child) => sum.add(child.duration), new Fraction(0)),
+      }
+      // The children advanced the shared cursor; the caller advances by this sequence.
+      state.offset = state.offset.sub(resolved.duration)
+    } else if (shape.kind === 'parallel') {
+      const branches = shape.branches.map((branch) =>
+        resolveBarRests(branch, { ...state, offset: new Fraction(state.offset) }),
+      )
+      const duration = branches.reduce(
+        (maximum, branch) => (branch.duration.compare(maximum) > 0 ? branch.duration : maximum),
+        new Fraction(0),
+      )
+      resolved = { ...shape, branches: branches.map((branch) => pad(branch, duration)), duration }
+    } else resolved = shape
+    if (saved) Object.assign(state, saved)
+    return resolved
+  }
+  const initialLength = options.timeSignature
+    ? new Fraction(options.timeSignature.numerator * 4, options.timeSignature.denominator)
+    : undefined
+  const resolvedShape = resolveBarRests(result.shape, {
+    offset: new Fraction(0),
+    length: initialLength,
+    origin: initialLength ? new Fraction(0) : undefined,
+  })
+  const resolvedResult = {
     ...result,
+    shape: resolvedShape,
+    diagnostics: [...result.diagnostics, ...barRestDiagnostics],
+  }
+  const prevailingVisitor = visitorAfter(node, visitor)
+  const lexicalEnvironment = resolvedResult.lexicalEnvironment ?? options.lexicalEnvironment
+  return {
+    ...resolvedResult,
     pitchContext: prevailingVisitor.scope.context,
     directiveState: prevailingVisitor.scope.directiveState,
     lexicalEnvironment,
