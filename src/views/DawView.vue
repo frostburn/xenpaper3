@@ -18,6 +18,7 @@ import DrumLane from '../components/daw/DrumLane.vue'
 import GlobalLane from '../components/daw/GlobalLane.vue'
 import PitchedLane from '../components/daw/PitchedLane.vue'
 import TransportControls from '../components/daw/TransportControls.vue'
+import TimeDomainVisualiser from '../components/TimeDomainVisualiser.vue'
 import { DawAudioEngine, renderProjectToWavBlob } from '../daw/audio-engine'
 import { demoProjects } from '../demo-projects'
 import {
@@ -70,6 +71,7 @@ const rendering = ref(false)
 const playbackPending = ref(false)
 let playTimer: ReturnType<typeof setInterval> | undefined
 let audioEngine: DawAudioEngine | undefined
+const outputAnalyser = ref<AnalyserNode | null>(null)
 let playbackRequestId = 0
 const editor = ref<InstanceType<typeof ClipSourceEditor>>()
 const workspace = ref<HTMLElement>()
@@ -345,6 +347,7 @@ const startPlayback = async (
       return
     }
     audioEngine ??= new DawAudioEngine()
+    outputAnalyser.value = audioEngine.analyser
     audioEngine.addEventListener('ended', finishPlayback)
     if (audioEngine.context.state === 'suspended') await audioEngine.context.resume()
     if (requestId !== playbackRequestId) return
@@ -741,6 +744,15 @@ onBeforeUnmount(() => {
         @play="togglePlayback"
         @stop="stopPlayback"
       />
+      <div class="output-visualiser" aria-label="Master output waveform" role="img">
+        <TimeDomainVisualiser
+          :analyser="outputAnalyser"
+          :width="240"
+          :height="48"
+          :line-width="1.5"
+          stroke-style="#61dafb"
+        />
+      </div>
       <div class="history-controls" aria-label="Edit history">
         <button
           type="button"
@@ -1098,6 +1110,19 @@ onBeforeUnmount(() => {
   display: flex;
   gap: 0.25rem;
   margin-right: 0.5rem;
+}
+.output-visualiser {
+  width: min(15rem, 25vw);
+  height: 3rem;
+  overflow: hidden;
+  border: 1px solid var(--xenpaper-slate-500);
+  border-radius: 0.3rem;
+  background: var(--xenpaper-slate-950);
+}
+.output-visualiser canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
 }
 .zoom-control {
   margin-left: auto;

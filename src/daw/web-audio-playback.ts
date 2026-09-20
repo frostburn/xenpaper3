@@ -29,6 +29,8 @@ type DrumkitFactory = typeof createDrumkit
 
 export interface WebAudioPlaybackOptions {
   readonly outputGain?: number
+  /** Destination for the session mix. Defaults to the audio context destination. */
+  readonly output?: AudioNode
   readonly patchFactory?: PatchFactory
   readonly drumkitFactory?: DrumkitFactory
   readonly sampledDrumkits?: ReadonlyMap<string, SampledDrumkit>
@@ -95,7 +97,7 @@ export class WebAudioPlaybackSession {
     this.nativePatchNoise = options.nativePatchNoise ?? false
     this.onEnded = options.onEnded
     this.output = new GainNode(context, { gain: options.outputGain ?? DEFAULT_OUTPUT_GAIN })
-    this.output.connect(context.destination)
+    this.output.connect(options.output ?? context.destination)
   }
 
   get positionTime(): number {

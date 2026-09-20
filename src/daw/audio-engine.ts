@@ -162,6 +162,8 @@ export const renderProjectToWavBlob = async (
 /** Small owner/facade around immutable playback plans and disposable Web Audio sessions. */
 export class DawAudioEngine extends EventTarget {
   readonly context: AudioContext
+  /** Analyses the final session mix without changing the audible signal path. */
+  readonly analyser: AnalyserNode | null
   private readonly ownsContext: boolean
   private session: WebAudioPlaybackSession | undefined
   private activePlan: PlaybackPlan | undefined
@@ -172,6 +174,11 @@ export class DawAudioEngine extends EventTarget {
     super()
     this.ownsContext = context === undefined
     this.context = context ?? new AudioContext({ latencyHint: 'interactive' })
+    this.analyser = this.context.createAnalyser?.() ?? null
+    if (this.analyser) {
+      this.analyser.fftSize = 2048
+      this.analyser.connect(this.context.destination)
+    }
   }
 
   async play(project: DawProject, fromBeat = 0): Promise<void> {
@@ -194,6 +201,7 @@ export class DawAudioEngine extends EventTarget {
       const session = new WebAudioPlaybackSession(this.context, plan, {
         sampledDrumkits,
         sampledInstruments,
+        output: this.analyser ?? undefined,
         onEnded: () => {
           if (this.session !== session) return
           this.session = undefined
@@ -239,6 +247,7 @@ export class DawAudioEngine extends EventTarget {
     if (this.disposed) return
     this.stop()
     this.disposed = true
+    this.analyser?.disconnect()
     if (this.ownsContext) void this.context.close()
   }
 }
