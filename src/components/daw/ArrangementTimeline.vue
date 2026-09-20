@@ -39,6 +39,11 @@ const marks = computed(() => {
   const count = Math.ceil(viewportWidth.value / props.pixelsPerBeat / step) + 1
   return Array.from({ length: count }, (_, index) => first + index * step)
 })
+const visibleBarlines = computed(() => {
+  const firstBeat = props.scrollLeft / props.pixelsPerBeat
+  const lastBeat = (props.scrollLeft + viewportWidth.value) / props.pixelsPerBeat
+  return props.barlines?.filter((beat) => beat >= firstBeat && beat <= lastBeat) ?? []
+})
 const scrollTo = (pixels: number) => {
   const next = clamp(0, maxScroll.value, pixels)
   if (next !== props.scrollLeft) emit('update:scrollLeft', next)
@@ -168,7 +173,7 @@ const onRulerKey = (event: KeyboardEvent) => {
       <slot />
       <div class="barline-clipper" aria-hidden="true">
         <div
-          v-for="barline in barlines"
+          v-for="barline in visibleBarlines"
           :key="barline"
           class="measure-barline"
           :style="{ left: `${barline * pixelsPerBeat - scrollLeft}px` }"

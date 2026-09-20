@@ -1494,6 +1494,40 @@ describe('DawView', () => {
     expect((notes[2]!.element as HTMLElement).style.top).toBe('0%')
   })
 
+  it('renders pitched previews with duration-bearing global meter sources', () => {
+    const project = createDefaultProject()
+    const lane = project.instrumentLanes[0]! as PitchedInstrumentLane
+    lane.clips = [{ id: 'meter-preview', start: beat(4), length: beat(1), source: 'C' }]
+    const wrapper = mount(PitchedLane, {
+      props: {
+        lane,
+        globalSource: ';@time(5/4)',
+        pixelsPerBeat: 64,
+        scrollLeft: 0,
+        displayMode: 'piano-roll',
+      },
+    })
+
+    expect(wrapper.findAll('[aria-label="Piano roll preview"] i')).toHaveLength(1)
+  })
+
+  it('renders drum previews with duration-bearing global meter sources', () => {
+    const project = createDefaultProject()
+    const lane = createDrumLane(project)
+    lane.clips = [{ id: 'meter-preview', start: beat(4), length: beat(1), source: 'bd' }]
+    const wrapper = mount(DrumLane, {
+      props: {
+        lane,
+        globalSource: ';@time(5/4)',
+        pixelsPerBeat: 64,
+        scrollLeft: 0,
+        displayMode: 'piano-roll',
+      },
+    })
+
+    expect(wrapper.findAll('[aria-label="Drum pattern preview"] i')).toHaveLength(1)
+  })
+
   it('does not let an extreme pitch fold an audible clip out of view', () => {
     const project = createDefaultProject()
     const lane = project.instrumentLanes[0]! as PitchedInstrumentLane

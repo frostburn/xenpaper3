@@ -363,6 +363,21 @@ describe('Arrangement timeline', () => {
     expect(wrapper.findAll('.ruler-mark').length).toBeLessThan(20)
   })
 
+  it('only renders measure barlines within the visible timeline', () => {
+    const barlines = Array.from({ length: 250_001 }, (_, index) => index * 4)
+    const wrapper = mount(ArrangementTimeline, {
+      props: { ...props, endBeat: 1_000_000, scrollLeft: 640_000, barlines },
+    })
+
+    const rendered = wrapper.findAll('.measure-barline')
+    expect(rendered).toHaveLength(3)
+    expect(rendered.map((barline) => barline.attributes('style'))).toEqual([
+      'left: 0px;',
+      'left: 256px;',
+      'left: 512px;',
+    ])
+  })
+
   it('keeps ordinary wheel scrolling vertical and uses Shift-wheel for panning', () => {
     const wrapper = mount(ArrangementTimeline, { props })
     const ruler = wrapper.get('.ruler').element

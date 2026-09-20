@@ -188,7 +188,7 @@ const notePitches = (note: PreviewNote) => {
 const pianoRoll = computed(() => {
   let initialization
   try {
-    const globalInitialization = compileSourceInitialization(props.globalSource ?? '')
+    const globalInitialization = compileSourceInitialization(props.globalSource ?? '', {}, true)
     initialization = compileSourceInitialization(props.lane.source, globalInitialization)
   } catch {
     initialization = undefined
