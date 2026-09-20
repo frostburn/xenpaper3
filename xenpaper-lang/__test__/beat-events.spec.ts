@@ -49,6 +49,20 @@ describe('beat event expansion', () => {
     expect('score' in result && result.score.duration.toFraction()).toBe('2')
   })
 
+  it('recomputes parallel padding after resolving bar rests', () => {
+    expect(score('@time(4/4)(1;, 1 2 3 4 5)').duration.toFraction()).toBe('5')
+  })
+
+  it('resolves an inherited bar rest from the absolute clip offset', () => {
+    const result = expandToBeatEvents(parse(';'), {
+      beatOffset: new Fraction(1),
+      timeSignature: { numerator: 4, denominator: 4 },
+    })
+
+    expect(result.diagnostics).toEqual([])
+    expect('score' in result && result.score.duration.toFraction()).toBe('3')
+  })
+
   it('compares the sounding value of root-relative absolute pitches', () => {
     expect(audibleResult('C')).not.toEqual(audibleResult('{root = D} C'))
   })

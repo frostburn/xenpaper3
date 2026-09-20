@@ -62,8 +62,10 @@ export interface ScoreShapeOptions {
   readonly pitchContext?: PitchContext
   readonly directiveState?: DirectiveExtensionState
   readonly directiveExtensions?: readonly DirectiveExtension[]
-  /** Prevailing signature before the score starts, aligned to its first beat. */
+  /** Prevailing signature before the score starts, aligned to absolute beat zero. */
   readonly timeSignature?: { readonly numerator: number; readonly denominator: number }
+  /** Absolute beat of the score's start when resolving measure-aware notation. */
+  readonly beatOffset?: Fraction
   /** Lexical declarations inherited from an enclosing source. */
   readonly lexicalEnvironment?: LexicalEnvironment
 }

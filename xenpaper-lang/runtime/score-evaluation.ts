@@ -2065,6 +2065,11 @@ export function evaluateScoreSemantics(
   if (!('shape' in result)) return result
   const barRestDiagnostics: Diagnostic[] = []
   type MeasureState = { offset: Fraction; length?: Fraction; origin?: Fraction }
+  const removeParallelPadding = (shape: ScoreShape): ScoreShape => {
+    if (shape.kind !== 'sequence' || shape.children.length !== 2) return shape
+    const padding = shape.children[1]!
+    return padding.kind === 'rest' && padding.generated ? shape.children[0]! : shape
+  }
   const resolveBarRests = (shape: ScoreShape, state: MeasureState): ScoreShape => {
     const saved = shape.isolatedDirectiveScope ? { ...state } : undefined
     let resolved: ScoreShape
@@ -2102,7 +2107,10 @@ export function evaluateScoreSemantics(
       state.offset = state.offset.sub(resolved.duration)
     } else if (shape.kind === 'parallel') {
       const branches = shape.branches.map((branch) =>
-        resolveBarRests(branch, { ...state, offset: new Fraction(state.offset) }),
+        resolveBarRests(removeParallelPadding(branch), {
+          ...state,
+          offset: new Fraction(state.offset),
+        }),
       )
       const duration = branches.reduce(
         (maximum, branch) => (branch.duration.compare(maximum) > 0 ? branch.duration : maximum),
@@ -2117,7 +2125,7 @@ export function evaluateScoreSemantics(
     ? new Fraction(options.timeSignature.numerator * 4, options.timeSignature.denominator)
     : undefined
   const resolvedShape = resolveBarRests(result.shape, {
-    offset: new Fraction(0),
+    offset: new Fraction(options.beatOffset ?? 0),
     length: initialLength,
     origin: initialLength ? new Fraction(0) : undefined,
   })
