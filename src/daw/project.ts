@@ -36,6 +36,11 @@ export const OSCILLATOR_TYPES = [
 ] as const
 export type OscillatorType = (typeof OSCILLATOR_TYPES)[number]
 
+export const NOISE_COLORS = ['brown', 'pink', 'white', 'blue', 'violet'] as const
+export type NoiseColor = (typeof NOISE_COLORS)[number]
+export const NOISE_INTERPOLATIONS = ['impulse', 'constant', 'linear'] as const
+export type NoiseInterpolation = (typeof NOISE_INTERPOLATIONS)[number]
+
 export const CLIP_DISPLAY_MODES = ['piano-roll', 'source'] as const
 export type ClipDisplayMode = (typeof CLIP_DISPLAY_MODES)[number]
 
@@ -70,6 +75,8 @@ export interface PatchInstrumentSource {
   type: 'patch'
   patchPreset: string
   oscillatorType: OscillatorType
+  color?: NoiseColor
+  interpolation?: NoiseInterpolation
 }
 
 export type InstrumentSource = PatchInstrumentSource | SampledInstrumentSource
@@ -159,7 +166,13 @@ export const parseDawProject = (source: string): DawProject => {
             ((lane.instrument.type === 'patch' &&
               isString(lane.instrument.patchPreset) &&
               isString(lane.instrument.oscillatorType) &&
-              OSCILLATOR_TYPES.includes(lane.instrument.oscillatorType as OscillatorType)) ||
+              OSCILLATOR_TYPES.includes(lane.instrument.oscillatorType as OscillatorType) &&
+              (lane.instrument.color === undefined ||
+                NOISE_COLORS.includes(lane.instrument.color as NoiseColor)) &&
+              (lane.instrument.interpolation === undefined ||
+                NOISE_INTERPOLATIONS.includes(
+                  lane.instrument.interpolation as NoiseInterpolation,
+                ))) ||
               (lane.instrument.type === 'samples' &&
                 isString(lane.instrument.url) &&
                 isString(lane.instrument.instrument) &&
@@ -230,6 +243,10 @@ export const serializeDawProject = (project: DawProject): string => {
                   type: 'patch',
                   patchPreset: lane.instrument.patchPreset,
                   oscillatorType: lane.instrument.oscillatorType,
+                  ...(lane.instrument.color === undefined ? {} : { color: lane.instrument.color }),
+                  ...(lane.instrument.interpolation === undefined
+                    ? {}
+                    : { interpolation: lane.instrument.interpolation }),
                 }
               : {
                   type: 'samples',

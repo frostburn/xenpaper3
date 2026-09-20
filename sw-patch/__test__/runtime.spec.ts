@@ -364,6 +364,47 @@ describe('SW Patch runtime', () => {
     expect(worklets.at(-4)?.port.postMessage).toHaveBeenCalledTimes(completedSourceMessages!)
   })
 
+  it('configures driven colored noise worklets without replacing simple noise', () => {
+    const worklets: Array<{
+      name: string
+      options: AudioWorkletNodeOptions
+      parameters: Map<string, { value: number }>
+    }> = []
+    class MockAudioWorkletNode extends EventTarget {
+      port = { onmessage: null, postMessage: vi.fn<(message: unknown) => void>() }
+      parameters = new Map<string, { value: number }>([
+        ['frequency', { value: 440 }],
+        ['detune', { value: 0 }],
+      ])
+      disconnect = vi.fn<() => void>()
+      constructor(
+        _context: BaseAudioContext,
+        readonly name: string,
+        readonly options: AudioWorkletNodeOptions,
+      ) {
+        super()
+        worklets.push(this)
+      }
+    }
+    vi.stubGlobal('AudioWorkletNode', MockAudioWorkletNode)
+    const patch = createPatch(
+      "fn noise():\n    ret DrivenNoiseNode(color = 'pink', interpolation = 'linear', frequency = 2kHz, detune = 100c)\n",
+      { currentTime: 0 } as BaseAudioContext,
+    )
+
+    const noise = (patch.noise as PatchFunction)() as MockAudioWorkletNode
+
+    expect(noise.name).toBe('sw-patch-driven-noise')
+    expect(noise.options).toEqual({
+      numberOfInputs: 0,
+      processorOptions: { color: 'pink', interpolation: 'linear' },
+    })
+    expect(noise.parameters.get('frequency')?.value).toBe(2_000)
+    expect(noise.parameters.get('detune')?.value).toBe(100)
+    expect(noise).toHaveProperty('frequency', noise.parameters.get('frequency'))
+    expect(noise).toHaveProperty('detune', noise.parameters.get('detune'))
+  })
+
   it('uses one shared native noise buffer when requested for offline rendering', () => {
     const samples = new Float32Array(48_000 * 4.013)
     const buffer = {

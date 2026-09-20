@@ -1,0 +1,38 @@
+config color: string = 'white'
+config interpolation: string = 'constant'
+
+fn on(
+    destination: AudioNode,
+    start: Instant,
+    pitch: AudioSignal<Pitch>,
+    velocity: Level,
+    attack: Duration = 100ms,
+    decay: Duration = 200ms,
+    sustain: Level = 70%,
+    release: Duration = 300ms,
+):
+    noise = DrivenNoiseNode(color = color, interpolation = interpolation)
+    attackEnv = GainNode(gain = 0)
+    decayEnv = GainNode(gain = 1)
+
+    until noise:ended:
+        noise -> attackEnv -> decayEnv -> destination
+        pitch -> noise.detune
+
+    noise.start(start)
+
+    @(start) attackEnv.gain = 0
+    @(start + attack; linear) attackEnv.gain = velocity
+
+    @(start + attack) decayEnv.gain = 1
+    @(start + attack; target decay) decayEnv.gain = sustain
+
+    ret once fn off(end: Instant):
+        @(end; hold) attackEnv.gain
+        @(end; hold) decayEnv.gain
+        @(end; target release) decayEnv.gain = 0
+
+        cutOff = end + 5 * release
+        noise.stop(cutOff)
+
+        ret cutOff

@@ -7,8 +7,12 @@ import type { SourceRange } from '../../daw/score'
 import { easeGlissando } from '../../daw/easing'
 import {
   beatToNumber,
+  NOISE_COLORS,
+  NOISE_INTERPOLATIONS,
   OSCILLATOR_TYPES,
   type ClipDisplayMode,
+  type NoiseColor,
+  type NoiseInterpolation,
   type OscillatorType,
   type PatchInstrumentSource,
   type PitchedInstrumentLane,
@@ -50,10 +54,28 @@ const emit = defineEmits<{
 const sampleUrl = ref(props.lane.instrument.type === 'samples' ? props.lane.instrument.url : '')
 const sampleError = ref('')
 const loadingSamples = ref(false)
-type InstrumentMode = 'patch' | 'samples'
-const instrumentMode = ref<InstrumentMode>(props.lane.instrument.type)
+type InstrumentMode = 'patch' | 'driven-noise' | 'samples'
+const instrumentModeFor = (instrument: PitchedInstrumentLane['instrument']): InstrumentMode =>
+  instrument.type === 'patch' && instrument.patchPreset === 'driven-noise'
+    ? 'driven-noise'
+    : instrument.type
+const instrumentMode = ref<InstrumentMode>(instrumentModeFor(props.lane.instrument))
+const drivenNoiseInstrument = ref<PatchInstrumentSource>({
+  type: 'patch',
+  patchPreset: 'driven-noise',
+  oscillatorType:
+    props.lane.instrument.type === 'patch' ? props.lane.instrument.oscillatorType : 'sawtooth',
+  color:
+    props.lane.instrument.type === 'patch' && props.lane.instrument.patchPreset === 'driven-noise'
+      ? (props.lane.instrument.color ?? 'white')
+      : 'white',
+  interpolation:
+    props.lane.instrument.type === 'patch' && props.lane.instrument.patchPreset === 'driven-noise'
+      ? (props.lane.instrument.interpolation ?? 'constant')
+      : 'constant',
+})
 const patchInstrument = ref<PatchInstrumentSource>(
-  props.lane.instrument.type === 'patch'
+  props.lane.instrument.type === 'patch' && props.lane.instrument.patchPreset !== 'driven-noise'
     ? { ...props.lane.instrument }
     : { type: 'patch', patchPreset: 'default', oscillatorType: 'sawtooth' },
 )
@@ -61,9 +83,15 @@ const patchInstrument = ref<PatchInstrumentSource>(
 watch(
   () => props.lane.instrument,
   (source) => {
-    instrumentMode.value = source.type
+    instrumentMode.value = instrumentModeFor(source)
     if (source.type === 'samples') {
       sampleUrl.value = source.url
+    } else if (source.patchPreset === 'driven-noise') {
+      drivenNoiseInstrument.value = {
+        ...source,
+        color: source.color ?? 'white',
+        interpolation: source.interpolation ?? 'constant',
+      }
     } else {
       patchInstrument.value = { ...source }
     }
@@ -74,11 +102,20 @@ const selectInstrumentMode = (mode: InstrumentMode) => {
   instrumentMode.value = mode
   sampleError.value = ''
   if (mode === 'patch') emit('update-instrument', { ...patchInstrument.value })
+  if (mode === 'driven-noise') {
+    drivenNoiseInstrument.value.oscillatorType = patchInstrument.value.oscillatorType
+    emit('update-instrument', { ...drivenNoiseInstrument.value })
+  }
 }
 
 const updateOscillator = (oscillatorType: OscillatorType) => {
   patchInstrument.value = { ...patchInstrument.value, oscillatorType }
   emit('update-instrument', { ...patchInstrument.value })
+}
+
+const updateDrivenNoise = (updates: { color?: NoiseColor; interpolation?: NoiseInterpolation }) => {
+  drivenNoiseInstrument.value = { ...drivenNoiseInstrument.value, ...updates }
+  emit('update-instrument', { ...drivenNoiseInstrument.value })
 }
 
 const importSampleJson = (text: string, url = '') => {
@@ -329,6 +366,15 @@ const clipPreview = (clipId: string) => pianoRoll.value.notesByClip[clipId]!
         <label
           ><input
             type="radio"
+            value="driven-noise"
+            :checked="instrumentMode === 'driven-noise'"
+            @change="selectInstrumentMode('driven-noise')"
+          />
+          Driven noise</label
+        >
+        <label
+          ><input
+            type="radio"
             value="samples"
             :checked="instrumentMode === 'samples'"
             @change="selectInstrumentMode('samples')"
@@ -356,7 +402,11 @@ const clipPreview = (clipId: string) => pianoRoll.value.notesByClip[clipId]!
           </select>
         </label>
       </section>
-      <section v-else class="instrument-source" aria-label="Sampled instrument source">
+      <section
+        v-else-if="instrumentMode === 'samples'"
+        class="instrument-source"
+        aria-label="Sampled instrument source"
+      >
         <strong>{{
           lane.instrument.type === 'samples'
             ? 'Dough samples loaded'
@@ -400,6 +450,37 @@ const clipPreview = (clipId: string) => pianoRoll.value.notesByClip[clipId]!
               :key="name"
             >
               {{ name }}
+            </option>
+          </select>
+        </label>
+      </section>
+      <section v-else class="instrument-source" aria-label="Driven noise instrument source">
+        <strong>Driven noise SW Patch</strong>
+        <label
+          >Color
+          <select
+            aria-label="Noise color"
+            :value="drivenNoiseInstrument.color"
+            @change="
+              updateDrivenNoise({ color: ($event.target as HTMLSelectElement).value as NoiseColor })
+            "
+          >
+            <option v-for="color in NOISE_COLORS" :key="color">{{ color }}</option>
+          </select>
+        </label>
+        <label
+          >Interpolation
+          <select
+            aria-label="Noise interpolation"
+            :value="drivenNoiseInstrument.interpolation"
+            @change="
+              updateDrivenNoise({
+                interpolation: ($event.target as HTMLSelectElement).value as NoiseInterpolation,
+              })
+            "
+          >
+            <option v-for="interpolation in NOISE_INTERPOLATIONS" :key="interpolation">
+              {{ interpolation }}
             </option>
           </select>
         </label>
