@@ -261,7 +261,7 @@ class SwPatchDrivenNoiseProcessor extends SwPatchScheduledSourceProcessor {
     const white = this.whiteSample()
     if (this.color === 'brown') {
       this.brown = (this.brown + 0.02 * white) / 1.02
-      return Math.max(-1, Math.min(1, this.brown * 3.5))
+      return Math.max(-1, Math.min(1, this.brown * 4))
     }
     if (this.color === 'violet') {
       const violet = (white - this.previousWhite) / 2
@@ -271,7 +271,7 @@ class SwPatchDrivenNoiseProcessor extends SwPatchScheduledSourceProcessor {
     if (this.color === 'pink' || this.color === 'blue') {
       const pink = this.pinkSample()
       if (this.color === 'pink') return pink
-      const blue = (pink - this.previousPink) / 2
+      const blue = (pink - this.previousPink) * 1.5
       this.previousPink = pink
       return blue
     }
