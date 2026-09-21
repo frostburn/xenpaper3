@@ -161,6 +161,7 @@ const selectedClipDiagnostics = computed(() => {
       initialization,
       clip.start,
       project.value.globalTrack.timeSignatureChanges[0],
+      globalMeterChanges.value,
     )
   } catch {
     return []
@@ -194,6 +195,7 @@ const clipNotes = computed(() => {
                 initialization,
                 clip.start,
                 project.value.globalTrack.timeSignatureChanges[0],
+                globalMeterChanges.value,
               )
             : parseClipNotes(
                 clip.source,
@@ -201,6 +203,7 @@ const clipNotes = computed(() => {
                 initialization,
                 clip.start,
                 project.value.globalTrack.timeSignatureChanges[0],
+                globalMeterChanges.value,
               ),
         )
       } catch {
@@ -283,6 +286,7 @@ watchEffect(() => {
           initialization,
           signature,
           clip.start,
+          globalMeterChanges.value,
         )
       } catch {
         // A clip may contain incomplete syntax while it is being edited. Isolate that
@@ -895,6 +899,7 @@ onBeforeUnmount(() => {
               :lane="lane"
               :global-source="project.globalTrack.source"
               :time-signature="project.globalTrack.timeSignatureChanges[0]"
+              :time-signature-changes="globalMeterChanges"
               :selected-clip-id="selectedLaneId === lane.id ? selectedClipId : undefined"
               :pixels-per-beat="pixelsPerBeat"
               :scroll-left="scrollLeft"
@@ -926,6 +931,7 @@ onBeforeUnmount(() => {
                 :lane="lane"
                 :global-source="project.globalTrack.source"
                 :time-signature="project.globalTrack.timeSignatureChanges[0]"
+                :time-signature-changes="globalMeterChanges"
                 :selected-clip-id="selectedLaneId === lane.id ? selectedClipId : undefined"
                 :pixels-per-beat="pixelsPerBeat"
                 :scroll-left="scrollLeft"

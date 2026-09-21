@@ -17,7 +17,15 @@ import {
 import { drumNames } from '../../sw-patch'
 import { parseStrudelSampleMap, strudelSampleNames, type StrudelSampleMap } from '../../sw-seq'
 import DRUMKIT_PATCH_SOURCE from '../patches/drumkit.swpatch?raw'
-import { beat, beatToNumber, type Beat, type DawProject, type InstrumentLane } from './project'
+import {
+  beat,
+  beatToNumber,
+  type Beat,
+  type DawProject,
+  type InstrumentLane,
+  type TimeSignatureChange,
+} from './project'
+import { globalTimeSignatureChanges } from './timeline'
 
 export interface EnvelopeSettings {
   readonly attack: number
@@ -285,6 +293,7 @@ export const parseClipNotes = (
   initialization: SourceInitialization = {},
   clipOffset: Beat = beat(0),
   timeSignature?: { readonly numerator: number; readonly denominator: number },
+  timeSignatureChanges?: readonly TimeSignatureChange[],
 ): ScheduledLaneNote[] => {
   const sourceIdentity = 'xenpaper:clip-source'
   const result = expandToBeatEvents(parse(source, { grammarSource: sourceIdentity }), {
@@ -293,6 +302,7 @@ export const parseClipNotes = (
     initializationShape: initialization.shape,
     beatOffset: clipOffset,
     timeSignature,
+    timeSignatureChanges,
   })
   const errors = result.diagnostics.filter(({ severity }) => severity === 'error')
   if (errors.length) throw new Error(errors.map(({ message }) => message).join('\n'))
@@ -334,6 +344,7 @@ export const clipSourceDiagnostics = (
   initialization: SourceInitialization = {},
   clipOffset: Beat = beat(0),
   timeSignature?: { readonly numerator: number; readonly denominator: number },
+  timeSignatureChanges?: readonly TimeSignatureChange[],
 ): readonly Diagnostic[] => {
   const program = samples.length
     ? lowerDrumSamples(parse(source, { drumSamples: samples }))
@@ -344,6 +355,7 @@ export const clipSourceDiagnostics = (
     initializationShape: initialization.shape,
     beatOffset: clipOffset,
     timeSignature,
+    timeSignatureChanges,
   }).diagnostics
 }
 
@@ -355,6 +367,7 @@ export const parseDrumClipNotes = (
   initialization: SourceInitialization = {},
   clipOffset: Beat = beat(0),
   timeSignature?: { readonly numerator: number; readonly denominator: number },
+  timeSignatureChanges?: readonly TimeSignatureChange[],
 ): ScheduledLaneNote[] => {
   const sourceIdentity = 'xenpaper:clip-source'
   const program = lowerDrumSamples(
@@ -366,6 +379,7 @@ export const parseDrumClipNotes = (
     initializationShape: initialization.shape,
     beatOffset: clipOffset,
     timeSignature,
+    timeSignatureChanges,
   })
   const errors = result.diagnostics.filter(({ severity }) => severity === 'error')
   if (errors.length) throw new Error(errors.map(({ message }) => message).join('\n'))
@@ -394,6 +408,7 @@ export const sourceClipLength = (
   initialization: SourceInitialization = {},
   timeSignature?: { readonly numerator: number; readonly denominator: number },
   clipOffset: Beat = beat(0),
+  timeSignatureChanges?: readonly TimeSignatureChange[],
 ): Beat => {
   const program = samples.length
     ? lowerDrumSamples(parse(source, { drumSamples: samples }))
@@ -404,6 +419,7 @@ export const sourceClipLength = (
     initializationShape: initialization.shape,
     timeSignature,
     beatOffset: clipOffset,
+    timeSignatureChanges,
   })
   if (!('score' in result) || result.diagnostics.some(({ severity }) => severity === 'error'))
     return defaultBar
@@ -417,6 +433,7 @@ export const parseLaneNotes = (
   lane: InstrumentLane,
   globalInitialization: SourceInitialization = {},
   timeSignature?: { readonly numerator: number; readonly denominator: number },
+  timeSignatureChanges?: readonly TimeSignatureChange[],
 ): ScheduledLaneNote[] => {
   const samples = drumSamplesForLane(lane)
   const laneInitialization = compileSourceInitialization(lane.source, globalInitialization)
@@ -430,6 +447,7 @@ export const parseLaneNotes = (
           laneInitialization,
           clip.start,
           timeSignature,
+          timeSignatureChanges,
         )
       : parseClipNotes(
           clip.source,
@@ -437,6 +455,7 @@ export const parseLaneNotes = (
           laneInitialization,
           clip.start,
           timeSignature,
+          timeSignatureChanges,
         )
     return clipNotes.map((event) => ({ ...event, beat: clipStart + event.beat }))
   })
@@ -447,7 +466,10 @@ export const parseLaneNotes = (
 export const parseProjectScoreNotes = (project: DawProject): ScheduledLaneNote[] => {
   const globalInitialization = compileSourceInitialization(project.globalTrack.source, {}, true)
   const timeSignature = project.globalTrack.timeSignatureChanges[0]
+  const timeSignatureChanges = globalTimeSignatureChanges(project.globalTrack.source, timeSignature!)
   return project.instrumentLanes
-    .flatMap((lane) => parseLaneNotes(lane, globalInitialization, timeSignature))
+    .flatMap((lane) =>
+      parseLaneNotes(lane, globalInitialization, timeSignature, timeSignatureChanges),
+    )
     .sort((left, right) => left.beat - right.beat)
 }

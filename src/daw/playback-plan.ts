@@ -6,7 +6,7 @@ import {
   type EnvelopeSettings,
   type ScheduledLaneNote,
 } from './score'
-import { TempoMap } from './timeline'
+import { globalTimeSignatureChanges, TempoMap } from './timeline'
 
 const GLISSANDO_SAMPLES_PER_SECOND = 120
 
@@ -174,6 +174,10 @@ export const createPlaybackPlan = (project: DawProject, fromBeat = 0): PlaybackP
   assertPlaybackStart(fromBeat)
   const tempoMap = TempoMap.fromProject(project)
   const globalInitialization = compileSourceInitialization(project.globalTrack.source, {}, true)
+  const timeSignatureChanges = globalTimeSignatureChanges(
+    project.globalTrack.source,
+    project.globalTrack.timeSignatureChanges[0]!,
+  )
   let endBeat = fromBeat
   const lanes: PlaybackLane[] = []
 
@@ -183,6 +187,7 @@ export const createPlaybackPlan = (project: DawProject, fromBeat = 0): PlaybackP
       lane,
       globalInitialization,
       project.globalTrack.timeSignatureChanges[0],
+      timeSignatureChanges,
     )) {
       const window = notePlaybackWindow(note.beat, note.duration, fromBeat)
       if (!window) continue

@@ -12,6 +12,7 @@ import {
   type ClipDisplayMode,
   type DrumkitSource,
   type DrumLane,
+  type TimeSignatureChange,
   type SourceClip,
 } from '../../daw/project'
 import InstrumentLaneComponent from './InstrumentLane.vue'
@@ -20,6 +21,7 @@ const props = defineProps<{
   lane: DrumLane
   globalSource?: string
   timeSignature?: { readonly numerator: number; readonly denominator: number }
+  timeSignatureChanges?: readonly TimeSignatureChange[]
   selectedClipId?: string
   pixelsPerBeat: number
   scrollLeft: number
@@ -151,6 +153,7 @@ const eventsByClip = computed(() => {
             initialization,
             clip.start,
             props.timeSignature,
+            props.timeSignatureChanges,
           ),
         ]
       } catch {

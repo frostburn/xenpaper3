@@ -17,6 +17,7 @@ import {
   type PatchInstrumentSource,
   type PitchedInstrumentLane,
   type SourceClip,
+  type TimeSignatureChange,
 } from '../../daw/project'
 import InstrumentLaneComponent from './InstrumentLane.vue'
 
@@ -24,6 +25,7 @@ const props = defineProps<{
   lane: PitchedInstrumentLane
   globalSource?: string
   timeSignature?: { readonly numerator: number; readonly denominator: number }
+  timeSignatureChanges?: readonly TimeSignatureChange[]
   selectedClipId?: string
   pixelsPerBeat: number
   scrollLeft: number
@@ -204,6 +206,7 @@ const pianoRoll = computed(() => {
           initialization,
           clip.start,
           props.timeSignature,
+          props.timeSignatureChanges,
         ),
       }
     } catch {

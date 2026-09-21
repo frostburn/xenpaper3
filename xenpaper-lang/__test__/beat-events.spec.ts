@@ -63,6 +63,21 @@ describe('beat event expansion', () => {
     expect('score' in result && result.score.duration.toFraction()).toBe('3')
   })
 
+  it('resolves bar rests and barlines against inherited meter changes', () => {
+    const options = {
+      beatOffset: new Fraction(0),
+      timeSignature: { numerator: 4, denominator: 4 },
+      timeSignatureChanges: [
+        { beat: new Fraction(0), numerator: 4, denominator: 4 },
+        { beat: new Fraction(4), numerator: 5, denominator: 4 },
+      ],
+    }
+    const result = expandToBeatEvents(parse('1;|2;|'), options)
+
+    expect(result.diagnostics).toEqual([])
+    expect('score' in result && result.score.duration.toFraction()).toBe('9')
+  })
+
   it('compares the sounding value of root-relative absolute pitches', () => {
     expect(audibleResult('C')).not.toEqual(audibleResult('{root = D} C'))
   })

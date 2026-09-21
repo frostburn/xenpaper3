@@ -176,6 +176,32 @@ describe('DAW project model', () => {
     expect(sourceClipLength(source, beat(4), [], {}, signature)).toEqual(beat(12))
   })
 
+  it('uses global meter changes for clip bar rests and barline diagnostics', () => {
+    const signature = { numerator: 4, denominator: 4 }
+    const changes = [
+      { id: 'four-four', beat: beat(0), ...signature },
+      { id: 'five-four', beat: beat(4), numerator: 5, denominator: 4 },
+      { id: 'three-four', beat: beat(14), numerator: 3, denominator: 4 },
+    ]
+
+    const crossingSource = 'C;|D;|'
+    expect(
+      parseClipNotes(crossingSource, Infinity, {}, beat(0), signature, changes).map(
+        ({ beat }) => beat,
+      ),
+    ).toEqual([0, 4])
+    expect(clipSourceDiagnostics(crossingSource, [], {}, beat(0), signature, changes)).toEqual([])
+    expect(sourceClipLength(crossingSource, beat(4), [], {}, signature, beat(0), changes)).toEqual(
+      beat(9),
+    )
+
+    const laterSource = 'C==|'
+    expect(clipSourceDiagnostics(laterSource, [], {}, beat(14), signature, changes)).toEqual([])
+    expect(sourceClipLength(laterSource, beat(4), [], {}, signature, beat(14), changes)).toEqual(
+      beat(3),
+    )
+  })
+
   it('marks only the currently playing parts of a source token', () => {
     const wrapper = mount(XenpaperSourceHighlight, {
       props: { source: 'C4 D', playingRanges: [{ start: 0, end: 1 }] },
