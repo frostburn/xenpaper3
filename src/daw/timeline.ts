@@ -1,4 +1,5 @@
 import { expandToBeatEvents, parse } from '../../xenpaper-lang'
+import { Fraction } from 'xen-dev-utils/fraction'
 import {
   beatToNumber,
   type DawProject,
@@ -176,7 +177,7 @@ export const globalTempoChanges = (
   let index = 0
   for (const event of result.score.events) {
     if (event.kind !== 'marker' || event.marker !== 'tempo') continue
-    const bpm = Number(event.label)
+    const bpm = new Fraction(event.label).valueOf()
     if (!Number.isFinite(bpm) || bpm <= 0) continue
     const position = event.start.valueOf()
     byBeat.set(position, {

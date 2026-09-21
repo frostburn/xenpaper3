@@ -28,6 +28,16 @@ describe('DAW playback planning', () => {
     ])
   })
 
+  it('preserves fractional BPM values emitted as exact fraction labels', () => {
+    const project = createDefaultProject()
+    project.globalTrack.source = ';@tempo(123.5bpm)'
+
+    expect(TempoMap.fromProject(project).points.map(({ beat, bpm }) => ({ beat, bpm }))).toEqual([
+      { beat: 0, bpm: 120 },
+      { beat: 4, bpm: 123.5 },
+    ])
+  })
+
   it('keeps score data C-relative and converts pitch only at the SW Patch boundary', () => {
     const project = createDefaultProject()
     project.instrumentLanes[0]!.clips.push({
