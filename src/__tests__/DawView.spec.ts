@@ -176,6 +176,32 @@ describe('DAW project model', () => {
     expect(sourceClipLength(source, beat(4), [], {}, signature)).toEqual(beat(12))
   })
 
+  it('uses global meter changes for clip bar rests and barline diagnostics', () => {
+    const signature = { numerator: 4, denominator: 4 }
+    const changes = [
+      { id: 'four-four', beat: beat(0), ...signature },
+      { id: 'five-four', beat: beat(4), numerator: 5, denominator: 4 },
+      { id: 'three-four', beat: beat(14), numerator: 3, denominator: 4 },
+    ]
+
+    const crossingSource = 'C;|D;|'
+    expect(
+      parseClipNotes(crossingSource, Infinity, {}, beat(0), signature, changes).map(
+        ({ beat }) => beat,
+      ),
+    ).toEqual([0, 4])
+    expect(clipSourceDiagnostics(crossingSource, [], {}, beat(0), signature, changes)).toEqual([])
+    expect(sourceClipLength(crossingSource, beat(4), [], {}, signature, beat(0), changes)).toEqual(
+      beat(9),
+    )
+
+    const laterSource = 'C==|'
+    expect(clipSourceDiagnostics(laterSource, [], {}, beat(14), signature, changes)).toEqual([])
+    expect(sourceClipLength(laterSource, beat(4), [], {}, signature, beat(14), changes)).toEqual(
+      beat(3),
+    )
+  })
+
   it('marks only the currently playing parts of a source token', () => {
     const wrapper = mount(XenpaperSourceHighlight, {
       props: { source: 'C4 D', playingRanges: [{ start: 0, end: 1 }] },
@@ -592,7 +618,7 @@ describe('DAW project model', () => {
     expect(notes[1]!.envelope).toEqual({ attack: 0.03, decay: 0.4, sustain: 0.9, release: 0.8 })
   })
 
-  it('rejects duration-bearing global and lane initialization sources', () => {
+  it('rejects pitch-bearing global and duration-bearing lane initialization sources', () => {
     const project = createDefaultProject()
     project.instrumentLanes[0]!.clips.push({
       id: 'clip',
@@ -602,7 +628,7 @@ describe('DAW project model', () => {
     })
     project.globalTrack.source = 'C'
     expect(() => parseProjectNotes(project)).toThrow(
-      'Initialization sources cannot contain duration-bearing expressions.',
+      'Initialization sources cannot contain pitch-bearing expressions.',
     )
 
     project.globalTrack.source = ''
@@ -1343,6 +1369,19 @@ describe('DawView', () => {
     expect(wrapper.get('button.clip').attributes('style')).toContain('width: 128px')
   })
 
+  it('highlights off-cycle barlines in the global source', async () => {
+    const wrapper = mount(DawView)
+    const source = wrapper.get('[aria-label="Global source"]')
+
+    await source.setValue('C==|')
+    await source.trigger('blur')
+    expect(wrapper.get('.global-lane [data-highlight="warning"]').text()).toBe('|')
+
+    await source.setValue('.... @time(3/4) C==|')
+    await source.trigger('blur')
+    expect(wrapper.find('.global-lane [data-highlight="warning"]').exists()).toBe(false)
+  })
+
   it('resizes a MOS clip using the global source context', async () => {
     const wrapper = mount(DawView)
     await wrapper.get('[aria-label="Global source"]').setValue('MOS{5L4s}')
@@ -1492,6 +1531,40 @@ describe('DawView', () => {
     expect(notes[1]!.classes()).not.toContain('inaudible')
     expect(notes[2]!.classes()).toContain('inaudible')
     expect((notes[2]!.element as HTMLElement).style.top).toBe('0%')
+  })
+
+  it('renders pitched previews with duration-bearing global meter sources', () => {
+    const project = createDefaultProject()
+    const lane = project.instrumentLanes[0]! as PitchedInstrumentLane
+    lane.clips = [{ id: 'meter-preview', start: beat(4), length: beat(1), source: 'C' }]
+    const wrapper = mount(PitchedLane, {
+      props: {
+        lane,
+        globalSource: ';@time(5/4)',
+        pixelsPerBeat: 64,
+        scrollLeft: 0,
+        displayMode: 'piano-roll',
+      },
+    })
+
+    expect(wrapper.findAll('[aria-label="Piano roll preview"] i')).toHaveLength(1)
+  })
+
+  it('renders drum previews with duration-bearing global meter sources', () => {
+    const project = createDefaultProject()
+    const lane = createDrumLane(project)
+    lane.clips = [{ id: 'meter-preview', start: beat(4), length: beat(1), source: 'bd' }]
+    const wrapper = mount(DrumLane, {
+      props: {
+        lane,
+        globalSource: ';@time(5/4)',
+        pixelsPerBeat: 64,
+        scrollLeft: 0,
+        displayMode: 'piano-roll',
+      },
+    })
+
+    expect(wrapper.findAll('[aria-label="Drum pattern preview"] i')).toHaveLength(1)
   })
 
   it('does not let an extreme pitch fold an audible clip out of view', () => {

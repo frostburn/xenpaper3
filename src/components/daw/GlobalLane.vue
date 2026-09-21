@@ -1,8 +1,9 @@
 <script setup lang="ts">
+import type { Diagnostic } from '../../../xenpaper-lang'
 import type { GlobalTrack } from '../../daw/project'
 import XenpaperSourceEditor from './XenpaperSourceEditor.vue'
 
-defineProps<{ track: GlobalTrack }>()
+defineProps<{ track: GlobalTrack; diagnostics?: readonly Diagnostic[] }>()
 defineEmits<{
   'update-source': [source: string]
   'update-tempo': [bpm: number]
@@ -17,6 +18,7 @@ defineEmits<{
       <XenpaperSourceEditor
         editor-label="Global source"
         :source="track.source"
+        :diagnostics="diagnostics"
         :rows="3"
         @update:source="$emit('update-source', $event)"
       />

@@ -2064,7 +2064,24 @@ export function evaluateScoreSemantics(
   const result = visitor.visit(node)
   if (!('shape' in result)) return result
   const barRestDiagnostics: Diagnostic[] = []
-  type MeasureState = { offset: Fraction; length?: Fraction; origin?: Fraction }
+  type MeasureState = {
+    offset: Fraction
+    length?: Fraction
+    origin?: Fraction
+    authoredSignature?: boolean
+  }
+  const inheritedMeasureAt = (offset: Fraction) => {
+    let prevailing: { length: Fraction; origin: Fraction } | undefined
+    for (const change of options.timeSignatureChanges ?? []) {
+      const origin = new Fraction(change.beat)
+      if (origin.compare(offset) > 0) break
+      prevailing = {
+        length: new Fraction(change.numerator * 4, change.denominator),
+        origin,
+      }
+    }
+    return prevailing
+  }
   const removeParallelPadding = (shape: ScoreShape): ScoreShape => {
     if (shape.kind !== 'sequence' || shape.children.length !== 2) return shape
     const padding = shape.children[1]!
@@ -2076,8 +2093,10 @@ export function evaluateScoreSemantics(
     if (shape.kind === 'time-signature') {
       state.length = new Fraction(shape.numerator * 4, shape.denominator)
       state.origin = new Fraction(state.offset)
+      state.authoredSignature = true
       resolved = shape
     } else if (shape.kind === 'rest' && shape.barRest) {
+      if (!state.authoredSignature) Object.assign(state, inheritedMeasureAt(state.offset))
       let duration = new Fraction(0)
       if (state.length && state.origin) {
         const elapsed = state.offset.sub(state.origin)

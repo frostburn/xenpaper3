@@ -7,6 +7,7 @@ import PitchedLane from '../components/daw/PitchedLane.vue'
 import InstrumentLane from '../components/daw/InstrumentLane.vue'
 import XenpaperSourceEditor from '../components/daw/XenpaperSourceEditor.vue'
 import ArrangementTimeline from '../components/daw/ArrangementTimeline.vue'
+import { globalTimeSignatureChanges, measureBoundaries } from '../daw/timeline'
 import { beat, beatToNumber, createClip, createDefaultProject } from '../daw/project'
 
 enableAutoUnmount(afterEach)
@@ -299,6 +300,24 @@ describe('Arrangement timeline', () => {
     follow: true,
   }
 
+  it('derives measure highlights from duration-bearing global meter source', () => {
+    const changes = globalTimeSignatureChanges(';@time(5/4);;@time(3/4);;', {
+      id: 'default-time',
+      beat: beat(0),
+      numerator: 4,
+      denominator: 4,
+    })
+
+    expect(
+      changes.map(({ beat, numerator, denominator }) => [beat.valueOf(), numerator, denominator]),
+    ).toEqual([
+      [0, 4, 4],
+      [4, 5, 4],
+      [14, 3, 4],
+    ])
+    expect(measureBoundaries(changes, 20)).toEqual([0, 4, 9, 14, 17, 20])
+  })
+
   it('maps native scroll and ruler coordinates to the same beat', async () => {
     const wrapper = mount(ArrangementTimeline, { props })
     const scrollbar = wrapper.get<HTMLElement>('[aria-label="Timeline scroll"]')
@@ -342,6 +361,21 @@ describe('Arrangement timeline', () => {
       props: { ...props, endBeat: 1_000_000, scrollLeft: 63_900_000 },
     })
     expect(wrapper.findAll('.ruler-mark').length).toBeLessThan(20)
+  })
+
+  it('only renders measure barlines within the visible timeline', () => {
+    const barlines = Array.from({ length: 250_001 }, (_, index) => index * 4)
+    const wrapper = mount(ArrangementTimeline, {
+      props: { ...props, endBeat: 1_000_000, scrollLeft: 640_000, barlines },
+    })
+
+    const rendered = wrapper.findAll('.measure-barline')
+    expect(rendered).toHaveLength(3)
+    expect(rendered.map((barline) => barline.attributes('style'))).toEqual([
+      'left: 0px;',
+      'left: 256px;',
+      'left: 512px;',
+    ])
   })
 
   it('keeps ordinary wheel scrolling vertical and uses Shift-wheel for panning', () => {

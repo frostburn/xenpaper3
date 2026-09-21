@@ -20,6 +20,7 @@ import PitchedLane from '../components/daw/PitchedLane.vue'
 import TransportControls from '../components/daw/TransportControls.vue'
 import TimeDomainVisualiser from '../components/TimeDomainVisualiser.vue'
 import { DawAudioEngine, renderProjectToWavBlob } from '../daw/audio-engine'
+import { globalTimeSignatureChanges, measureBoundaries } from '../daw/timeline'
 import { demoProjects } from '../demo-projects'
 import {
   clipSourceDiagnostics,
@@ -152,7 +153,7 @@ const selectedClipDiagnostics = computed(() => {
   const clip = selectedClip.value
   if (!lane || !clip) return []
   try {
-    const global = compileSourceInitialization(project.value.globalTrack.source)
+    const global = compileSourceInitialization(project.value.globalTrack.source, {}, true)
     const initialization = compileSourceInitialization(lane.source, global)
     return clipSourceDiagnostics(
       clip.source,
@@ -160,6 +161,7 @@ const selectedClipDiagnostics = computed(() => {
       initialization,
       clip.start,
       project.value.globalTrack.timeSignatureChanges[0],
+      globalMeterChanges.value,
     )
   } catch {
     return []
@@ -169,7 +171,7 @@ const clipNotes = computed(() => {
   const notes = new Map<string, readonly ScheduledLaneNote[]>()
   let global
   try {
-    global = compileSourceInitialization(project.value.globalTrack.source)
+    global = compileSourceInitialization(project.value.globalTrack.source, {}, true)
   } catch {
     return notes
   }
@@ -193,6 +195,7 @@ const clipNotes = computed(() => {
                 initialization,
                 clip.start,
                 project.value.globalTrack.timeSignatureChanges[0],
+                globalMeterChanges.value,
               )
             : parseClipNotes(
                 clip.source,
@@ -200,6 +203,7 @@ const clipNotes = computed(() => {
                 initialization,
                 clip.start,
                 project.value.globalTrack.timeSignatureChanges[0],
+                globalMeterChanges.value,
               ),
         )
       } catch {
@@ -245,12 +249,34 @@ const projectEndBeat = computed(() =>
     ),
   ),
 )
+const globalMeterChanges = computed(() =>
+  globalTimeSignatureChanges(
+    project.value.globalTrack.source,
+    project.value.globalTrack.timeSignatureChanges[0]!,
+  ),
+)
+const timelineBarlines = computed(() =>
+  measureBoundaries(globalMeterChanges.value, projectEndBeat.value + 8),
+)
+const globalSourceDiagnostics = computed(() => {
+  try {
+    return clipSourceDiagnostics(
+      project.value.globalTrack.source,
+      [],
+      {},
+      beat(0),
+      project.value.globalTrack.timeSignatureChanges[0],
+    )
+  } catch {
+    return []
+  }
+})
 watchEffect(() => {
   const signature = project.value.globalTrack.timeSignatureChanges[0]!
   const defaultBar = beat(signature.numerator * 4, signature.denominator)
   let globalInitialization
   try {
-    globalInitialization = compileSourceInitialization(project.value.globalTrack.source)
+    globalInitialization = compileSourceInitialization(project.value.globalTrack.source, {}, true)
   } catch {
     // Keep independently valid clips usable while an initialization source is being edited.
     globalInitialization = undefined
@@ -273,6 +299,7 @@ watchEffect(() => {
           initialization,
           signature,
           clip.start,
+          globalMeterChanges.value,
         )
       } catch {
         // A clip may contain incomplete syntax while it is being edited. Isolate that
@@ -854,6 +881,7 @@ onBeforeUnmount(() => {
           </summary>
           <GlobalLane
             :track="project.globalTrack"
+            :diagnostics="globalSourceDiagnostics"
             @update-source="project.globalTrack.source = $event"
             @update-tempo="project.globalTrack.tempoChanges[0]!.bpm = $event"
             @update-time-signature="
@@ -872,6 +900,7 @@ onBeforeUnmount(() => {
           :end-beat="projectEndBeat"
           :playhead="playhead"
           :playing="playing"
+          :barlines="timelineBarlines"
           @seek="seekPlayback"
         >
           <section
@@ -884,6 +913,7 @@ onBeforeUnmount(() => {
               :lane="lane"
               :global-source="project.globalTrack.source"
               :time-signature="project.globalTrack.timeSignatureChanges[0]"
+              :time-signature-changes="globalMeterChanges"
               :selected-clip-id="selectedLaneId === lane.id ? selectedClipId : undefined"
               :pixels-per-beat="pixelsPerBeat"
               :scroll-left="scrollLeft"
@@ -915,6 +945,7 @@ onBeforeUnmount(() => {
                 :lane="lane"
                 :global-source="project.globalTrack.source"
                 :time-signature="project.globalTrack.timeSignatureChanges[0]"
+                :time-signature-changes="globalMeterChanges"
                 :selected-clip-id="selectedLaneId === lane.id ? selectedClipId : undefined"
                 :pixels-per-beat="pixelsPerBeat"
                 :scroll-left="scrollLeft"

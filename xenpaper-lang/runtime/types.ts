@@ -64,6 +64,12 @@ export interface ScoreShapeOptions {
   readonly directiveExtensions?: readonly DirectiveExtension[]
   /** Prevailing signature before the score starts, aligned to absolute beat zero. */
   readonly timeSignature?: { readonly numerator: number; readonly denominator: number }
+  /** Absolute meter changes inherited from an enclosing project timeline. */
+  readonly timeSignatureChanges?: readonly {
+    readonly beat: FractionValue
+    readonly numerator: number
+    readonly denominator: number
+  }[]
   /** Absolute beat of the score's start when resolving measure-aware notation. */
   readonly beatOffset?: Fraction
   /** Lexical declarations inherited from an enclosing source. */

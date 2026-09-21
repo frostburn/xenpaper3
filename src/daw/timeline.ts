@@ -1,4 +1,10 @@
-import { beatToNumber, type DawProject, type TempoChange } from './project'
+import { expandToBeatEvents, parse } from '../../xenpaper-lang'
+import {
+  beatToNumber,
+  type DawProject,
+  type TempoChange,
+  type TimeSignatureChange,
+} from './project'
 
 const DEFAULT_BPM = 120
 
@@ -95,3 +101,60 @@ export const projectBeatToSeconds = (project: DawProject, targetBeat: number): n
 /** Compatibility helper for callers that do not need to retain a tempo-map snapshot. */
 export const projectSecondsToBeat = (project: DawProject, seconds: number): number =>
   TempoMap.fromProject(project).secondsToBeat(seconds)
+
+/**
+ * Interpret the duration-bearing global source as a meter timeline. The time signature
+ * selected in the project UI prevails until the source reaches an authored @time directive.
+ */
+export const globalTimeSignatureChanges = (
+  source: string,
+  initial: TimeSignatureChange,
+): TimeSignatureChange[] => {
+  let result
+  try {
+    result = expandToBeatEvents(parse(source), { timeSignature: initial })
+  } catch {
+    return [initial]
+  }
+  if (!('score' in result) || result.diagnostics.some(({ severity }) => severity === 'error')) {
+    return [initial]
+  }
+
+  const byBeat = new Map<number, TimeSignatureChange>([[beatToNumber(initial.beat), initial]])
+  let index = 0
+  for (const event of result.score.events) {
+    if (event.kind !== 'marker' || event.marker !== 'time-signature') continue
+    const [numerator, denominator] = event.label.split('/').map(Number)
+    if (!numerator || !denominator) continue
+    const position = event.start.valueOf()
+    byBeat.set(position, {
+      id: `global-source-time-${index++}`,
+      beat: event.start,
+      numerator,
+      denominator,
+    })
+  }
+  return [...byBeat.values()].sort(
+    (left, right) => beatToNumber(left.beat) - beatToNumber(right.beat),
+  )
+}
+
+/** Return every measure boundary in a meter timeline up to the requested beat. */
+export const measureBoundaries = (
+  changes: readonly TimeSignatureChange[],
+  endBeat: number,
+): number[] => {
+  const result = new Set<number>()
+  for (let index = 0; index < changes.length; index++) {
+    const change = changes[index]!
+    const start = beatToNumber(change.beat)
+    const end = Math.min(
+      endBeat,
+      changes[index + 1] ? beatToNumber(changes[index + 1]!.beat) : endBeat,
+    )
+    const length = (change.numerator * 4) / change.denominator
+    if (!Number.isFinite(start) || !Number.isFinite(length) || length <= 0) continue
+    for (let beat = start; beat <= end + Number.EPSILON; beat += length) result.add(beat)
+  }
+  return [...result].filter((beat) => beat <= endBeat).sort((left, right) => left - right)
+}

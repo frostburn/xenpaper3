@@ -367,6 +367,19 @@ export function expandToBeatEvents(
       }
     : undefined
   const absoluteOffset = options.beatOffset ?? new Fraction(0)
+  const inheritedSignatureAt = (beat: Fraction) => {
+    let prevailing: { length: Fraction; origin: Fraction } | undefined
+    for (const change of options.timeSignatureChanges ?? []) {
+      const origin = new Fraction(change.beat)
+      if (origin.compare(beat) > 0) break
+      prevailing = {
+        length: new Fraction(change.numerator * 4, change.denominator),
+        origin,
+      }
+    }
+    return prevailing
+  }
+  let authoredSignature = false
   const warnedBarlines = new Set<string>()
   for (const event of structuralEvents) {
     if (event.kind !== 'marker') continue
@@ -375,9 +388,12 @@ export function expandToBeatEvents(
       const [numerator, denominator] = event.label.split('/').map(Number)
       signature = {
         length: new Fraction(numerator! * 4, denominator),
-        origin: options.beatOffset ? new Fraction(0) : absoluteStart,
+        origin: absoluteStart,
       }
-    } else if (event.marker === 'barline' && signature) {
+      authoredSignature = true
+    } else if (event.marker === 'barline') {
+      if (!authoredSignature) signature = inheritedSignatureAt(absoluteStart) ?? signature
+      if (!signature) continue
       const cycles = absoluteStart.sub(signature.origin).div(signature.length)
       const locations = event.origins.map((origin) => origin.location)
       const warningKey = locations
