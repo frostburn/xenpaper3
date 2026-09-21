@@ -78,6 +78,14 @@ describe('beat event expansion', () => {
     expect('score' in result && result.score.duration.toFraction()).toBe('9')
   })
 
+  it('resets the barline cycle where an authored time signature begins', () => {
+    const result = expandToBeatEvents(parse('.... @time(3/4) 1==|'), {
+      timeSignature: { numerator: 4, denominator: 4 },
+    })
+
+    expect(result.diagnostics).toEqual([])
+  })
+
   it('compares the sounding value of root-relative absolute pitches', () => {
     expect(audibleResult('C')).not.toEqual(audibleResult('{root = D} C'))
   })

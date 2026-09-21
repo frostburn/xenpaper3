@@ -258,6 +258,19 @@ const globalMeterChanges = computed(() =>
 const timelineBarlines = computed(() =>
   measureBoundaries(globalMeterChanges.value, projectEndBeat.value + 8),
 )
+const globalSourceDiagnostics = computed(() => {
+  try {
+    return clipSourceDiagnostics(
+      project.value.globalTrack.source,
+      [],
+      {},
+      beat(0),
+      project.value.globalTrack.timeSignatureChanges[0],
+    )
+  } catch {
+    return []
+  }
+})
 watchEffect(() => {
   const signature = project.value.globalTrack.timeSignatureChanges[0]!
   const defaultBar = beat(signature.numerator * 4, signature.denominator)
@@ -868,6 +881,7 @@ onBeforeUnmount(() => {
           </summary>
           <GlobalLane
             :track="project.globalTrack"
+            :diagnostics="globalSourceDiagnostics"
             @update-source="project.globalTrack.source = $event"
             @update-tempo="project.globalTrack.tempoChanges[0]!.bpm = $event"
             @update-time-signature="

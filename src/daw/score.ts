@@ -266,7 +266,9 @@ export const compileSourceInitialization = (
   const containsAttack = (shape: ScoreShape): boolean =>
     shape.kind === 'attack' ||
     ('children' in shape && shape.children.some((child) => containsAttack(child)))
-  if (result.shape.duration.n && (!allowDuration || containsAttack(result.shape)))
+  if (containsAttack(result.shape))
+    throw new Error('Initialization sources cannot contain pitch-bearing expressions.')
+  if (result.shape.duration.n && !allowDuration)
     throw new Error('Initialization sources cannot contain duration-bearing expressions.')
   return {
     pitchContext: result.pitchContext,

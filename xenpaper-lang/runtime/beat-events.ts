@@ -388,7 +388,7 @@ export function expandToBeatEvents(
       const [numerator, denominator] = event.label.split('/').map(Number)
       signature = {
         length: new Fraction(numerator! * 4, denominator),
-        origin: options.beatOffset ? new Fraction(0) : absoluteStart,
+        origin: absoluteStart,
       }
       authoredSignature = true
     } else if (event.marker === 'barline') {

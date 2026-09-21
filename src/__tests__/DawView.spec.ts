@@ -618,7 +618,7 @@ describe('DAW project model', () => {
     expect(notes[1]!.envelope).toEqual({ attack: 0.03, decay: 0.4, sustain: 0.9, release: 0.8 })
   })
 
-  it('rejects duration-bearing global and lane initialization sources', () => {
+  it('rejects pitch-bearing global and duration-bearing lane initialization sources', () => {
     const project = createDefaultProject()
     project.instrumentLanes[0]!.clips.push({
       id: 'clip',
@@ -628,7 +628,7 @@ describe('DAW project model', () => {
     })
     project.globalTrack.source = 'C'
     expect(() => parseProjectNotes(project)).toThrow(
-      'Initialization sources cannot contain duration-bearing expressions.',
+      'Initialization sources cannot contain pitch-bearing expressions.',
     )
 
     project.globalTrack.source = ''
@@ -1367,6 +1367,19 @@ describe('DawView', () => {
     await wrapper.get('textarea[aria-label="Xenpaper clip source"]').trigger('blur')
 
     expect(wrapper.get('button.clip').attributes('style')).toContain('width: 128px')
+  })
+
+  it('highlights off-cycle barlines in the global source', async () => {
+    const wrapper = mount(DawView)
+    const source = wrapper.get('[aria-label="Global source"]')
+
+    await source.setValue('C==|')
+    await source.trigger('blur')
+    expect(wrapper.get('.global-lane [data-highlight="warning"]').text()).toBe('|')
+
+    await source.setValue('.... @time(3/4) C==|')
+    await source.trigger('blur')
+    expect(wrapper.find('.global-lane [data-highlight="warning"]').exists()).toBe(false)
   })
 
   it('resizes a MOS clip using the global source context', async () => {
