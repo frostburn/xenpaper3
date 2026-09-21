@@ -258,6 +258,7 @@ export const compileSourceInitialization = (
 ): SourceInitialization => {
   const result = evaluateProgramSemantics(parse(source), {
     directiveExtensions: ENVELOPE_EXTENSIONS,
+    allowTempoDirective: allowDuration,
     ...inheritedScoreOptions(parent),
   })
   const errors = result.diagnostics.filter(({ severity }) => severity === 'error')
@@ -347,6 +348,7 @@ export const clipSourceDiagnostics = (
   clipOffset: Beat = beat(0),
   timeSignature?: { readonly numerator: number; readonly denominator: number },
   timeSignatureChanges?: readonly TimeSignatureChange[],
+  allowTempoDirective = false,
 ): readonly Diagnostic[] => {
   const program = samples.length
     ? lowerDrumSamples(parse(source, { drumSamples: samples }))
@@ -358,6 +360,7 @@ export const clipSourceDiagnostics = (
     beatOffset: clipOffset,
     timeSignature,
     timeSignatureChanges,
+    allowTempoDirective,
   }).diagnostics
 }
 
@@ -468,7 +471,10 @@ export const parseLaneNotes = (
 export const parseProjectScoreNotes = (project: DawProject): ScheduledLaneNote[] => {
   const globalInitialization = compileSourceInitialization(project.globalTrack.source, {}, true)
   const timeSignature = project.globalTrack.timeSignatureChanges[0]
-  const timeSignatureChanges = globalTimeSignatureChanges(project.globalTrack.source, timeSignature!)
+  const timeSignatureChanges = globalTimeSignatureChanges(
+    project.globalTrack.source,
+    timeSignature!,
+  )
   return project.instrumentLanes
     .flatMap((lane) =>
       parseLaneNotes(lane, globalInitialization, timeSignature, timeSignatureChanges),

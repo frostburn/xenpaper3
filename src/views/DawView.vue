@@ -266,6 +266,8 @@ const globalSourceDiagnostics = computed(() => {
       {},
       beat(0),
       project.value.globalTrack.timeSignatureChanges[0],
+      undefined,
+      true,
     )
   } catch {
     return []

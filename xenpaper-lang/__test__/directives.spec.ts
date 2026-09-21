@@ -13,6 +13,39 @@ const notes = (source: string) => {
 }
 
 describe('directive runtime', () => {
+  it('emits exact tempo markers when explicitly enabled for a DAW global source', () => {
+    const result = expandToBeatEvents(parse(';;;;@tempo(200bpm);;;;@tempo(120bpm)'), {
+      allowTempoDirective: true,
+      timeSignature: { numerator: 4, denominator: 4 },
+    })
+    expect(result.diagnostics.filter(({ severity }) => severity === 'error')).toEqual([])
+    if (!('score' in result)) throw new Error('Expected score.')
+    expect(
+      result.score.events
+        .filter((event) => event.kind === 'marker' && event.marker === 'tempo')
+        .map((event) => [event.start.valueOf(), event.label]),
+    ).toEqual([
+      [16, '200'],
+      [32, '120'],
+    ])
+  })
+
+  it('rejects tempo directives outside a DAW global source', () => {
+    expect(compile('@tempo(123bpm) C').diagnostics).toContainEqual(
+      expect.objectContaining({ code: 'XP_TEMPO_SCOPE', severity: 'error' }),
+    )
+  })
+
+  it.each(['@tempo(120)', '@tempo(120Hz)', '@tempo(0bpm)', '@tempo(-1bpm)'])(
+    'rejects invalid tempo %s',
+    (source) => {
+      const result = expandToBeatEvents(parse(source), { allowTempoDirective: true })
+      expect(result.diagnostics).toContainEqual(
+        expect.objectContaining({ code: 'XP_DIRECTIVE', severity: 'error' }),
+      )
+    },
+  )
+
   it('warns when structural barlines do not align with the prevailing time signature', () => {
     const result = compile('@time(10/8) C D E F G | A |')
     expect(result.diagnostics.filter(({ code }) => code === 'XP_BARLINE_OFF_CYCLE')).toHaveLength(1)

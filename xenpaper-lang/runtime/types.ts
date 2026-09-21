@@ -55,6 +55,8 @@ export interface RepeatExpansionOptions {
 }
 
 export interface ScoreShapeOptions {
+  /** Allow project-level tempo directives. These are invalid in ordinary score sources. */
+  readonly allowTempoDirective?: boolean
   readonly pulse?: FractionValue
   readonly dynamic?: DynamicMark
   readonly articulation?: FractionValue
@@ -479,6 +481,12 @@ export interface TimeSignatureShape extends ShapeBase {
   readonly denominator: number
 }
 
+/** Establishes a project playback tempo, expressed in beats per minute. */
+export interface TempoShape extends ShapeBase {
+  readonly kind: 'tempo'
+  readonly bpm: Fraction
+}
+
 export interface KeySignatureShape extends ShapeBase {
   readonly kind: 'key-signature'
   readonly pitches: readonly AbsolutePitchValue[]
@@ -529,6 +537,7 @@ export type ScoreShape =
   | DynamicShape
   | ClefShape
   | TimeSignatureShape
+  | TempoShape
   | KeySignatureShape
   | GrooveShape
   | DroneShape
@@ -555,7 +564,7 @@ export interface BeatTimedNoteEvent {
 export interface BeatTimedMarkerEvent {
   readonly kind: 'marker'
   readonly start: Fraction
-  readonly marker: 'barline' | 'annotation' | 'dynamic' | 'time-signature'
+  readonly marker: 'barline' | 'annotation' | 'dynamic' | 'time-signature' | 'tempo'
   readonly label: string
   readonly origins: readonly SourceOrigin[]
 }

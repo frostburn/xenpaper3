@@ -2,6 +2,7 @@ import { Fraction } from 'xen-dev-utils/fraction'
 import type { Directive, Expression } from '../parser.generated.js'
 import type { Diagnostic } from '../diagnostics'
 import { evaluateExpression } from './expressions'
+import { Value } from '../value'
 import type { DynamicMark, LexicalEnvironment, PitchContext, StaffClef } from './types'
 
 export const DYNAMIC_VELOCITIES: Readonly<Record<DynamicMark, Fraction>> = {
@@ -31,6 +32,7 @@ export const DIRECTIVE_REGISTRY = Object.freeze({
   drone: 'drone',
   clef: 'clef',
   time: 'time',
+  tempo: 'tempo',
   art: 'articulation',
   'articulation-shorthand': 'articulation',
   staccatissimo: 'articulation',
@@ -59,6 +61,7 @@ export type ResolvedDirective =
   | { kind: 'articulation'; ratio: Fraction; mark?: string; shorthand: boolean }
   | { kind: 'clef'; clef: Extract<StaffClef, { kind: 'treble' | 'bass' }> }
   | { kind: 'time'; numerator: number; denominator: number }
+  | { kind: 'tempo'; bpm: Fraction }
   | { kind: 'unknown' }
 
 export function resolveDirective(
@@ -118,6 +121,27 @@ export function resolveDirective(
     return {
       directive: { kind: 'time', numerator, denominator },
       diagnostics: [],
+    }
+  }
+  if (registered === 'tempo') {
+    if (node.arguments.length !== 1 || node.arguments[0]?.type === 'NamedArgument')
+      return fail(
+        '@tempo requires one positive tempo with beats-over-time units, for example @tempo(120bpm).',
+      )
+    const evaluated = evaluateExpression(node.arguments[0] as Expression, context, environment)
+    if (
+      !('value' in evaluated) ||
+      evaluated.value.kind !== 'scalar' ||
+      !evaluated.value.value.dimensions.equals({ beats: 1, seconds: -1 })
+    )
+      return fail(
+        '@tempo requires one positive tempo with beats-over-time units, for example @tempo(120bpm).',
+      )
+    const bpm = evaluated.value.value.mul(Value.seconds(60)).div(Value.beats(1)).exactRational()
+    if (!bpm || bpm.compare(0) <= 0) return fail('@tempo requires a positive exact tempo.')
+    return {
+      directive: { kind: 'tempo', bpm: new Fraction(bpm) },
+      diagnostics: [...evaluated.diagnostics],
     }
   }
   if (registered === 'groove') {

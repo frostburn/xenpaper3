@@ -1085,7 +1085,7 @@ QuantityLiteral
     }
 
 UnitSuffix
-  = value:$("kHz"i / "Hz"i / "ms"i / "dB"i / "beats"i / "beat"i / "s"i / "c" / "¢" / "%") {
+  = value:$("kHz"i / "Hz"i / "bpm"i / "ms"i / "dB"i / "beats"i / "beat"i / "s"i / "c" / "¢" / "%") {
       return value;
     }
 
