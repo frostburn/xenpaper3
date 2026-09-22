@@ -734,6 +734,20 @@ describe('DAW project model', () => {
     expect(notes[2]!.cents).toBeCloseTo(notes[0]!.cents)
   })
 
+  it('preserves lane rhythm and relative context around timed tuning changes', () => {
+    const project = parseDawProject(demoProjects.minuet!)
+    const baseline = parseProjectNotes(project)
+    project.globalTrack.source += ';{12edo}'
+
+    const changed = parseProjectNotes(project)
+    expect(changed.map(({ beat, duration }) => [beat, duration])).toEqual(
+      baseline.map(({ beat, duration }) => [beat, duration]),
+    )
+    expect(changed.filter(({ beat: noteBeat }) => noteBeat < 3).map(({ cents }) => cents)).toEqual(
+      baseline.filter(({ beat: noteBeat }) => noteBeat < 3).map(({ cents }) => cents),
+    )
+  })
+
   it('restores a global groove after its isolated timeline scope', () => {
     const project = createDefaultProject()
     const instrument = project.instrumentLanes[0]!

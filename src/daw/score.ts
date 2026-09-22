@@ -242,6 +242,8 @@ export interface SourceInitialization {
   readonly timelineShape?: ScoreShape
   /** Semantic states established at positions in the repeating global timeline. */
   readonly timelineContexts?: readonly TimedVisitorContext[]
+  /** State before the repeating timeline, used when an isolated change is restored. */
+  readonly timelineBaseContext?: ScoreVisitorContext
 }
 
 interface TimedVisitorContext {
@@ -318,6 +320,19 @@ const inheritedScoreOptions = (initialization: SourceInitialization) => ({
     initialization.visitorContext?.lexicalEnvironment ?? initialization.lexicalEnvironment,
 })
 
+const visitorContextOptions = (context: ScoreVisitorContext | undefined) =>
+  context
+    ? {
+        pitchContext: context.pitchContext,
+        pulse: context.pulse,
+        dynamic: context.dynamic,
+        articulation: context.articulation,
+        articulationMarks: context.articulationMarks,
+        directiveState: context.directiveState,
+        lexicalEnvironment: context.lexicalEnvironment,
+      }
+    : {}
+
 const inheritedScoreOptionsAt = (initialization: SourceInitialization, offset: Fraction) => {
   const inherited = inheritedScoreOptions(initialization)
   const timed = contextAt(initialization, offset)
@@ -342,12 +357,14 @@ export const compileSourceInitialization = (
   allowDuration = false,
   timeSignature?: { readonly numerator: number; readonly denominator: number },
 ): SourceInitialization => {
-  const result = evaluateProgramSemantics(parse(source), {
+  const program = parse(source)
+  const options = {
     directiveExtensions: ENVELOPE_EXTENSIONS,
     allowTempoDirective: allowDuration,
     timeSignature,
     ...inheritedScoreOptions(parent),
-  })
+  }
+  const result = evaluateProgramSemantics(program, options)
   const errors = result.diagnostics.filter(({ severity }) => severity === 'error')
   if (errors.length) throw new Error(errors.map(({ message }) => message).join('\n'))
   if (!('shape' in result)) return parent
@@ -358,16 +375,40 @@ export const compileSourceInitialization = (
     throw new Error('Initialization sources cannot contain pitch-bearing expressions.')
   if (result.shape.duration.n && !allowDuration)
     throw new Error('Initialization sources cannot contain duration-bearing expressions.')
+  const evaluateLocalContext = (context: ScoreVisitorContext | undefined) => {
+    const local = evaluateProgramSemantics(program, {
+      directiveExtensions: ENVELOPE_EXTENSIONS,
+      allowTempoDirective: allowDuration,
+      timeSignature,
+      ...visitorContextOptions(context),
+    })
+    return 'shape' in local ? local.visitorContext : context
+  }
+  const ownTimeline = result.shape.duration.n
+  const inheritedTimelineContexts = !ownTimeline
+    ? parent.timelineContexts?.map(({ start, context }) => ({
+        start,
+        context: evaluateLocalContext(context ?? parent.timelineBaseContext),
+      }))
+    : undefined
+  const initialContext = () => {
+    const base = evaluateProgramSemantics(parse(''), options)
+    return 'shape' in base ? base.visitorContext : undefined
+  }
+  const timelineBaseContext = ownTimeline
+    ? initialContext()
+    : parent.timelineBaseContext
+      ? evaluateLocalContext(parent.timelineBaseContext)
+      : undefined
   return {
     pitchContext: result.pitchContext,
     directiveState: result.directiveState,
     lexicalEnvironment: result.lexicalEnvironment,
     visitorContext: result.visitorContext,
-    timelineShape: result.shape.duration.n ? result.shape : parent.timelineShape,
-    timelineContexts: result.shape.duration.n
-      ? timelineContexts(result.shape)
-      : parent.timelineContexts,
-    shape: result.shape.duration.n
+    timelineShape: ownTimeline ? result.shape : parent.timelineShape,
+    timelineContexts: ownTimeline ? timelineContexts(result.shape) : inheritedTimelineContexts,
+    timelineBaseContext,
+    shape: ownTimeline
       ? parent.shape
       : parent.shape
         ? {
