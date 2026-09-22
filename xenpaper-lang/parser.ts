@@ -3,27 +3,32 @@ import type { Comment, Node, Program, XenpaperParserOptions } from './parser.gen
 
 export type * from './parser.generated.js'
 
-const overlapsCommittedSyntax = (comment: Comment, value: unknown): boolean => {
-  if (Array.isArray(value)) return value.some((child) => overlapsCommittedSyntax(comment, child))
+const collectSyntaxHashes = (value: unknown, source: string, hashes: Set<number>): boolean => {
+  if (Array.isArray(value)) {
+    let containsNode = false
+    for (const child of value) containsNode = collectSyntaxHashes(child, source, hashes) || containsNode
+    return containsNode
+  }
   if (!value || typeof value !== 'object') return false
   const node = value as Partial<Node> & Record<string, unknown>
-  if (node.type && node.location) {
-    const { start, end } = node.location
-    if (
-      start.offset < comment.location.end.offset &&
-      end.offset > comment.location.start.offset &&
-      !(start.offset < comment.location.start.offset && end.offset > comment.location.end.offset)
-    )
-      return true
+  let containsChildNode = false
+  for (const [key, child] of Object.entries(node)) {
+    if (key === 'location' || key === 'replayPrefix') continue
+    containsChildNode = collectSyntaxHashes(child, source, hashes) || containsChildNode
   }
-  return Object.entries(node).some(
-    ([key, child]) =>
-      key !== 'location' && key !== 'replayPrefix' && overlapsCommittedSyntax(comment, child),
-  )
+  if (!node.type || !node.location) return containsChildNode
+  if (!containsChildNode) {
+    for (let offset = node.location.start.offset; offset < node.location.end.offset; offset += 1) {
+      if (source[offset] === '#') hashes.add(offset)
+    }
+  }
+  return true
 }
 
 /** Collect comments only after parsing, when the committed syntax tree is known. */
 const collectComments = (program: Program): Comment[] => {
+  const syntaxHashes = new Set<number>()
+  collectSyntaxHashes(program.body, program.source, syntaxHashes)
   const positions = [{ offset: 0, line: 1, column: 1 }]
   for (let offset = 0, line = 1, column = 1; offset < program.source.length; offset += 1) {
     if (program.source[offset] === '\n') {
@@ -40,6 +45,10 @@ const collectComments = (program: Program): Comment[] => {
   while (cursor < program.source.length) {
     const start = program.source.indexOf('#', cursor)
     if (start < 0) break
+    if (syntaxHashes.has(start)) {
+      cursor = start + 1
+      continue
+    }
     let end = start + 1
     while (end < program.source.length && !'\r\n'.includes(program.source[end]!)) end += 1
     const raw = program.source.slice(start, end)
@@ -53,12 +62,8 @@ const collectComments = (program: Program): Comment[] => {
         end: positions[end]!,
       },
     }
-    if (overlapsCommittedSyntax(comment, program.body)) {
-      cursor = start + 1
-    } else {
-      comments.push(comment)
-      cursor = end
-    }
+    comments.push(comment)
+    cursor = end
   }
   return comments
 }

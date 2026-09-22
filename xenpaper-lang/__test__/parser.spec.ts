@@ -604,6 +604,12 @@ describe('Xenpaper surface grammar', () => {
     expect(program.comments[0]!.location.start.offset).toBe(8)
   })
 
+  it('collects syntax hashes once for sharp-heavy sources', () => {
+    const source = Array.from({ length: 512 }, () => 'C#').join(' ')
+
+    expect(parse(source).comments).toEqual([])
+  })
+
   it.each([
     ['{13edo}C D E', ['PitchContextChange', 'PitchLiteral', 'PitchLiteral', 'PitchLiteral']],
     ['{Pythagorean}C', ['PitchContextChange', 'PitchLiteral']],
