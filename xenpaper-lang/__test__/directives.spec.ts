@@ -30,6 +30,18 @@ describe('directive runtime', () => {
     ])
   })
 
+  it.each([
+    ['@tempo(1beat/100ms)', '600'],
+    ['@tempo(2beats/1s)', '120'],
+  ])('accepts a beats-over-time tempo expression: %s', (source, expectedBpm) => {
+    const result = expandToBeatEvents(parse(source), { allowTempoDirective: true })
+    expect(result.diagnostics.filter(({ severity }) => severity === 'error')).toEqual([])
+    if (!('score' in result)) throw new Error('Expected score.')
+    expect(result.score.events).toContainEqual(
+      expect.objectContaining({ kind: 'marker', marker: 'tempo', label: expectedBpm }),
+    )
+  })
+
   it('rejects tempo directives outside a DAW global source', () => {
     expect(compile('@tempo(123bpm) C').diagnostics).toContainEqual(
       expect.objectContaining({ code: 'XP_TEMPO_SCOPE', severity: 'error' }),
