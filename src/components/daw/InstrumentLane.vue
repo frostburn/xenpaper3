@@ -81,10 +81,6 @@ const pointerBeat = (event: MouseEvent) =>
 
 const clipVisibleStart = (clip: SourceClip) =>
   Math.max(0, props.scrollLeft - beatToNumber(clip.start) * props.pixelsPerBeat)
-const clipStyle = (clip: SourceClip) => ({
-  left: `${beatToNumber(clip.start) * props.pixelsPerBeat - props.scrollLeft}px`,
-  width: `${beatToNumber(clip.length) * props.pixelsPerBeat}px`,
-})
 
 const onClick = (event: MouseEvent) => {
   if ((event.target as HTMLElement).closest('.clip')) return
@@ -273,7 +269,11 @@ const onKeyDown = (event: KeyboardEvent) => {
         :aria-pressed="selectedClipId === clip.id"
         :aria-label="`${lane.name}: ${clipCaption(clip)}, beat ${beatToNumber(clip.start)}, ${beatToNumber(clip.length)} beats`"
         :title="`${clipCaption(clip)} — drag to move; Delete to remove`"
-        :style="clipStyle(clip)"
+        :style="{
+          left: `${beatToNumber(clip.start) * pixelsPerBeat - scrollLeft}px`,
+          width: `${beatToNumber(clip.length) * pixelsPerBeat}px`,
+          zIndex: selectedClipId === clip.id ? 1 : undefined,
+        }"
         @click.stop="emit('select', clip)"
         @dblclick.stop
         @pointerdown.prevent="startDrag($event, clip)"
@@ -289,14 +289,6 @@ const onKeyDown = (event: KeyboardEvent) => {
         /></pre>
         <div v-else class="clip-preview"><slot name="preview" :clip="clip" /></div>
       </button>
-      <span
-        v-for="clip in lane.clips"
-        :key="clip.id"
-        class="clip-border"
-        :class="{ selected: selectedClipId === clip.id }"
-        :style="clipStyle(clip)"
-        aria-hidden="true"
-      />
       <span v-if="!lane.clips.length" class="hint"
         >Double-click to create a clip<br />or choose + Clip</span
       >
@@ -436,6 +428,7 @@ const onKeyDown = (event: KeyboardEvent) => {
 }
 .clip {
   position: absolute;
+  isolation: isolate;
   top: 0.65rem;
   height: 7.5rem;
   padding: 0;
@@ -476,18 +469,6 @@ const onKeyDown = (event: KeyboardEvent) => {
   pointer-events: none;
 }
 .clip.selected {
-  border: 2px solid var(--xenpaper-cyan);
-}
-.clip-border {
-  position: absolute;
-  top: 0.65rem;
-  height: 7.5rem;
-  border: 1px solid var(--xenpaper-slate-450);
-  border-radius: 0.3rem;
-  pointer-events: none;
-  z-index: 2;
-}
-.clip-border.selected {
   border: 2px solid var(--xenpaper-cyan);
 }
 .hint {

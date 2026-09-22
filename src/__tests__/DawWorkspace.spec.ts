@@ -289,7 +289,7 @@ describe('DAW workspace', () => {
     expect(wrapper.emitted('move')).toHaveLength(1)
   })
 
-  it('draws every clip card border above overlapping clips', () => {
+  it('keeps selected overlapping clips and their contents in one stacking context', () => {
     const project = createDefaultProject()
     const lane = project.instrumentLanes[0]!
     lane.clips.push(
@@ -299,6 +299,7 @@ describe('DAW workspace', () => {
     const wrapper = mount(InstrumentLane, {
       props: {
         lane,
+        selectedClipId: 'first',
         pixelsPerBeat: 64,
         scrollLeft: 0,
         displayMode: 'source',
@@ -308,11 +309,10 @@ describe('DAW workspace', () => {
       },
     })
 
-    expect(wrapper.findAll('.clip-border').map((border) => border.attributes('style'))).toEqual([
-      'left: 0px; width: 128px;',
-      'left: 64px; width: 128px;',
-    ])
-    expect(wrapper.get('.lane').element.lastElementChild?.classList).toContain('clip-border')
+    const clips = wrapper.findAll('button.clip')
+    expect(clips[0]!.attributes('style')).toContain('z-index: 1')
+    expect(clips[1]!.attributes('style')).not.toContain('z-index')
+    expect(wrapper.find('.clip-border').exists()).toBe(false)
   })
 })
 
