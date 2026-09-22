@@ -14,6 +14,7 @@ import {
   type ScoreVisitorContext,
   type BeatTimedNoteEvent,
 } from '../../xenpaper-lang'
+import { Fraction } from 'xen-dev-utils/fraction'
 import { drumNames } from '../../sw-patch'
 import { parseStrudelSampleMap, strudelSampleNames, type StrudelSampleMap } from '../../sw-seq'
 import DRUMKIT_PATCH_SOURCE from '../patches/drumkit.swpatch?raw'
@@ -237,6 +238,75 @@ export interface SourceInitialization {
   readonly shape?: ScoreShape
   /** Complete visitor scope spawned into the next initialization source or clip. */
   readonly visitorContext?: ScoreVisitorContext
+  /** Duration-bearing global state changes, repeated across the project timeline. */
+  readonly timelineShape?: ScoreShape
+  /** Semantic states established at positions in the repeating global timeline. */
+  readonly timelineContexts?: readonly TimedVisitorContext[]
+  /** State before the repeating timeline, used when an isolated change is restored. */
+  readonly timelineBaseContext?: ScoreVisitorContext
+}
+
+interface TimedVisitorContext {
+  readonly start: Fraction
+  readonly context?: ScoreVisitorContext
+}
+
+const timelineContexts = (shape: ScoreShape): TimedVisitorContext[] => {
+  const changes: TimedVisitorContext[] = []
+  const visit = (
+    current: ScoreShape,
+    start: Fraction,
+    context: ScoreVisitorContext | undefined,
+  ): ScoreVisitorContext | undefined => {
+    const saved = current.isolatedDirectiveScope ? context : undefined
+    let active = current.visitorContextChange ?? context
+    if (current.visitorContextChange)
+      changes.push({ start: new Fraction(start), context: current.visitorContextChange })
+    if (current.kind === 'sequence') {
+      let cursor = start
+      for (const child of current.children) {
+        active = visit(child, cursor, active)
+        cursor = cursor.add(child.duration)
+      }
+    } else if (current.kind === 'parallel') {
+      for (const branch of current.branches) {
+        const branchContext = visit(branch, start, active)
+        if (branchContext !== active)
+          changes.push({ start: start.add(current.duration), context: active })
+      }
+      active = context
+    }
+    if (current.isolatedDirectiveScope && active !== saved) {
+      changes.push({ start: start.add(current.duration), context: saved })
+      return saved
+    }
+    return active
+  }
+  visit(shape, new Fraction(0), undefined)
+  return changes.sort((left, right) => left.start.compare(right.start))
+}
+
+const contextAt = (
+  initialization: SourceInitialization,
+  offset: Fraction,
+): ScoreVisitorContext | undefined => {
+  const changes = initialization.timelineContexts
+  const shape = initialization.timelineShape
+  if (!changes?.length || !shape?.duration.n) return undefined
+  const last = changes[changes.length - 1]!
+  const previous = changes[changes.length - 2]
+  const duration =
+    previous && last.start.compare(shape.duration) === 0
+      ? shape.duration.add(last.start.sub(previous.start))
+      : shape.duration
+  const cycle = Math.floor(offset.div(duration).valueOf())
+  const local = offset.sub(duration.mul(cycle))
+  let change = changes[changes.length - 1]!
+  for (const candidate of changes) {
+    if (candidate.start.compare(local) > 0) break
+    change = candidate
+  }
+  return change.context
 }
 
 const inheritedScoreOptions = (initialization: SourceInitialization) => ({
@@ -250,17 +320,94 @@ const inheritedScoreOptions = (initialization: SourceInitialization) => ({
     initialization.visitorContext?.lexicalEnvironment ?? initialization.lexicalEnvironment,
 })
 
+const visitorContextOptions = (context: ScoreVisitorContext | undefined) =>
+  context
+    ? {
+        pitchContext: context.pitchContext,
+        pulse: context.pulse,
+        dynamic: context.dynamic,
+        articulation: context.articulation,
+        articulationMarks: context.articulationMarks,
+        directiveState: context.directiveState,
+        lexicalEnvironment: context.lexicalEnvironment,
+      }
+    : {}
+
+const inheritedScoreOptionsAt = (initialization: SourceInitialization, offset: Fraction) => {
+  const inherited = inheritedScoreOptions(initialization)
+  const timed = contextAt(initialization, offset)
+  return timed
+    ? {
+        ...inherited,
+        pitchContext: timed.pitchContext,
+        pulse: timed.pulse,
+        dynamic: timed.dynamic,
+        articulation: timed.articulation,
+        articulationMarks: timed.articulationMarks,
+        directiveState: timed.directiveState,
+        lexicalEnvironment: timed.lexicalEnvironment,
+      }
+    : inherited
+}
+
+const timelineAdjustedNoteEvents = (
+  program: Program,
+  events: readonly BeatTimedNoteEvent[],
+  initialization: SourceInitialization,
+  clipOffset: Beat,
+  timeSignature?: { readonly numerator: number; readonly denominator: number },
+  timeSignatureChanges?: readonly TimeSignatureChange[],
+): readonly BeatTimedNoteEvent[] => {
+  if (!initialization.timelineContexts?.length) return events
+  const initialContext = contextAt(initialization, clipOffset)
+  const variants = new Map<ScoreVisitorContext, readonly BeatTimedNoteEvent[]>()
+  return events.map((event, index) => {
+    const context = contextAt(initialization, clipOffset.add(event.start))
+    if (!context || context === initialContext) return event
+    let notes = variants.get(context)
+    if (!notes) {
+      const variant = expandToBeatEvents(program, {
+        directiveExtensions: ENVELOPE_EXTENSIONS,
+        ...visitorContextOptions(context),
+        initializationShape: initialization.shape,
+        timelineShape: initialization.timelineShape,
+        beatOffset: clipOffset,
+        timeSignature,
+        timeSignatureChanges,
+      })
+      if (!('score' in variant) || variant.diagnostics.some(({ severity }) => severity === 'error'))
+        return event
+      notes = variant.score.events.filter(
+        (candidate): candidate is BeatTimedNoteEvent => candidate.kind === 'note',
+      )
+      variants.set(context, notes)
+    }
+    const replacement = notes[index]
+    return replacement
+      ? {
+          ...replacement,
+          start: event.start,
+          origins: event.origins,
+        }
+      : event
+  })
+}
+
 /** Evaluate a zero-duration source once and retain its prevailing state for child scopes. */
 export const compileSourceInitialization = (
   source: string,
   parent: SourceInitialization = {},
   allowDuration = false,
+  timeSignature?: { readonly numerator: number; readonly denominator: number },
 ): SourceInitialization => {
-  const result = evaluateProgramSemantics(parse(source), {
+  const program = parse(source)
+  const options = {
     directiveExtensions: ENVELOPE_EXTENSIONS,
     allowTempoDirective: allowDuration,
+    timeSignature,
     ...inheritedScoreOptions(parent),
-  })
+  }
+  const result = evaluateProgramSemantics(program, options)
   const errors = result.diagnostics.filter(({ severity }) => severity === 'error')
   if (errors.length) throw new Error(errors.map(({ message }) => message).join('\n'))
   if (!('shape' in result)) return parent
@@ -271,12 +418,40 @@ export const compileSourceInitialization = (
     throw new Error('Initialization sources cannot contain pitch-bearing expressions.')
   if (result.shape.duration.n && !allowDuration)
     throw new Error('Initialization sources cannot contain duration-bearing expressions.')
+  const evaluateLocalContext = (context: ScoreVisitorContext | undefined) => {
+    const local = evaluateProgramSemantics(program, {
+      directiveExtensions: ENVELOPE_EXTENSIONS,
+      allowTempoDirective: allowDuration,
+      timeSignature,
+      ...visitorContextOptions(context),
+    })
+    return 'shape' in local ? local.visitorContext : context
+  }
+  const ownTimeline = result.shape.duration.n
+  const inheritedTimelineContexts = !ownTimeline
+    ? parent.timelineContexts?.map(({ start, context }) => ({
+        start,
+        context: evaluateLocalContext(context ?? parent.timelineBaseContext),
+      }))
+    : undefined
+  const initialContext = () => {
+    const base = evaluateProgramSemantics(parse(''), options)
+    return 'shape' in base ? base.visitorContext : undefined
+  }
+  const timelineBaseContext = ownTimeline
+    ? initialContext()
+    : parent.timelineBaseContext
+      ? evaluateLocalContext(parent.timelineBaseContext)
+      : undefined
   return {
     pitchContext: result.pitchContext,
     directiveState: result.directiveState,
     lexicalEnvironment: result.lexicalEnvironment,
     visitorContext: result.visitorContext,
-    shape: result.shape.duration.n
+    timelineShape: ownTimeline ? result.shape : parent.timelineShape,
+    timelineContexts: ownTimeline ? timelineContexts(result.shape) : inheritedTimelineContexts,
+    timelineBaseContext,
+    shape: ownTimeline
       ? parent.shape
       : parent.shape
         ? {
@@ -299,10 +474,12 @@ export const parseClipNotes = (
   timeSignatureChanges?: readonly TimeSignatureChange[],
 ): ScheduledLaneNote[] => {
   const sourceIdentity = 'xenpaper:clip-source'
-  const result = expandToBeatEvents(parse(source, { grammarSource: sourceIdentity }), {
+  const program = parse(source, { grammarSource: sourceIdentity })
+  const result = expandToBeatEvents(program, {
     directiveExtensions: ENVELOPE_EXTENSIONS,
-    ...inheritedScoreOptions(initialization),
+    ...inheritedScoreOptionsAt(initialization, clipOffset),
     initializationShape: initialization.shape,
+    timelineShape: initialization.timelineShape,
     beatOffset: clipOffset,
     timeSignature,
     timeSignatureChanges,
@@ -311,8 +488,17 @@ export const parseClipNotes = (
   if (errors.length) throw new Error(errors.map(({ message }) => message).join('\n'))
   if (!('score' in result)) return []
 
-  return result.score.events
-    .filter((event): event is BeatTimedNoteEvent => event.kind === 'note')
+  const events = result.score.events.filter(
+    (event): event is BeatTimedNoteEvent => event.kind === 'note',
+  )
+  return timelineAdjustedNoteEvents(
+    program,
+    events,
+    initialization,
+    clipOffset,
+    timeSignature,
+    timeSignatureChanges,
+  )
     .filter((event) => event.start.valueOf() < duration)
     .map((event) => ({
       beat: event.start.valueOf(),
@@ -355,8 +541,9 @@ export const clipSourceDiagnostics = (
     : parse(source)
   return expandToBeatEvents(program, {
     directiveExtensions: ENVELOPE_EXTENSIONS,
-    ...inheritedScoreOptions(initialization),
+    ...inheritedScoreOptionsAt(initialization, clipOffset),
     initializationShape: initialization.shape,
+    timelineShape: initialization.timelineShape,
     beatOffset: clipOffset,
     timeSignature,
     timeSignatureChanges,
@@ -380,8 +567,9 @@ export const parseDrumClipNotes = (
   )
   const result = expandToBeatEvents(program, {
     directiveExtensions: ENVELOPE_EXTENSIONS,
-    ...inheritedScoreOptions(initialization),
+    ...inheritedScoreOptionsAt(initialization, clipOffset),
     initializationShape: initialization.shape,
+    timelineShape: initialization.timelineShape,
     beatOffset: clipOffset,
     timeSignature,
     timeSignatureChanges,
@@ -389,11 +577,18 @@ export const parseDrumClipNotes = (
   const errors = result.diagnostics.filter(({ severity }) => severity === 'error')
   if (errors.length) throw new Error(errors.map(({ message }) => message).join('\n'))
   if (!('score' in result)) return []
-  return result.score.events
-    .filter(
-      (event): event is BeatTimedNoteEvent =>
-        event.kind === 'note' && event.start.valueOf() < duration,
-    )
+  const events = result.score.events.filter(
+    (event): event is BeatTimedNoteEvent => event.kind === 'note',
+  )
+  return timelineAdjustedNoteEvents(
+    program,
+    events,
+    initialization,
+    clipOffset,
+    timeSignature,
+    timeSignatureChanges,
+  )
+    .filter((event) => event.start.valueOf() < duration)
     .map((event) => ({
       beat: event.start.valueOf(),
       duration: Math.min(event.duration.valueOf(), duration - event.start.valueOf()),
@@ -420,8 +615,9 @@ export const sourceClipLength = (
     : parse(source)
   const result = expandToBeatEvents(program, {
     directiveExtensions: ENVELOPE_EXTENSIONS,
-    ...inheritedScoreOptions(initialization),
+    ...inheritedScoreOptionsAt(initialization, clipOffset),
     initializationShape: initialization.shape,
+    timelineShape: initialization.timelineShape,
     timeSignature,
     beatOffset: clipOffset,
     timeSignatureChanges,
@@ -469,8 +665,13 @@ export const parseLaneNotes = (
 
 /** Compile every lane without applying any synthesizer- or tuning-reference conversion. */
 export const parseProjectScoreNotes = (project: DawProject): ScheduledLaneNote[] => {
-  const globalInitialization = compileSourceInitialization(project.globalTrack.source, {}, true)
   const timeSignature = project.globalTrack.timeSignatureChanges[0]
+  const globalInitialization = compileSourceInitialization(
+    project.globalTrack.source,
+    {},
+    true,
+    timeSignature,
+  )
   const timeSignatureChanges = globalTimeSignatureChanges(
     project.globalTrack.source,
     timeSignature!,

@@ -702,6 +702,84 @@ describe('DAW project model', () => {
     expect(notes.filter(({ sample }) => sample).map(({ beat }) => beat)).toEqual([0, 2 / 3])
   })
 
+  it('repeats duration-bearing global groove changes over absolute project time', () => {
+    const project = createDefaultProject()
+    const instrument = project.instrumentLanes[0]!
+    project.globalTrack.source = '@groove([0==0=]);@groove([0=0==])'
+    instrument.clips.push({
+      id: 'alternating-swing',
+      start: beat(0),
+      length: beat(10),
+      source: '@2 C C C C C C C C C C C C C C C C C C',
+    })
+
+    const beats = parseProjectNotes(project).map(({ beat: noteBeat }) => noteBeat)
+    expect(beats[1]).toBeGreaterThan(0.5)
+    expect(beats[9]).toBeLessThan(4.5)
+    expect(beats[17]! - 8).toBeCloseTo(beats[1]!)
+  })
+
+  it('selects global tuning changes from each clip position and repeats them', () => {
+    const project = createDefaultProject()
+    const instrument = project.instrumentLanes[0]!
+    project.globalTrack.source = '{19edo};{12edo}'
+    instrument.clips.push(
+      { id: 'nineteen-a', start: beat(0), length: beat(1), source: 'D' },
+      { id: 'twelve', start: beat(4), length: beat(1), source: 'D' },
+      { id: 'nineteen-b', start: beat(8), length: beat(1), source: 'D' },
+    )
+
+    const notes = parseProjectNotes(project)
+    expect(notes[0]!.cents).not.toBeCloseTo(notes[1]!.cents)
+    expect(notes[2]!.cents).toBeCloseTo(notes[0]!.cents)
+  })
+
+  it('applies cascading global tuning changes within a clip', () => {
+    const project = createDefaultProject()
+    const instrument = project.instrumentLanes[0]!
+    project.globalTrack.source = '{5edo};{12edo}'
+    instrument.clips.push({
+      id: 'cascading-tuning',
+      start: beat(0),
+      length: beat(9),
+      source: '@2 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1',
+    })
+
+    const notes = parseProjectNotes(project)
+    expect(notes[0]!.cents).not.toBeCloseTo(notes[8]!.cents)
+    expect(notes[16]!.cents).toBeCloseTo(notes[0]!.cents)
+  })
+
+  it('preserves lane rhythm and relative context around timed tuning changes', () => {
+    const project = parseDawProject(demoProjects.minuet!)
+    const baseline = parseProjectNotes(project)
+    project.globalTrack.source += ';{12edo}'
+
+    const changed = parseProjectNotes(project)
+    expect(changed.map(({ beat, duration }) => [beat, duration])).toEqual(
+      baseline.map(({ beat, duration }) => [beat, duration]),
+    )
+    expect(changed.filter(({ beat: noteBeat }) => noteBeat < 3).map(({ cents }) => cents)).toEqual(
+      baseline.filter(({ beat: noteBeat }) => noteBeat < 3).map(({ cents }) => cents),
+    )
+  })
+
+  it('restores a global groove after its isolated timeline scope', () => {
+    const project = createDefaultProject()
+    const instrument = project.instrumentLanes[0]!
+    project.globalTrack.source = '(@groove([0= 0]) ;);'
+    instrument.clips.push({
+      id: 'scoped-swing',
+      start: beat(0),
+      length: beat(6),
+      source: '@2 C C C C C C C C C C',
+    })
+
+    const beats = parseProjectNotes(project).map(({ beat: noteBeat }) => noteBeat)
+    expect(beats[1]).toBeGreaterThan(0.5)
+    expect(beats[9]).toBe(4.5)
+  })
+
   it('compiles glissando segments and implements all supported easing curves', () => {
     const note = parseClipNotes('@gliss(ease-in) C @gliss(ease-out) D E')[0]!
     expect(note.glissando).toMatchObject([

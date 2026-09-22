@@ -379,6 +379,8 @@ export interface ShapeBase {
   readonly origins: readonly SourceOrigin[]
   /** Directive state within this shape does not escape to its parent scope. */
   readonly isolatedDirectiveScope?: boolean
+  /** Prevailing semantic state established by a zero-duration global-source item. */
+  readonly visitorContextChange?: ScoreVisitorContext
 }
 
 export interface AttackShape extends ShapeBase {
