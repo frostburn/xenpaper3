@@ -173,7 +173,12 @@ const assertPlaybackStart = (fromBeat: number): void => {
 export const createPlaybackPlan = (project: DawProject, fromBeat = 0): PlaybackPlan => {
   assertPlaybackStart(fromBeat)
   const tempoMap = TempoMap.fromProject(project)
-  const globalInitialization = compileSourceInitialization(project.globalTrack.source, {}, true)
+  const globalInitialization = compileSourceInitialization(
+    project.globalTrack.source,
+    {},
+    true,
+    project.globalTrack.timeSignatureChanges[0],
+  )
   const timeSignatureChanges = globalTimeSignatureChanges(
     project.globalTrack.source,
     project.globalTrack.timeSignatureChanges[0]!,

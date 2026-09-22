@@ -702,6 +702,23 @@ describe('DAW project model', () => {
     expect(notes.filter(({ sample }) => sample).map(({ beat }) => beat)).toEqual([0, 2 / 3])
   })
 
+  it('repeats duration-bearing global groove changes over absolute project time', () => {
+    const project = createDefaultProject()
+    const instrument = project.instrumentLanes[0]!
+    project.globalTrack.source = '@groove([0==0=]);@groove([0=0==])'
+    instrument.clips.push({
+      id: 'alternating-swing',
+      start: beat(0),
+      length: beat(10),
+      source: '@2 C C C C C C C C C C C C C C C C C C',
+    })
+
+    const beats = parseProjectNotes(project).map(({ beat: noteBeat }) => noteBeat)
+    expect(beats[1]).toBeGreaterThan(0.5)
+    expect(beats[9]).toBeLessThan(4.5)
+    expect(beats[17]! - 8).toBeCloseTo(beats[1]!)
+  })
+
   it('compiles glissando segments and implements all supported easing curves', () => {
     const note = parseClipNotes('@gliss(ease-in) C @gliss(ease-out) D E')[0]!
     expect(note.glissando).toMatchObject([

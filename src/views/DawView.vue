@@ -153,7 +153,12 @@ const selectedClipDiagnostics = computed(() => {
   const clip = selectedClip.value
   if (!lane || !clip) return []
   try {
-    const global = compileSourceInitialization(project.value.globalTrack.source, {}, true)
+    const global = compileSourceInitialization(
+      project.value.globalTrack.source,
+      {},
+      true,
+      project.value.globalTrack.timeSignatureChanges[0],
+    )
     const initialization = compileSourceInitialization(lane.source, global)
     return clipSourceDiagnostics(
       clip.source,
@@ -171,7 +176,12 @@ const clipNotes = computed(() => {
   const notes = new Map<string, readonly ScheduledLaneNote[]>()
   let global
   try {
-    global = compileSourceInitialization(project.value.globalTrack.source, {}, true)
+    global = compileSourceInitialization(
+      project.value.globalTrack.source,
+      {},
+      true,
+      project.value.globalTrack.timeSignatureChanges[0],
+    )
   } catch {
     return notes
   }
@@ -278,7 +288,12 @@ watchEffect(() => {
   const defaultBar = beat(signature.numerator * 4, signature.denominator)
   let globalInitialization
   try {
-    globalInitialization = compileSourceInitialization(project.value.globalTrack.source, {}, true)
+    globalInitialization = compileSourceInitialization(
+      project.value.globalTrack.source,
+      {},
+      true,
+      signature,
+    )
   } catch {
     // Keep independently valid clips usable while an initialization source is being edited.
     globalInitialization = undefined

@@ -237,6 +237,8 @@ export interface SourceInitialization {
   readonly shape?: ScoreShape
   /** Complete visitor scope spawned into the next initialization source or clip. */
   readonly visitorContext?: ScoreVisitorContext
+  /** Duration-bearing global state changes, repeated across the project timeline. */
+  readonly timelineShape?: ScoreShape
 }
 
 const inheritedScoreOptions = (initialization: SourceInitialization) => ({
@@ -255,10 +257,12 @@ export const compileSourceInitialization = (
   source: string,
   parent: SourceInitialization = {},
   allowDuration = false,
+  timeSignature?: { readonly numerator: number; readonly denominator: number },
 ): SourceInitialization => {
   const result = evaluateProgramSemantics(parse(source), {
     directiveExtensions: ENVELOPE_EXTENSIONS,
     allowTempoDirective: allowDuration,
+    timeSignature,
     ...inheritedScoreOptions(parent),
   })
   const errors = result.diagnostics.filter(({ severity }) => severity === 'error')
@@ -276,6 +280,7 @@ export const compileSourceInitialization = (
     directiveState: result.directiveState,
     lexicalEnvironment: result.lexicalEnvironment,
     visitorContext: result.visitorContext,
+    timelineShape: result.shape.duration.n ? result.shape : parent.timelineShape,
     shape: result.shape.duration.n
       ? parent.shape
       : parent.shape
@@ -303,6 +308,7 @@ export const parseClipNotes = (
     directiveExtensions: ENVELOPE_EXTENSIONS,
     ...inheritedScoreOptions(initialization),
     initializationShape: initialization.shape,
+    timelineShape: initialization.timelineShape,
     beatOffset: clipOffset,
     timeSignature,
     timeSignatureChanges,
@@ -357,6 +363,7 @@ export const clipSourceDiagnostics = (
     directiveExtensions: ENVELOPE_EXTENSIONS,
     ...inheritedScoreOptions(initialization),
     initializationShape: initialization.shape,
+    timelineShape: initialization.timelineShape,
     beatOffset: clipOffset,
     timeSignature,
     timeSignatureChanges,
@@ -382,6 +389,7 @@ export const parseDrumClipNotes = (
     directiveExtensions: ENVELOPE_EXTENSIONS,
     ...inheritedScoreOptions(initialization),
     initializationShape: initialization.shape,
+    timelineShape: initialization.timelineShape,
     beatOffset: clipOffset,
     timeSignature,
     timeSignatureChanges,
@@ -422,6 +430,7 @@ export const sourceClipLength = (
     directiveExtensions: ENVELOPE_EXTENSIONS,
     ...inheritedScoreOptions(initialization),
     initializationShape: initialization.shape,
+    timelineShape: initialization.timelineShape,
     timeSignature,
     beatOffset: clipOffset,
     timeSignatureChanges,
@@ -469,8 +478,13 @@ export const parseLaneNotes = (
 
 /** Compile every lane without applying any synthesizer- or tuning-reference conversion. */
 export const parseProjectScoreNotes = (project: DawProject): ScheduledLaneNote[] => {
-  const globalInitialization = compileSourceInitialization(project.globalTrack.source, {}, true)
   const timeSignature = project.globalTrack.timeSignatureChanges[0]
+  const globalInitialization = compileSourceInitialization(
+    project.globalTrack.source,
+    {},
+    true,
+    timeSignature,
+  )
   const timeSignatureChanges = globalTimeSignatureChanges(
     project.globalTrack.source,
     timeSignature!,

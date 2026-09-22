@@ -18,6 +18,8 @@ import type {
 export interface BeatEventExpansionOptions extends ScoreShapeOptions, RepeatExpansionOptions {
   /** Pre-evaluated, zero-duration state annotations applied before the program. */
   initializationShape?: ScoreShape
+  /** A duration-bearing global score whose state changes repeat over absolute time. */
+  timelineShape?: ScoreShape
 }
 
 export type BeatEventExpansionResult =
@@ -27,6 +29,7 @@ export type BeatEventExpansionResult =
 interface BeatEventFlatteningResult {
   readonly score: BeatTimedScore
   readonly diagnostics: readonly Diagnostic[]
+  readonly grooveChanges: readonly GrooveChange[]
 }
 
 const copy = (value: Fraction) => new Fraction(value.n, value.d)
@@ -36,6 +39,8 @@ type Groove = {
   cycle: Fraction
   points: { nominal: Fraction; actual: Fraction; dynamic: Fraction; articulation: Fraction }[]
 }
+
+type GrooveChange = { readonly start: Fraction; readonly groove?: Groove }
 
 type MutableNoteEvent = Omit<
   BeatTimedNoteEvent,
@@ -48,6 +53,7 @@ type MutableNoteEvent = Omit<
   automation?: BeatTimedNoteEvent['automation']
   origins: readonly BeatTimedNoteEvent['origins'][number][]
   groove?: Groove
+  useTimelineGroove: boolean
   articulation: Fraction
 }
 
@@ -56,6 +62,7 @@ type FlatteningState = {
   activeStart?: Fraction
   activeSpan?: Fraction
   groove?: Groove
+  grooveOverride?: boolean
   drone?: MutableNoteEvent[]
 }
 
@@ -96,9 +103,14 @@ function stopDrone(state: FlatteningState, end: Fraction) {
 }
 
 /** Flatten evaluated playback semantics without converting exact beat positions to seconds. */
-export function flattenScoreSemantics(shape: ScoreShape): BeatEventFlatteningResult {
+export function flattenScoreSemantics(
+  shape: ScoreShape,
+  timeline?: BeatEventFlatteningResult,
+  beatOffset = new Fraction(0),
+): BeatEventFlatteningResult {
   const events: BeatTimedEvent[] = []
   const diagnostics: Diagnostic[] = []
+  const grooveChanges: GrooveChange[] = []
   const completedAutomations = new WeakSet<MutableNoteEvent>()
   const evaluate: VisitorEvaluation<ScoreShape, FlatteningScope, Fraction> = (current, visitor) => {
     const { state } = visitor.scope
@@ -131,6 +143,7 @@ export function flattenScoreSemantics(shape: ScoreShape): BeatEventFlatteningRes
         label: current.authoredLabel ?? current.displayLabel,
         origins: current.origins,
         groove: state.groove,
+        useTimelineGroove: !state.grooveOverride,
         articulation: current.articulation ?? new Fraction(1),
       }
       events.push(event)
@@ -167,8 +180,11 @@ export function flattenScoreSemantics(shape: ScoreShape): BeatEventFlatteningRes
       state.activeStart = undefined
       state.activeSpan = undefined
     } else if (current.kind === 'groove') {
-      if (!current.template) state.groove = undefined
-      else {
+      state.grooveOverride = true
+      if (!current.template) {
+        state.groove = undefined
+        grooveChanges.push({ start: copy(start) })
+      } else {
         const flattened = flattenScoreSemantics(current.template)
         diagnostics.push(...flattened.diagnostics)
         const controls = flattened.score.events.filter(
@@ -194,6 +210,7 @@ export function flattenScoreSemantics(shape: ScoreShape): BeatEventFlatteningRes
               }
             }),
           }
+          grooveChanges.push({ start: copy(start), groove: state.groove })
         }
       }
     } else if (current.kind === 'drone') {
@@ -214,6 +231,7 @@ export function flattenScoreSemantics(shape: ScoreShape): BeatEventFlatteningRes
               origins: [...current.origins, ...event.origins],
               articulation: new Fraction(1),
               groove: state.groove,
+              useTimelineGroove: !state.grooveOverride,
             }
             events.push(drone)
             return drone
@@ -259,7 +277,11 @@ export function flattenScoreSemantics(shape: ScoreShape): BeatEventFlatteningRes
     } else {
       const firstEvent = events.length
       const states = current.branches.map(
-        (): FlatteningState => ({ active: [], groove: state.groove }),
+        (): FlatteningState => ({
+          active: [],
+          groove: state.groove,
+          grooveOverride: state.grooveOverride,
+        }),
       )
       current.branches.forEach((branch, index) => visitor.visit(branch, { state: states[index]! }))
       const end = start.add(current.duration)
@@ -287,23 +309,61 @@ export function flattenScoreSemantics(shape: ScoreShape): BeatEventFlatteningRes
     const mutable = event as MutableNoteEvent
     const nominalStart = mutable.start
     const nominalEnd = nominalStart.add(mutable.duration)
-    if (mutable.groove) {
-      const warpedStart = interpolateGroove(mutable.groove, nominalStart, 'actual')
-      const warpedEnd = interpolateGroove(mutable.groove, nominalEnd, 'actual')
+    const groove =
+      mutable.groove ??
+      (timeline && mutable.useTimelineGroove
+        ? grooveAt(timeline.grooveChanges, timelineDuration(timeline), nominalStart.add(beatOffset))
+        : undefined)
+    if (groove) {
+      const grooveStart = nominalStart.add(beatOffset)
+      const grooveEnd = nominalEnd.add(beatOffset)
+      const warpedStart = interpolateGroove(groove, grooveStart, 'actual').sub(beatOffset)
+      const warpedEnd = interpolateGroove(groove, grooveEnd, 'actual').sub(beatOffset)
       mutable.start = warpedStart
       mutable.duration = warpedEnd
         .sub(warpedStart)
         .mul(mutable.articulation)
-        .mul(interpolateGroove(mutable.groove, nominalStart, 'articulation'))
+        .mul(interpolateGroove(groove, grooveStart, 'articulation'))
       mutable.dynamic = mutable.dynamic.mul(
-        interpolateGroove(mutable.groove, nominalStart, 'dynamic').div(DYNAMIC_VELOCITIES.mf),
+        interpolateGroove(groove, grooveStart, 'dynamic').div(DYNAMIC_VELOCITIES.mf),
       )
     } else mutable.duration = mutable.duration.mul(mutable.articulation)
     delete mutable.groove
+    delete (mutable as Partial<MutableNoteEvent>).useTimelineGroove
     delete (mutable as Partial<MutableNoteEvent>).articulation
   }
   events.sort((left, right) => left.start.compare(right.start))
-  return { score: { duration: copy(shape.duration), events }, diagnostics }
+  return { score: { duration: copy(shape.duration), events }, diagnostics, grooveChanges }
+}
+
+const grooveAt = (
+  changes: readonly GrooveChange[],
+  duration: Fraction,
+  absoluteBeat: Fraction,
+): Groove | undefined => {
+  if (!changes.length || !duration.n) return undefined
+  const cycleIndex = Math.floor(absoluteBeat.div(duration).valueOf())
+  const cycleStart = duration.mul(cycleIndex)
+  const localBeat = absoluteBeat.sub(cycleStart)
+  let change = changes[changes.length - 1]!
+  let changeCycle = cycleIndex - 1
+  for (const candidate of changes) {
+    if (candidate.start.compare(localBeat) > 0) break
+    change = candidate
+    changeCycle = cycleIndex
+  }
+  if (!change.groove) return undefined
+  const origin = duration.mul(changeCycle).add(change.start)
+  return { ...change.groove, origin }
+}
+
+const timelineDuration = (timeline: BeatEventFlatteningResult): Fraction => {
+  const duration = timeline.score.duration
+  const last = timeline.grooveChanges[timeline.grooveChanges.length - 1]
+  const previous = timeline.grooveChanges[timeline.grooveChanges.length - 2]
+  return last && previous && last.start.compare(duration) === 0
+    ? duration.add(last.start.sub(previous.start))
+    : duration
 }
 
 /** Expand repeats, evaluate score semantics, then produce exact beat-timed events. */
@@ -334,8 +394,15 @@ export function expandToBeatEvents(
         children: [options.initializationShape, evaluated.shape],
       }
     : evaluated.shape
-  const flattened = flattenScoreSemantics(shape)
-  const allDiagnostics = [...diagnostics, ...flattened.diagnostics]
+  const timeline = options.timelineShape?.duration.n
+    ? flattenScoreSemantics(options.timelineShape)
+    : undefined
+  const flattened = flattenScoreSemantics(shape, timeline, options.beatOffset ?? new Fraction(0))
+  const allDiagnostics = [
+    ...diagnostics,
+    ...(timeline?.diagnostics ?? []),
+    ...flattened.diagnostics,
+  ]
   // Repeat expansion removes authored repeat/ending markers. Evaluate the original
   // tree as notation as well so every structural marker remains available for checks.
   const authored = evaluateScoreSemantics(

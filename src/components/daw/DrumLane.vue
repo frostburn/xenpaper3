@@ -135,7 +135,12 @@ const sampleLabelStyle = (index: number) => {
 const eventsByClip = computed(() => {
   let initialization
   try {
-    const globalInitialization = compileSourceInitialization(props.globalSource ?? '', {}, true)
+    const globalInitialization = compileSourceInitialization(
+      props.globalSource ?? '',
+      {},
+      true,
+      props.timeSignature,
+    )
     initialization = compileSourceInitialization(props.lane.source, globalInitialization)
   } catch {
     initialization = undefined
