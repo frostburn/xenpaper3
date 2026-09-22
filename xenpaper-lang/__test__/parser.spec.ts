@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { parse } from '../parser.generated.js'
+import { parse } from '../parser.js'
 
 describe('lexical declarations', () => {
   it('retains complete declaration and parameter-name locations', () => {
@@ -593,6 +593,15 @@ describe('Xenpaper surface grammar', () => {
       ' Parallel composition; duration checks happen after parsing',
       ' Repeat remains an AST macro',
     ])
+  })
+
+  it('collects comments after choosing the successful syntax alternative', () => {
+    const program = parse('vF# G A # one # comment')
+
+    expect(program.comments).toMatchObject([
+      { type: 'Comment', raw: '# one # comment', value: ' one # comment' },
+    ])
+    expect(program.comments[0]!.location.start.offset).toBe(8)
   })
 
   it.each([

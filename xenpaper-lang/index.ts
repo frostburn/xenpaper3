@@ -1,6 +1,6 @@
 export type { Diagnostic, DiagnosticSeverity } from './diagnostics'
-export { parse } from './parser.generated.js'
-export type * from './parser.generated.js'
+export { parse } from './parser.js'
+export type * from './parser.js'
 export { expandRepeats } from './runtime/repeat-expansion'
 export { decimalFraction, evaluateLiteral } from './runtime/literals'
 export type { LiteralEvaluationResult, NumericLiteralNode } from './runtime/literals'

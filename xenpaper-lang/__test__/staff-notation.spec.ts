@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { parse, type Expression } from '../parser.generated.js'
+import { parse, type Expression } from '../parser.js'
 import { evaluateExpression } from '../runtime/expressions'
 import { constructStaffNotation } from '../runtime/staff-notation'
 import { constructStaffNotationShape } from '../runtime/staff-notation'

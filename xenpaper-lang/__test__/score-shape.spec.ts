@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { Fraction } from 'xen-dev-utils/fraction'
-import { parse, type Expression, type PitchContextChange } from '../parser.generated.js'
+import { parse, type Expression, type PitchContextChange } from '../parser.js'
 import { applyPitchContextChange } from '../runtime/pitches'
 import { evaluateScoreShape } from '../runtime/score-shape'
 import type { ParallelShape, ScoreShape, SequenceShape } from '../runtime/types'

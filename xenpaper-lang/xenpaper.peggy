@@ -44,19 +44,6 @@
   const parallel = (branches, loc = location()) =>
     branches.length === 1 ? branches[0] : node('Parallel', { branches }, loc);
 
-  const commentsByOffset = new Map();
-
-  const rememberComment = (raw, loc = location()) => {
-    const comment = node('Comment', {
-      value: raw.slice(1),
-      raw,
-    }, loc);
-    // Peggy may revisit a spacing production while backtracking. Source offset
-    // makes comment collection idempotent.
-    commentsByOffset.set(loc.start.offset, comment);
-    return comment;
-  };
-
   const modifierKind = raw => {
     switch (raw) {
       case "'": return 'equaveUp';
@@ -89,9 +76,7 @@ Start
       return node('Program', {
         source,
         body: body ?? [],
-        comments: [...commentsByOffset.values()].sort(
-          (a, b) => a.location.start.offset - b.location.start.offset,
-        ),
+        comments: [],
       });
     }
 
@@ -1206,4 +1191,4 @@ White
   = [ \t\r\n]
 
 Comment
-  = raw:$("#" [^\r\n]*) { return rememberComment(raw); }
+  = "#" [^\r\n]*

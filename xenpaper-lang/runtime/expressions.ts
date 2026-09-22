@@ -1,4 +1,4 @@
-import { parse, type Expression } from '../parser.generated.js'
+import { parse, type Expression } from '../parser.js'
 import { Fraction, mmod } from 'xen-dev-utils/fraction'
 import type { Diagnostic } from '../diagnostics'
 import { Value } from '../value'

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { tutorialChapters } from '../../src/tutorial'
-import { parse } from '../parser.generated.js'
+import { parse } from '../parser.js'
 import { expandToBeatEvents } from '../runtime/beat-events'
 
 describe('Xenpaper tutorial', () => {
