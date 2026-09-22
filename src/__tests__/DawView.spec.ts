@@ -734,6 +734,22 @@ describe('DAW project model', () => {
     expect(notes[2]!.cents).toBeCloseTo(notes[0]!.cents)
   })
 
+  it('applies cascading global tuning changes within a clip', () => {
+    const project = createDefaultProject()
+    const instrument = project.instrumentLanes[0]!
+    project.globalTrack.source = '{5edo};{12edo}'
+    instrument.clips.push({
+      id: 'cascading-tuning',
+      start: beat(0),
+      length: beat(9),
+      source: '@2 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1',
+    })
+
+    const notes = parseProjectNotes(project)
+    expect(notes[0]!.cents).not.toBeCloseTo(notes[8]!.cents)
+    expect(notes[16]!.cents).toBeCloseTo(notes[0]!.cents)
+  })
+
   it('preserves lane rhythm and relative context around timed tuning changes', () => {
     const project = parseDawProject(demoProjects.minuet!)
     const baseline = parseProjectNotes(project)

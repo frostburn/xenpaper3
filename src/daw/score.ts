@@ -350,6 +350,49 @@ const inheritedScoreOptionsAt = (initialization: SourceInitialization, offset: F
     : inherited
 }
 
+const timelineAdjustedNoteEvents = (
+  program: Program,
+  events: readonly BeatTimedNoteEvent[],
+  initialization: SourceInitialization,
+  clipOffset: Beat,
+  timeSignature?: { readonly numerator: number; readonly denominator: number },
+  timeSignatureChanges?: readonly TimeSignatureChange[],
+): readonly BeatTimedNoteEvent[] => {
+  if (!initialization.timelineContexts?.length) return events
+  const initialContext = contextAt(initialization, clipOffset)
+  const variants = new Map<ScoreVisitorContext, readonly BeatTimedNoteEvent[]>()
+  return events.map((event, index) => {
+    const context = contextAt(initialization, clipOffset.add(event.start))
+    if (!context || context === initialContext) return event
+    let notes = variants.get(context)
+    if (!notes) {
+      const variant = expandToBeatEvents(program, {
+        directiveExtensions: ENVELOPE_EXTENSIONS,
+        ...visitorContextOptions(context),
+        initializationShape: initialization.shape,
+        timelineShape: initialization.timelineShape,
+        beatOffset: clipOffset,
+        timeSignature,
+        timeSignatureChanges,
+      })
+      if (!('score' in variant) || variant.diagnostics.some(({ severity }) => severity === 'error'))
+        return event
+      notes = variant.score.events.filter(
+        (candidate): candidate is BeatTimedNoteEvent => candidate.kind === 'note',
+      )
+      variants.set(context, notes)
+    }
+    const replacement = notes[index]
+    return replacement
+      ? {
+          ...replacement,
+          start: event.start,
+          origins: event.origins,
+        }
+      : event
+  })
+}
+
 /** Evaluate a zero-duration source once and retain its prevailing state for child scopes. */
 export const compileSourceInitialization = (
   source: string,
@@ -431,7 +474,8 @@ export const parseClipNotes = (
   timeSignatureChanges?: readonly TimeSignatureChange[],
 ): ScheduledLaneNote[] => {
   const sourceIdentity = 'xenpaper:clip-source'
-  const result = expandToBeatEvents(parse(source, { grammarSource: sourceIdentity }), {
+  const program = parse(source, { grammarSource: sourceIdentity })
+  const result = expandToBeatEvents(program, {
     directiveExtensions: ENVELOPE_EXTENSIONS,
     ...inheritedScoreOptionsAt(initialization, clipOffset),
     initializationShape: initialization.shape,
@@ -444,8 +488,17 @@ export const parseClipNotes = (
   if (errors.length) throw new Error(errors.map(({ message }) => message).join('\n'))
   if (!('score' in result)) return []
 
-  return result.score.events
-    .filter((event): event is BeatTimedNoteEvent => event.kind === 'note')
+  const events = result.score.events.filter(
+    (event): event is BeatTimedNoteEvent => event.kind === 'note',
+  )
+  return timelineAdjustedNoteEvents(
+    program,
+    events,
+    initialization,
+    clipOffset,
+    timeSignature,
+    timeSignatureChanges,
+  )
     .filter((event) => event.start.valueOf() < duration)
     .map((event) => ({
       beat: event.start.valueOf(),
@@ -524,11 +577,18 @@ export const parseDrumClipNotes = (
   const errors = result.diagnostics.filter(({ severity }) => severity === 'error')
   if (errors.length) throw new Error(errors.map(({ message }) => message).join('\n'))
   if (!('score' in result)) return []
-  return result.score.events
-    .filter(
-      (event): event is BeatTimedNoteEvent =>
-        event.kind === 'note' && event.start.valueOf() < duration,
-    )
+  const events = result.score.events.filter(
+    (event): event is BeatTimedNoteEvent => event.kind === 'note',
+  )
+  return timelineAdjustedNoteEvents(
+    program,
+    events,
+    initialization,
+    clipOffset,
+    timeSignature,
+    timeSignatureChanges,
+  )
+    .filter((event) => event.start.valueOf() < duration)
     .map((event) => ({
       beat: event.start.valueOf(),
       duration: Math.min(event.duration.valueOf(), duration - event.start.valueOf()),
