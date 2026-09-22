@@ -105,6 +105,8 @@ function quantity(node: QuantityLiteral): EvaluatedLiteral {
     case 'beat':
     case 'beats':
       return scalar(Value.beats(magnitude), node)
+    case 'bpm':
+      return scalar(Value.beats(magnitude).div(Value.seconds(60)), node)
     case 's':
       return scalar(Value.seconds(magnitude), node)
     case 'ms':

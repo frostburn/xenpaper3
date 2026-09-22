@@ -1,4 +1,5 @@
 import { expandToBeatEvents, parse } from '../../xenpaper-lang'
+import { Fraction } from 'xen-dev-utils/fraction'
 import {
   beatToNumber,
   type DawProject,
@@ -74,7 +75,13 @@ export class TempoMap {
   }
 
   static fromProject(project: DawProject): TempoMap {
-    return new TempoMap(project.globalTrack.tempoChanges)
+    return new TempoMap(
+      globalTempoChanges(
+        project.globalTrack.source,
+        project.globalTrack.tempoChanges,
+        project.globalTrack.timeSignatureChanges[0],
+      ),
+    )
   }
 
   /** Integrate the tempo map from beat zero, extrapolating backwards at the initial tempo. */
@@ -112,7 +119,10 @@ export const globalTimeSignatureChanges = (
 ): TimeSignatureChange[] => {
   let result
   try {
-    result = expandToBeatEvents(parse(source), { timeSignature: initial })
+    result = expandToBeatEvents(parse(source), {
+      timeSignature: initial,
+      allowTempoDirective: true,
+    })
   } catch {
     return [initial]
   }
@@ -132,6 +142,48 @@ export const globalTimeSignatureChanges = (
       beat: event.start,
       numerator,
       denominator,
+    })
+  }
+  return [...byBeat.values()].sort(
+    (left, right) => beatToNumber(left.beat) - beatToNumber(right.beat),
+  )
+}
+
+/** Interpret tempo directives in the duration-bearing DAW global source. */
+export const globalTempoChanges = (
+  source: string,
+  initial: readonly TempoChange[],
+  timeSignature: { readonly numerator: number; readonly denominator: number } = {
+    numerator: 4,
+    denominator: 4,
+  },
+): TempoChange[] => {
+  let result
+  try {
+    result = expandToBeatEvents(parse(source), {
+      allowTempoDirective: true,
+      timeSignature,
+    })
+  } catch {
+    return [...initial]
+  }
+  if (!('score' in result) || result.diagnostics.some(({ severity }) => severity === 'error')) {
+    return [...initial]
+  }
+
+  const byBeat = new Map<number, TempoChange>(
+    initial.map((change) => [beatToNumber(change.beat), change]),
+  )
+  let index = 0
+  for (const event of result.score.events) {
+    if (event.kind !== 'marker' || event.marker !== 'tempo') continue
+    const bpm = new Fraction(event.label).valueOf()
+    if (!Number.isFinite(bpm) || bpm <= 0) continue
+    const position = event.start.valueOf()
+    byBeat.set(position, {
+      id: `global-source-tempo-${index++}`,
+      beat: event.start,
+      bpm,
     })
   }
   return [...byBeat.values()].sort(

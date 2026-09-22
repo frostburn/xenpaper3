@@ -244,6 +244,11 @@ MultiplicativeTail
   = Spacing operator:MultiplicativeOperator Spacing right:PowerExpression {
       return { operator, right };
     }
+  // Unitful quantities make both operands unambiguous, so compact rates such
+  // as `1beat/100ms` do not need the whitespace required by general division.
+  / "/" right:QuantityLiteral {
+      return { operator: "/", right };
+    }
   // `/` is both a pitch lift prefix and ordinary division. Requiring whitespace
   // on both sides for binary division keeps the distinction purely grammatical:
   // `m7 / 2` divides, while `/2` is a lifted degree and `/cb` is a lifted pitch.
@@ -1085,7 +1090,7 @@ QuantityLiteral
     }
 
 UnitSuffix
-  = value:$("kHz"i / "Hz"i / "ms"i / "dB"i / "beats"i / "beat"i / "s"i / "c" / "¢" / "%") {
+  = value:$("kHz"i / "Hz"i / "bpm"i / "ms"i / "dB"i / "beats"i / "beat"i / "s"i / "c" / "¢" / "%") {
       return value;
     }
 

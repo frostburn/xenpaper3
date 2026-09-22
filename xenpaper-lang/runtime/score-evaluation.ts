@@ -598,6 +598,7 @@ function scaleShape(shape: ScoreShape, factor: Fraction): ScoreShape {
     case 'dynamic':
     case 'clef':
     case 'time-signature':
+    case 'tempo':
     case 'key-signature':
     case 'groove':
     case 'drone':
@@ -1561,6 +1562,14 @@ export function evaluateScoreSemantics(
             activeVisitor.scope.environment,
           )
           const directive = resolved.directive
+          if (directive?.kind === 'tempo' && !options.allowTempoDirective) {
+            resolved.diagnostics.push({
+              code: 'XP_TEMPO_SCOPE',
+              severity: 'error',
+              message: '@tempo is only allowed in a DAW global source.',
+              locations: [item.location],
+            })
+          }
           if (directive?.kind === 'subdivision')
             activeVisitor = activeVisitor.spawn({ pulse: subdivisionBase.mul(directive.pulse) })
           else if (directive?.kind === 'dynamic')
@@ -1669,7 +1678,14 @@ export function evaluateScoreSemantics(
                             duration: new Fraction(0),
                             origins: [origin(item, 'directive')],
                           }
-                        : sequence([], [origin(item, 'directive')])
+                        : directive?.kind === 'tempo' && options.allowTempoDirective
+                          ? {
+                              kind: 'tempo',
+                              bpm: directive.bpm,
+                              duration: new Fraction(0),
+                              origins: [origin(item, 'directive')],
+                            }
+                          : sequence([], [origin(item, 'directive')])
           results.push({ shape, diagnostics: resolved.diagnostics })
           continue
         }

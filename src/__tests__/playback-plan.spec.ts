@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { createPlaybackPlan } from '../daw/playback-plan'
 import { beat, createDefaultProject } from '../daw/project'
 import { parseClipNotes, parseProjectScoreNotes } from '../daw/score'
-import { TempoMap } from '../daw/timeline'
+import { globalTempoChanges, TempoMap } from '../daw/timeline'
 import {
   applyPitchAutomation,
   glissandoCurveDuration,
@@ -10,6 +10,44 @@ import {
 } from '../daw/web-audio-automation'
 
 describe('DAW playback planning', () => {
+  it('derives tempo changes from the duration-bearing global source', () => {
+    const project = createDefaultProject()
+    project.globalTrack.source = ';;;;@tempo(200bpm);;;;@tempo(120bpm)'
+
+    expect(
+      globalTempoChanges(project.globalTrack.source, project.globalTrack.tempoChanges),
+    ).toEqual([
+      expect.objectContaining({ beat: beat(0), bpm: 120 }),
+      expect.objectContaining({ beat: beat(16), bpm: 200 }),
+      expect.objectContaining({ beat: beat(32), bpm: 120 }),
+    ])
+    expect(TempoMap.fromProject(project).points.map(({ beat, bpm }) => ({ beat, bpm }))).toEqual([
+      { beat: 0, bpm: 120 },
+      { beat: 16, bpm: 200 },
+      { beat: 32, bpm: 120 },
+    ])
+  })
+
+  it('preserves fractional BPM values emitted as exact fraction labels', () => {
+    const project = createDefaultProject()
+    project.globalTrack.source = ';@tempo(123.5bpm)'
+
+    expect(TempoMap.fromProject(project).points.map(({ beat, bpm }) => ({ beat, bpm }))).toEqual([
+      { beat: 0, bpm: 120 },
+      { beat: 4, bpm: 123.5 },
+    ])
+  })
+
+  it('converts general beats-over-time tempo expressions for playback', () => {
+    const project = createDefaultProject()
+    project.globalTrack.source = ';@tempo(1beat/100ms)'
+
+    expect(TempoMap.fromProject(project).points.map(({ beat, bpm }) => ({ beat, bpm }))).toEqual([
+      { beat: 0, bpm: 120 },
+      { beat: 4, bpm: 600 },
+    ])
+  })
+
   it('keeps score data C-relative and converts pitch only at the SW Patch boundary', () => {
     const project = createDefaultProject()
     project.instrumentLanes[0]!.clips.push({

@@ -394,6 +394,8 @@ export function constructStaffNotationShape(shape: ScoreShape): StaffNotationSha
         text: `${shape.numerator}/${shape.denominator}`,
         duration: shape.duration,
       }
+    case 'tempo':
+      return { kind: 'annotation', text: `${shape.bpm.toFraction()} bpm`, duration: shape.duration }
     case 'key-signature':
       return {
         kind: 'key-signature',

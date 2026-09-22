@@ -223,7 +223,8 @@ export function flattenScoreSemantics(shape: ScoreShape): BeatEventFlatteningRes
       current.kind === 'barline' ||
       current.kind === 'annotation' ||
       current.kind === 'dynamic' ||
-      current.kind === 'time-signature'
+      current.kind === 'time-signature' ||
+      current.kind === 'tempo'
     ) {
       events.push({
         kind: 'marker',
@@ -236,7 +237,9 @@ export function flattenScoreSemantics(shape: ScoreShape): BeatEventFlatteningRes
               ? current.mark
               : current.kind === 'time-signature'
                 ? `${current.numerator}/${current.denominator}`
-                : current.text,
+                : current.kind === 'tempo'
+                  ? current.bpm.toFraction()
+                  : current.text,
         origins: current.origins,
       })
     } else if (current.kind === 'clef' || current.kind === 'key-signature') {
