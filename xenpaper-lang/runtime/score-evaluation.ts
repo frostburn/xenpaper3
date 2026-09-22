@@ -31,6 +31,7 @@ import type {
   ScoreShapeOptions,
   LexicalEnvironment,
   ScoreShapeEvaluationResult,
+  ScoreVisitorContext,
 } from './types'
 
 interface PlaybackAttackShape extends AttackShape {
@@ -1299,6 +1300,21 @@ export function evaluateScoreSemantics(
     })
   }
 
+  const visitorContext = (visitor: ScoreVisitor): ScoreVisitorContext => ({
+    pitchContext: visitor.scope.context,
+    pulse: visitor.scope.pulse,
+    dynamic: visitor.scope.dynamic,
+    articulation: visitor.scope.articulation,
+    articulationMarks: visitor.scope.articulationMarks,
+    directiveState: visitor.scope.directiveState,
+    lexicalEnvironment: visitor.scope.environment,
+  })
+
+  const withVisitorContext = (shape: ScoreShape, visitor: ScoreVisitor): ScoreShape => ({
+    ...shape,
+    visitorContextChange: visitorContext(visitor),
+  })
+
   const evaluateNode: VisitorEvaluation<Expression, VisitorScope, ScoreShapeEvaluationResult> = (
     current,
     visitor,
@@ -1516,7 +1532,10 @@ export function evaluateScoreSemantics(
             activeVisitor.scope.environment,
           )
           activeVisitor = activeVisitor.spawn({ environment: declared.environment })
-          results.push({ shape: sequence([], [origin(item)]), diagnostics: declared.diagnostics })
+          results.push({
+            shape: withVisitorContext(sequence([], [origin(item)]), activeVisitor),
+            diagnostics: declared.diagnostics,
+          })
           continue
         }
         if (item.type === 'PitchContextChange') {
@@ -1525,7 +1544,10 @@ export function evaluateScoreSemantics(
             const changedContext = applyPitchContextChange(item, previousContext)
             activeVisitor = activeVisitor.spawn({ context: changedContext })
             results.push({
-              shape: contextShape(item, changedContext, previousContext),
+              shape: withVisitorContext(
+                contextShape(item, changedContext, previousContext),
+                activeVisitor,
+              ),
               diagnostics: [],
             })
           } catch (error) {
@@ -1551,7 +1573,7 @@ export function evaluateScoreSemantics(
           if (extended) {
             activeVisitor = activeVisitor.spawn({ directiveState: extended.state })
             results.push({
-              shape: sequence([], [origin(item, 'directive')]),
+              shape: withVisitorContext(sequence([], [origin(item, 'directive')]), activeVisitor),
               diagnostics: extended.diagnostics,
             })
             continue
@@ -1686,7 +1708,15 @@ export function evaluateScoreSemantics(
                               origins: [origin(item, 'directive')],
                             }
                           : sequence([], [origin(item, 'directive')])
-          results.push({ shape, diagnostics: resolved.diagnostics })
+          results.push({
+            shape:
+              directive?.kind === 'subdivision' ||
+              directive?.kind === 'dynamic' ||
+              directive?.kind === 'articulation'
+                ? withVisitorContext(shape, activeVisitor)
+                : shape,
+            diagnostics: resolved.diagnostics,
+          })
           continue
         }
         let result = activeVisitor.visit(item)

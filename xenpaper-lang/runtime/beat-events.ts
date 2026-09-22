@@ -119,6 +119,8 @@ export function flattenScoreSemantics(
     const isolatedVisitor = visitor.spawn({ state: isolatedState })
     const end = visitCurrent(current, isolatedVisitor)
     if (isolatedState.drone !== state.drone) stopDrone(isolatedState, end)
+    if (isolatedState.groove !== state.groove)
+      grooveChanges.push({ start: copy(end), groove: state.groove })
     state.active = isolatedState.active
     state.activeStart = isolatedState.activeStart
     state.activeSpan = isolatedState.activeSpan
@@ -285,7 +287,11 @@ export function flattenScoreSemantics(
       )
       current.branches.forEach((branch, index) => visitor.visit(branch, { state: states[index]! }))
       const end = start.add(current.duration)
-      for (const branchState of states) stopDrone(branchState, end)
+      for (const branchState of states) {
+        stopDrone(branchState, end)
+        if (branchState.groove !== state.groove)
+          grooveChanges.push({ start: copy(end), groove: state.groove })
+      }
       // A continuation after a parallel distributes over every attack in the
       // construction, rather than only the last attack in each branch.
       state.active = events

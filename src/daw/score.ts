@@ -14,6 +14,7 @@ import {
   type ScoreVisitorContext,
   type BeatTimedNoteEvent,
 } from '../../xenpaper-lang'
+import { Fraction } from 'xen-dev-utils/fraction'
 import { drumNames } from '../../sw-patch'
 import { parseStrudelSampleMap, strudelSampleNames, type StrudelSampleMap } from '../../sw-seq'
 import DRUMKIT_PATCH_SOURCE from '../patches/drumkit.swpatch?raw'
@@ -239,6 +240,71 @@ export interface SourceInitialization {
   readonly visitorContext?: ScoreVisitorContext
   /** Duration-bearing global state changes, repeated across the project timeline. */
   readonly timelineShape?: ScoreShape
+  /** Semantic states established at positions in the repeating global timeline. */
+  readonly timelineContexts?: readonly TimedVisitorContext[]
+}
+
+interface TimedVisitorContext {
+  readonly start: Fraction
+  readonly context?: ScoreVisitorContext
+}
+
+const timelineContexts = (shape: ScoreShape): TimedVisitorContext[] => {
+  const changes: TimedVisitorContext[] = []
+  const visit = (
+    current: ScoreShape,
+    start: Fraction,
+    context: ScoreVisitorContext | undefined,
+  ): ScoreVisitorContext | undefined => {
+    const saved = current.isolatedDirectiveScope ? context : undefined
+    let active = current.visitorContextChange ?? context
+    if (current.visitorContextChange)
+      changes.push({ start: new Fraction(start), context: current.visitorContextChange })
+    if (current.kind === 'sequence') {
+      let cursor = start
+      for (const child of current.children) {
+        active = visit(child, cursor, active)
+        cursor = cursor.add(child.duration)
+      }
+    } else if (current.kind === 'parallel') {
+      for (const branch of current.branches) {
+        const branchContext = visit(branch, start, active)
+        if (branchContext !== active)
+          changes.push({ start: start.add(current.duration), context: active })
+      }
+      active = context
+    }
+    if (current.isolatedDirectiveScope && active !== saved) {
+      changes.push({ start: start.add(current.duration), context: saved })
+      return saved
+    }
+    return active
+  }
+  visit(shape, new Fraction(0), undefined)
+  return changes.sort((left, right) => left.start.compare(right.start))
+}
+
+const contextAt = (
+  initialization: SourceInitialization,
+  offset: Fraction,
+): ScoreVisitorContext | undefined => {
+  const changes = initialization.timelineContexts
+  const shape = initialization.timelineShape
+  if (!changes?.length || !shape?.duration.n) return undefined
+  const last = changes[changes.length - 1]!
+  const previous = changes[changes.length - 2]
+  const duration =
+    previous && last.start.compare(shape.duration) === 0
+      ? shape.duration.add(last.start.sub(previous.start))
+      : shape.duration
+  const cycle = Math.floor(offset.div(duration).valueOf())
+  const local = offset.sub(duration.mul(cycle))
+  let change = changes[changes.length - 1]!
+  for (const candidate of changes) {
+    if (candidate.start.compare(local) > 0) break
+    change = candidate
+  }
+  return change.context
 }
 
 const inheritedScoreOptions = (initialization: SourceInitialization) => ({
@@ -251,6 +317,23 @@ const inheritedScoreOptions = (initialization: SourceInitialization) => ({
   lexicalEnvironment:
     initialization.visitorContext?.lexicalEnvironment ?? initialization.lexicalEnvironment,
 })
+
+const inheritedScoreOptionsAt = (initialization: SourceInitialization, offset: Fraction) => {
+  const inherited = inheritedScoreOptions(initialization)
+  const timed = contextAt(initialization, offset)
+  return timed
+    ? {
+        ...inherited,
+        pitchContext: timed.pitchContext,
+        pulse: timed.pulse,
+        dynamic: timed.dynamic,
+        articulation: timed.articulation,
+        articulationMarks: timed.articulationMarks,
+        directiveState: timed.directiveState,
+        lexicalEnvironment: timed.lexicalEnvironment,
+      }
+    : inherited
+}
 
 /** Evaluate a zero-duration source once and retain its prevailing state for child scopes. */
 export const compileSourceInitialization = (
@@ -281,6 +364,9 @@ export const compileSourceInitialization = (
     lexicalEnvironment: result.lexicalEnvironment,
     visitorContext: result.visitorContext,
     timelineShape: result.shape.duration.n ? result.shape : parent.timelineShape,
+    timelineContexts: result.shape.duration.n
+      ? timelineContexts(result.shape)
+      : parent.timelineContexts,
     shape: result.shape.duration.n
       ? parent.shape
       : parent.shape
@@ -306,7 +392,7 @@ export const parseClipNotes = (
   const sourceIdentity = 'xenpaper:clip-source'
   const result = expandToBeatEvents(parse(source, { grammarSource: sourceIdentity }), {
     directiveExtensions: ENVELOPE_EXTENSIONS,
-    ...inheritedScoreOptions(initialization),
+    ...inheritedScoreOptionsAt(initialization, clipOffset),
     initializationShape: initialization.shape,
     timelineShape: initialization.timelineShape,
     beatOffset: clipOffset,
@@ -361,7 +447,7 @@ export const clipSourceDiagnostics = (
     : parse(source)
   return expandToBeatEvents(program, {
     directiveExtensions: ENVELOPE_EXTENSIONS,
-    ...inheritedScoreOptions(initialization),
+    ...inheritedScoreOptionsAt(initialization, clipOffset),
     initializationShape: initialization.shape,
     timelineShape: initialization.timelineShape,
     beatOffset: clipOffset,
@@ -387,7 +473,7 @@ export const parseDrumClipNotes = (
   )
   const result = expandToBeatEvents(program, {
     directiveExtensions: ENVELOPE_EXTENSIONS,
-    ...inheritedScoreOptions(initialization),
+    ...inheritedScoreOptionsAt(initialization, clipOffset),
     initializationShape: initialization.shape,
     timelineShape: initialization.timelineShape,
     beatOffset: clipOffset,
@@ -428,7 +514,7 @@ export const sourceClipLength = (
     : parse(source)
   const result = expandToBeatEvents(program, {
     directiveExtensions: ENVELOPE_EXTENSIONS,
-    ...inheritedScoreOptions(initialization),
+    ...inheritedScoreOptionsAt(initialization, clipOffset),
     initializationShape: initialization.shape,
     timelineShape: initialization.timelineShape,
     timeSignature,
