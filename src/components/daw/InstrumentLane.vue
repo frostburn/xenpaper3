@@ -49,6 +49,7 @@ const emit = defineEmits<{
 
 const laneElement = ref<HTMLElement>()
 const viewportWidth = window.innerWidth
+const clipEdgeGap = 2
 const dragging = ref<{
   clip: SourceClip
   pointerOffset: number
@@ -270,8 +271,8 @@ const onKeyDown = (event: KeyboardEvent) => {
         :aria-label="`${lane.name}: ${clipCaption(clip)}, beat ${beatToNumber(clip.start)}, ${beatToNumber(clip.length)} beats`"
         :title="`${clipCaption(clip)} — drag to move; Delete to remove`"
         :style="{
-          left: `${beatToNumber(clip.start) * pixelsPerBeat - scrollLeft}px`,
-          width: `${beatToNumber(clip.length) * pixelsPerBeat}px`,
+          left: `${beatToNumber(clip.start) * pixelsPerBeat - scrollLeft + clipEdgeGap}px`,
+          width: `max(1px, calc(${beatToNumber(clip.length) * pixelsPerBeat}px - ${clipEdgeGap * 2}px))`,
         }"
         @click.stop="emit('select', clip)"
         @dblclick.stop

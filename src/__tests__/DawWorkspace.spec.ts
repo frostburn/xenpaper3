@@ -288,6 +288,31 @@ describe('DAW workspace', () => {
     pointer(track, 'pointermove', 148)
     expect(wrapper.emitted('move')).toHaveLength(1)
   })
+
+  it('leaves clip card borders distinct at shared timeline edges', () => {
+    const project = createDefaultProject()
+    const lane = project.instrumentLanes[0]!
+    lane.clips.push(
+      { id: 'first', start: beat(0), length: beat(1), source: 'C' },
+      { id: 'second', start: beat(1), length: beat(1), source: 'D' },
+    )
+    const wrapper = mount(InstrumentLane, {
+      props: {
+        lane,
+        pixelsPerBeat: 64,
+        scrollLeft: 0,
+        displayMode: 'source',
+        laneLabel: 'Instrument lane',
+        timelineLabel: 'Test timeline',
+        editorLabel: 'Lane source',
+      },
+    })
+
+    expect(wrapper.findAll('button.clip').map((clip) => clip.attributes('style'))).toEqual([
+      'left: 2px; width: calc(60px);',
+      'left: 66px; width: calc(60px);',
+    ])
+  })
 })
 
 describe('Arrangement timeline', () => {
