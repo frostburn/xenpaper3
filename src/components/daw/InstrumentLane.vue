@@ -272,6 +272,7 @@ const onKeyDown = (event: KeyboardEvent) => {
         :style="{
           left: `${beatToNumber(clip.start) * pixelsPerBeat - scrollLeft}px`,
           width: `${beatToNumber(clip.length) * pixelsPerBeat}px`,
+          zIndex: selectedClipId === clip.id ? 1 : undefined,
         }"
         @click.stop="emit('select', clip)"
         @dblclick.stop
@@ -427,6 +428,7 @@ const onKeyDown = (event: KeyboardEvent) => {
 }
 .clip {
   position: absolute;
+  isolation: isolate;
   top: 0.65rem;
   height: 7.5rem;
   padding: 0;

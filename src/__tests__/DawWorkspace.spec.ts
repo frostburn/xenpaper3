@@ -288,6 +288,32 @@ describe('DAW workspace', () => {
     pointer(track, 'pointermove', 148)
     expect(wrapper.emitted('move')).toHaveLength(1)
   })
+
+  it('keeps selected overlapping clips and their contents in one stacking context', () => {
+    const project = createDefaultProject()
+    const lane = project.instrumentLanes[0]!
+    lane.clips.push(
+      { id: 'first', start: beat(0), length: beat(2), source: 'C D' },
+      { id: 'second', start: beat(1), length: beat(2), source: 'E F' },
+    )
+    const wrapper = mount(InstrumentLane, {
+      props: {
+        lane,
+        selectedClipId: 'first',
+        pixelsPerBeat: 64,
+        scrollLeft: 0,
+        displayMode: 'source',
+        laneLabel: 'Instrument lane',
+        timelineLabel: 'Test timeline',
+        editorLabel: 'Lane source',
+      },
+    })
+
+    const clips = wrapper.findAll('button.clip')
+    expect(clips[0]!.attributes('style')).toContain('z-index: 1')
+    expect(clips[1]!.attributes('style')).not.toContain('z-index')
+    expect(wrapper.find('.clip-border').exists()).toBe(false)
+  })
 })
 
 describe('Arrangement timeline', () => {
