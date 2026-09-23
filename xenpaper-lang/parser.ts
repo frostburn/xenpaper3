@@ -6,7 +6,8 @@ export type * from './parser.generated.js'
 const collectSyntaxHashes = (value: unknown, source: string, hashes: Set<number>): boolean => {
   if (Array.isArray(value)) {
     let containsNode = false
-    for (const child of value) containsNode = collectSyntaxHashes(child, source, hashes) || containsNode
+    for (const child of value)
+      containsNode = collectSyntaxHashes(child, source, hashes) || containsNode
     return containsNode
   }
   if (!value || typeof value !== 'object') return false
