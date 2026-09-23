@@ -808,32 +808,11 @@ function attacks(shape: ScoreShape): AttackShape[] {
   return []
 }
 
-interface TimedAttack {
-  readonly attack: AttackShape
-  readonly start: Fraction
-}
-
-/** Locate attacks without flattening their authored rhythm. */
-function timedAttacks(shape: ScoreShape, start = new Fraction(0)): TimedAttack[] {
-  if (shape.kind === 'attack') return [{ attack: shape, start }]
-  if (shape.kind === 'sequence') {
-    const result: TimedAttack[] = []
-    let offset = start
-    for (const child of shape.children) {
-      result.push(...timedAttacks(child, offset))
-      offset = offset.add(child.duration)
-    }
-    return result
-  }
-  if (shape.kind === 'parallel')
-    return shape.branches.flatMap((branch) => timedAttacks(branch, start))
-  return []
-}
-
 /**
- * Turn a rhythmic fragment into independently holdable voices. The leading
- * generated rests retain every attack's original onset while the parallel
- * branches allow its sounding duration to extend without moving later notes.
+ * Give every attack an independent sounding span while retaining the original
+ * score tree. A one-branch parallel wrapper occupies the attack's authored
+ * duration even when the wrapped attack sounds beyond it, so later onsets and
+ * all non-attack shapes remain at their authored positions.
  */
 function holdAttacks(
   shape: ScoreShape,
@@ -841,26 +820,41 @@ function holdAttacks(
   extension: Fraction,
   holdUntilEnd: boolean,
   markOrigins: readonly SourceOrigin[],
-): ScoreShape {
-  const timed = timedAttacks(shape)
-  if (!timed.length) return shape
-  const branches = timed.map(({ attack, start }) => {
-    const heldDuration = holdUntilEnd ? duration.sub(start) : attack.duration.add(extension)
-    const held: AttackShape = {
-      ...attack,
-      duration: heldDuration,
-      origins: [...attack.origins, ...markOrigins],
+): ScoreShape | undefined {
+  let attackCount = 0
+  const hold = (current: ScoreShape, start: Fraction): ScoreShape => {
+    if (current.kind === 'attack') {
+      attackCount++
+      const held: AttackShape = {
+        ...current,
+        duration: holdUntilEnd ? duration.sub(start) : current.duration.add(extension),
+        origins: [...current.origins, ...markOrigins],
+      }
+      return {
+        kind: 'parallel',
+        duration: current.duration,
+        branches: [held],
+        origins: current.origins,
+      }
     }
-    if (!start.n) return held
-    return sequence([generatedRest(start), held], shape.origins)
-  })
-  return {
-    kind: 'parallel',
-    duration,
-    branches: branches.map((branch) => pad(branch, duration)),
-    origins: shape.origins,
-    isolatedDirectiveScope: shape.isolatedDirectiveScope,
+    if (current.kind === 'sequence') {
+      let offset = start
+      const children = current.children.map((child) => {
+        const result = hold(child, offset)
+        offset = offset.add(child.duration)
+        return result
+      })
+      return { ...current, children }
+    }
+    if (current.kind === 'parallel') {
+      return { ...current, branches: current.branches.map((branch) => hold(branch, start)) }
+    }
+    return current
   }
+  const held = hold(shape, new Fraction(0))
+  if (!attackCount) return undefined
+  if (!extension.n) return held
+  return sequence([held, generatedRest(extension)], shape.origins)
 }
 
 function contextAnnotation(
@@ -2109,7 +2103,7 @@ export function evaluateScoreSemantics(
       if (distributesHolds || hold) {
         const extension = currentPulse.mul(continuations.length)
         const duration = base.duration.add(extension)
-        base = holdAttacks(
+        const held = holdAttacks(
           base,
           duration,
           extension,
@@ -2118,10 +2112,11 @@ export function evaluateScoreSemantics(
             .filter((mark) => mark.type === 'DetachedContinue' || mark.type === 'HoldUntilEnd')
             .map((mark) => origin(mark, 'duration')),
         )
-        return withVisitor(
-          { shape: base, diagnostics: evaluated.diagnostics },
-          visitorAfter(evaluated, visitor),
-        )
+        if (held)
+          return withVisitor(
+            { shape: held, diagnostics: evaluated.diagnostics },
+            visitorAfter(evaluated, visitor),
+          )
       }
       if (!continuations.length)
         return withVisitor(

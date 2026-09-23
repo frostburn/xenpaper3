@@ -145,6 +145,28 @@ describe('beat event expansion', () => {
     expect(result.duration.toFraction()).toBe(totalDuration)
   })
 
+  it('preserves non-attack shapes while holding a container', () => {
+    const result = score('(@drone(5) 0 | 7)!')
+    const notes = result.events.filter((event) => event.kind === 'note')
+    const markers = result.events.filter((event) => event.kind === 'marker')
+
+    expect(notes.map((note) => [note.start.toFraction(), note.duration.toFraction()])).toEqual([
+      ['0', '2'],
+      ['0', '2'],
+      ['1', '1'],
+    ])
+    expect(markers.map((marker) => [marker.marker, marker.start.toFraction()])).toEqual([
+      ['barline', '1'],
+    ])
+  })
+
+  it('retains continuations on attack-free parenthesized groups', () => {
+    const result = expandToBeatEvents(parse('(.)='))
+
+    expect(result.diagnostics).toMatchObject([{ code: 'XP_CONTINUE_WITHOUT_ATTACK' }])
+    expect('score' in result).toBe(false)
+  })
+
   it('distributes a continuation over every note of an uneven parallel', () => {
     const result = score('(C, D E) =')
     const notes = result.events.filter((event) => event.kind === 'note')
