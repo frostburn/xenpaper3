@@ -1,26 +1,18 @@
 import { Fraction } from 'xen-dev-utils/fraction'
 import type { Program } from '../parser.generated.js'
 import type { Diagnostic } from '../diagnostics'
-import { expandRepeats } from './repeat-expansion'
-import { evaluateScoreSemantics } from './score-evaluation'
+import { evaluateProgramSemantics } from './score-shape'
 import { DYNAMIC_VELOCITIES } from './directives'
 import { Visitor, type VisitorEvaluation } from './visitor'
 import type {
   BeatTimedEvent,
   BeatTimedNoteEvent,
   BeatTimedScore,
-  ExpandedNode,
-  RepeatExpansionOptions,
   ScoreShape,
   ScoreShapeOptions,
 } from './types'
 
-export interface BeatEventExpansionOptions extends ScoreShapeOptions, RepeatExpansionOptions {
-  /** Pre-evaluated, zero-duration state annotations applied before the program. */
-  initializationShape?: ScoreShape
-  /** A duration-bearing global score whose state changes repeat over absolute time. */
-  timelineShape?: ScoreShape
-}
+export type BeatEventExpansionOptions = ScoreShapeOptions
 
 export type BeatEventExpansionResult =
   | { readonly score: BeatTimedScore; readonly diagnostics: readonly Diagnostic[] }
@@ -77,7 +69,7 @@ function interpolateGroove(
   key: 'actual' | 'dynamic' | 'articulation',
 ) {
   const relative = value.sub(groove.origin)
-  const cycleIndex = Math.floor(relative.div(groove.cycle).valueOf())
+  const cycleIndex = relative.div(groove.cycle).floor()
   const local = relative.sub(groove.cycle.mul(cycleIndex))
   const points = groove.points
   let left = points[0]!
@@ -318,7 +310,7 @@ export function flattenScoreSemantics(
     const groove =
       mutable.groove ??
       (timeline && mutable.useTimelineGroove
-        ? grooveAt(timeline.grooveChanges, timelineDuration(timeline), nominalStart.add(beatOffset))
+        ? grooveAt(timeline.grooveChanges, nominalStart.add(beatOffset))
         : undefined)
     if (groove) {
       const grooveStart = nominalStart.add(beatOffset)
@@ -342,34 +334,13 @@ export function flattenScoreSemantics(
   return { score: { duration: copy(shape.duration), events }, diagnostics, grooveChanges }
 }
 
-const grooveAt = (
-  changes: readonly GrooveChange[],
-  duration: Fraction,
-  absoluteBeat: Fraction,
-): Groove | undefined => {
-  if (!changes.length || !duration.n) return undefined
-  const cycleIndex = Math.floor(absoluteBeat.div(duration).valueOf())
-  const cycleStart = duration.mul(cycleIndex)
-  const localBeat = absoluteBeat.sub(cycleStart)
-  let change = changes[changes.length - 1]!
-  let changeCycle = cycleIndex - 1
-  for (const candidate of changes) {
-    if (candidate.start.compare(localBeat) > 0) break
-    change = candidate
-    changeCycle = cycleIndex
+const grooveAt = (changes: readonly GrooveChange[], absoluteBeat: Fraction): Groove | undefined => {
+  let groove: Groove | undefined
+  for (const change of changes) {
+    if (change.start.compare(absoluteBeat) > 0) break
+    groove = change.groove
   }
-  if (!change.groove) return undefined
-  const origin = duration.mul(changeCycle).add(change.start)
-  return { ...change.groove, origin }
-}
-
-const timelineDuration = (timeline: BeatEventFlatteningResult): Fraction => {
-  const duration = timeline.score.duration
-  const last = timeline.grooveChanges[timeline.grooveChanges.length - 1]
-  const previous = timeline.grooveChanges[timeline.grooveChanges.length - 2]
-  return last && previous && last.start.compare(duration) === 0
-    ? duration.add(last.start.sub(previous.start))
-    : duration
+  return groove
 }
 
 /** Expand repeats, evaluate score semantics, then produce exact beat-timed events. */
@@ -377,115 +348,26 @@ export function expandToBeatEvents(
   program: Program,
   options: BeatEventExpansionOptions = {},
 ): BeatEventExpansionResult {
-  const expanded = expandRepeats(program, options)
-  if (!expanded.program) return { diagnostics: expanded.diagnostics }
-  const body = expanded.program.body
-  if (!body.length)
-    return { score: { duration: new Fraction(0), events: [] }, diagnostics: expanded.diagnostics }
-  const location = program.location
-  const node = {
-    type: 'Sequence',
-    items: body,
-    location,
-    expansionPath: [],
-  } as unknown as ExpandedNode
-  const evaluated = evaluateScoreSemantics(node as never, options)
-  const diagnostics = [...expanded.diagnostics, ...evaluated.diagnostics]
+  const evaluated = evaluateProgramSemantics(program, options)
+  const diagnostics = [...evaluated.diagnostics]
   if (!('shape' in evaluated)) return { diagnostics }
-  const shape = options.initializationShape
+  const initializationShape = options.initialization?.shape
+  const timelineShape = options.initialization?.timelineShape
+  const shape = initializationShape
     ? {
         kind: 'sequence' as const,
         duration: evaluated.shape.duration,
-        origins: [...options.initializationShape.origins, ...evaluated.shape.origins],
-        children: [options.initializationShape, evaluated.shape],
+        origins: [...initializationShape.origins, ...evaluated.shape.origins],
+        children: [initializationShape, evaluated.shape],
       }
     : evaluated.shape
-  const timeline = options.timelineShape?.duration.n
-    ? flattenScoreSemantics(options.timelineShape)
-    : undefined
+  const timeline = timelineShape?.duration.n ? flattenScoreSemantics(timelineShape) : undefined
   const flattened = flattenScoreSemantics(shape, timeline, options.beatOffset ?? new Fraction(0))
   const allDiagnostics = [
     ...diagnostics,
     ...(timeline?.diagnostics ?? []),
     ...flattened.diagnostics,
   ]
-  // Repeat expansion removes authored repeat/ending markers. Evaluate the original
-  // tree as notation as well so every structural marker remains available for checks.
-  const authored = evaluateScoreSemantics(
-    {
-      type: 'Sequence',
-      items: program.body,
-      location: program.location,
-      expansionPath: [],
-    } as unknown as never,
-    options,
-  )
-  const structuralEvents =
-    'shape' in authored
-      ? flattenScoreSemantics(
-          options.initializationShape
-            ? {
-                kind: 'sequence',
-                duration: authored.shape.duration,
-                origins: [...options.initializationShape.origins, ...authored.shape.origins],
-                children: [options.initializationShape, authored.shape],
-              }
-            : authored.shape,
-        ).score.events
-      : flattened.score.events
-  let signature: { length: Fraction; origin: Fraction } | undefined = options.timeSignature
-    ? {
-        length: new Fraction(
-          options.timeSignature.numerator * 4,
-          options.timeSignature.denominator,
-        ),
-        origin: new Fraction(0),
-      }
-    : undefined
-  const absoluteOffset = options.beatOffset ?? new Fraction(0)
-  const inheritedSignatureAt = (beat: Fraction) => {
-    let prevailing: { length: Fraction; origin: Fraction } | undefined
-    for (const change of options.timeSignatureChanges ?? []) {
-      const origin = new Fraction(change.beat)
-      if (origin.compare(beat) > 0) break
-      prevailing = {
-        length: new Fraction(change.numerator * 4, change.denominator),
-        origin,
-      }
-    }
-    return prevailing
-  }
-  let authoredSignature = false
-  const warnedBarlines = new Set<string>()
-  for (const event of structuralEvents) {
-    if (event.kind !== 'marker') continue
-    const absoluteStart = event.start.add(absoluteOffset)
-    if (event.marker === 'time-signature') {
-      const [numerator, denominator] = event.label.split('/').map(Number)
-      signature = {
-        length: new Fraction(numerator! * 4, denominator),
-        origin: absoluteStart,
-      }
-      authoredSignature = true
-    } else if (event.marker === 'barline') {
-      if (!authoredSignature) signature = inheritedSignatureAt(absoluteStart) ?? signature
-      if (!signature) continue
-      const cycles = absoluteStart.sub(signature.origin).div(signature.length)
-      const locations = event.origins.map((origin) => origin.location)
-      const warningKey = locations
-        .map(({ start, end }) => `${start.offset}:${end.offset}`)
-        .join(',')
-      if (cycles.d !== 1 && !warnedBarlines.has(warningKey)) {
-        warnedBarlines.add(warningKey)
-        allDiagnostics.push({
-          code: 'XP_BARLINE_OFF_CYCLE',
-          severity: 'warning',
-          message: `Barline does not fall on a whole multiple of the ${signature.length.toFraction()}-beat measure.`,
-          locations,
-        })
-      }
-    }
-  }
   return allDiagnostics.some((diagnostic) => diagnostic.severity === 'error')
     ? { diagnostics: allDiagnostics }
     : { score: flattened.score, diagnostics: allDiagnostics }

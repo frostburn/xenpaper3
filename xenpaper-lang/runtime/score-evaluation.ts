@@ -5,6 +5,8 @@ import { Value } from '../value'
 import { evaluateDeclaration, evaluateExpression, prepareFunctionCall } from './expressions'
 import { DYNAMIC_VELOCITIES, resolveDirective } from './directives'
 import { Visitor, type VisitorEvaluation } from './visitor'
+import { contextAt } from './initialization'
+import { extendLexicalEnvironment } from './types'
 import {
   DEFAULT_PITCH_CONTEXT,
   applyPitchContextChange,
@@ -19,7 +21,6 @@ import type {
   BarlineShape,
   BarlineStyle,
   ContinueShape,
-  EvaluatedLiteral,
   ParallelShape,
   RestShape,
   ScoreShape,
@@ -40,7 +41,49 @@ interface PlaybackAttackShape extends AttackShape {
   readonly velocityExplicit?: boolean
 }
 
+class EvaluationError extends Error {
+  constructor(readonly diagnostics: readonly Diagnostic[]) {
+    super(diagnostics[0]?.message)
+  }
+}
+
+interface ContextResolver {
+  readonly parent?: ContextResolver
+  readonly change?: (context: ScoreVisitorContext, base: ScoreVisitorContext) => ScoreVisitorContext
+  readonly cache: WeakMap<ScoreVisitorContext, ScoreVisitorContext>
+}
+
+function resolveContext(resolver: ContextResolver, base: ScoreVisitorContext): ScoreVisitorContext {
+  const pending: ContextResolver[] = []
+  let current: ContextResolver | undefined = resolver
+  let context = base
+  while (current) {
+    const cached = current.cache.get(base)
+    if (cached) {
+      context = cached
+      break
+    }
+    pending.push(current)
+    current = current.parent
+  }
+  for (const layer of pending.reverse()) {
+    context = layer.change?.(context, base) ?? context
+    layer.cache.set(base, context)
+  }
+  return context
+}
+
 interface VisitorScope {
+  readonly offset: Fraction
+  readonly timeScale: Fraction
+  readonly layout?: boolean
+  readonly lockedPulse?: Fraction
+  readonly base: ScoreVisitorContext
+  readonly resolve: ContextResolver
+  readonly subdivisionContext: ContextResolver
+  readonly tempo?: Fraction
+  readonly timeSignature?: ScoreVisitorContext['timeSignature']
+
   readonly context: PitchContext
   readonly pulse: Fraction
   readonly dynamic: DynamicMark
@@ -48,7 +91,6 @@ interface VisitorScope {
   readonly articulationMarks: readonly string[]
   readonly directiveState: DirectiveExtensionState
   readonly environment?: LexicalEnvironment
-  readonly subdivisionBase: Fraction
 }
 
 type ScoreVisitor = Visitor<Expression, VisitorScope, ScoreShapeEvaluationResult>
@@ -484,6 +526,7 @@ function repeatBody(
     repeatEndingBodies.set(node, endings)
   }
   const result: Expression[] = []
+  if (iteration > 0) appendRepeatItems(result, node.replayPrefix ?? [])
   appendRepeatItems(result, node.body)
   appendRepeatItems(result, endings.get(BigInt(iteration + 1)) ?? [])
   return result
@@ -997,6 +1040,11 @@ export function evaluateScoreSemantics(
   node: Expression,
   options: ScoreShapeOptions = {},
 ): ScoreShapeEvaluationResult {
+  const inherited = contextAt(options.initialization, options.beatOffset ?? new Fraction(0))
+  options = {
+    ...inherited,
+    ...Object.fromEntries(Object.entries(options).filter(([, value]) => value !== undefined)),
+  }
   const pulse = new Fraction(options.pulse ?? 1)
   if (pulse.compare(0) <= 0) throw new RangeError('pulse must be positive.')
   const extensions = new Map(
@@ -1055,252 +1103,17 @@ export function evaluateScoreSemantics(
     }
   }
 
-  const contextAfter = (current: Expression, visitor: ScoreVisitor): PitchContext => {
-    const { context } = visitor.scope
-    if (current.type === 'PitchContextChange') {
-      try {
-        return applyPitchContextChange(current, context)
-      } catch {
-        return context
-      }
-    }
-    if (current.type === 'Sequence') {
-      let activeVisitor = visitor
-      for (const item of current.items)
-        activeVisitor = activeVisitor.spawn({ context: contextAfter(item, activeVisitor) })
-      return activeVisitor.scope.context
-    }
-    // Explicit groups and normalized slots inherit the surrounding pitch context, but changes
-    // made inside them are lexical and must not escape into the containing sequence.
-    if (current.type === 'Group' || current.type === 'NormalizeToSlot') return context
-    if (current.type === 'PostfixExpression') return contextAfter(current.expression, visitor)
-    if (current.type === 'Repeat') {
-      let active = context
-      const count = repeatCount(current)
-      if (count === undefined) return context
-      for (let iteration = 0; iteration < count; iteration++) {
-        for (const item of repeatBody(current, iteration)) {
-          const itemVisitor = visitor.spawn({ context: active })
-          active = contextAfter(item, itemVisitor)
-        }
-      }
-      return active
-    }
-    return context
+  const resultVisitors = new WeakMap<ScoreShapeEvaluationResult, ScoreVisitor>()
+  const withVisitor = (result: ScoreShapeEvaluationResult, visitor: ScoreVisitor) => {
+    resultVisitors.set(result, visitor)
+    return result
   }
-
-  const subdivisionPulse = (
-    current: Extract<Expression, { type: 'Directive' }>,
-    visitor: ScoreVisitor,
-  ) => {
-    const { context, environment } = visitor.scope
-    if (current.name !== 'subdivision' || current.graceCount) return undefined
-    const argument = current.arguments[0]
-    const evaluated =
-      argument && argument.type !== 'NamedArgument'
-        ? evaluateExpression(argument, context, environment)
-        : undefined
-    let subdivision: Fraction | undefined
-    if (evaluated && 'value' in evaluated) {
-      const value = (evaluated as { readonly value: EvaluatedLiteral }).value
-      const exact = value.kind === 'absolutePitch' ? undefined : value.value.exactRational()
-      if (exact) subdivision = new Fraction(exact)
-    }
-    return subdivision && subdivision.compare(0) > 0
-      ? { pulse: new Fraction(1).div(subdivision), diagnostics: evaluated?.diagnostics ?? [] }
-      : undefined
-  }
-
-  const pulseAfter = (current: Expression, visitor: ScoreVisitor): Fraction => {
-    const { pulse: currentPulse, subdivisionBase } = visitor.scope
-    if (current.type === 'Directive')
-      return subdivisionPulse(current, visitor)?.pulse.mul(subdivisionBase) ?? currentPulse
-    if (current.type === 'Sequence') {
-      let activeVisitor = visitor
-      for (const item of current.items) {
-        const nextPulse = pulseAfter(item, activeVisitor)
-        const nextContext = contextAfter(item, activeVisitor)
-        const declared =
-          item.type === 'VariableDeclaration' || item.type === 'FunctionDeclaration'
-            ? evaluateDeclaration(
-                item,
-                activeVisitor.scope.context,
-                activeVisitor.scope.environment,
-              )
-            : undefined
-        activeVisitor = activeVisitor.spawn({
-          pulse: nextPulse,
-          context: nextContext,
-          ...(declared ? { environment: declared.environment } : {}),
-        })
-      }
-      return activeVisitor.scope.pulse
-    }
-    if (current.type === 'Repeat') {
-      let active = currentPulse
-      const count = repeatCount(current)
-      if (count === undefined) return active
-      for (let iteration = 0; iteration < count; iteration++) {
-        for (const item of repeatBody(current, iteration)) {
-          const itemVisitor = visitor.spawn({ pulse: active })
-          active = pulseAfter(item, itemVisitor)
-        }
-      }
-      return active
-    }
-    // Explicit groups, normalized slots, and parallel branches isolate directive state.
-    return currentPulse
-  }
-
-  const articulationAfter = (
-    current: Expression,
-    visitor: ScoreVisitor,
-  ): { ratio: Fraction; marks: readonly string[] } => {
-    const { articulation: ratio, articulationMarks: marks, context, environment } = visitor.scope
-    if (current.type === 'Directive') {
-      const resolved = resolveDirective(current, context, environment).directive
-      if (resolved?.kind !== 'articulation') return { ratio, marks }
-      return {
-        ratio: resolved.ratio,
-        marks: resolved.shorthand && resolved.mark !== '-' ? [...marks, resolved.mark!] : [],
-      }
-    }
-    if (current.type === 'Sequence') {
-      let activeVisitor = visitor
-      for (const item of current.items) {
-        const active = articulationAfter(item, activeVisitor)
-        const declared =
-          item.type === 'VariableDeclaration' || item.type === 'FunctionDeclaration'
-            ? evaluateDeclaration(
-                item,
-                activeVisitor.scope.context,
-                activeVisitor.scope.environment,
-              )
-            : undefined
-        activeVisitor = activeVisitor.spawn({
-          articulation: active.ratio,
-          articulationMarks: active.marks,
-          context: contextAfter(item, activeVisitor),
-          ...(declared ? { environment: declared.environment } : {}),
-        })
-      }
-      return {
-        ratio: activeVisitor.scope.articulation,
-        marks: activeVisitor.scope.articulationMarks,
-      }
-    }
-    if (current.type === 'Repeat') {
-      let activeVisitor = visitor
-      const count = repeatCount(current)
-      if (count === undefined) return { ratio, marks }
-      for (let iteration = 0; iteration < count; iteration++) {
-        for (const item of repeatBody(current, iteration)) {
-          const active = articulationAfter(item, activeVisitor)
-          activeVisitor = activeVisitor.spawn({
-            articulation: active.ratio,
-            articulationMarks: active.marks,
-            context: contextAfter(item, activeVisitor),
-          })
-        }
-      }
-      return {
-        ratio: activeVisitor.scope.articulation,
-        marks: activeVisitor.scope.articulationMarks,
-      }
-    }
-    return { ratio, marks }
-  }
-
-  const dynamicAfter = (current: Expression, visitor: ScoreVisitor): DynamicMark => {
-    const { dynamic, context, environment } = visitor.scope
-    if (current.type === 'Directive') {
-      const resolved = resolveDirective(current, context, environment).directive
-      return resolved?.kind === 'dynamic' ? resolved.mark : dynamic
-    }
-    if (current.type === 'Sequence') {
-      let activeVisitor = visitor
-      for (const item of current.items) {
-        const declared =
-          item.type === 'VariableDeclaration' || item.type === 'FunctionDeclaration'
-            ? evaluateDeclaration(
-                item,
-                activeVisitor.scope.context,
-                activeVisitor.scope.environment,
-              )
-            : undefined
-        activeVisitor = activeVisitor.spawn({
-          dynamic: dynamicAfter(item, activeVisitor),
-          context: contextAfter(item, activeVisitor),
-          ...(declared ? { environment: declared.environment } : {}),
-        })
-      }
-      return activeVisitor.scope.dynamic
-    }
-    if (current.type === 'Repeat') {
-      let activeVisitor = visitor
-      const count = repeatCount(current)
-      if (count === undefined) return dynamic
-      for (let iteration = 0; iteration < count; iteration++)
-        for (const item of repeatBody(current, iteration))
-          activeVisitor = activeVisitor.spawn({
-            dynamic: dynamicAfter(item, activeVisitor),
-            context: contextAfter(item, activeVisitor),
-          })
-      return activeVisitor.scope.dynamic
-    }
-    return dynamic
-  }
-
-  const directiveStateAfter = (
-    current: Expression,
-    visitor: ScoreVisitor,
-  ): DirectiveExtensionState => {
-    const { directiveState: state, context } = visitor.scope
-    if (current.type === 'Directive') {
-      return applyExtension(current, context, state)?.state ?? state
-    }
-    if (current.type === 'Sequence') {
-      let activeVisitor = visitor
-      for (const item of current.items) {
-        activeVisitor = activeVisitor.spawn({
-          directiveState: directiveStateAfter(item, activeVisitor),
-          context: contextAfter(item, activeVisitor),
-        })
-      }
-      return activeVisitor.scope.directiveState
-    }
-    if (current.type === 'PostfixExpression')
-      return directiveStateAfter(current.expression, visitor)
-    if (current.type === 'Repeat') {
-      let activeVisitor = visitor
-      const count = repeatCount(current)
-      if (count === undefined) return state
-      for (let iteration = 0; iteration < count; iteration++) {
-        for (const item of repeatBody(current, iteration)) {
-          activeVisitor = activeVisitor.spawn({
-            directiveState: directiveStateAfter(item, activeVisitor),
-            context: contextAfter(item, activeVisitor),
-          })
-        }
-      }
-      return activeVisitor.scope.directiveState
-    }
-    return state
-  }
-
-  const visitorAfter = (current: Expression, visitor: ScoreVisitor): ScoreVisitor => {
-    const articulation = articulationAfter(current, visitor)
-    return visitor.spawn({
-      context: contextAfter(current, visitor),
-      pulse: pulseAfter(current, visitor),
-      dynamic: dynamicAfter(current, visitor),
-      articulation: articulation.ratio,
-      articulationMarks: articulation.marks,
-      directiveState: directiveStateAfter(current, visitor),
-    })
-  }
+  const visitorAfter = (result: ScoreShapeEvaluationResult, visitor: ScoreVisitor) =>
+    resultVisitors.get(result) ?? visitor
 
   const visitorContext = (visitor: ScoreVisitor): ScoreVisitorContext => ({
+    tempo: visitor.scope.tempo,
+    timeSignature: visitor.scope.timeSignature,
     pitchContext: visitor.scope.context,
     pulse: visitor.scope.pulse,
     dynamic: visitor.scope.dynamic,
@@ -1309,6 +1122,58 @@ export function evaluateScoreSemantics(
     directiveState: visitor.scope.directiveState,
     lexicalEnvironment: visitor.scope.environment,
   })
+
+  const contextScope = (context: ScoreVisitorContext) => ({
+    tempo: context.tempo,
+    timeSignature: context.timeSignature,
+    context: context.pitchContext,
+    pulse: context.pulse,
+    dynamic: context.dynamic,
+    articulation: context.articulation,
+    articulationMarks: context.articulationMarks,
+    directiveState: context.directiveState,
+    environment: context.lexicalEnvironment,
+  })
+
+  const changeVisitor = (
+    visitor: ScoreVisitor,
+    change: (context: ScoreVisitorContext, base: ScoreVisitorContext) => ScoreVisitorContext,
+  ) => {
+    const resolve: ContextResolver = { parent: visitor.scope.resolve, change, cache: new WeakMap() }
+    return visitor.spawn({ ...contextScope(resolveContext(resolve, visitor.scope.base)), resolve })
+  }
+
+  const at = (visitor: ScoreVisitor, offset: Fraction): ScoreVisitor => {
+    let base = visitor.scope.layout
+      ? visitor.scope.base
+      : (contextAt(options.initialization, offset) ?? visitor.scope.base)
+    if (base === visitor.scope.base) return visitor.spawn({ offset })
+    if (visitor.scope.lockedPulse && !base.pulse.equals(visitor.scope.lockedPulse))
+      base = { ...base, pulse: visitor.scope.lockedPulse }
+    return visitor.spawn({
+      ...contextScope(resolveContext(visitor.scope.resolve, base)),
+      base,
+      offset,
+    })
+  }
+
+  const inheritedMeasureAt = (offset: Fraction) => {
+    let measure = options.timeSignature
+      ? {
+          length: new Fraction(
+            options.timeSignature.numerator * 4,
+            options.timeSignature.denominator,
+          ),
+          origin: new Fraction(0),
+        }
+      : undefined
+    for (const change of options.timeSignatureChanges ?? []) {
+      const origin = new Fraction(change.beat)
+      if (origin.compare(offset) > 0) break
+      measure = { length: new Fraction(change.numerator * 4, change.denominator), origin }
+    }
+    return measure
+  }
 
   const withVisitorContext = (shape: ScoreShape, visitor: ScoreVisitor): ScoreShape => ({
     ...shape,
@@ -1327,15 +1192,25 @@ export function evaluateScoreSemantics(
       articulationMarks: currentArticulationMarks,
       directiveState: currentDirectiveState,
       environment,
-      subdivisionBase,
     } = visitor.scope
+    if (current.type === 'DrumSampleLiteral') {
+      return visitor.visit({
+        type: 'DegreeLiteral',
+        degree: '0',
+        modifiers: [],
+        raw: current.sample,
+        location: current.location,
+      })
+    }
     if (current.type === 'CallExpression') {
       const prepared = prepareFunctionCall(current, context, environment)
       if (prepared) {
         if (!('expression' in prepared)) return prepared
-        const returned = visitor.visit(prepared.expression, {
-          environment: prepared.environment,
-          subdivisionBase: currentPulse,
+        const returned = changeVisitor(visitor, (context) => ({
+          ...context,
+          lexicalEnvironment: prepared.environment,
+        })).visit(prepared.expression, {
+          subdivisionContext: visitor.scope.resolve,
         })
         return {
           ...returned,
@@ -1381,15 +1256,30 @@ export function evaluateScoreSemantics(
       }
     }
     if (current.type === 'BarRest') {
+      const signature = visitor.scope.timeSignature
+      const measure = signature
+        ? {
+            length: new Fraction(signature.numerator * 4, signature.denominator),
+            origin: signature.origin,
+          }
+        : inheritedMeasureAt(visitor.scope.offset)
+      const duration = measure
+        ? measure.length
+            .sub(visitor.scope.offset.sub(measure.origin).mmod(measure.length))
+            .div(visitor.scope.timeScale)
+        : new Fraction(0)
       return {
-        shape: {
-          kind: 'rest',
-          duration: new Fraction(0),
-          generated: false,
-          barRest: true,
-          origins: [origin(current, 'duration')],
-        },
-        diagnostics: [],
+        shape: { kind: 'rest', duration, generated: false, origins: [origin(current, 'duration')] },
+        diagnostics: measure
+          ? []
+          : [
+              {
+                code: 'XP_BAR_REST_WITHOUT_TIME_SIGNATURE',
+                severity: 'warning',
+                message: 'A bar rest has no effect without a prevailing time signature.',
+                locations: [current.location],
+              },
+            ],
       }
     }
     if (current.type === 'DetachedContinue') {
@@ -1400,11 +1290,31 @@ export function evaluateScoreSemantics(
       }
       return { shape, diagnostics: [] }
     }
-    if (current.type === 'Barline') {
-      return { shape: barline(current, 'single'), diagnostics: [] }
-    }
-    if (current.type === 'HardBoundary') {
-      return { shape: barline(current, 'double'), diagnostics: [] }
+    if (current.type === 'Barline' || current.type === 'HardBoundary') {
+      const signature = visitor.scope.timeSignature
+      const measure = signature
+        ? {
+            length: new Fraction(signature.numerator * 4, signature.denominator),
+            origin: signature.origin,
+          }
+        : inheritedMeasureAt(visitor.scope.offset)
+      const offCycle =
+        !visitor.scope.layout &&
+        measure &&
+        visitor.scope.offset.sub(measure.origin).div(measure.length).d !== 1
+      return {
+        shape: barline(current, current.type === 'Barline' ? 'single' : 'double'),
+        diagnostics: offCycle
+          ? [
+              {
+                code: 'XP_BARLINE_OFF_CYCLE',
+                severity: 'warning',
+                message: `Barline does not fall on a whole multiple of the ${measure.length.toFraction()}-beat measure.`,
+                locations: [current.location],
+              },
+            ]
+          : [],
+      }
     }
     if (current.type === 'Repeat') {
       const count = repeatCount(current)
@@ -1434,7 +1344,7 @@ export function evaluateScoreSemantics(
           location: current.location,
         }
         const result = activeVisitor.visit(iterationNode)
-        const nextVisitor = visitorAfter(iterationNode, activeVisitor)
+        const nextVisitor = visitorAfter(result, activeVisitor)
         diagnostics.push(...result.diagnostics)
         if (!hasShape(result)) return { diagnostics }
         const iterationShapes = [result.shape]
@@ -1467,15 +1377,8 @@ export function evaluateScoreSemantics(
         items: current.body,
         location: current.location,
       }
-      const endingArticulation = articulationAfter(commonNode, visitor)
-      const endingVisitor = visitor.spawn({
-        context: contextAfter(commonNode, visitor),
-        pulse: pulseAfter(commonNode, visitor),
-        articulation: endingArticulation.ratio,
-        articulationMarks: endingArticulation.marks,
-        directiveState: directiveStateAfter(commonNode, visitor),
-      })
       const commonResult = visitor.visit(commonNode)
+      const endingVisitor = visitorAfter(commonResult, visitor)
       diagnostics.push(...commonResult.diagnostics)
       const commonShapes = hasShape(commonResult) ? [commonResult.shape] : []
       const endingShapes = current.endings.map((ending) => {
@@ -1495,20 +1398,26 @@ export function evaluateScoreSemantics(
           ? repeatMarker(current, 'end', 'ending-end')
           : endingMarker(current, current.endings[index + 1]!, index + 1, 'repeat-end'),
       ])
-      return {
-        shape: sequence(
-          [
-            repeatMarker(current, 'start', 'repeat-start'),
-            ...(current.endings.length ? [...commonShapes, ...endingMarkers] : displayed.children),
-            ...(current.endings.length ? [] : [repeatMarker(current, 'end', 'repeat-end')]),
-          ],
-          [origin(current)],
-        ),
-        diagnostics,
-      }
+      return withVisitor(
+        {
+          shape: sequence(
+            [
+              repeatMarker(current, 'start', 'repeat-start'),
+              ...(current.endings.length
+                ? [...commonShapes, ...endingMarkers]
+                : displayed.children),
+              ...(current.endings.length ? [] : [repeatMarker(current, 'end', 'repeat-end')]),
+            ],
+            [origin(current)],
+          ),
+          diagnostics,
+        },
+        activeVisitor,
+      )
     }
     if (current.type === 'Sequence') {
       let activeVisitor = visitor
+      let elapsed = new Fraction(0)
       let velocity: Fraction | undefined
       let grace: { duration: Fraction; count: number; indices: number[] } | undefined
       let gliss:
@@ -1525,13 +1434,26 @@ export function evaluateScoreSemantics(
         | undefined
       const results: ScoreShapeEvaluationResult[] = []
       for (const item of current.items) {
+        activeVisitor = at(
+          activeVisitor,
+          visitor.scope.offset.add(elapsed.mul(visitor.scope.timeScale)),
+        )
         if (item.type === 'VariableDeclaration' || item.type === 'FunctionDeclaration') {
           const declared = evaluateDeclaration(
             item,
             activeVisitor.scope.context,
             activeVisitor.scope.environment,
           )
-          activeVisitor = activeVisitor.spawn({ environment: declared.environment })
+          activeVisitor = changeVisitor(activeVisitor, (context) => ({
+            ...context,
+            lexicalEnvironment: extendLexicalEnvironment(
+              context.lexicalEnvironment ?? declared.environment,
+              {
+                variables: declared.environment.variables,
+                functions: declared.environment.functions,
+              },
+            ),
+          }))
           results.push({
             shape: withVisitorContext(sequence([], [origin(item)]), activeVisitor),
             diagnostics: declared.diagnostics,
@@ -1542,7 +1464,10 @@ export function evaluateScoreSemantics(
           try {
             const previousContext = activeVisitor.scope.context
             const changedContext = applyPitchContextChange(item, previousContext)
-            activeVisitor = activeVisitor.spawn({ context: changedContext })
+            activeVisitor = changeVisitor(activeVisitor, (context) => ({
+              ...context,
+              pitchContext: applyPitchContextChange(item, context.pitchContext),
+            }))
             results.push({
               shape: withVisitorContext(
                 contextShape(item, changedContext, previousContext),
@@ -1571,7 +1496,12 @@ export function evaluateScoreSemantics(
             activeVisitor.scope.directiveState,
           )
           if (extended) {
-            activeVisitor = activeVisitor.spawn({ directiveState: extended.state })
+            activeVisitor = changeVisitor(activeVisitor, (context) => {
+              const applied = applyExtension(item, context.pitchContext, context.directiveState)!
+              if (applied.diagnostics.some(({ severity }) => severity === 'error'))
+                throw new EvaluationError(applied.diagnostics)
+              return { ...context, directiveState: applied.state }
+            })
             results.push({
               shape: withVisitorContext(sequence([], [origin(item, 'directive')]), activeVisitor),
               diagnostics: extended.diagnostics,
@@ -1588,14 +1518,37 @@ export function evaluateScoreSemantics(
             resolved.diagnostics.push({
               code: 'XP_TEMPO_SCOPE',
               severity: 'error',
-              message: '@tempo is only allowed in a DAW global source.',
+              message: '@tempo is only allowed in a global source.',
               locations: [item.location],
             })
           }
           if (directive?.kind === 'subdivision')
-            activeVisitor = activeVisitor.spawn({ pulse: subdivisionBase.mul(directive.pulse) })
+            activeVisitor = changeVisitor(activeVisitor, (context, base) => ({
+              ...context,
+              pulse: resolveContext(visitor.scope.subdivisionContext, base).pulse.mul(
+                directive.pulse,
+              ),
+            }))
           else if (directive?.kind === 'dynamic')
-            activeVisitor = activeVisitor.spawn({ dynamic: directive.mark })
+            activeVisitor = changeVisitor(activeVisitor, (context) => ({
+              ...context,
+              dynamic: directive.mark,
+            }))
+          else if (directive?.kind === 'time') {
+            const signature = {
+              numerator: directive.numerator,
+              denominator: directive.denominator,
+              origin: activeVisitor.scope.offset,
+            }
+            activeVisitor = changeVisitor(activeVisitor, (context) => ({
+              ...context,
+              timeSignature: signature,
+            }))
+          } else if (directive?.kind === 'tempo')
+            activeVisitor = changeVisitor(activeVisitor, (context) => ({
+              ...context,
+              tempo: directive.bpm,
+            }))
           else if (directive?.kind === 'velocity') velocity = directive.velocity
           else if (directive?.kind === 'grace')
             grace = { duration: directive.duration, count: directive.count, indices: [] }
@@ -1612,10 +1565,11 @@ export function evaluateScoreSemantics(
               directive.shorthand && directive.mark !== '-'
                 ? [...activeVisitor.scope.articulationMarks, directive.mark!]
                 : []
-            activeVisitor = activeVisitor.spawn({
+            activeVisitor = changeVisitor(activeVisitor, (context) => ({
+              ...context,
               articulation: directive.ratio,
               articulationMarks,
-            })
+            }))
           }
           let grooveTemplate: ScoreShape | undefined
           if (directive?.kind === 'groove' && directive.argument) {
@@ -1624,7 +1578,8 @@ export function evaluateScoreSemantics(
               articulation: new Fraction(1),
               articulationMarks: [],
               directiveState: initialDirectiveState,
-              subdivisionBase: activeVisitor.scope.pulse,
+
+              subdivisionContext: activeVisitor.scope.resolve,
             })
             resolved.diagnostics.push(...template.diagnostics)
             if ('shape' in template) {
@@ -1641,7 +1596,7 @@ export function evaluateScoreSemantics(
           let droneTemplate: ScoreShape | undefined
           if (directive?.kind === 'drone' && directive.argument) {
             const template = activeVisitor.visit(directive.argument, {
-              subdivisionBase: activeVisitor.scope.pulse,
+              subdivisionContext: activeVisitor.scope.resolve,
             })
             resolved.diagnostics.push(...template.diagnostics)
             if ('shape' in template) {
@@ -1712,7 +1667,9 @@ export function evaluateScoreSemantics(
             shape:
               directive?.kind === 'subdivision' ||
               directive?.kind === 'dynamic' ||
-              directive?.kind === 'articulation'
+              directive?.kind === 'articulation' ||
+              directive?.kind === 'time' ||
+              directive?.kind === 'tempo'
                 ? withVisitorContext(shape, activeVisitor)
                 : shape,
             diagnostics: resolved.diagnostics,
@@ -1766,7 +1723,8 @@ export function evaluateScoreSemantics(
           const stolen = grace.duration.mul(grace.count)
           for (const i of grace.indices.slice(0, -1)) {
             const r = results[i]!
-            if ('shape' in r)
+            if ('shape' in r) {
+              elapsed = elapsed.add(grace.duration.sub(r.shape.duration))
               results[i] = {
                 ...r,
                 shape: mapAttacks(resizeShape(r.shape, grace.duration), (attack) => ({
@@ -1774,6 +1732,7 @@ export function evaluateScoreSemantics(
                   grace: true,
                 })),
               }
+            }
           }
           const target = results[targetIndex]!
           if ('shape' in target && target.shape.duration.compare(stolen) >= 0) {
@@ -1919,7 +1878,9 @@ export function evaluateScoreSemantics(
           }
           if (gliss?.indices.length === 2) gliss = undefined
         }
-        activeVisitor = visitorAfter(item, activeVisitor)
+        const timed = results[index]!
+        if ('shape' in timed) elapsed = elapsed.add(timed.shape.duration)
+        activeVisitor = visitorAfter(result, activeVisitor)
       }
       const diagnostics = results.flatMap((result) => result.diagnostics)
       if (grace || gliss)
@@ -1930,18 +1891,22 @@ export function evaluateScoreSemantics(
           locations: [current.location],
         })
       if (!results.every(hasShape)) return { diagnostics }
-      return {
-        shape: sequence(
-          results.map((result) => result.shape),
-          [origin(current)],
-        ),
-        diagnostics,
-        lexicalEnvironment: activeVisitor.scope.environment,
-      }
+      return withVisitor(
+        {
+          shape: sequence(
+            results.map((result) => result.shape),
+            [origin(current)],
+          ),
+          diagnostics,
+        },
+        activeVisitor,
+      )
     }
     if (current.type === 'Parallel') {
       const results = current.branches.map((branch) =>
-        visitor.visit(branch, { subdivisionBase: currentPulse }),
+        visitor.visit(branch, {
+          subdivisionContext: visitor.scope.resolve,
+        }),
       )
       const diagnostics = results.flatMap((result) => result.diagnostics)
       if (!results.every(hasShape)) return { diagnostics }
@@ -1959,7 +1924,9 @@ export function evaluateScoreSemantics(
       return { shape, diagnostics }
     }
     if (current.type === 'Group') {
-      const grouped = visitor.visit(current.expression, { subdivisionBase: currentPulse })
+      const grouped = visitor.visit(current.expression, {
+        subdivisionContext: visitor.scope.resolve,
+      })
       if (!('shape' in grouped)) return grouped
       return {
         ...grouped,
@@ -1978,7 +1945,8 @@ export function evaluateScoreSemantics(
           diagnostics: [],
         }
       }
-      const evaluated = visitor.visit(current.expression, { subdivisionBase: currentPulse })
+      const local = { subdivisionContext: visitor.scope.resolve }
+      let evaluated = visitor.visit(current.expression, { ...local, layout: true })
       if (!('shape' in evaluated)) return evaluated
       if (!evaluated.shape.duration.n) {
         return {
@@ -1991,6 +1959,32 @@ export function evaluateScoreSemantics(
               locations: [current.location],
             },
           ],
+        }
+      }
+      if (!visitor.scope.layout) {
+        const tried = new Set<string>()
+        for (;;) {
+          const duration = evaluated.shape.duration
+          if (!duration.n || tried.has(duration.toFraction()) || tried.size >= 32)
+            return {
+              diagnostics: [
+                {
+                  code: 'XP_TIMELINE_LAYOUT',
+                  severity: 'error',
+                  message:
+                    'Timed context changes do not produce a stable rhythm inside this normalized slot.',
+                  locations: [current.location],
+                },
+              ],
+            }
+          tried.add(duration.toFraction())
+          evaluated = visitor.visit(current.expression, {
+            ...local,
+            lockedPulse: visitor.scope.base.pulse,
+            timeScale: visitor.scope.timeScale.mul(currentPulse).div(duration),
+          })
+          if (!('shape' in evaluated)) return evaluated
+          if (evaluated.shape.duration.equals(duration)) break
         }
       }
       const normalizedSlots = evaluated.shape.duration.div(currentPulse)
@@ -2016,9 +2010,25 @@ export function evaluateScoreSemantics(
       }
     }
     if (current.type === 'PostfixExpression') {
-      const evaluated = visitor.visit(current.expression)
-      if (!('shape' in evaluated)) return evaluated
+      const continuations = current.marks.filter((mark) => mark.type === 'DetachedContinue')
       const elimination = current.marks.find((mark) => mark.type === 'TailElimination')
+      let evaluated = visitor.visit(current.expression)
+      if (!('shape' in evaluated)) return evaluated
+      if (
+        continuations.length &&
+        (evaluated.shape.kind === 'sequence' || evaluated.shape.kind === 'parallel') &&
+        !visitor.scope.layout
+      ) {
+        const duration = evaluated.shape.duration.sub(currentPulse.mul(elimination?.count ?? 0))
+        if (duration.compare(0) > 0) {
+          evaluated = visitor.visit(current.expression, {
+            timeScale: visitor.scope.timeScale
+              .mul(duration.add(currentPulse.mul(continuations.length)))
+              .div(duration),
+          })
+          if (!('shape' in evaluated)) return evaluated
+        }
+      }
       let base = evaluated.shape
       if (elimination) {
         const removed = currentPulse.mul(elimination.count)
@@ -2036,22 +2046,28 @@ export function evaluateScoreSemantics(
           }
         base = trimShape(base, base.duration.sub(removed))
       }
-      const continuations = current.marks.filter((mark) => mark.type === 'DetachedContinue')
-      if (!continuations.length) return { shape: base, diagnostics: evaluated.diagnostics }
-      return {
-        shape: sequence(
-          [
-            base,
-            ...continuations.map<ContinueShape>((mark) => ({
-              kind: 'continue',
-              duration: currentPulse,
-              origins: [origin(mark, 'duration')],
-            })),
-          ],
-          [origin(current)],
-        ),
-        diagnostics: evaluated.diagnostics,
-      }
+      if (!continuations.length)
+        return withVisitor(
+          { shape: base, diagnostics: evaluated.diagnostics },
+          visitorAfter(evaluated, visitor),
+        )
+      return withVisitor(
+        {
+          shape: sequence(
+            [
+              base,
+              ...continuations.map<ContinueShape>((mark) => ({
+                kind: 'continue',
+                duration: currentPulse,
+                origins: [origin(mark, 'duration')],
+              })),
+            ],
+            [origin(current)],
+          ),
+          diagnostics: evaluated.diagnostics,
+        },
+        visitorAfter(evaluated, visitor),
+      )
     }
 
     if (current.type === 'PitchContextChange') {
@@ -2096,124 +2112,60 @@ export function evaluateScoreSemantics(
     return { shape, diagnostics: evaluated.diagnostics }
   }
 
-  const initialContext = options.pitchContext ?? DEFAULT_PITCH_CONTEXT
-  const visitor = new Visitor(evaluateNode, {
-    context: initialContext,
+  const base: ScoreVisitorContext = {
+    tempo: options.tempo === undefined ? undefined : new Fraction(options.tempo),
+    timeSignature:
+      inherited?.timeSignature ??
+      (options.timeSignature?.origin
+        ? { ...options.timeSignature, origin: options.timeSignature.origin }
+        : undefined),
+    pitchContext: options.pitchContext ?? DEFAULT_PITCH_CONTEXT,
     pulse,
     dynamic: options.dynamic ?? 'mf',
     articulation: new Fraction(options.articulation ?? 1),
     articulationMarks: options.articulationMarks ?? [],
     directiveState: initialDirectiveState,
-    environment: options.lexicalEnvironment,
-    subdivisionBase: pulse,
-  })
+    lexicalEnvironment: options.lexicalEnvironment,
+  }
+  const identity: ContextResolver = { cache: new WeakMap() }
+  const visitor: ScoreVisitor = new Visitor(
+    (current, active) => {
+      try {
+        return evaluateNode(current, at(active, active.scope.offset))
+      } catch (error) {
+        return {
+          diagnostics:
+            error instanceof EvaluationError
+              ? error.diagnostics
+              : [
+                  {
+                    code: 'XP_CONTEXT',
+                    severity: 'error',
+                    message: error instanceof Error ? error.message : String(error),
+                    locations: [current.location],
+                  },
+                ],
+        }
+      }
+    },
+    {
+      ...contextScope(base),
+      base,
+      resolve: identity,
+      subdivisionContext: identity,
+
+      offset: options.beatOffset ?? new Fraction(0),
+      timeScale: new Fraction(1),
+    },
+  )
   const result = visitor.visit(node)
   if (!('shape' in result)) return result
-  const barRestDiagnostics: Diagnostic[] = []
-  type MeasureState = {
-    offset: Fraction
-    length?: Fraction
-    origin?: Fraction
-    authoredSignature?: boolean
-  }
-  const inheritedMeasureAt = (offset: Fraction) => {
-    let prevailing: { length: Fraction; origin: Fraction } | undefined
-    for (const change of options.timeSignatureChanges ?? []) {
-      const origin = new Fraction(change.beat)
-      if (origin.compare(offset) > 0) break
-      prevailing = {
-        length: new Fraction(change.numerator * 4, change.denominator),
-        origin,
-      }
-    }
-    return prevailing
-  }
-  const removeParallelPadding = (shape: ScoreShape): ScoreShape => {
-    if (shape.kind !== 'sequence' || shape.children.length !== 2) return shape
-    const padding = shape.children[1]!
-    return padding.kind === 'rest' && padding.generated ? shape.children[0]! : shape
-  }
-  const resolveBarRests = (shape: ScoreShape, state: MeasureState): ScoreShape => {
-    const saved = shape.isolatedDirectiveScope ? { ...state } : undefined
-    let resolved: ScoreShape
-    if (shape.kind === 'time-signature') {
-      state.length = new Fraction(shape.numerator * 4, shape.denominator)
-      state.origin = new Fraction(state.offset)
-      state.authoredSignature = true
-      resolved = shape
-    } else if (shape.kind === 'rest' && shape.barRest) {
-      if (!state.authoredSignature) Object.assign(state, inheritedMeasureAt(state.offset))
-      let duration = new Fraction(0)
-      if (state.length && state.origin) {
-        const elapsed = state.offset.sub(state.origin)
-        const completedMeasures = elapsed.div(state.length).floor()
-        duration = state.origin.add(state.length.mul(completedMeasures.add(1))).sub(state.offset)
-      } else {
-        barRestDiagnostics.push({
-          code: 'XP_BAR_REST_WITHOUT_TIME_SIGNATURE',
-          severity: 'warning',
-          message: 'A bar rest has no effect without a prevailing time signature.',
-          locations: shape.origins.map(({ location }) => location),
-        })
-      }
-      resolved = { ...shape, duration, barRest: undefined }
-    } else if (shape.kind === 'sequence') {
-      const children = shape.children.map((child) => {
-        const result = resolveBarRests(child, state)
-        state.offset = state.offset.add(result.duration)
-        return result
-      })
-      resolved = {
-        ...shape,
-        children,
-        duration: children.reduce((sum, child) => sum.add(child.duration), new Fraction(0)),
-      }
-      // The children advanced the shared cursor; the caller advances by this sequence.
-      state.offset = state.offset.sub(resolved.duration)
-    } else if (shape.kind === 'parallel') {
-      const branches = shape.branches.map((branch) =>
-        resolveBarRests(removeParallelPadding(branch), {
-          ...state,
-          offset: new Fraction(state.offset),
-        }),
-      )
-      const duration = branches.reduce(
-        (maximum, branch) => (branch.duration.compare(maximum) > 0 ? branch.duration : maximum),
-        new Fraction(0),
-      )
-      resolved = { ...shape, branches: branches.map((branch) => pad(branch, duration)), duration }
-    } else resolved = shape
-    if (saved) Object.assign(state, saved)
-    return resolved
-  }
-  const initialLength = options.timeSignature
-    ? new Fraction(options.timeSignature.numerator * 4, options.timeSignature.denominator)
-    : undefined
-  const resolvedShape = resolveBarRests(result.shape, {
-    offset: new Fraction(options.beatOffset ?? 0),
-    length: initialLength,
-    origin: initialLength ? new Fraction(0) : undefined,
-  })
-  const resolvedResult = {
-    ...result,
-    shape: resolvedShape,
-    diagnostics: [...result.diagnostics, ...barRestDiagnostics],
-  }
-  const prevailingVisitor = visitorAfter(node, visitor)
-  const lexicalEnvironment = resolvedResult.lexicalEnvironment ?? options.lexicalEnvironment
+  const prevailing = visitorContext(visitorAfter(result, visitor))
   return {
-    ...resolvedResult,
-    pitchContext: prevailingVisitor.scope.context,
-    directiveState: prevailingVisitor.scope.directiveState,
-    lexicalEnvironment,
-    visitorContext: {
-      pitchContext: prevailingVisitor.scope.context,
-      pulse: prevailingVisitor.scope.pulse,
-      dynamic: prevailingVisitor.scope.dynamic,
-      articulation: prevailingVisitor.scope.articulation,
-      articulationMarks: prevailingVisitor.scope.articulationMarks,
-      directiveState: prevailingVisitor.scope.directiveState,
-      lexicalEnvironment,
-    },
+    ...result,
+    pitchContext: prevailing.pitchContext,
+    directiveState: prevailing.directiveState,
+    lexicalEnvironment: prevailing.lexicalEnvironment,
+    visitorContext: prevailing,
   }
 }

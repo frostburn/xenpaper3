@@ -32,6 +32,10 @@ export {
   evaluateScoreShape,
 } from './runtime/score-shape'
 export { expandToBeatEvents } from './runtime/beat-events'
+export { evaluateInitialization } from './runtime/initialization'
+export { evaluateTimeline, gridMeasureBoundaries } from './runtime/timeline'
+export type { GridTempoChange, GridTimeSignatureChange } from './runtime/timeline'
+export type { ScoreInitialization, TimedScoreContext } from './runtime/types'
 export { Visitor } from './runtime/visitor'
 export type { VisitorEvaluation } from './runtime/visitor'
 export type { BeatEventExpansionOptions, BeatEventExpansionResult } from './runtime/beat-events'

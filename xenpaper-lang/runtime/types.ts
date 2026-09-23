@@ -52,11 +52,16 @@ export interface ExpandedProgram extends Omit<Program, 'body'> {
 
 export interface RepeatExpansionOptions {
   readonly expansionLimit?: number
+  /** Retain repeat boundaries as zero-duration barlines for grid diagnostics. */
+  readonly preserveBarlines?: boolean
 }
 
-export interface ScoreShapeOptions {
+export interface ScoreShapeOptions extends RepeatExpansionOptions {
+  /** Inherited global grid and enclosing lexical initialization. */
+  readonly initialization?: ScoreInitialization
   /** Allow project-level tempo directives. These are invalid in ordinary score sources. */
   readonly allowTempoDirective?: boolean
+  readonly tempo?: FractionValue
   readonly pulse?: FractionValue
   readonly dynamic?: DynamicMark
   readonly articulation?: FractionValue
@@ -65,7 +70,11 @@ export interface ScoreShapeOptions {
   readonly directiveState?: DirectiveExtensionState
   readonly directiveExtensions?: readonly DirectiveExtension[]
   /** Prevailing signature before the score starts, aligned to absolute beat zero. */
-  readonly timeSignature?: { readonly numerator: number; readonly denominator: number }
+  readonly timeSignature?: {
+    readonly numerator: number
+    readonly denominator: number
+    readonly origin?: Fraction
+  }
   /** Absolute meter changes inherited from an enclosing project timeline. */
   readonly timeSignatureChanges?: readonly {
     readonly beat: FractionValue
@@ -130,6 +139,12 @@ export type ScoreShapeEvaluationResult =
 
 /** Serializable public projection of the score visitor's prevailing scope. */
 export interface ScoreVisitorContext {
+  readonly tempo?: Fraction
+  readonly timeSignature?: {
+    readonly numerator: number
+    readonly denominator: number
+    readonly origin: Fraction
+  }
   readonly pitchContext: PitchContext
   readonly pulse: Fraction
   readonly dynamic: DynamicMark
@@ -137,6 +152,19 @@ export interface ScoreVisitorContext {
   readonly articulationMarks: readonly string[]
   readonly directiveState: DirectiveExtensionState
   readonly lexicalEnvironment?: LexicalEnvironment
+}
+
+export interface TimedScoreContext {
+  readonly start: Fraction
+  readonly context: ScoreVisitorContext
+}
+
+/** An absolute grid timeline. Its final state prevails until explicitly changed. */
+export interface ScoreInitialization {
+  readonly context?: ScoreVisitorContext
+  readonly changes?: readonly TimedScoreContext[]
+  readonly shape?: ScoreShape
+  readonly timelineShape?: ScoreShape
 }
 
 export interface RepeatExpansionResult {

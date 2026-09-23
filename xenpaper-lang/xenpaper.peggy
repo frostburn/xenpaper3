@@ -59,15 +59,7 @@
     }
   };
 
-  const containsDeclaration = value => {
-    if (!value || typeof value !== 'object') return false;
-    if (value.type === 'VariableDeclaration' || value.type === 'FunctionDeclaration') return true;
-    return Object.entries(value).some(([key, child]) =>
-      key !== 'location' && (Array.isArray(child)
-        ? child.some(containsDeclaration)
-        : containsDeclaration(child))
-    );
-  };
+
 }
 
 Start
@@ -106,9 +98,6 @@ ParallelExpression
 ScopedParallelExpression
   = repeated:ParallelExpression Spacing ":|" !(Spacing ",")
     remainder:(Spacing item:ScopedParallelExpression { return item; })? {
-      if (containsDeclaration(repeated)) {
-        error('Variable and function declarations are not allowed inside repeats.');
-      }
       const repeat = node('Repeat', {
         count: null,
         body: [repeated],
@@ -122,9 +111,6 @@ ScopedParallelExpression
     }
   / body:ParallelExpression result:RepeatEndings !(Spacing ",")
     remainder:(Spacing item:ScopedParallelExpression { return item; })? {
-      if (containsDeclaration(body) || containsDeclaration(result.endings)) {
-        error('Variable and function declarations are not allowed inside repeats.');
-      }
       const repeat = node('Repeat', {
         count: null,
         body: [body],
@@ -143,9 +129,6 @@ ScopedParallelExpression
 
 ScopedSequenceExpression
   = repeated:SequenceExpression Spacing ":|" remainder:(Spacing item:ScopedSequenceExpression { return item; })? {
-      if (containsDeclaration(repeated)) {
-        error('Variable and function declarations are not allowed inside repeats.');
-      }
       const repeat = node('Repeat', {
         count: null,
         body: [repeated],
@@ -159,9 +142,6 @@ ScopedSequenceExpression
     }
   / body:SequenceExpression result:RepeatEndings
     remainder:(Spacing item:ScopedSequenceExpression { return item; })? {
-      if (containsDeclaration(body) || containsDeclaration(result.endings)) {
-        error('Variable and function declarations are not allowed inside repeats.');
-      }
       const repeat = node('Repeat', {
         count: null,
         body: [body],
@@ -417,9 +397,6 @@ HardBoundary
 
 RepeatExpression
   = "|:" Spacing count:RepeatCount? Spacing body:RepeatBody? result:RepeatEndings {
-      if (containsDeclaration(body) || containsDeclaration(result.endings)) {
-        error('Variable and function declarations are not allowed inside repeats.');
-      }
       return node('Repeat', {
         count,
         body: body ?? [],

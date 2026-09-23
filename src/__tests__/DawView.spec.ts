@@ -705,7 +705,7 @@ describe('DAW project model', () => {
   it('repeats duration-bearing global groove changes over absolute project time', () => {
     const project = createDefaultProject()
     const instrument = project.instrumentLanes[0]!
-    project.globalTrack.source = '@groove([0==0=]);@groove([0=0==])'
+    project.globalTrack.source = '|: @groove([0==0=]);@groove([0=0==]); :|'
     instrument.clips.push({
       id: 'alternating-swing',
       start: beat(0),
@@ -722,7 +722,7 @@ describe('DAW project model', () => {
   it('selects global tuning changes from each clip position and repeats them', () => {
     const project = createDefaultProject()
     const instrument = project.instrumentLanes[0]!
-    project.globalTrack.source = '{19edo};{12edo}'
+    project.globalTrack.source = '|: {19edo};{12edo}; :|'
     instrument.clips.push(
       { id: 'nineteen-a', start: beat(0), length: beat(1), source: 'D' },
       { id: 'twelve', start: beat(4), length: beat(1), source: 'D' },
@@ -737,7 +737,7 @@ describe('DAW project model', () => {
   it('applies cascading global tuning changes within a clip', () => {
     const project = createDefaultProject()
     const instrument = project.instrumentLanes[0]!
-    project.globalTrack.source = '{5edo};{12edo}'
+    project.globalTrack.source = '|: {5edo};{12edo}; :|'
     instrument.clips.push({
       id: 'cascading-tuning',
       start: beat(0),

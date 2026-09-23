@@ -46,15 +46,14 @@ describe('lexical declarations', () => {
     expect(parse('letter').body[0]).not.toMatchObject({ type: 'VariableDeclaration' })
   })
 
-  it('rejects declarations in repeat bodies and alternate endings', () => {
-    expect(() => parse('|: let interval = 3/2 interval :|')).toThrow(/not allowed inside repeats/)
-    expect(() => parse('|: C |@^1 fn transform() { ret 3/2 } transform() ||')).toThrow(
-      /not allowed inside repeats/,
-    )
-    expect(() => parse('let interval = 3/2 interval :|')).toThrow(/not allowed inside repeats/)
-    expect(() => parse('fn transform() { ret 3/2 } transform() :|')).toThrow(
-      /not allowed inside repeats/,
-    )
+  it('allows declarations in repeated text', () => {
+    for (const source of [
+      '|: let interval = 3/2 interval :|',
+      '|: C |@^1 fn transform() { ret 3/2 } transform() ||',
+      'let interval = 3/2 interval :|',
+      'fn transform() { ret 3/2 } transform() :|',
+    ])
+      expect(() => parse(source)).not.toThrow()
   })
 
   it('does not allow declarations to claim musical spellings', () => {
