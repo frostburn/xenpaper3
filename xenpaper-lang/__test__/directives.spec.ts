@@ -393,7 +393,7 @@ describe('directive runtime', () => {
     const held = notes('@gliss F= C')
     expect(held).toHaveLength(1)
     expect(held[0]!.duration.valueOf()).toBe(3)
-    const mismatch = compile('@gliss (F C)= [E, D]?')
+    const mismatch = compile('@gliss (F C)= [E, D, G]?')
     expect(mismatch.diagnostics).toContainEqual(expect.objectContaining({ code: 'XP_GLISS_SHAPE' }))
   })
 

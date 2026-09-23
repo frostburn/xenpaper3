@@ -1,5 +1,5 @@
 import { Fraction } from 'xen-dev-utils/fraction'
-import type { Expression } from '../parser.generated.js'
+import type { Expression, Node } from '../parser.generated.js'
 import type { Diagnostic } from '../diagnostics'
 import { Value } from '../value'
 import { evaluateDeclaration, evaluateExpression, prepareFunctionCall } from './expressions'
@@ -538,7 +538,7 @@ function hasShape(
   return 'shape' in result
 }
 
-function origin(node: Expression, role: SourceOrigin['role'] = 'structural'): SourceOrigin {
+function origin(node: Node, role: SourceOrigin['role'] = 'structural'): SourceOrigin {
   return { location: node.location, role }
 }
 
@@ -806,6 +806,61 @@ function attacks(shape: ScoreShape): AttackShape[] {
   if (shape.kind === 'sequence') return shape.children.flatMap(attacks)
   if (shape.kind === 'parallel') return shape.branches.flatMap(attacks)
   return []
+}
+
+interface TimedAttack {
+  readonly attack: AttackShape
+  readonly start: Fraction
+}
+
+/** Locate attacks without flattening their authored rhythm. */
+function timedAttacks(shape: ScoreShape, start = new Fraction(0)): TimedAttack[] {
+  if (shape.kind === 'attack') return [{ attack: shape, start }]
+  if (shape.kind === 'sequence') {
+    const result: TimedAttack[] = []
+    let offset = start
+    for (const child of shape.children) {
+      result.push(...timedAttacks(child, offset))
+      offset = offset.add(child.duration)
+    }
+    return result
+  }
+  if (shape.kind === 'parallel')
+    return shape.branches.flatMap((branch) => timedAttacks(branch, start))
+  return []
+}
+
+/**
+ * Turn a rhythmic fragment into independently holdable voices. The leading
+ * generated rests retain every attack's original onset while the parallel
+ * branches allow its sounding duration to extend without moving later notes.
+ */
+function holdAttacks(
+  shape: ScoreShape,
+  duration: Fraction,
+  extension: Fraction,
+  holdUntilEnd: boolean,
+  markOrigins: readonly SourceOrigin[],
+): ScoreShape {
+  const timed = timedAttacks(shape)
+  if (!timed.length) return shape
+  const branches = timed.map(({ attack, start }) => {
+    const heldDuration = holdUntilEnd ? duration.sub(start) : attack.duration.add(extension)
+    const held: AttackShape = {
+      ...attack,
+      duration: heldDuration,
+      origins: [...attack.origins, ...markOrigins],
+    }
+    if (!start.n) return held
+    return sequence([generatedRest(start), held], shape.origins)
+  })
+  return {
+    kind: 'parallel',
+    duration,
+    branches: branches.map((branch) => pad(branch, duration)),
+    origins: shape.origins,
+    isolatedDirectiveScope: shape.isolatedDirectiveScope,
+  }
 }
 
 function contextAnnotation(
@@ -2011,12 +2066,17 @@ export function evaluateScoreSemantics(
     }
     if (current.type === 'PostfixExpression') {
       const continuations = current.marks.filter((mark) => mark.type === 'DetachedContinue')
+      const hold = current.marks.find((mark) => mark.type === 'HoldUntilEnd')
       const elimination = current.marks.find((mark) => mark.type === 'TailElimination')
       let evaluated = visitor.visit(current.expression)
       if (!('shape' in evaluated)) return evaluated
+      const distributesHolds =
+        current.expression.type === 'Group' ||
+        (Boolean(hold) && current.expression.type === 'NormalizeToSlot')
       if (
         continuations.length &&
         (evaluated.shape.kind === 'sequence' || evaluated.shape.kind === 'parallel') &&
+        !distributesHolds &&
         !visitor.scope.layout
       ) {
         const duration = evaluated.shape.duration.sub(currentPulse.mul(elimination?.count ?? 0))
@@ -2045,6 +2105,23 @@ export function evaluateScoreSemantics(
             ],
           }
         base = trimShape(base, base.duration.sub(removed))
+      }
+      if (distributesHolds || hold) {
+        const extension = currentPulse.mul(continuations.length)
+        const duration = base.duration.add(extension)
+        base = holdAttacks(
+          base,
+          duration,
+          extension,
+          Boolean(hold),
+          current.marks
+            .filter((mark) => mark.type === 'DetachedContinue' || mark.type === 'HoldUntilEnd')
+            .map((mark) => origin(mark, 'duration')),
+        )
+        return withVisitor(
+          { shape: base, diagnostics: evaluated.diagnostics },
+          visitorAfter(evaluated, visitor),
+        )
       }
       if (!continuations.length)
         return withVisitor(

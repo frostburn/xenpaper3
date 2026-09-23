@@ -370,7 +370,12 @@ export interface PitchContextChange extends Node {
 export interface PostfixExpression extends Node {
   type: 'PostfixExpression'
   expression: Expression
-  marks: (DetachedContinue | TailElimination)[]
+  marks: (DetachedContinue | HoldUntilEnd | TailElimination)[]
+}
+
+export interface HoldUntilEnd extends Node {
+  type: 'HoldUntilEnd'
+  raw: '!'
 }
 
 export interface PitchLiteral extends Node {

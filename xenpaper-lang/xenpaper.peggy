@@ -261,6 +261,7 @@ PostfixExpression
 
 AttachedPostfixMark
   = "=" { return node('DetachedContinue', { raw: "=" }); }
+  / "!" { return node('HoldUntilEnd', { raw: "!" }); }
   / marks:$("?"+) {
       return node('TailElimination', { count: marks.length, raw: marks });
     }

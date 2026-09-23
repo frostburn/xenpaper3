@@ -843,6 +843,21 @@ describe('Xenpaper surface grammar', () => {
     })
   })
 
+  it('parses hold-until-container-end marks', () => {
+    expect(parse('(0 5 7)!=')).toMatchObject({
+      body: [
+        {
+          type: 'PostfixExpression',
+          expression: { type: 'Group' },
+          marks: [
+            { type: 'HoldUntilEnd', raw: '!' },
+            { type: 'DetachedContinue', raw: '=' },
+          ],
+        },
+      ],
+    })
+  })
+
   it('parses double barlines as hard boundaries', () => {
     const items = parse('C || D').body as SyntaxNode[]
 

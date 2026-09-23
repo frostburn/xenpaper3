@@ -112,6 +112,7 @@ const kindsByNodeType: Partial<Record<string, XenpaperHighlightKind>> = {
   PostfixExpression: 'operator',
   TailElimination: 'operator',
   DetachedContinue: 'operator',
+  HoldUntilEnd: 'operator',
   Barline: 'punctuation',
   HardBoundary: 'punctuation',
   Group: 'punctuation',

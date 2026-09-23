@@ -130,6 +130,21 @@ describe('beat event expansion', () => {
     ])
   })
 
+  it.each([
+    ['(0 5 7)!', ['0', '1', '2'], ['3', '2', '1'], '3'],
+    ['[0 5 7]!', ['0', '1/3', '2/3'], ['1', '2/3', '1/3'], '1'],
+    ['(0 5 7)=', ['0', '1', '2'], ['2', '2', '2'], '4'],
+    ['(0 5 7)!=', ['0', '1', '2'], ['4', '3', '2'], '4'],
+    ['[0 5 7]!=', ['0', '1/3', '2/3'], ['2', '5/3', '4/3'], '2'],
+  ])('holds attacks independently for %s', (source, starts, durations, totalDuration) => {
+    const result = score(source)
+    const notes = result.events.filter((event) => event.kind === 'note')
+
+    expect(notes.map((note) => note.start.toFraction())).toEqual(starts)
+    expect(notes.map((note) => note.duration.toFraction())).toEqual(durations)
+    expect(result.duration.toFraction()).toBe(totalDuration)
+  })
+
   it('distributes a continuation over every note of an uneven parallel', () => {
     const result = score('(C, D E) =')
     const notes = result.events.filter((event) => event.kind === 'note')
