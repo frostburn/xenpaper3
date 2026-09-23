@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { Fraction } from 'xen-dev-utils/fraction'
-import { parse } from '../parser.generated.js'
+import { parse } from '../parser.js'
 import { decimalFraction, evaluateLiteral, type NumericLiteralNode } from '../runtime/literals'
 import { Value } from '../value'
 

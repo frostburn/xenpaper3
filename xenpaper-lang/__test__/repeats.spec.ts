@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { parse } from '../parser.generated.js'
+import { parse } from '../parser.js'
 import { expandRepeats } from '../runtime/repeat-expansion'
 import type { ExpandedNode } from '../runtime/types'
 

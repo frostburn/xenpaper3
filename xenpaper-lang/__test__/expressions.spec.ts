@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { Fraction } from 'xen-dev-utils/fraction'
-import { parse, type Expression } from '../parser.generated.js'
+import { parse, type Expression } from '../parser.js'
 import { evaluateExpression } from '../runtime/expressions'
 import { fjsInflection, groupFjsInflections } from '../runtime/fjs'
 import {

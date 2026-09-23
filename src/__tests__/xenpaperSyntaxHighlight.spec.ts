@@ -102,6 +102,19 @@ describe('highlightXenpaper', () => {
     )
   })
 
+  it('uses parsed pitch syntax instead of a rejected comment alternative', () => {
+    const program = parse('vF# G A')
+    const tokens = highlightXenpaper(program)
+
+    expect(program.comments).toEqual([])
+    expect(tokens.filter(({ kind }) => kind === 'comment')).toEqual([])
+    expect(tokens.filter(({ kind }) => kind === 'pitch-latin').map(({ text }) => text)).toEqual([
+      'F#',
+      'G',
+      'A',
+    ])
+  })
+
   it('highlights structured pitch modifiers as operators', () => {
     const tokens = highlightXenpaper(parse("'C vK /2"))
 
