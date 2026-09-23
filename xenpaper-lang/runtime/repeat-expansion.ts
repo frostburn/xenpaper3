@@ -141,12 +141,11 @@ export function expandRepeats(
         appendChildren(children, body, iterationPath)
         const endingStart = children.length
         appendChildren(children, endingsByIteration.get(iteration) ?? [], iterationPath)
-        // Without structural barlines, an empty, ending-free repeat has no
-        // observable occurrences. Stop after the first expansion instead of
-        // iterating a potentially huge authored count (this also covers bodies
-        // made empty by nested x0 repeats). Preserve mode still emits its
-        // authored boundaries so semantic validation can inspect them.
-        if (!options.preserveBarlines && !endings.length && !children.length) return result
+        const emptyEndingFree = !endings.length && !children.length
+        // An empty, ending-free repeat has no playback occurrences. Preserve
+        // mode emits its authored boundaries once for semantic validation,
+        // then takes the same fast path rather than expanding every iteration.
+        if (!options.preserveBarlines && emptyEndingFree) return result
         if (options.preserveBarlines) {
           const marker = (location: LocationRange): ExpandedNode => {
             const marker = { type: 'Barline', raw: '|', location, expansionPath: iterationPath }
@@ -192,6 +191,7 @@ export function expandRepeats(
             )
         }
         result.push(...children)
+        if (emptyEndingFree) return result
       }
       return result
     }
