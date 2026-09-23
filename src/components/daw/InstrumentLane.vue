@@ -462,11 +462,18 @@ const onKeyDown = (event: KeyboardEvent) => {
 .clip pre,
 .clip-preview {
   position: absolute;
-  inset: 1.5rem 0.25rem 0.25rem;
   margin: 0;
   overflow: hidden;
   white-space: pre-wrap;
   pointer-events: none;
+}
+.clip pre {
+  inset: 1.5rem 0.25rem 0.25rem;
+}
+.clip-preview {
+  /* Piano-roll percentages use the clip's full beat-scaled width. Horizontal
+     padding would progressively pull later notes away from the lane grid. */
+  inset: 1.5rem 0 0.25rem;
 }
 .clip.selected {
   border: 2px solid var(--xenpaper-cyan);
