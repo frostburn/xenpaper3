@@ -208,6 +208,14 @@ describe('beat event expansion', () => {
     ['pitch-context changes', '', '{root = D} C E', 'G'],
     ['hard boundaries', 'A', 'C || D E', 'F'],
     ['nested repeats', '', 'C |:@x2 D :| E', 'F'],
+    ['one-shot state across iterations', '', 'C @velocity(1/4)', 'D'],
+    [
+      'sequential declarations',
+      'let division = 2',
+      'let division = division + 1 @subdivision(division) C',
+      'D',
+    ],
+    ['function declarations', '', 'fn phrase() { ret C D } phrase()', 'phrase()'],
   ])('matches authored copies for %s', (_description, prefix, repeatedBody, suffix) => {
     const repeated = `${prefix} |: ${repeatedBody} :| ${suffix}`
     const authored = `${prefix} ${repeatedBody} ${repeatedBody} ${suffix}`
@@ -255,6 +263,11 @@ describe('beat event expansion', () => {
     ['nested ending body', '|: C |¹ |: D :| :|² E ||', 'C D D C E ||'],
     ['implicit repeat', 'C @2 D :| E', '|: C @2 D :| E'],
     ['chained implicit repeats', 'C :| D :|', 'C C D C C D'],
+    [
+      'declarations in alternate endings',
+      '|: C |¹ let interval = 3/2 interval :|² interval ||',
+      'C let interval = 3/2 interval C interval ||',
+    ],
   ])('matches the authored expansion for %s', (_description, repeated, authored) => {
     expect(audibleResult(repeated)).toEqual(audibleResult(authored))
   })

@@ -1,4 +1,5 @@
 import type { Expression, Program } from '../parser.generated.js'
+import { expandRepeats } from './repeat-expansion'
 import { evaluateScoreSemantics } from './score-evaluation'
 import type { ScoreShape, ScoreShapeEvaluationResult, ScoreShapeOptions } from './types'
 
@@ -22,7 +23,16 @@ export function evaluateProgramShape(
   program: Program,
   options: ScoreShapeOptions = {},
 ): ScoreShapeEvaluationResult {
-  return abstractResult(evaluateProgramSemantics(program, options))
+  return abstractResult(
+    evaluateScoreSemantics(
+      {
+        type: 'Sequence',
+        items: program.body,
+        location: program.location,
+      } as Expression,
+      options,
+    ),
+  )
 }
 
 /** Build one playback-preserving score shape for a complete program. */
@@ -30,12 +40,23 @@ export function evaluateProgramSemantics(
   program: Program,
   options: ScoreShapeOptions = {},
 ): ScoreShapeEvaluationResult {
+  const expanded = expandRepeats(program, { ...options, preserveBarlines: true })
+  if (!expanded.program) return { diagnostics: expanded.diagnostics }
   const sequence = {
     type: 'Sequence',
-    items: program.body,
+    items: expanded.program.body,
     location: program.location,
-  } as Expression
-  return evaluateScoreSemantics(sequence, options)
+  } as unknown as Expression
+  const result = evaluateScoreSemantics(sequence, options)
+  const warned = new Set<string>()
+  const diagnostics = [...expanded.diagnostics, ...result.diagnostics].filter((diagnostic) => {
+    if (diagnostic.code !== 'XP_BARLINE_OFF_CYCLE') return true
+    const key = JSON.stringify(diagnostic.locations)
+    if (warned.has(key)) return false
+    warned.add(key)
+    return true
+  })
+  return { ...result, diagnostics }
 }
 
 const abstractResult = (result: ScoreShapeEvaluationResult): ScoreShapeEvaluationResult => {

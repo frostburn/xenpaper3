@@ -32,6 +32,7 @@ export function expandRepeats(
   const diagnostics: Diagnostic[] = []
   const limit = options.expansionLimit ?? DEFAULT_EXPANSION_LIMIT
   let emitted = 0
+  let iterations = 0
 
   if (!Number.isSafeInteger(limit) || limit < 0) {
     throw new RangeError('expansionLimit must be a non-negative safe integer.')
@@ -111,6 +112,15 @@ export function expandRepeats(
         }
       }
       for (let iteration = 0n; iteration < count; iteration += 1n) {
+        if (++iterations > limit) {
+          diagnostics.push({
+            code: 'XP_REPEAT_EXPANSION_LIMIT',
+            severity: 'error',
+            message: `Repeat expansion exceeded the ${limit}-iteration limit.`,
+            locations: [node.location],
+          })
+          throw new ExpansionLimitError()
+        }
         if (iteration > BigInt(Number.MAX_SAFE_INTEGER)) {
           // The normal node limit makes this unreachable with default options,
           // but paths deliberately use ordinary, interoperable numbers.
@@ -129,6 +139,7 @@ export function expandRepeats(
         const children: ExpandedNode[] = []
         if (iteration > 0n) appendChildren(children, replayPrefix, iterationPath)
         appendChildren(children, body, iterationPath)
+        const endingStart = children.length
         appendChildren(children, endingsByIteration.get(iteration) ?? [], iterationPath)
         // An empty, ending-free repeat has no observable occurrences. Stop
         // after the first expansion instead of iterating a potentially huge
@@ -136,11 +147,51 @@ export function expandRepeats(
         // repeats). Alternate endings are excluded because a later iteration
         // may still select a non-empty ending.
         if (!endings.length && !children.length) return result
-        if (endings.length && children.length) {
-          result.push(makeSequence(children, node.location, iterationPath))
-        } else {
-          result.push(...children)
+        if (options.preserveBarlines && children.length) {
+          const marker = (location: LocationRange): ExpandedNode => {
+            const marker = { type: 'Barline', raw: '|', location, expansionPath: iterationPath }
+            countEmission(marker)
+            return marker
+          }
+          const repeatStart = node.location.start
+          const repeatEnd = node.location.end
+          const endingIndex = endings.findIndex(
+            (ending) => BigInt(String(ending.number.value)) === iteration + 1n,
+          )
+          if (endingIndex >= 0) {
+            const ending = endings[endingIndex]! as (typeof endings)[number] & {
+              markerLocation: LocationRange
+            }
+            children.splice(endingStart, 0, marker(ending.markerLocation))
+          }
+          children.unshift(
+            marker({
+              ...node.location,
+              end: {
+                ...repeatStart,
+                offset: repeatStart.offset + 2,
+                column: repeatStart.column + 2,
+              },
+            }),
+          )
+          const nextEnding = endings[endingIndex + 1] as
+            | ((typeof endings)[number] & { markerLocation: LocationRange })
+            | undefined
+          const width = String(node.terminal ?? '').length
+          if (nextEnding && endingIndex >= 0) children.push(marker(nextEnding.markerLocation))
+          else if (width)
+            children.push(
+              marker({
+                ...node.location,
+                start: {
+                  ...repeatEnd,
+                  offset: repeatEnd.offset - width,
+                  column: repeatEnd.column - width,
+                },
+              }),
+            )
         }
+        result.push(...children)
       }
       return result
     }
@@ -151,7 +202,9 @@ export function expandRepeats(
       if (key === 'location' || key === 'type') continue
       if (Array.isArray(value)) {
         if (key === 'items' || key === 'body') {
-          clone[key] = value.flatMap((item) => (isNode(item) ? cloneNode(item, path) : [item]))
+          clone[key] = value
+            .flatMap((item) => (isNode(item) ? cloneNode(item, path) : [item]))
+            .flatMap((item) => (isNode(item) && item.type === 'Sequence' ? item.items : [item]))
         } else {
           clone[key] = value.map((item) => {
             if (!isNode(item)) return item

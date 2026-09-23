@@ -1,5 +1,4 @@
-import { expandToBeatEvents, parse } from '../../xenpaper-lang'
-import { Fraction } from 'xen-dev-utils/fraction'
+import { evaluateTimeline, gridMeasureBoundaries, parse } from '../../xenpaper-lang'
 import {
   beatToNumber,
   type DawProject,
@@ -109,104 +108,55 @@ export const projectBeatToSeconds = (project: DawProject, targetBeat: number): n
 export const projectSecondsToBeat = (project: DawProject, seconds: number): number =>
   TempoMap.fromProject(project).secondsToBeat(seconds)
 
-/**
- * Interpret the duration-bearing global source as a meter timeline. The time signature
- * selected in the project UI prevails until the source reaches an authored @time directive.
- */
+/** Adapt the language's exact meter timeline to editor change IDs. */
 export const globalTimeSignatureChanges = (
   source: string,
   initial: TimeSignatureChange,
 ): TimeSignatureChange[] => {
-  let result
   try {
-    result = expandToBeatEvents(parse(source), {
-      timeSignature: initial,
-      allowTempoDirective: true,
-    })
+    const result = evaluateTimeline(parse(source), { timeSignature: initial })
+    if (!result.initialization) return [initial]
+    const changes = new Map([[initial.beat.toFraction(), initial]])
+    result.timeSignatureChanges.forEach((change, index) =>
+      changes.set(change.beat.toFraction(), {
+        ...change,
+        id: `global-source-time-${index}`,
+      }),
+    )
+    return [...changes.values()].sort((left, right) => left.beat.compare(right.beat))
   } catch {
     return [initial]
   }
-  if (!('score' in result) || result.diagnostics.some(({ severity }) => severity === 'error')) {
-    return [initial]
-  }
-
-  const byBeat = new Map<number, TimeSignatureChange>([[beatToNumber(initial.beat), initial]])
-  let index = 0
-  for (const event of result.score.events) {
-    if (event.kind !== 'marker' || event.marker !== 'time-signature') continue
-    const [numerator, denominator] = event.label.split('/').map(Number)
-    if (!numerator || !denominator) continue
-    const position = event.start.valueOf()
-    byBeat.set(position, {
-      id: `global-source-time-${index++}`,
-      beat: event.start,
-      numerator,
-      denominator,
-    })
-  }
-  return [...byBeat.values()].sort(
-    (left, right) => beatToNumber(left.beat) - beatToNumber(right.beat),
-  )
 }
 
-/** Interpret tempo directives in the duration-bearing DAW global source. */
+/** Adapt abstract tempo declarations to the sound renderer's numeric BPM values. */
 export const globalTempoChanges = (
   source: string,
   initial: readonly TempoChange[],
-  timeSignature: { readonly numerator: number; readonly denominator: number } = {
-    numerator: 4,
-    denominator: 4,
-  },
+  timeSignature = { numerator: 4, denominator: 4 },
 ): TempoChange[] => {
-  let result
   try {
-    result = expandToBeatEvents(parse(source), {
-      allowTempoDirective: true,
+    const result = evaluateTimeline(parse(source), {
       timeSignature,
+      tempo: initial[0]?.bpm ?? DEFAULT_BPM,
     })
+    if (!result.initialization) return [...initial]
+    const changes = new Map(initial.map((change) => [change.beat.toFraction(), change]))
+    result.tempoChanges.forEach((change, index) =>
+      changes.set(change.beat.toFraction(), {
+        id: `global-source-tempo-${index}`,
+        beat: change.beat,
+        bpm: change.bpm.valueOf(),
+      }),
+    )
+    return [...changes.values()].sort((left, right) => left.beat.compare(right.beat))
   } catch {
     return [...initial]
   }
-  if (!('score' in result) || result.diagnostics.some(({ severity }) => severity === 'error')) {
-    return [...initial]
-  }
-
-  const byBeat = new Map<number, TempoChange>(
-    initial.map((change) => [beatToNumber(change.beat), change]),
-  )
-  let index = 0
-  for (const event of result.score.events) {
-    if (event.kind !== 'marker' || event.marker !== 'tempo') continue
-    const bpm = new Fraction(event.label).valueOf()
-    if (!Number.isFinite(bpm) || bpm <= 0) continue
-    const position = event.start.valueOf()
-    byBeat.set(position, {
-      id: `global-source-tempo-${index++}`,
-      beat: event.start,
-      bpm,
-    })
-  }
-  return [...byBeat.values()].sort(
-    (left, right) => beatToNumber(left.beat) - beatToNumber(right.beat),
-  )
 }
 
-/** Return every measure boundary in a meter timeline up to the requested beat. */
+/** Convert exact measure positions only at the visualisation boundary. */
 export const measureBoundaries = (
   changes: readonly TimeSignatureChange[],
   endBeat: number,
-): number[] => {
-  const result = new Set<number>()
-  for (let index = 0; index < changes.length; index++) {
-    const change = changes[index]!
-    const start = beatToNumber(change.beat)
-    const end = Math.min(
-      endBeat,
-      changes[index + 1] ? beatToNumber(changes[index + 1]!.beat) : endBeat,
-    )
-    const length = (change.numerator * 4) / change.denominator
-    if (!Number.isFinite(start) || !Number.isFinite(length) || length <= 0) continue
-    for (let beat = start; beat <= end + Number.EPSILON; beat += length) result.add(beat)
-  }
-  return [...result].filter((beat) => beat <= endBeat).sort((left, right) => left - right)
-}
+): number[] => gridMeasureBoundaries(changes, endBeat).map((beat) => beat.valueOf())

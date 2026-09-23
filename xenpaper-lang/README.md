@@ -50,11 +50,46 @@ tree; dynamics remain zero-duration annotations and velocity never changes a
 notation attack. `constructStaffNotationShape()` converts that tree to
 renderer-independent staff data.
 
-Independently, `expandToBeatEvents()` expands repeats and evaluates playback
-semantics directly into notes and structural markers at exact beat positions.
-It applies prevailing dynamics and one-shot velocities only in this audio
-pipeline. `expandRepeats()` remains available separately for tooling that needs
-to inspect expanded source occurrences and their expansion paths.
+`evaluateProgramSemantics()` expands repeats and evaluates the score once,
+returning its exact-duration tree and prevailing context. `expandToBeatEvents()`
+projects those semantics into notes and structural markers, including dynamics,
+articulation and groove, still on a rational grid. Neither API schedules audio
+or converts beats to seconds. `expandRepeats()` is also available for tooling
+that needs source occurrences and their expansion paths.
+
+## Global grid context
+
+`evaluateInitialization()` compiles an enclosing zero-duration source, or a
+global timeline with `allowDuration: true`. Pass the returned `initialization`
+to another initialization or to score evaluation. A clip's `beatOffset` is an
+exact `Fraction`; global context is selected at each expression's absolute grid
+position, before evaluation. Local groups and function calls retain their scopes.
+
+```ts
+const global = evaluateInitialization(parse('{19edo};{12edo}'), {
+  allowDuration: true,
+  timeSignature: { numerator: 4, denominator: 4 },
+})
+const result = expandToBeatEvents(parse('D D D D D D'), {
+  initialization: global.initialization,
+})
+```
+
+Global changes remain in force until another authored change. There is no
+implicit looping or inferred final segment: write `|: {19edo};{12edo}; :|` to
+repeat those two measures. This applies equally to tuning, meter, tempo, and
+groove changes. A groove's own rhythmic template still cycles while active.
+
+`evaluateTimeline()` enables global `@tempo` directives and exposes typed tempo
+and meter changes at exact grid positions. Tempo only affects the renderer's
+conversion to seconds. `gridMeasureBoundaries()` enumerates rational measure
+positions without floating-point accumulation. Bar rests and barline checks
+use the same prevailing meter during evaluation.
+
+Normalized slots establish their rhythm before looking up timed contexts at
+their scaled positions. If a context-dependent expression changes that rhythm,
+layout is resolved again; a cyclic or non-converging layout is diagnosed rather
+than assigned inconsistent note positions.
 
 The lower-level literal, expression, pitch, FJS, directive, and notation helpers
 are exported for focused tooling and tests. There is not yet a single
@@ -108,10 +143,10 @@ position. A function captures the environment at its declaration, arguments are
 evaluated exactly once in left-to-right order at the call site, and parameters
 are then bound in a child scope. Later declarations may shadow earlier ones.
 Groups, normalized groups, and each parallel branch isolate their local bindings;
-hard boundaries retain the surrounding sequence's bindings. Repeats inherit
-bindings declared outside them, but `let` and `fn` declarations are illegal in
-repeat bodies and alternate endings so repeat expansion cannot duplicate or leak
-bindings.
+hard boundaries retain the surrounding sequence's bindings. Repeats splice their
+body and selected ending into that sequence, just like written-out copies.
+Declarations are evaluated at each occurrence and can shadow earlier bindings;
+only explicit groups, slots, function calls, and parallel branches create scopes.
 
 Parameter names must be unique. Functions are intentionally non-recursive (both
 direct and mutual recursion are rejected), keeping score evaluation finite and
