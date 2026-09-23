@@ -82,6 +82,17 @@ describe('directive runtime', () => {
     expect(highlighted).toEqual(expect.arrayContaining(['|:', '|¹', ':|²', '||']))
   })
 
+  it('locates both off-cycle boundaries of an empty repeat', () => {
+    const source = '@time(4/4) C |: :|'
+    const result = compile(source)
+    const highlighted = result.diagnostics
+      .filter(({ code }) => code === 'XP_BARLINE_OFF_CYCLE')
+      .flatMap(({ locations }) => locations)
+      .map(({ start, end }) => source.slice(start.offset, end.offset))
+
+    expect(highlighted).toEqual(['|:', ':|'])
+  })
+
   it('uses an absolute offset when checking DAW clips', () => {
     const result = expandToBeatEvents(parse('@time(4/4) C D |'), {
       beatOffset: new Fraction(1),

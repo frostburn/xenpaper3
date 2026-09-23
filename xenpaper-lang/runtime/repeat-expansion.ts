@@ -141,13 +141,13 @@ export function expandRepeats(
         appendChildren(children, body, iterationPath)
         const endingStart = children.length
         appendChildren(children, endingsByIteration.get(iteration) ?? [], iterationPath)
-        // An empty, ending-free repeat has no observable occurrences. Stop
-        // after the first expansion instead of iterating a potentially huge
-        // authored count (this also covers bodies made empty by nested x0
-        // repeats). Alternate endings are excluded because a later iteration
-        // may still select a non-empty ending.
-        if (!endings.length && !children.length) return result
-        if (options.preserveBarlines && children.length) {
+        // Without structural barlines, an empty, ending-free repeat has no
+        // observable occurrences. Stop after the first expansion instead of
+        // iterating a potentially huge authored count (this also covers bodies
+        // made empty by nested x0 repeats). Preserve mode still emits its
+        // authored boundaries so semantic validation can inspect them.
+        if (!options.preserveBarlines && !endings.length && !children.length) return result
+        if (options.preserveBarlines) {
           const marker = (location: LocationRange): ExpandedNode => {
             const marker = { type: 'Barline', raw: '|', location, expansionPath: iterationPath }
             countEmission(marker)
