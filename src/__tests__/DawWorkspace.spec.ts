@@ -95,6 +95,27 @@ describe('DAW workspace', () => {
     expect(wrapper.find('.lane-settings').exists()).toBe(false)
   })
 
+  it('teleports the global source editor into the shared inspector dock', async () => {
+    const wrapper = mountDaw()
+
+    expect(wrapper.get('.global-summary').text()).toContain('120 BPM')
+    expect(wrapper.get('.global-summary').text()).toContain('4/4')
+    expect(wrapper.find('[aria-label="Tempo in BPM"]').exists()).toBe(false)
+    await wrapper
+      .get('[aria-label="Edit global tempo, time signature, and source"]')
+      .trigger('click')
+
+    const inspector = wrapper.get('[aria-label="Global settings"]')
+    expect(inspector.get('h2').text()).toBe('Tempo & source')
+    expect(inspector.get('textarea[aria-label="Global source"]').attributes('rows')).toBe('14')
+    expect(wrapper.find('.project-settings textarea').exists()).toBe(false)
+    expect(wrapper.find('[aria-label="Xenpaper clip source"]').exists()).toBe(false)
+
+    await wrapper.get('[aria-label="Add clip to Instrument 1"]').trigger('click')
+    expect(wrapper.get('.clip-inspector').attributes('aria-label')).toBe('Clip editor')
+    expect(wrapper.find('[aria-label="Global settings"]').exists()).toBe(false)
+  })
+
   it('returns to the clip inspector when undo removes the lane being edited', async () => {
     const wrapper = mountDaw()
     await wrapper.get('button.add-lane').trigger('click')
