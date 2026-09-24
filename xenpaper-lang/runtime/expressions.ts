@@ -225,8 +225,12 @@ export function prepareFunctionCall(
         },
       ],
     }
-  const evaluated = node.arguments.map((argument) => {
-    if (scaleDegreeArguments && !definition.prelude && argument.type === 'IntegerLiteral') {
+  const evaluated = node.arguments.map((argument, index) => {
+    const degreeArgument =
+      argument.type === 'IntegerLiteral' &&
+      ((scaleDegreeArguments && !definition.prelude) ||
+        (definition.prelude && node.callee === 'cps' && index === 1))
+    if (degreeArgument) {
       return evaluateExpression(
         {
           type: 'DegreeLiteral',
@@ -261,6 +265,7 @@ export function prepareFunctionCall(
     const declared = evaluateDeclaration(declaration, mapping, bodyEnvironment)
     bodyEnvironment = declared.environment
     diagnostics.push(...declared.diagnostics)
+    if (declared.diagnostics.some((item) => item.severity === 'error')) break
   }
   if (diagnostics.some((item) => item.severity === 'error')) return { diagnostics }
   return {
@@ -1006,9 +1011,26 @@ export function evaluateExpression(
       }
       const containerBuiltins = ['kCombinations', 'arrayReduce', 'sort']
       if (containerBuiltins.includes(node.callee)) {
-        const evaluated = node.arguments.map((argument) =>
-          containerItems(argument, mapping, environment),
-        )
+        const evaluated = node.arguments.map((argument, index) => {
+          if (
+            node.callee === 'kCombinations' &&
+            index === 1 &&
+            argument.type === 'IntegerLiteral'
+          ) {
+            return evaluateExpression(
+              {
+                type: 'DegreeLiteral',
+                degree: argument.value,
+                modifiers: [],
+                raw: argument.raw,
+                location: argument.location,
+              },
+              mapping,
+              environment,
+            )
+          }
+          return containerItems(argument, mapping, environment)
+        })
         const diagnostics = evaluated.flatMap((argument) => argument.diagnostics)
         if (!evaluated.every((argument) => 'value' in argument)) return { diagnostics }
         return {

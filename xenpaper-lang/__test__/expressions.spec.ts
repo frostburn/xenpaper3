@@ -164,10 +164,13 @@ describe('arithmetic expression evaluation', () => {
   })
 
   it('provides combination and sorting container built-ins', () => {
-    const combinations = evaluate('kCombinations([1/1, 3/1, 5/1], 2)')
+    const combinations = evaluate('kCombinations([1/1, 3/1, 5/1], 2/1)')
     expect(combinations.kind).toBe('container')
     if (combinations.kind !== 'container') throw new Error('Expected a container.')
     expect(combinations.values).toHaveLength(3)
+    expect(evaluateExpression(expression('kCombinations([1/1, 3/1, 5/1], 2)'))).toMatchObject({
+      diagnostics: [{ code: 'XP_TYPE_MISMATCH', message: 'Combination size must be an integer.' }],
+    })
 
     const sorted = evaluate('sort([3/1, 1/1, 2/1])')
     if (sorted.kind !== 'container') throw new Error('Expected a container.')
@@ -236,6 +239,9 @@ describe('arithmetic expression evaluation', () => {
       [7n, 4n],
       [2n, 1n],
     ])
+    expect(evaluateExpression(expression('cps([1/1, 3/1, 5/1, 7/1], 2)'))).toMatchObject({
+      diagnostics: [{ code: 'XP_TYPE_MISMATCH', message: 'Combination size must be an integer.' }],
+    })
   })
 
   it('applies pitch operators uniformly without coercing scalars to pitches', () => {
