@@ -185,11 +185,11 @@ EnumeratedChordArithmetic
     }
 
 AdditiveExpression
-  = condition:(first:MultiplicativeExpression rest:AdditiveTail* { return foldBinary(first, rest); })
-    alternative:(Spacing "?" Spacing consequent:AdditiveExpression Spacing ":" Spacing alternate:AdditiveExpression {
-      return { consequent, alternate };
+  = consequent:(first:MultiplicativeExpression rest:AdditiveTail* { return foldBinary(first, rest); })
+    alternative:(RequiredSpacing "if" !IdentifierContinue RequiredSpacing condition:AdditiveExpression RequiredSpacing "else" !IdentifierContinue RequiredSpacing alternate:AdditiveExpression {
+      return { condition, alternate };
     })? {
-      return alternative ? node('ConditionalExpression', { condition, ...alternative }) : condition;
+      return alternative ? node('ConditionalExpression', { consequent, ...alternative }) : consequent;
     }
 
 // Compact pitch arithmetic such as `G-n3` is accepted when the right operand
@@ -785,8 +785,8 @@ LocatedIdentifier
   = !(MosPitchLiteral / PitchLiteral) name:Identifier { return node('Identifier', { name }); }
 
 CallArgumentList
-  = first:AdditiveExpression
-    rest:(Spacing "," Spacing argument:AdditiveExpression { return argument; })* {
+  = first:(ScaleDegreeLiteral / AdditiveExpression)
+    rest:(Spacing "," Spacing argument:(ScaleDegreeLiteral / AdditiveExpression) { return argument; })* {
       return [first, ...rest];
     }
 

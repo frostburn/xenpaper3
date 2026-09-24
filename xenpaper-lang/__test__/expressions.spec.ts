@@ -68,7 +68,7 @@ describe('arithmetic expression evaluation', () => {
     expect(tempered.value.kind).toBe('pitchOffset')
     expect(tempered.value.value.equals(Value.cents(400))).toBe(true)
 
-    const radical = evaluateExpression(expression('~sqrt(2)'), edoMapping(12))
+    const radical = evaluateExpression(expression('~sqrt(2/1)'), edoMapping(12))
     expect(radical.diagnostics).toEqual([])
     if (!('value' in radical)) throw new Error('Expected a value.')
     expect(radical.value.value.equals(Value.cents(600))).toBe(true)
@@ -143,8 +143,8 @@ describe('arithmetic expression evaluation', () => {
   })
 
   it('evaluates square roots while preserving exact values and dimensions', () => {
-    expect(evaluate('sqrt(4)').value.equals(2)).toBe(true)
-    expect(evaluate('sqrt(2) * sqrt(2)').value.equals(2)).toBe(true)
+    expect(evaluate('sqrt(4/1)').value.equals(2)).toBe(true)
+    expect(evaluate('sqrt(2/1) * sqrt(2/1)').value.equals(2)).toBe(true)
     expect(evaluate('√2 * √2').value.equals(2)).toBe(true)
 
     const duration = evaluate('sqrt(4 * 1s**2)')
@@ -161,6 +161,8 @@ describe('arithmetic expression evaluation', () => {
     expect(evaluate('niente al 3/2').value.equals(new Value(3n, 2n))).toBe(true)
     expect(evaluate('5/4 al 3/2').value.equals(new Value(5n, 4n))).toBe(true)
     expect(evaluate('1 al (1 / 0)').value.equals(1)).toBe(true)
+    expect(evaluate('3/2 if true else (1 / 0)').value.equals(new Value(3n, 2n))).toBe(true)
+    expect(evaluate('3/2 if false else 5/4').value.equals(new Value(5n, 4n))).toBe(true)
   })
 
   it('provides combination and sorting container built-ins', () => {
@@ -247,7 +249,7 @@ describe('arithmetic expression evaluation', () => {
   })
 
   it('applies pitch operators uniformly without coercing scalars to pitches', () => {
-    expect(evaluate("'sqrt(2)").value.equals(evaluate('sqrt(8)').value)).toBe(true)
+    expect(evaluate("'sqrt(2/1)").value.equals(evaluate('sqrt(8/1)').value)).toBe(true)
     const up = evaluate('^3/2')
     expect(up.kind).toBe('scalar')
     expect(up.value.equals(new Value(3n, 2n).mul(Value.ratio(DEFAULT_PITCH_CONTEXT.up)))).toBe(true)
@@ -315,7 +317,7 @@ describe('arithmetic expression evaluation', () => {
   })
 
   it('falls back to real arithmetic for sums of unrelated square roots', () => {
-    const sum = evaluate('sqrt(2) + sqrt(3)')
+    const sum = evaluate('sqrt(2/1) + sqrt(3/1)')
 
     expect(sum.value.magnitude.kind).toBe('real')
     expect(sum.value.valueOf()).toBeCloseTo(Math.sqrt(2) + Math.sqrt(3))
@@ -323,11 +325,9 @@ describe('arithmetic expression evaluation', () => {
 
   it('rejects pitch arguments and invalid arity for conversion functions', () => {
     expect(evaluate('ratio(3/2)').value.equals(new Value(3n, 2n))).toBe(true)
-    expect(evaluateExpression(expression('sqrt(700c)'))).toMatchObject({
-      diagnostics: [
-        { code: 'XP_TYPE_MISMATCH', message: 'Exponentiation requires scalar operands.' },
-      ],
-    })
+    expect(
+      evaluate('sqrt(700c)').value.equals(Value.ratio(Value.cents(700)).pow(new Fraction(1, 2))),
+    ).toBe(true)
     expect(evaluateExpression(expression('sqrt(1, 2)'))).toMatchObject({
       diagnostics: [{ code: 'XP_ARITY', message: 'sqrt() expects 1 argument, but received 2.' }],
     })

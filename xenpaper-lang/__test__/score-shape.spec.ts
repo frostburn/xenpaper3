@@ -18,7 +18,7 @@ function shape(source: string, pulse: Fraction | number = 1): ScoreShape {
 describe('score-shape timing', () => {
   it('evaluates zero-duration lexical declarations before musical calls', () => {
     const score = shape(
-      'let interval = 3/2 fn transpose(note) { let shifted = note * interval ret shifted } transpose(1)',
+      'let interval = 3/2 fn transpose(note) { let shifted = note * interval ret shifted } transpose(1/1)',
     )
     const attacks: Extract<ScoreShape, { kind: 'attack' }>[] = []
     const collect = (current: ScoreShape) => {
@@ -935,7 +935,7 @@ K L M N j k=`) as SequenceShape
   })
 
   it('treats positive irrational scalar expressions as playable ratios', () => {
-    const result = shape('sqrt(2)')
+    const result = shape('sqrt(2/1)')
 
     expect(result).toMatchObject({ kind: 'attack' })
     if (result.kind !== 'attack') throw new Error('Expected an attack.')

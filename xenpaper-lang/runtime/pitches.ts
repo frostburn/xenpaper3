@@ -353,7 +353,7 @@ export function applyPitchContextChange(
         expressionEnvironment = environment,
       ): ExpandedDegrees => {
         if (expression.type === 'CallExpression') {
-          const prepared = prepareFunctionCall(expression, context, expressionEnvironment, true)
+          const prepared = prepareFunctionCall(expression, context, expressionEnvironment)
           // Calls without user definitions may still be scalar built-ins such as pitch() and
           // ratio(); leave those intact for ordinary expression evaluation below.
           if (!prepared)

@@ -56,17 +56,17 @@ export type ExpressionEvaluationResult =
 /** Xenpaper declarations installed as the outermost lexical scope by default. */
 export const PRELUDE = `
 let pi = 3.141592653589793r
-fn sqrt(radicand) { ret radicand ** 1/2 }
+fn sqrt(radicand) { ret ratio(radicand) ** 1/2 }
 fn prod(factors) { ret arrayReduce((total, element) => total * ratio(element), factors, 1/1) }
-fn ground(scale) { ret scale / scale[0] }
+fn ground(scale) { ret scale - pitch(scale[0]) }
 fn equaveReduce(scale, equave) {
   let actualEquave = equave al scale[-1]
-  ret scale rd actualEquave
+  ret ratio(scale) rd ratio(actualEquave)
 }
 fn cps(factors, count, equave, withUnity) {
   let products = sort(arrayMap((combination) => prod(combination), kCombinations(factors, count)))
-  let grounded = (withUnity al false) ? products : ground(products)
-  let actualEquave = equave al (2 * grounded[0])
+  let grounded = products if (withUnity al false) else ground(products)
+  let actualEquave = equave al (pitch(2/1) + grounded[0])
   ret sort(equaveReduce(grounded, actualEquave))
 }
 `
@@ -175,7 +175,6 @@ export function prepareFunctionCall(
   node: Extract<Expression, { type: 'CallExpression' }>,
   mapping: PrimeMapping | PitchContext = DEFAULT_PITCH_CONTEXT,
   environment: LexicalEnvironment = preludeEnvironment(),
-  scaleDegreeArguments = false,
 ): FunctionCallPreparation | undefined {
   let definition
   let variable = false
@@ -225,26 +224,9 @@ export function prepareFunctionCall(
         },
       ],
     }
-  const evaluated = node.arguments.map((argument, index) => {
-    const degreeArgument =
-      argument.type === 'IntegerLiteral' &&
-      ((scaleDegreeArguments && !definition.prelude) ||
-        (definition.prelude && node.callee === 'cps' && index === 1))
-    if (degreeArgument) {
-      return evaluateExpression(
-        {
-          type: 'DegreeLiteral',
-          degree: argument.value,
-          modifiers: [],
-          raw: argument.raw,
-          location: argument.location,
-        },
-        mapping,
-        environment,
-      )
-    }
-    return evaluateExpression(argument, mapping, environment)
-  })
+  const evaluated = node.arguments.map((argument) =>
+    evaluateExpression(argument, mapping, environment),
+  )
   const diagnostics = evaluated.flatMap((result) => result.diagnostics)
   if (!evaluated.every((result) => 'value' in result)) return { diagnostics }
   const variables = new Map(
@@ -1065,26 +1047,9 @@ export function evaluateExpression(
       }
       const containerBuiltins = ['kCombinations', 'arrayReduce', 'arrayMap', 'sort']
       if (containerBuiltins.includes(node.callee)) {
-        const evaluated = node.arguments.map((argument, index) => {
-          if (
-            node.callee === 'kCombinations' &&
-            index === 1 &&
-            argument.type === 'IntegerLiteral'
-          ) {
-            return evaluateExpression(
-              {
-                type: 'DegreeLiteral',
-                degree: argument.value,
-                modifiers: [],
-                raw: argument.raw,
-                location: argument.location,
-              },
-              mapping,
-              environment,
-            )
-          }
-          return containerItems(argument, mapping, environment)
-        })
+        const evaluated = node.arguments.map((argument) =>
+          containerItems(argument, mapping, environment),
+        )
         const diagnostics = evaluated.flatMap((argument) => argument.diagnostics)
         if (!evaluated.every((argument) => 'value' in argument)) return { diagnostics }
         return {
@@ -1112,6 +1077,17 @@ export function evaluateExpression(
       const argument = evaluateExpression(argumentNode, mapping, environment)
       if (!('value' in argument)) return argument
       if (node.callee === 'pitch') {
+        if (argument.value.kind === 'container') {
+          const convert = (value: EvaluatedLiteral): EvaluatedLiteral => {
+            if (value.kind === 'container') return { ...value, values: value.values.map(convert) }
+            if (value.kind !== 'scalar') throw new TypeError('pitch() expects scalar ratios.')
+            return {
+              ...result('pitchOffset', Value.pitch(value.value), value.origins),
+              ...(value.value.isPositiveExactRatio() ? { justIntonation: true } : {}),
+            }
+          }
+          return { value: convert(argument.value), diagnostics: argument.diagnostics }
+        }
         if (argument.value.kind !== 'scalar') throw new TypeError('pitch() expects a scalar ratio.')
         return {
           value: {
@@ -1122,6 +1098,15 @@ export function evaluateExpression(
         }
       }
       if (node.callee === 'ratio') {
+        if (argument.value.kind === 'container') {
+          const convert = (value: EvaluatedLiteral): EvaluatedLiteral => {
+            if (value.kind === 'container') return { ...value, values: value.values.map(convert) }
+            if (value.kind === 'scalar') return value
+            if (value.kind !== 'pitchOffset') throw new TypeError('ratio() expects pitch offsets.')
+            return result('scalar', Value.ratio(value.value), value.origins)
+          }
+          return { value: convert(argument.value), diagnostics: argument.diagnostics }
+        }
         if (argument.value.kind === 'scalar') return argument
         if (argument.value.kind !== 'pitchOffset')
           throw new TypeError('ratio() expects a pitch offset.')
