@@ -1,5 +1,5 @@
 import { Fraction } from 'xen-dev-utils/fraction'
-import type { Expression } from '../parser.generated.js'
+import type { Expression, Node } from '../parser.generated.js'
 import type { Diagnostic } from '../diagnostics'
 import { Value } from '../value'
 import { evaluateDeclaration, evaluateExpression, prepareFunctionCall } from './expressions'
@@ -538,7 +538,7 @@ function hasShape(
   return 'shape' in result
 }
 
-function origin(node: Expression, role: SourceOrigin['role'] = 'structural'): SourceOrigin {
+function origin(node: Node, role: SourceOrigin['role'] = 'structural'): SourceOrigin {
   return { location: node.location, role }
 }
 
@@ -806,6 +806,69 @@ function attacks(shape: ScoreShape): AttackShape[] {
   if (shape.kind === 'sequence') return shape.children.flatMap(attacks)
   if (shape.kind === 'parallel') return shape.branches.flatMap(attacks)
   return []
+}
+
+/**
+ * Give every attack an independent sounding span while retaining the original
+ * score tree. A one-branch parallel wrapper occupies the attack's authored
+ * duration even when the wrapped attack sounds beyond it, so later onsets and
+ * all non-attack shapes remain at their authored positions.
+ */
+function holdAttacks(
+  shape: ScoreShape,
+  duration: Fraction,
+  extension: Fraction,
+  holdUntilEnd: boolean,
+  markOrigins: readonly SourceOrigin[],
+): ScoreShape | undefined {
+  let attackCount = 0
+  const hold = (current: ScoreShape, start: Fraction): ScoreShape => {
+    if (current.kind === 'attack') {
+      attackCount++
+      const held: AttackShape = {
+        ...current,
+        duration: holdUntilEnd ? duration.sub(start) : current.duration.add(extension),
+        origins: [...current.origins, ...markOrigins],
+      }
+      return {
+        kind: 'parallel',
+        duration: current.duration,
+        branches: [held],
+        origins: current.origins,
+      }
+    }
+    if (current.kind === 'sequence') {
+      let offset = start
+      const children = current.children.map((child) => {
+        const result = hold(child, offset)
+        offset = offset.add(child.duration)
+        return result
+      })
+      return { ...current, children }
+    }
+    if (current.kind === 'parallel') {
+      return { ...current, branches: current.branches.map((branch) => hold(branch, start)) }
+    }
+    return current
+  }
+  const held = hold(shape, new Fraction(0))
+  if (!attackCount) return undefined
+  if (!extension.n) return held
+  return sequence([held, generatedRest(extension)], shape.origins)
+}
+
+/** Materialize the timing of postfix continuations before a later `!` mark. */
+function materializeTrailingContinuations(shape: ScoreShape): ScoreShape {
+  if (shape.kind !== 'sequence') return shape
+  let end = shape.children.length
+  while (end && shape.children[end - 1]!.kind === 'continue') end--
+  if (end === shape.children.length || !end) return shape
+  const body = sequence(shape.children.slice(0, end), shape.origins)
+  if (!body.duration.n || !attacks(body).length) return shape
+  const continuationDuration = shape.children
+    .slice(end)
+    .reduce((duration, child) => duration.add(child.duration), new Fraction(0))
+  return scaleShape(body, body.duration.add(continuationDuration).div(body.duration))
 }
 
 function contextAnnotation(
@@ -2010,13 +2073,43 @@ export function evaluateScoreSemantics(
       }
     }
     if (current.type === 'PostfixExpression') {
+      const holdIndex = current.marks.findIndex((mark) => mark.type === 'HoldUntilEnd')
+      if (holdIndex >= 0) {
+        const prefix = current.marks.slice(0, holdIndex)
+        const withoutHold = current.marks.filter((mark) => mark.type !== 'HoldUntilEnd')
+        const heldFrom = current.marks.slice(holdIndex)
+        const evaluated = visitor.visit(
+          prefix.length ? { ...current, marks: prefix } : current.expression,
+        )
+        if (!('shape' in evaluated)) return evaluated
+        const continuations = heldFrom.filter((mark) => mark.type === 'DetachedContinue')
+        const extension = currentPulse.mul(continuations.length)
+        const base = materializeTrailingContinuations(evaluated.shape)
+        const held = holdAttacks(
+          base,
+          base.duration.add(extension),
+          extension,
+          true,
+          current.marks.map((mark) => origin(mark, 'duration')),
+        )
+        if (held)
+          return withVisitor(
+            { shape: held, diagnostics: evaluated.diagnostics },
+            visitorAfter(evaluated, visitor),
+          )
+        return visitor.visit(
+          withoutHold.length ? { ...current, marks: withoutHold } : current.expression,
+        )
+      }
       const continuations = current.marks.filter((mark) => mark.type === 'DetachedContinue')
       const elimination = current.marks.find((mark) => mark.type === 'TailElimination')
       let evaluated = visitor.visit(current.expression)
       if (!('shape' in evaluated)) return evaluated
+      const distributesHolds = current.expression.type === 'Group'
       if (
         continuations.length &&
         (evaluated.shape.kind === 'sequence' || evaluated.shape.kind === 'parallel') &&
+        !distributesHolds &&
         !visitor.scope.layout
       ) {
         const duration = evaluated.shape.duration.sub(currentPulse.mul(elimination?.count ?? 0))
@@ -2045,6 +2138,24 @@ export function evaluateScoreSemantics(
             ],
           }
         base = trimShape(base, base.duration.sub(removed))
+      }
+      if (distributesHolds) {
+        const extension = currentPulse.mul(continuations.length)
+        const duration = base.duration.add(extension)
+        const held = holdAttacks(
+          base,
+          duration,
+          extension,
+          false,
+          current.marks
+            .filter((mark) => mark.type === 'DetachedContinue')
+            .map((mark) => origin(mark, 'duration')),
+        )
+        if (held)
+          return withVisitor(
+            { shape: held, diagnostics: evaluated.diagnostics },
+            visitorAfter(evaluated, visitor),
+          )
       }
       if (!continuations.length)
         return withVisitor(

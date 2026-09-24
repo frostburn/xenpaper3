@@ -19,7 +19,7 @@ context-dependent meanings.
 | U+000D         | _CR_     | Whitespace; ends a comment                                                                                                                               |
 | U+000E–U+001F  | _SO–US_  | Unsupported                                                                                                                                              |
 | U+0020         | _SP_     | Whitespace                                                                                                                                               |
-| U+0021         | !        | Unsupported                                                                                                                                              |
+| U+0021         | !        | Hold every attack until the end of its containing group                                                                                                  |
 | U+0022         | "        | Double-equave-up pitch modifier                                                                                                                          |
 | U+0023         | #        | Sharp accidental; starts a line comment                                                                                                                  |
 | U+0024         | $        | Unsupported                                                                                                                                              |

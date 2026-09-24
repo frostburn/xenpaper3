@@ -130,6 +130,44 @@ describe('beat event expansion', () => {
     ])
   })
 
+  it.each([
+    ['(0 5 7)!', ['0', '1', '2'], ['3', '2', '1'], '3'],
+    ['[0 5 7]!', ['0', '1/3', '2/3'], ['1', '2/3', '1/3'], '1'],
+    ['(0 5 7)=', ['0', '1', '2'], ['2', '2', '2'], '4'],
+    ['(0 5 7)!=', ['0', '1', '2'], ['4', '3', '2'], '4'],
+    ['[0 5 7]!=', ['0', '1/3', '2/3'], ['2', '5/3', '4/3'], '2'],
+    ['[0 5 7]=!=', ['0', '2/3', '4/3'], ['3', '7/3', '5/3'], '3'],
+  ])('holds attacks independently for %s', (source, starts, durations, totalDuration) => {
+    const result = score(source)
+    const notes = result.events.filter((event) => event.kind === 'note')
+
+    expect(notes.map((note) => note.start.toFraction())).toEqual(starts)
+    expect(notes.map((note) => note.duration.toFraction())).toEqual(durations)
+    expect(result.duration.toFraction()).toBe(totalDuration)
+  })
+
+  it('preserves non-attack shapes while holding a container', () => {
+    const result = score('(@drone(5) 0 | 7)!')
+    const notes = result.events.filter((event) => event.kind === 'note')
+    const markers = result.events.filter((event) => event.kind === 'marker')
+
+    expect(notes.map((note) => [note.start.toFraction(), note.duration.toFraction()])).toEqual([
+      ['0', '2'],
+      ['0', '2'],
+      ['1', '1'],
+    ])
+    expect(markers.map((marker) => [marker.marker, marker.start.toFraction()])).toEqual([
+      ['barline', '1'],
+    ])
+  })
+
+  it('retains continuations on attack-free parenthesized groups', () => {
+    const result = expandToBeatEvents(parse('(.)='))
+
+    expect(result.diagnostics).toMatchObject([{ code: 'XP_CONTINUE_WITHOUT_ATTACK' }])
+    expect('score' in result).toBe(false)
+  })
+
   it('distributes a continuation over every note of an uneven parallel', () => {
     const result = score('(C, D E) =')
     const notes = result.events.filter((event) => event.kind === 'note')
