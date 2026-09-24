@@ -2,6 +2,7 @@
 import { computed, ref, watch } from 'vue'
 import { githubRawUrl, parseStrudelSampleMap } from '../../../sw-seq'
 import {
+  compileLaneSourceInitialization,
   compileSourceInitialization,
   drumSamplesForLane,
   parseDrumClipNotes,
@@ -141,7 +142,11 @@ const eventsByClip = computed(() => {
       true,
       props.timeSignature,
     )
-    initialization = compileSourceInitialization(props.lane.source, globalInitialization)
+    initialization = compileLaneSourceInitialization(
+      props.lane.source,
+      globalInitialization,
+      props.timeSignature,
+    )
   } catch {
     initialization = undefined
   }

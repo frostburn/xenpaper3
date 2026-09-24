@@ -67,6 +67,16 @@ function containsAttack(shape: ScoreShape): boolean {
   )
 }
 
+const combineTimelineShapes = (parent: ScoreShape | undefined, child: ScoreShape): ScoreShape => {
+  if (!parent?.duration.n) return child
+  return {
+    kind: 'parallel',
+    duration: parent.duration.compare(child.duration) >= 0 ? parent.duration : child.duration,
+    origins: [...parent.origins, ...child.origins],
+    branches: [parent, child],
+  }
+}
+
 /** Compile a global timeline or a zero-duration enclosing source without any audio concepts. */
 export function evaluateInitialization(
   program: Program,
@@ -79,9 +89,9 @@ export function evaluateInitialization(
       origin: settings.timeSignature.origin ?? new Fraction(0),
     }
   const diagnostics: Diagnostic[] = []
-  const evaluate = (context?: ScoreVisitorContext) => {
+  const evaluate = (context?: ScoreVisitorContext, collectDiagnostics = true) => {
     const result = evaluateProgramSemantics(program, { ...settings, ...context })
-    diagnostics.push(...result.diagnostics)
+    if (collectDiagnostics) diagnostics.push(...result.diagnostics)
     if (!('shape' in result)) return undefined
     const message = containsAttack(result.shape)
       ? 'Initialization sources cannot contain pitch-bearing expressions.'
@@ -101,15 +111,37 @@ export function evaluateInitialization(
   if (!result) return { diagnostics }
   let initialization: ScoreInitialization
   if (result.shape.duration.n) {
-    const base = evaluateProgramSemantics(
-      { ...program, body: [] },
-      { ...settings, ...parent.context },
-    )
-    if (!('shape' in base) || !base.visitorContext) return { diagnostics }
+    const parentContexts = [
+      ...(parent.context ? [parent.context] : []),
+      ...(parent.changes?.map(({ context }) => context) ?? []),
+    ]
+    const variants = new Map<ScoreVisitorContext | undefined, ScoreInitialization>()
+    for (const context of parentContexts.length ? parentContexts : [undefined]) {
+      const evaluated =
+        context === contextAt(parent, new Fraction(0)) ? result : evaluate(context, false)
+      if (!evaluated || !('shape' in evaluated)) return { diagnostics }
+      const base = evaluateProgramSemantics({ ...program, body: [] }, { ...settings, ...context })
+      if (!('shape' in base) || !base.visitorContext) return { diagnostics }
+      variants.set(context, {
+        context: base.visitorContext,
+        changes: timelineContexts(evaluated.shape, base.visitorContext),
+      })
+    }
+    const starts = new Map<string, Fraction>()
+    for (const { start } of parent.changes ?? []) starts.set(start.toFraction(), start)
+    for (const variant of variants.values())
+      for (const { start } of variant.changes ?? []) starts.set(start.toFraction(), start)
+    const changes = [...starts.values()]
+      .sort((left, right) => left.compare(right))
+      .map((start) => {
+        const parentContext = contextAt(parent, start)
+        return { start, context: contextAt(variants.get(parentContext), start)! }
+      })
+    const initialParentContext = contextAt(parent, new Fraction(0))
     initialization = {
-      context: base.visitorContext,
-      changes: timelineContexts(result.shape, base.visitorContext),
-      timelineShape: result.shape,
+      context: variants.get(initialParentContext)?.context,
+      changes,
+      timelineShape: combineTimelineShapes(parent.timelineShape, result.shape),
       shape: parent.shape,
     }
   } else {

@@ -214,18 +214,26 @@ export const compileSourceInitialization = (
   parent: SourceInitialization = {},
   allowDuration = false,
   timeSignature?: { readonly numerator: number; readonly denominator: number },
+  allowTempoDirective = allowDuration,
 ): SourceInitialization => {
   const result = evaluateInitialization(parse(source), {
     initialization: parent,
     directiveExtensions: ENVELOPE_EXTENSIONS,
     allowDuration,
-    allowTempoDirective: allowDuration,
+    allowTempoDirective,
     timeSignature,
   })
   const errors = result.diagnostics.filter(({ severity }) => severity === 'error')
   if (errors.length) throw new Error(errors.map(({ message }) => message).join('\n'))
   return result.initialization ?? parent
 }
+
+/** Compile a lane source, whose duration-bearing score acts as that lane's timeline. */
+export const compileLaneSourceInitialization = (
+  source: string,
+  parent: SourceInitialization = {},
+  timeSignature?: { readonly numerator: number; readonly denominator: number },
+): SourceInitialization => compileSourceInitialization(source, parent, true, timeSignature, false)
 
 /** Convert the exact language score at the sound/preview boundary. */
 const realizeClipNotes = (
@@ -380,7 +388,11 @@ export const parseLaneNotes = (
   timeSignatureChanges?: readonly TimeSignatureChange[],
 ): ScheduledLaneNote[] => {
   const samples = drumSamplesForLane(lane)
-  const laneInitialization = compileSourceInitialization(lane.source, globalInitialization)
+  const laneInitialization = compileLaneSourceInitialization(
+    lane.source,
+    globalInitialization,
+    timeSignature,
+  )
   const notes = lane.clips.flatMap((clip) =>
     realizeClipNotes(
       clip.source,

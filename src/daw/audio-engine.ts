@@ -30,6 +30,7 @@ export type {
   PlaybackPlan,
 } from './playback-plan'
 export {
+  compileLaneSourceInitialization,
   parseClipNotes,
   parseDrumClipNotes,
   parseLaneNotes,
