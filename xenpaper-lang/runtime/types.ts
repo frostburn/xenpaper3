@@ -101,6 +101,8 @@ export interface FunctionDefinition {
   readonly parameters: readonly string[]
   readonly body: FunctionBody
   readonly environment: LexicalEnvironment
+  /** Minimum arity; only prelude definitions currently supply optional trailing parameters. */
+  readonly minimumArguments: number
 }
 
 export const EMPTY_LEXICAL_ENVIRONMENT: LexicalEnvironment = {

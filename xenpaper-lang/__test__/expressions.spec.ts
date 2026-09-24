@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { Fraction } from 'xen-dev-utils/fraction'
 import { parse, type Expression } from '../parser.js'
-import { evaluateExpression } from '../runtime/expressions'
+import { evaluateDeclaration, evaluateExpression } from '../runtime/expressions'
 import { fjsInflection, groupFjsInflections } from '../runtime/fjs'
 import {
   DEFAULT_PITCH_CONTEXT,
@@ -160,6 +160,7 @@ describe('arithmetic expression evaluation', () => {
     expect(evaluate('niente').kind).toBe('undefined')
     expect(evaluate('niente al 3/2').value.equals(new Value(3n, 2n))).toBe(true)
     expect(evaluate('5/4 al 3/2').value.equals(new Value(5n, 4n))).toBe(true)
+    expect(evaluate('1 al (1 / 0)').value.equals(1)).toBe(true)
   })
 
   it('provides combination and sorting container built-ins', () => {
@@ -171,6 +172,29 @@ describe('arithmetic expression evaluation', () => {
     const sorted = evaluate('sort([3, 1, 2])')
     if (sorted.kind !== 'container') throw new Error('Expected a container.')
     expect(sorted.values.map((item) => item.value.valueOf())).toEqual([1, 2, 3])
+    const singleton = evaluate('sort([2])')
+    if (singleton.kind !== 'container') throw new Error('Expected a container.')
+    expect(singleton.values.map((item) => item.value.valueOf())).toEqual([2])
+    expect(evaluate('[1][0]').value.equals(1)).toBe(true)
+    expect(evaluate('arrayReduce([pitch(3/2)])').value.equals(new Value(3n, 2n))).toBe(true)
+
+    expect(evaluateExpression(expression('sort([niente, 2, 1])'))).toMatchObject({
+      diagnostics: [{ code: 'XP_TYPE_MISMATCH', message: 'sort() expects numeric values.' }],
+    })
+  })
+
+  it('does not apply prelude optional arity to shadowing functions', () => {
+    const declaration = parse('fn cps(foo) { ret foo }').body[0]
+    if (declaration.type !== 'FunctionDeclaration') throw new Error('Expected a function.')
+    const declared = evaluateDeclaration(declaration)
+    expect(declared.diagnostics).toEqual([])
+    const called = evaluateExpression(
+      expression('cps(3/2)'),
+      DEFAULT_PITCH_CONTEXT,
+      declared.environment,
+    )
+    expect(called.diagnostics).toEqual([])
+    expect('value' in called && called.value.value.equals(new Value(3n, 2n))).toBe(true)
   })
 
   it('implements scale construction helpers in the Xenpaper prelude', () => {

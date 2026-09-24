@@ -253,8 +253,7 @@ UnaryExpression
     }
 
 UnaryOperator
-  = "*~" { return "*~"; }
-  / "+" { return "+"; }
+  = "+" { return "+"; }
   / "-" { return "-"; }
   / "~" { return "~"; }
   / "√" { return "√"; }

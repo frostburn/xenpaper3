@@ -57,7 +57,7 @@ export type ExpressionEvaluationResult =
 export const PRELUDE = `
 let pi = 3.141592653589793r
 fn sqrt(radicand) { ret radicand ** 1/2 }
-fn prod(factors) { ret *~factors }
+fn prod(factors) { ret arrayReduce(factors) }
 fn ground(scale) { ret scale / scale[0] }
 fn equaveReduce(scale, equave) {
   let actualEquave = equave al scale[-1]
@@ -83,7 +83,7 @@ function preludeEnvironment(): LexicalEnvironment {
     if (declaration.type !== 'VariableDeclaration' && declaration.type !== 'FunctionDeclaration') {
       throw new TypeError('The Xenpaper prelude may only contain declarations.')
     }
-    const evaluated = evaluateDeclaration(declaration, DEFAULT_PITCH_CONTEXT, environment)
+    const evaluated = evaluateDeclaration(declaration, DEFAULT_PITCH_CONTEXT, environment, true)
     if (evaluated.diagnostics.length) {
       throw new TypeError(`Invalid Xenpaper prelude: ${evaluated.diagnostics[0]!.message}`)
     }
@@ -97,6 +97,7 @@ export function evaluateDeclaration(
   node: Extract<Expression, { type: 'VariableDeclaration' | 'FunctionDeclaration' }>,
   mapping: PrimeMapping | PitchContext = DEFAULT_PITCH_CONTEXT,
   environment: LexicalEnvironment = preludeEnvironment(),
+  prelude = false,
 ): { readonly environment: LexicalEnvironment; readonly diagnostics: readonly Diagnostic[] } {
   if (node.type === 'VariableDeclaration') {
     const evaluated = evaluateExpression(node.value, mapping, environment)
@@ -127,7 +128,19 @@ export function evaluateDeclaration(
   }
   // Capture before installing the definition: ordinary lexical closures work,
   // while direct and mutual recursion remain unavailable by policy.
-  const definition = { declaration: node, parameters: names, body: node.body, environment }
+  const optionalPreludeParameters: Readonly<Record<string, number>> = {
+    cps: 2,
+    equaveReduce: 1,
+  }
+  const definition = {
+    declaration: node,
+    parameters: names,
+    body: node.body,
+    environment,
+    minimumArguments: prelude
+      ? (optionalPreludeParameters[node.name.name] ?? names.length)
+      : names.length,
+  }
   return {
     environment: extendLexicalEnvironment(environment, {
       functions: new Map([[node.name.name, definition]]),
@@ -192,8 +205,7 @@ export function prepareFunctionCall(
         },
       ],
     }
-  const optionalParameters: Readonly<Record<string, number>> = { cps: 2, equaveReduce: 1 }
-  const minimumArguments = optionalParameters[node.callee] ?? definition.parameters.length
+  const minimumArguments = definition.minimumArguments
   if (
     node.arguments.length < minimumArguments ||
     node.arguments.length > definition.parameters.length
@@ -562,17 +574,6 @@ function binary(
   }
 }
 
-function productReduction(value: EvaluatedLiteral, node: Expression): EvaluatedLiteral {
-  if (value.kind !== 'container') throw new TypeError('Product reduction requires a container.')
-  if (value.values.some((item) => item.kind === 'container')) {
-    return { ...value, values: value.values.map((item) => productReduction(item, node)) }
-  }
-  return value.values.reduce<EvaluatedLiteral>(
-    (total, item) => binary('*', total, item, node),
-    result('scalar', new Value(1), value.origins),
-  )
-}
-
 function containerItems(
   node: Expression,
   mapping: PrimeMapping | PitchContext,
@@ -586,13 +587,26 @@ function containerItems(
       raw: String(node.degree),
       location: node.location,
     })
-  if (node.type === 'Group' || node.type === 'NormalizeToSlot') {
+  if (node.type === 'Group') return containerItems(node.expression, mapping, environment)
+  if (node.type === 'NormalizeToSlot') {
     if (!node.expression)
       return {
         value: { kind: 'container', values: [], value: new Value(0), origins: [] },
         diagnostics: [],
       }
-    return containerItems(node.expression, mapping, environment)
+    if (node.expression.type === 'Sequence' || node.expression.type === 'Parallel')
+      return containerItems(node.expression, mapping, environment)
+    const item = containerItems(node.expression, mapping, environment)
+    if (!('value' in item)) return item
+    return {
+      value: {
+        kind: 'container',
+        values: [item.value],
+        value: new Value(0),
+        origins: [{ location: node.location, role: 'literal' }],
+      },
+      diagnostics: item.diagnostics,
+    }
   }
   if (node.type === 'Sequence' || node.type === 'Parallel') {
     const nodes = node.type === 'Sequence' ? node.items : node.branches
@@ -642,14 +656,40 @@ function callContainerBuiltin(name: string, args: readonly EvaluatedLiteral[]): 
       origins: origin,
     }
   }
+  if (name === 'arrayReduce') {
+    const reduce = (items: readonly EvaluatedLiteral[]): EvaluatedLiteral => {
+      if (items.some((item) => item.kind === 'container')) {
+        return {
+          kind: 'container',
+          values: items.map((item) => {
+            if (item.kind !== 'container')
+              throw new TypeError('arrayReduce() requires consistently nested containers.')
+            return reduce(item.values)
+          }),
+          value: new Value(0),
+          origins: origin,
+        }
+      }
+      const value = items.reduce((total, item) => {
+        if (item.kind === 'scalar') return total.mul(item.value)
+        if (item.kind === 'pitchOffset') return total.mul(Value.ratio(item.value))
+        throw new TypeError('arrayReduce() expects values coercible to ratios.')
+      }, new Value(1))
+      return result('scalar', value, origin)
+    }
+    return reduce(requireContainer())
+  }
   if (name === 'sort') {
+    const values = requireContainer()
+    if (values.some((item) => item.kind !== 'scalar' && item.kind !== 'pitchOffset'))
+      throw new TypeError('sort() expects numeric values.')
+    const numeric = values as readonly Extract<
+      EvaluatedLiteral,
+      { kind: 'scalar' | 'pitchOffset' }
+    >[]
     return {
       kind: 'container',
-      values: [...requireContainer()].sort((a, b) => {
-        if (!('value' in a) || !('value' in b))
-          throw new TypeError('sort() expects numeric values.')
-        return a.value.valueOf() - b.value.valueOf()
-      }),
+      values: [...numeric].sort((a, b) => a.value.valueOf() - b.value.valueOf()),
       value: new Value(0),
       origins: origin,
     }
@@ -831,9 +871,7 @@ export function evaluateExpression(
       const operand = evaluateExpression(node.operand, mapping, environment)
       if (!('value' in operand)) return operand
       if (operand.value.kind === 'container' || operand.value.kind === 'undefined')
-        if (node.operator === '*~' && operand.value.kind === 'container')
-          return { value: productReduction(operand.value, node), diagnostics: operand.diagnostics }
-        else throw new TypeError('Unary operators require a numeric operand.')
+        throw new TypeError('Unary operators require a numeric operand.')
       if (node.operator === '+') return operand
       if (node.operator === '√') {
         if (operand.value.kind !== 'scalar')
@@ -912,9 +950,11 @@ export function evaluateExpression(
     }
     if (node.type === 'BinaryExpression') {
       const left = evaluateExpression(node.left, mapping, environment)
+      if (!('value' in left)) return left
+      if (node.operator === 'al' && left.value.kind !== 'undefined') return left
       const right = evaluateExpression(node.right, mapping, environment)
       const diagnostics = [...left.diagnostics, ...right.diagnostics]
-      if (!('value' in left) || !('value' in right)) return { diagnostics }
+      if (!('value' in right)) return { diagnostics }
       return { value: binary(node.operator, left.value, right.value, node), diagnostics }
     }
     if (node.type === 'IndexExpression') {
@@ -957,7 +997,7 @@ export function evaluateExpression(
           diagnostics: [...prepared.diagnostics, ...body.diagnostics],
         }
       }
-      const containerBuiltins = ['kCombinations', 'sort']
+      const containerBuiltins = ['kCombinations', 'arrayReduce', 'sort']
       if (containerBuiltins.includes(node.callee)) {
         const evaluated = node.arguments.map((argument) =>
           containerItems(argument, mapping, environment),
