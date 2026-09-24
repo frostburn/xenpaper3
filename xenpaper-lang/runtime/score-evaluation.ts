@@ -1526,10 +1526,18 @@ export function evaluateScoreSemantics(
         if (item.type === 'PitchContextChange') {
           try {
             const previousContext = activeVisitor.scope.context
-            const changedContext = applyPitchContextChange(item, previousContext)
+            const changedContext = applyPitchContextChange(
+              item,
+              previousContext,
+              activeVisitor.scope.environment,
+            )
             activeVisitor = changeVisitor(activeVisitor, (context) => ({
               ...context,
-              pitchContext: applyPitchContextChange(item, context.pitchContext),
+              pitchContext: applyPitchContextChange(
+                item,
+                context.pitchContext,
+                context.lexicalEnvironment,
+              ),
             }))
             results.push({
               shape: withVisitorContext(
@@ -2183,7 +2191,7 @@ export function evaluateScoreSemantics(
 
     if (current.type === 'PitchContextChange') {
       try {
-        const changed = applyPitchContextChange(current, context)
+        const changed = applyPitchContextChange(current, context, environment)
         return { shape: contextShape(current, changed, context), diagnostics: [] }
       } catch {
         return { shape: contextAnnotation(current), diagnostics: [] }

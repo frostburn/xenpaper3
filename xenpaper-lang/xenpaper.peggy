@@ -625,6 +625,9 @@ ContextStatement
   = name:$('tuning'i) !IdentifierContinue Spacing '*=' Spacing value:AdditiveExpression {
       return node('TuningStretch', { factor: value, raw: text() });
     }
+  / "scale"i !IdentifierContinue Spacing "=" Spacing value:ScopedParallelExpression {
+      return node('ContextDegreeMapping', { values: [value] });
+    }
   / operator:$("'") Spacing "=" Spacing value:ContextValue {
       return node('ContextAssignment', {
         target: node('ContextOperatorTarget', { operator }),

@@ -14,7 +14,7 @@ import type {
 import type { Diagnostic } from '../diagnostics'
 import { Value } from '../value'
 import { applyFjsInflections, fjsPrimeComma, groupFjsInflections } from './fjs'
-import { evaluateExpression } from './expressions'
+import { evaluateExpression, prepareFunctionCall } from './expressions'
 import type {
   AbsolutePitchValue,
   IntervalSpelling,
@@ -25,6 +25,7 @@ import type {
   PitchContext,
   MosContext,
   SourceOrigin,
+  LexicalEnvironment,
 } from './types'
 import { parseVal, valMapping } from './val'
 
@@ -297,6 +298,7 @@ function asContext(input: PrimeMapping | PitchContext): PitchContext {
 export function applyPitchContextChange(
   node: PitchContextChange,
   input: PitchContext = DEFAULT_PITCH_CONTEXT,
+  environment?: LexicalEnvironment,
 ): PitchContext {
   let context = input
   for (const statement of node.statements) {
@@ -342,17 +344,38 @@ export function applyPitchContextChange(
       continue
     }
     if (statement.type === 'ContextDegreeMapping') {
-      const expandDegreeExpression = (expression: Expression): Expression[] => {
-        if (expression.type === 'Sequence') return expression.items.flatMap(expandDegreeExpression)
+      const expandDegreeExpression = (
+        expression: Expression,
+        expressionEnvironment = environment,
+      ): { expression: Expression; environment?: LexicalEnvironment }[] => {
+        if (expression.type === 'CallExpression') {
+          const prepared = prepareFunctionCall(expression, context, expressionEnvironment)
+          if (!prepared)
+            throw new TypeError(`${expression.callee} is not a defined scale constructor.`)
+          if (!('expression' in prepared))
+            throw new TypeError(
+              prepared.diagnostics[0]?.message ?? 'The scale constructor could not be evaluated.',
+            )
+          return expandDegreeExpression(prepared.expression, prepared.environment)
+        }
+        if (expression.type === 'Group')
+          return expandDegreeExpression(expression.expression, expressionEnvironment)
+        if (expression.type === 'Sequence')
+          return expression.items.flatMap((item) =>
+            expandDegreeExpression(item, expressionEnvironment),
+          )
         if (expression.type === 'Parallel')
-          return expression.branches.flatMap(expandDegreeExpression)
-        if (expression.type !== 'EnumeratedChord') return [expression]
+          return expression.branches.flatMap((branch) =>
+            expandDegreeExpression(branch, expressionEnvironment),
+          )
+        if (expression.type !== 'EnumeratedChord')
+          return [{ expression, environment: expressionEnvironment }]
 
         const enumerated = expression
         let enumerands = enumerated.enumerands
         if (!enumerands) {
           const endpoints = [enumerated.first, enumerated.rangeEnd!].map((endpoint) => {
-            const evaluated = evaluateExpression(endpoint, context)
+            const evaluated = evaluateExpression(endpoint, context, expressionEnvironment)
             if (!('value' in evaluated) || evaluated.value.kind !== 'scalar') return undefined
             const exact = evaluated.value.value.exactRational()
             return exact?.d === 1 ? BigInt(exact.s * exact.n) : undefined
@@ -378,16 +401,19 @@ export function applyPitchContextChange(
         // Unlike a chord used as notes, a scale already has an implicit unison.
         // Drop the first enumerand rather than storing a redundant 1/1 degree.
         return enumerands.slice(1).map((enumerand) => ({
-          type: 'BinaryExpression',
-          operator: '/',
-          left: enumerated.inverted ? enumerated.first : enumerand,
-          right: enumerated.inverted ? enumerand : enumerated.first,
-          location: enumerated.location,
+          expression: {
+            type: 'BinaryExpression',
+            operator: '/',
+            left: enumerated.inverted ? enumerated.first : enumerand,
+            right: enumerated.inverted ? enumerand : enumerated.first,
+            location: enumerated.location,
+          },
+          environment: expressionEnvironment,
         }))
       }
-      const values = statement.values.flatMap(expandDegreeExpression)
-      const degrees = values.map((value) => {
-        const evaluated = evaluateExpression(value, context)
+      const values = statement.values.flatMap((value) => expandDegreeExpression(value))
+      const degrees = values.map(({ expression, environment: valueEnvironment }) => {
+        const evaluated = evaluateExpression(expression, context, valueEnvironment)
         if (!('value' in evaluated))
           throw new TypeError('Degree assignments require pitch intervals.')
         if (evaluated.value.kind === 'absolutePitch') return evaluated.value.rootOffset
