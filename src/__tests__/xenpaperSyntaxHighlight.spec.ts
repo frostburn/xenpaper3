@@ -32,12 +32,13 @@ describe('highlightXenpaper', () => {
   })
 
   it('uses semantic kinds for rests, ratios, pitch systems, and repeat ending contents', () => {
-    const source = '|: 0 . |¹ 3/2 A Α :|² 7 ||'
+    const source = '|: 0 . ; |¹ 3/2 A Α :|² 7 ||'
     const tokens = highlightXenpaper(parse(source))
 
     expect(tokens).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ kind: 'rest', text: '.' }),
+        expect.objectContaining({ kind: 'rest', text: ';', nodeType: 'BarRest' }),
         expect.objectContaining({ kind: 'ratio', text: '3/2' }),
         expect.objectContaining({ kind: 'pitch-latin', text: 'A' }),
         expect.objectContaining({ kind: 'pitch-greek', text: 'Α' }),
