@@ -652,6 +652,33 @@ describe('DAW project model', () => {
     expect(notes[16]!.cents).toBeCloseTo(notes[0]!.cents)
   })
 
+  it('overlays timed lane changes on timed global changes', () => {
+    const project = createDefaultProject()
+    const lane = project.instrumentLanes[0]! as PitchedInstrumentLane
+    project.globalTrack.source = '|: {19edo} @groove([0= 0]); {12edo} @groove([0= 0]); :|'
+    lane.source = '|: @adsr(10ms, 20ms, 30%, 40ms); @adsr(50ms, 60ms, 70%, 80ms); :|'
+    lane.clips.push({
+      id: 'layered-lane-time',
+      start: beat(0),
+      length: beat(9),
+      source: '@2 D D D D D D D D D D D D D D D D D D',
+    })
+
+    const notes = parseProjectNotes(project)
+    expect(notes[1]!.beat).toBeGreaterThan(0.5)
+    expect(notes[0]!.envelope.attack).toBeCloseTo(0.01)
+    expect(notes[8]!.envelope.attack).toBeCloseTo(0.05)
+    expect(notes[16]!.envelope.attack).toBeCloseTo(0.01)
+    expect(notes[0]!.cents).not.toBeCloseTo(notes[8]!.cents)
+    expect(notes[16]!.cents).toBeCloseTo(notes[0]!.cents)
+  })
+
+  it('keeps tempo directives global-only in timed lane sources', () => {
+    const project = createDefaultProject()
+    project.instrumentLanes[0]!.source = '@tempo(90bpm);'
+    expect(() => parseProjectNotes(project)).toThrow('@tempo is only allowed in a global source.')
+  })
+
   it('initializes every lane clip from the global and instrument sources', () => {
     const project = createDefaultProject()
     const lane = project.instrumentLanes[0]! as PitchedInstrumentLane

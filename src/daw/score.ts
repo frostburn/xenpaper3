@@ -214,12 +214,13 @@ export const compileSourceInitialization = (
   parent: SourceInitialization = {},
   allowDuration = false,
   timeSignature?: { readonly numerator: number; readonly denominator: number },
+  allowTempoDirective = allowDuration,
 ): SourceInitialization => {
   const result = evaluateInitialization(parse(source), {
     initialization: parent,
     directiveExtensions: ENVELOPE_EXTENSIONS,
     allowDuration,
-    allowTempoDirective: allowDuration,
+    allowTempoDirective,
     timeSignature,
   })
   const errors = result.diagnostics.filter(({ severity }) => severity === 'error')
@@ -232,7 +233,7 @@ export const compileLaneSourceInitialization = (
   source: string,
   parent: SourceInitialization = {},
   timeSignature?: { readonly numerator: number; readonly denominator: number },
-): SourceInitialization => compileSourceInitialization(source, parent, true, timeSignature)
+): SourceInitialization => compileSourceInitialization(source, parent, true, timeSignature, false)
 
 /** Convert the exact language score at the sound/preview boundary. */
 const realizeClipNotes = (
