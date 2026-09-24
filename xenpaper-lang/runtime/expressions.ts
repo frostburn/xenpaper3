@@ -57,14 +57,14 @@ export type ExpressionEvaluationResult =
 export const PRELUDE = `
 let pi = 3.141592653589793r
 fn sqrt(radicand) { ret radicand ** 1/2 }
-fn prod(factors) { ret arrayReduce(factors) }
+fn prod(factors) { ret arrayReduce((total, element) => total * ratio(element), factors, 1/1) }
 fn ground(scale) { ret scale / scale[0] }
 fn equaveReduce(scale, equave) {
   let actualEquave = equave al scale[-1]
   ret scale rd actualEquave
 }
 fn cps(factors, count, equave, withUnity) {
-  let products = sort(prod(kCombinations(factors, count)))
+  let products = sort(arrayMap((combination) => prod(combination), kCombinations(factors, count)))
   let grounded = (withUnity al false) ? products : ground(products)
   let actualEquave = equave al (2 * grounded[0])
   ret sort(equaveReduce(grounded, actualEquave))
@@ -565,7 +565,12 @@ function binary(
       }),
     }
   }
-  if (left.kind === 'undefined' || right.kind === 'undefined')
+  if (
+    left.kind === 'undefined' ||
+    right.kind === 'undefined' ||
+    left.kind === 'lambda' ||
+    right.kind === 'lambda'
+  )
     throw new TypeError(`Operator ${operator} requires numeric operands.`)
   switch (operator) {
     case '+':
@@ -645,7 +650,11 @@ const scalarInteger = (value: EvaluatedLiteral, name: string): number => {
   return Number(exact.s * exact.n)
 }
 
-function callContainerBuiltin(name: string, args: readonly EvaluatedLiteral[]): EvaluatedLiteral {
+function callContainerBuiltin(
+  name: string,
+  args: readonly EvaluatedLiteral[],
+  mapping: PrimeMapping | PitchContext,
+): EvaluatedLiteral {
   const origin = args.flatMap((argument) => argument.origins)
   const requireContainer = (index = 0) => {
     const argument = args[index]
@@ -669,27 +678,48 @@ function callContainerBuiltin(name: string, args: readonly EvaluatedLiteral[]): 
     }
   }
   if (name === 'arrayReduce') {
-    const reduce = (items: readonly EvaluatedLiteral[]): EvaluatedLiteral => {
-      if (items.some((item) => item.kind === 'container')) {
-        return {
-          kind: 'container',
-          values: items.map((item) => {
-            if (item.kind !== 'container')
-              throw new TypeError('arrayReduce() requires consistently nested containers.')
-            return reduce(item.values)
-          }),
-          value: new Value(0),
-          origins: origin,
-        }
-      }
-      const value = items.reduce((total, item) => {
-        if (item.kind === 'scalar') return total.mul(item.value)
-        if (item.kind === 'pitchOffset') return total.mul(Value.ratio(item.value))
-        throw new TypeError('arrayReduce() expects values coercible to ratios.')
-      }, new Value(1))
-      return result('scalar', value, origin)
+    const callback = args[0]
+    if (callback?.kind !== 'lambda' || callback.parameters.length !== 2)
+      throw new TypeError('arrayReduce() expects a two-parameter lambda.')
+    const items = requireContainer(1)
+    const initial = args[2]
+    if (!items.length && !initial)
+      throw new TypeError(
+        'arrayReduce() cannot reduce an empty container without an initial value.',
+      )
+    let accumulator = initial ?? items[0]!
+    for (const item of initial ? items : items.slice(1)) {
+      const environment = extendLexicalEnvironment(callback.environment, {
+        variables: new Map([
+          [callback.parameters[0]!, accumulator],
+          [callback.parameters[1]!, item],
+        ]),
+      })
+      const reduced = evaluateExpression(callback.body, mapping, environment)
+      if (!('value' in reduced))
+        throw new TypeError(reduced.diagnostics[0]?.message ?? 'arrayReduce() callback failed.')
+      accumulator = reduced.value
     }
-    return reduce(requireContainer())
+    return accumulator
+  }
+  if (name === 'arrayMap') {
+    const callback = args[0]
+    if (callback?.kind !== 'lambda' || callback.parameters.length !== 1)
+      throw new TypeError('arrayMap() expects a one-parameter lambda.')
+    return {
+      kind: 'container',
+      values: requireContainer(1).map((item) => {
+        const environment = extendLexicalEnvironment(callback.environment, {
+          variables: new Map([[callback.parameters[0]!, item]]),
+        })
+        const mapped = evaluateExpression(callback.body, mapping, environment)
+        if (!('value' in mapped))
+          throw new TypeError(mapped.diagnostics[0]?.message ?? 'arrayMap() callback failed.')
+        return mapped.value
+      }),
+      value: new Value(0),
+      origins: origin,
+    }
   }
   if (name === 'sort') {
     const values = requireContainer()
@@ -774,6 +804,22 @@ export function evaluateExpression(
         ]),
         diagnostics: [],
       }
+    if (node.type === 'LambdaExpression') {
+      const parameters = node.parameters.map((parameter) => parameter.name)
+      if (new Set(parameters).size !== parameters.length)
+        throw new TypeError('Lambda parameters must be unique.')
+      return {
+        value: {
+          kind: 'lambda',
+          parameters,
+          body: node.body,
+          environment,
+          value: new Value(0),
+          origins: [{ location: node.location, role: 'literal' }],
+        },
+        diagnostics: [],
+      }
+    }
     if (node.type === 'Identifier')
       return {
         diagnostics: [
@@ -790,7 +836,11 @@ export function evaluateExpression(
     if (node.type === 'PitchModifierExpression') {
       const operand = evaluateExpression(node.operand, mapping, environment)
       if (!('value' in operand)) return operand
-      if (operand.value.kind === 'container' || operand.value.kind === 'undefined')
+      if (
+        operand.value.kind === 'container' ||
+        operand.value.kind === 'undefined' ||
+        operand.value.kind === 'lambda'
+      )
         throw new TypeError('Pitch modifiers require a numeric operand.')
       const context = 'rootPitch' in mapping ? mapping : createPitchContext(mapping)
       const modifier = node.modifier.kind
@@ -882,7 +932,11 @@ export function evaluateExpression(
     if (node.type === 'UnaryExpression') {
       const operand = evaluateExpression(node.operand, mapping, environment)
       if (!('value' in operand)) return operand
-      if (operand.value.kind === 'container' || operand.value.kind === 'undefined')
+      if (
+        operand.value.kind === 'container' ||
+        operand.value.kind === 'undefined' ||
+        operand.value.kind === 'lambda'
+      )
         throw new TypeError('Unary operators require a numeric operand.')
       if (node.operator === '+') return operand
       if (node.operator === '√') {
@@ -1009,7 +1063,7 @@ export function evaluateExpression(
           diagnostics: [...prepared.diagnostics, ...body.diagnostics],
         }
       }
-      const containerBuiltins = ['kCombinations', 'arrayReduce', 'sort']
+      const containerBuiltins = ['kCombinations', 'arrayReduce', 'arrayMap', 'sort']
       if (containerBuiltins.includes(node.callee)) {
         const evaluated = node.arguments.map((argument, index) => {
           if (
@@ -1037,6 +1091,7 @@ export function evaluateExpression(
           value: callContainerBuiltin(
             node.callee,
             evaluated.map((argument) => (argument as { value: EvaluatedLiteral }).value),
+            mapping,
           ),
           diagnostics,
         }
@@ -1067,6 +1122,7 @@ export function evaluateExpression(
         }
       }
       if (node.callee === 'ratio') {
+        if (argument.value.kind === 'scalar') return argument
         if (argument.value.kind !== 'pitchOffset')
           throw new TypeError('ratio() expects a pitch offset.')
         return {

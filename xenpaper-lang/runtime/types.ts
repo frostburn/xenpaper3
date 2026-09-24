@@ -1,5 +1,6 @@
 import type {
   Directive,
+  Expression,
   FunctionBody,
   FunctionDeclaration,
   PitchLiteral,
@@ -236,6 +237,16 @@ export interface UndefinedValue {
   readonly origins: readonly SourceOrigin[]
 }
 
+/** Lexically captured anonymous function used by higher-order container helpers. */
+export interface LambdaValue {
+  readonly kind: 'lambda'
+  readonly parameters: readonly string[]
+  readonly body: Expression
+  readonly environment: LexicalEnvironment
+  readonly value: Value
+  readonly origins: readonly SourceOrigin[]
+}
+
 export type PrimeMonzo = ReadonlyMap<number, Fraction>
 
 export interface IntervalSpelling {
@@ -329,6 +340,7 @@ export type EvaluatedLiteral =
   | AbsolutePitchValue
   | ContainerValue
   | UndefinedValue
+  | LambdaValue
 
 /** Renderer-independent description of a note on a treble/bass staff. */
 export interface StaffPitch {

@@ -43,6 +43,7 @@ export type Expression =
   | HardBoundary
   | Identifier
   | IntegerLiteral
+  | LambdaExpression
   | IntervalLiteral
   | IndexExpression
   | MappingLiteral
@@ -102,6 +103,12 @@ export interface IndexExpression extends Node {
   type: 'IndexExpression'
   container: Expression
   index: Expression
+}
+
+export interface LambdaExpression extends Node {
+  type: 'LambdaExpression'
+  parameters: Identifier[]
+  body: Expression
 }
 
 export interface EnumeratedChord extends Node {

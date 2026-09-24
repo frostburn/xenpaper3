@@ -282,6 +282,7 @@ PrimaryExpression
   / PitchContextChange
   / Directive
   / NormalizedGroup
+  / LambdaExpression
   / ParenthesizedExpression
   / Rest
   / BarRest
@@ -306,6 +307,13 @@ PrimaryExpression
   // such as `bd` to take precedence over pitch spellings when requested.
   / DrumSampleLiteral
   / IdentifierExpression
+
+LambdaExpression
+  = "(" Spacing parameters:(first:LocatedIdentifier rest:(Spacing "," Spacing parameter:LocatedIdentifier { return parameter; })* {
+      return [first, ...rest];
+    })? Spacing ")" Spacing "=>" Spacing body:AdditiveExpression {
+      return node('LambdaExpression', { parameters: parameters ?? [], body });
+    }
 
 DrumSampleLiteral
   = sample:Identifier &{ return options.drumSamples?.includes(sample) ?? false; } {

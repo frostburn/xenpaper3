@@ -183,7 +183,9 @@ describe('arithmetic expression evaluation', () => {
     expect(degree.kind).toBe('pitchOffset')
     expect(degree.value.equals(Value.cents(100))).toBe(true)
     expect(evaluate('prod([1 2])').value.equals(Value.ratio(Value.cents(300)))).toBe(true)
-    expect(evaluate('arrayReduce([pitch(3/2)])').value.equals(new Value(3n, 2n))).toBe(true)
+    expect(
+      evaluate('arrayReduce((total, element) => total + element, [1/1, 2/1, 3/1])').value.equals(6),
+    ).toBe(true)
 
     expect(evaluateExpression(expression('sort([niente, 2/1, 1/1])'))).toMatchObject({
       diagnostics: [{ code: 'XP_TYPE_MISMATCH', message: 'sort() expects numeric values.' }],
@@ -320,9 +322,7 @@ describe('arithmetic expression evaluation', () => {
   })
 
   it('rejects pitch arguments and invalid arity for conversion functions', () => {
-    expect(evaluateExpression(expression('ratio(3/2)'))).toMatchObject({
-      diagnostics: [{ code: 'XP_TYPE_MISMATCH', message: 'ratio() expects a pitch offset.' }],
-    })
+    expect(evaluate('ratio(3/2)').value.equals(new Value(3n, 2n))).toBe(true)
     expect(evaluateExpression(expression('sqrt(700c)'))).toMatchObject({
       diagnostics: [
         { code: 'XP_TYPE_MISMATCH', message: 'Exponentiation requires scalar operands.' },
