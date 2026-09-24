@@ -594,14 +594,6 @@ function containerItems(
   mapping: PrimeMapping | PitchContext,
   environment: LexicalEnvironment,
 ): ExpressionEvaluationResult {
-  // Integers inside an explicit container are data, not references to active scale degrees.
-  if (node.type === 'DegreeLiteral')
-    return evaluateLiteral({
-      type: 'IntegerLiteral',
-      value: String(node.degree),
-      raw: String(node.degree),
-      location: node.location,
-    })
   if (node.type === 'Group') return containerItems(node.expression, mapping, environment)
   if (node.type === 'NormalizeToSlot') {
     if (!node.expression)

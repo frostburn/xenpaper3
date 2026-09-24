@@ -164,21 +164,25 @@ describe('arithmetic expression evaluation', () => {
   })
 
   it('provides combination and sorting container built-ins', () => {
-    const combinations = evaluate('kCombinations([1, 3, 5], 2)')
+    const combinations = evaluate('kCombinations([1/1, 3/1, 5/1], 2)')
     expect(combinations.kind).toBe('container')
     if (combinations.kind !== 'container') throw new Error('Expected a container.')
     expect(combinations.values).toHaveLength(3)
 
-    const sorted = evaluate('sort([3, 1, 2])')
+    const sorted = evaluate('sort([3/1, 1/1, 2/1])')
     if (sorted.kind !== 'container') throw new Error('Expected a container.')
     expect(sorted.values.map((item) => item.value.valueOf())).toEqual([1, 2, 3])
-    const singleton = evaluate('sort([2])')
+    const singleton = evaluate('sort([2/1])')
     if (singleton.kind !== 'container') throw new Error('Expected a container.')
     expect(singleton.values.map((item) => item.value.valueOf())).toEqual([2])
-    expect(evaluate('[1][0]').value.equals(1)).toBe(true)
+    expect(evaluate('[1/1][0]').value.equals(1)).toBe(true)
+    const degree = evaluate('[1][0]')
+    expect(degree.kind).toBe('pitchOffset')
+    expect(degree.value.equals(Value.cents(100))).toBe(true)
+    expect(evaluate('prod([1 2])').value.equals(Value.ratio(Value.cents(300)))).toBe(true)
     expect(evaluate('arrayReduce([pitch(3/2)])').value.equals(new Value(3n, 2n))).toBe(true)
 
-    expect(evaluateExpression(expression('sort([niente, 2, 1])'))).toMatchObject({
+    expect(evaluateExpression(expression('sort([niente, 2/1, 1/1])'))).toMatchObject({
       diagnostics: [{ code: 'XP_TYPE_MISMATCH', message: 'sort() expects numeric values.' }],
     })
   })
@@ -208,23 +212,23 @@ describe('arithmetic expression evaluation', () => {
         values(source).map((value, index) => value.equals(new Value(...ratios[index]!))),
       ).toEqual(ratios.map(() => true))
 
-    expect(evaluate('prod([3, 5, 7])').value.equals(105)).toBe(true)
-    expectRatios('ground([3, 5, 7])', [
+    expect(evaluate('prod([3/1, 5/1, 7/1])').value.equals(105)).toBe(true)
+    expectRatios('ground([3/1, 5/1, 7/1])', [
       [1n, 1n],
       [5n, 3n],
       [7n, 3n],
     ])
-    expectRatios('equaveReduce([1, 3/2, 2], 2)', [
+    expectRatios('equaveReduce([1/1, 3/2, 2/1], 2/1)', [
       [2n, 1n],
       [3n, 2n],
       [2n, 1n],
     ])
-    expectRatios('equaveReduce([1, 3/2, 2])', [
+    expectRatios('equaveReduce([1/1, 3/2, 2/1])', [
       [2n, 1n],
       [3n, 2n],
       [2n, 1n],
     ])
-    expectRatios('cps([1, 3, 5, 7], 2)', [
+    expectRatios('cps([1/1, 3/1, 5/1, 7/1], 2/1)', [
       [7n, 6n],
       [5n, 4n],
       [35n, 24n],
