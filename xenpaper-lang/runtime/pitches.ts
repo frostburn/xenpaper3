@@ -344,33 +344,81 @@ export function applyPitchContextChange(
       continue
     }
     if (statement.type === 'ContextDegreeMapping') {
+      type ExpandedDegrees = {
+        values: { expression: Expression; environment?: LexicalEnvironment }[]
+        iterable: boolean
+      }
       const expandDegreeExpression = (
         expression: Expression,
         expressionEnvironment = environment,
-      ): { expression: Expression; environment?: LexicalEnvironment }[] => {
+      ): ExpandedDegrees => {
         if (expression.type === 'CallExpression') {
           const prepared = prepareFunctionCall(expression, context, expressionEnvironment)
           // Calls without user definitions may still be scalar built-ins such as pitch() and
           // ratio(); leave those intact for ordinary expression evaluation below.
-          if (!prepared) return [{ expression, environment: expressionEnvironment }]
+          if (!prepared)
+            return {
+              values: [{ expression, environment: expressionEnvironment }],
+              iterable: false,
+            }
           if (!('expression' in prepared))
             throw new TypeError(
               prepared.diagnostics[0]?.message ?? 'The scale constructor could not be evaluated.',
             )
           return expandDegreeExpression(prepared.expression, prepared.environment)
         }
-        if (expression.type === 'Group')
+        if (expression.type === 'Group' || expression.type === 'NormalizeToSlot') {
+          if (!expression.expression) return { values: [], iterable: true }
           return expandDegreeExpression(expression.expression, expressionEnvironment)
-        if (expression.type === 'Sequence')
-          return expression.items.flatMap((item) =>
-            expandDegreeExpression(item, expressionEnvironment),
-          )
-        if (expression.type === 'Parallel')
-          return expression.branches.flatMap((branch) =>
-            expandDegreeExpression(branch, expressionEnvironment),
-          )
+        }
+        if (expression.type === 'Sequence' || expression.type === 'Parallel') {
+          const items = expression.type === 'Sequence' ? expression.items : expression.branches
+          return {
+            values: items.flatMap(
+              (item) => expandDegreeExpression(item, expressionEnvironment).values,
+            ),
+            iterable: true,
+          }
+        }
+        if (
+          expression.type === 'UnaryExpression' ||
+          expression.type === 'PitchModifierExpression'
+        ) {
+          const expanded = expandDegreeExpression(expression.operand, expressionEnvironment)
+          if (expanded.iterable)
+            return {
+              values: expanded.values.map(({ expression: operand, environment }) => ({
+                expression: { ...expression, operand },
+                environment,
+              })),
+              iterable: true,
+            }
+        }
+        if (expression.type === 'BinaryExpression') {
+          const left = expandDegreeExpression(expression.left, expressionEnvironment)
+          const right = expandDegreeExpression(expression.right, expressionEnvironment)
+          if (left.iterable || right.iterable) {
+            if (left.iterable && right.iterable && left.values.length !== right.values.length)
+              throw new TypeError('Iterable scale operands must have the same length.')
+            const length = left.iterable ? left.values.length : right.values.length
+            return {
+              values: Array.from({ length }, (_, index) => {
+                const lhs = left.values[left.iterable ? index : 0]!
+                const rhs = right.values[right.iterable ? index : 0]!
+                return {
+                  expression: { ...expression, left: lhs.expression, right: rhs.expression },
+                  environment: lhs.environment ?? rhs.environment,
+                }
+              }),
+              iterable: true,
+            }
+          }
+        }
         if (expression.type !== 'EnumeratedChord')
-          return [{ expression, environment: expressionEnvironment }]
+          return {
+            values: [{ expression, environment: expressionEnvironment }],
+            iterable: false,
+          }
 
         const enumerated = expression
         let enumerands = enumerated.enumerands
@@ -401,18 +449,21 @@ export function applyPitchContextChange(
         }
         // Unlike a chord used as notes, a scale already has an implicit unison.
         // Drop the first enumerand rather than storing a redundant 1/1 degree.
-        return enumerands.slice(1).map((enumerand) => ({
-          expression: {
-            type: 'BinaryExpression',
-            operator: '/',
-            left: enumerated.inverted ? enumerated.first : enumerand,
-            right: enumerated.inverted ? enumerand : enumerated.first,
-            location: enumerated.location,
-          },
-          environment: expressionEnvironment,
-        }))
+        return {
+          values: enumerands.slice(1).map((enumerand) => ({
+            expression: {
+              type: 'BinaryExpression',
+              operator: '/',
+              left: enumerated.inverted ? enumerated.first : enumerand,
+              right: enumerated.inverted ? enumerand : enumerated.first,
+              location: enumerated.location,
+            },
+            environment: expressionEnvironment,
+          })),
+          iterable: true,
+        }
       }
-      const values = statement.values.flatMap((value) => expandDegreeExpression(value))
+      const values = statement.values.flatMap((value) => expandDegreeExpression(value).values)
       const degrees = values.map(({ expression, environment: valueEnvironment }) => {
         const evaluated = evaluateExpression(expression, context, valueEnvironment)
         if (!('value' in evaluated))
