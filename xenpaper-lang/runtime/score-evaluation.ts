@@ -857,6 +857,20 @@ function holdAttacks(
   return sequence([held, generatedRest(extension)], shape.origins)
 }
 
+/** Materialize the timing of postfix continuations before a later `!` mark. */
+function materializeTrailingContinuations(shape: ScoreShape): ScoreShape {
+  if (shape.kind !== 'sequence') return shape
+  let end = shape.children.length
+  while (end && shape.children[end - 1]!.kind === 'continue') end--
+  if (end === shape.children.length || !end) return shape
+  const body = sequence(shape.children.slice(0, end), shape.origins)
+  if (!body.duration.n || !attacks(body).length) return shape
+  const continuationDuration = shape.children
+    .slice(end)
+    .reduce((duration, child) => duration.add(child.duration), new Fraction(0))
+  return scaleShape(body, body.duration.add(continuationDuration).div(body.duration))
+}
+
 function contextAnnotation(
   node: Extract<Expression, { type: 'PitchContextChange' }>,
 ): AnnotationShape {
@@ -2059,14 +2073,39 @@ export function evaluateScoreSemantics(
       }
     }
     if (current.type === 'PostfixExpression') {
+      const holdIndex = current.marks.findIndex((mark) => mark.type === 'HoldUntilEnd')
+      if (holdIndex >= 0) {
+        const prefix = current.marks.slice(0, holdIndex)
+        const withoutHold = current.marks.filter((mark) => mark.type !== 'HoldUntilEnd')
+        const heldFrom = current.marks.slice(holdIndex)
+        const evaluated = visitor.visit(
+          prefix.length ? { ...current, marks: prefix } : current.expression,
+        )
+        if (!('shape' in evaluated)) return evaluated
+        const continuations = heldFrom.filter((mark) => mark.type === 'DetachedContinue')
+        const extension = currentPulse.mul(continuations.length)
+        const base = materializeTrailingContinuations(evaluated.shape)
+        const held = holdAttacks(
+          base,
+          base.duration.add(extension),
+          extension,
+          true,
+          current.marks.map((mark) => origin(mark, 'duration')),
+        )
+        if (held)
+          return withVisitor(
+            { shape: held, diagnostics: evaluated.diagnostics },
+            visitorAfter(evaluated, visitor),
+          )
+        return visitor.visit(
+          withoutHold.length ? { ...current, marks: withoutHold } : current.expression,
+        )
+      }
       const continuations = current.marks.filter((mark) => mark.type === 'DetachedContinue')
-      const hold = current.marks.find((mark) => mark.type === 'HoldUntilEnd')
       const elimination = current.marks.find((mark) => mark.type === 'TailElimination')
       let evaluated = visitor.visit(current.expression)
       if (!('shape' in evaluated)) return evaluated
-      const distributesHolds =
-        current.expression.type === 'Group' ||
-        (Boolean(hold) && current.expression.type === 'NormalizeToSlot')
+      const distributesHolds = current.expression.type === 'Group'
       if (
         continuations.length &&
         (evaluated.shape.kind === 'sequence' || evaluated.shape.kind === 'parallel') &&
@@ -2100,16 +2139,16 @@ export function evaluateScoreSemantics(
           }
         base = trimShape(base, base.duration.sub(removed))
       }
-      if (distributesHolds || hold) {
+      if (distributesHolds) {
         const extension = currentPulse.mul(continuations.length)
         const duration = base.duration.add(extension)
         const held = holdAttacks(
           base,
           duration,
           extension,
-          Boolean(hold),
+          false,
           current.marks
-            .filter((mark) => mark.type === 'DetachedContinue' || mark.type === 'HoldUntilEnd')
+            .filter((mark) => mark.type === 'DetachedContinue')
             .map((mark) => origin(mark, 'duration')),
         )
         if (held)

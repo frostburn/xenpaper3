@@ -136,6 +136,7 @@ describe('beat event expansion', () => {
     ['(0 5 7)=', ['0', '1', '2'], ['2', '2', '2'], '4'],
     ['(0 5 7)!=', ['0', '1', '2'], ['4', '3', '2'], '4'],
     ['[0 5 7]!=', ['0', '1/3', '2/3'], ['2', '5/3', '4/3'], '2'],
+    ['[0 5 7]=!=', ['0', '2/3', '4/3'], ['3', '7/3', '5/3'], '3'],
   ])('holds attacks independently for %s', (source, starts, durations, totalDuration) => {
     const result = score(source)
     const notes = result.events.filter((event) => event.kind === 'note')
