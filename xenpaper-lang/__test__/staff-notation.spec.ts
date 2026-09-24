@@ -457,6 +457,21 @@ describe('staff notation construction', () => {
     expect(cents).toEqual([0, 498, 702, 1200])
   })
 
+  it('constructs a combination product set as the active scale', () => {
+    const evaluated = evaluateProgramShape(parse('{scale = cps([1, 3, 5, 7], 2)}\n1 2 3 4 5 6'))
+    if (!('shape' in evaluated)) throw new Error('Expected a shape.')
+
+    expect(evaluated.diagnostics).toEqual([])
+    const cents: number[] = []
+    const collect = (shape: ReturnType<typeof constructStaffNotationShape>) => {
+      if (shape.kind === 'note') cents.push(Math.round(shape.pitch.cents))
+      else if (shape.kind === 'sequence') shape.children.forEach(collect)
+      else if (shape.kind === 'parallel') shape.branches.forEach(collect)
+    }
+    collect(constructStaffNotationShape(evaluated.shape))
+    expect(cents).toEqual([267, 386, 653, 884, 969, 1200])
+  })
+
   it('carries exact durations and rests from score construction', () => {
     const node = parse('1/1 []').body[0] as Expression
     const evaluated = evaluateScoreShape(node, { pulse: 2 })

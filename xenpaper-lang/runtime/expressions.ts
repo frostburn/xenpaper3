@@ -1,5 +1,6 @@
 import { parse, type Expression } from '../parser.js'
 import { Fraction, mmod } from 'xen-dev-utils/fraction'
+import { kCombinations } from 'xen-dev-utils'
 import type { Diagnostic } from '../diagnostics'
 import { Value } from '../value'
 import { evaluateLiteral, type NumericLiteralNode } from './literals'
@@ -56,6 +57,18 @@ export type ExpressionEvaluationResult =
 export const PRELUDE = `
 let pi = 3.141592653589793r
 fn sqrt(radicand) { ret radicand ** 1/2 }
+fn prod(factors) { ret *~factors }
+fn ground(scale) { ret scale / scale[0] }
+fn equaveReduce(scale, equave) {
+  let actualEquave = equave al scale[-1]
+  ret scale rd actualEquave
+}
+fn cps(factors, count, equave, withUnity) {
+  let products = sort(prod(kCombinations(factors, count)))
+  let grounded = (withUnity al false) ? products : ground(products)
+  let actualEquave = equave al (2 * grounded[0])
+  ret sort(equaveReduce(grounded, actualEquave))
+}
 `
 
 let cachedPreludeEnvironment: LexicalEnvironment | undefined
@@ -179,13 +192,21 @@ export function prepareFunctionCall(
         },
       ],
     }
-  if (node.arguments.length !== definition.parameters.length)
+  const optionalParameters: Readonly<Record<string, number>> = { cps: 2, equaveReduce: 1 }
+  const minimumArguments = optionalParameters[node.callee] ?? definition.parameters.length
+  if (
+    node.arguments.length < minimumArguments ||
+    node.arguments.length > definition.parameters.length
+  )
     return {
       diagnostics: [
         {
           code: 'XP_ARITY',
           severity: 'error',
-          message: `${node.callee}() expects ${definition.parameters.length} argument${definition.parameters.length === 1 ? '' : 's'}, but received ${node.arguments.length}.`,
+          message:
+            minimumArguments === definition.parameters.length
+              ? `${node.callee}() expects ${definition.parameters.length} argument${definition.parameters.length === 1 ? '' : 's'}, but received ${node.arguments.length}.`
+              : `${node.callee}() expects ${minimumArguments} to ${definition.parameters.length} arguments, but received ${node.arguments.length}.`,
           locations: [node.location, definition.declaration.location],
         },
       ],
@@ -198,7 +219,9 @@ export function prepareFunctionCall(
   const variables = new Map(
     definition.parameters.map((name, index) => [
       name,
-      (evaluated[index] as { value: EvaluatedLiteral }).value,
+      index < evaluated.length
+        ? (evaluated[index] as { value: EvaluatedLiteral }).value
+        : ({ kind: 'undefined', value: new Value(0), origins: [] } as EvaluatedLiteral),
     ]),
   )
   const calls = new Set(environment.calls).add(definition)
@@ -475,6 +498,43 @@ function binary(
   right: EvaluatedLiteral,
   node: Expression,
 ): EvaluatedLiteral {
+  if (operator === 'al') return left.kind === 'undefined' ? right : left
+  if (left.kind === 'container' || right.kind === 'container') {
+    if (left.kind === 'container' && right.kind === 'container') {
+      if (left.values.length !== right.values.length)
+        throw new TypeError('Container operands must have the same length.')
+      return {
+        ...left,
+        values: left.values.map((value, index) =>
+          binary(operator, value, right.values[index]!, node),
+        ),
+      }
+    }
+    const container = (left.kind === 'container' ? left : right) as Extract<
+      EvaluatedLiteral,
+      { kind: 'container' }
+    >
+    const scalar = left.kind === 'container' ? right : left
+    return {
+      ...container,
+      values: container.values.map((value) => {
+        const reduced =
+          left.kind === 'container'
+            ? binary(operator, value, scalar, node)
+            : binary(operator, scalar, value, node)
+        if (
+          operator === 'rd' &&
+          reduced.kind === 'scalar' &&
+          reduced.value.equals(new Value(1)) &&
+          scalar.kind === 'scalar'
+        )
+          return scalar
+        return reduced
+      }),
+    }
+  }
+  if (left.kind === 'undefined' || right.kind === 'undefined')
+    throw new TypeError(`Operator ${operator} requires numeric operands.`)
   switch (operator) {
     case '+':
       return addOrSubtract(left, right, false, node)
@@ -500,6 +560,101 @@ function binary(
     default:
       throw new TypeError(`Unknown binary operator ${operator}.`)
   }
+}
+
+function productReduction(value: EvaluatedLiteral, node: Expression): EvaluatedLiteral {
+  if (value.kind !== 'container') throw new TypeError('Product reduction requires a container.')
+  if (value.values.some((item) => item.kind === 'container')) {
+    return { ...value, values: value.values.map((item) => productReduction(item, node)) }
+  }
+  return value.values.reduce<EvaluatedLiteral>(
+    (total, item) => binary('*', total, item, node),
+    result('scalar', new Value(1), value.origins),
+  )
+}
+
+function containerItems(
+  node: Expression,
+  mapping: PrimeMapping | PitchContext,
+  environment: LexicalEnvironment,
+): ExpressionEvaluationResult {
+  // Integers inside an explicit container are data, not references to active scale degrees.
+  if (node.type === 'DegreeLiteral')
+    return evaluateLiteral({
+      type: 'IntegerLiteral',
+      value: String(node.degree),
+      raw: String(node.degree),
+      location: node.location,
+    })
+  if (node.type === 'Group' || node.type === 'NormalizeToSlot') {
+    if (!node.expression)
+      return {
+        value: { kind: 'container', values: [], value: new Value(0), origins: [] },
+        diagnostics: [],
+      }
+    return containerItems(node.expression, mapping, environment)
+  }
+  if (node.type === 'Sequence' || node.type === 'Parallel') {
+    const nodes = node.type === 'Sequence' ? node.items : node.branches
+    const results = nodes.map((item) => containerItems(item, mapping, environment))
+    const diagnostics = results.flatMap((item) => item.diagnostics)
+    if (!results.every((item) => 'value' in item)) return { diagnostics }
+    return {
+      value: {
+        kind: 'container',
+        values: results.map((item) => (item as { value: EvaluatedLiteral }).value),
+        value: new Value(0),
+        origins: [{ location: node.location, role: 'literal' }],
+      },
+      diagnostics,
+    }
+  }
+  return evaluateExpression(node, mapping, environment)
+}
+
+const scalarInteger = (value: EvaluatedLiteral, name: string): number => {
+  if (value.kind !== 'scalar') throw new TypeError(`${name} must be an integer.`)
+  const exact = value.value.exactRational()
+  if (!exact || exact.d !== 1) throw new TypeError(`${name} must be an integer.`)
+  return Number(exact.s * exact.n)
+}
+
+function callContainerBuiltin(name: string, args: readonly EvaluatedLiteral[]): EvaluatedLiteral {
+  const origin = args.flatMap((argument) => argument.origins)
+  const requireContainer = (index = 0) => {
+    const argument = args[index]
+    if (!argument || argument.kind !== 'container')
+      throw new TypeError(`${name}() expects a container.`)
+    return argument.values
+  }
+  if (name === 'kCombinations') {
+    const items = requireContainer()
+    const count = scalarInteger(args[1]!, 'Combination size')
+    return {
+      kind: 'container',
+      values: kCombinations(items, count).map((values) => ({
+        kind: 'container',
+        values,
+        value: new Value(0),
+        origins: origin,
+      })),
+      value: new Value(0),
+      origins: origin,
+    }
+  }
+  if (name === 'sort') {
+    return {
+      kind: 'container',
+      values: [...requireContainer()].sort((a, b) => {
+        if (!('value' in a) || !('value' in b))
+          throw new TypeError('sort() expects numeric values.')
+        return a.value.valueOf() - b.value.valueOf()
+      }),
+      value: new Value(0),
+      origins: origin,
+    }
+  }
+  throw new TypeError(`Unknown call ${name}().`)
 }
 
 /** Evaluate the arithmetic subset of the parser AST without throwing for source errors. */
@@ -551,6 +706,22 @@ export function evaluateExpression(
         if (value) return { value, diagnostics: [] }
       }
     }
+    if (node.type === 'Identifier' && node.name === 'niente')
+      return {
+        value: {
+          kind: 'undefined',
+          value: new Value(0),
+          origins: [{ location: node.location, role: 'literal' }],
+        },
+        diagnostics: [],
+      }
+    if (node.type === 'Identifier' && (node.name === 'true' || node.name === 'false'))
+      return {
+        value: result('scalar', new Value(node.name === 'true' ? 1 : 0), [
+          { location: node.location, role: 'literal' },
+        ]),
+        diagnostics: [],
+      }
     if (node.type === 'Identifier')
       return {
         diagnostics: [
@@ -563,9 +734,12 @@ export function evaluateExpression(
         ],
       }
     if (node.type === 'Group') return evaluateExpression(node.expression, mapping, environment)
+    if (node.type === 'NormalizeToSlot') return containerItems(node, mapping, environment)
     if (node.type === 'PitchModifierExpression') {
       const operand = evaluateExpression(node.operand, mapping, environment)
       if (!('value' in operand)) return operand
+      if (operand.value.kind === 'container' || operand.value.kind === 'undefined')
+        throw new TypeError('Pitch modifiers require a numeric operand.')
       const context = 'rootPitch' in mapping ? mapping : createPitchContext(mapping)
       const modifier = node.modifier.kind
       const equaveShift = EQUAVE_SHIFT_BY_MODIFIER[modifier] ?? 0
@@ -656,6 +830,10 @@ export function evaluateExpression(
     if (node.type === 'UnaryExpression') {
       const operand = evaluateExpression(node.operand, mapping, environment)
       if (!('value' in operand)) return operand
+      if (operand.value.kind === 'container' || operand.value.kind === 'undefined')
+        if (node.operator === '*~' && operand.value.kind === 'container')
+          return { value: productReduction(operand.value, node), diagnostics: operand.diagnostics }
+        else throw new TypeError('Unary operators require a numeric operand.')
       if (node.operator === '+') return operand
       if (node.operator === '√') {
         if (operand.value.kind !== 'scalar')
@@ -739,6 +917,36 @@ export function evaluateExpression(
       if (!('value' in left) || !('value' in right)) return { diagnostics }
       return { value: binary(node.operator, left.value, right.value, node), diagnostics }
     }
+    if (node.type === 'IndexExpression') {
+      const container = evaluateExpression(node.container, mapping, environment)
+      const index = evaluateExpression(node.index, mapping, environment)
+      const diagnostics = [...container.diagnostics, ...index.diagnostics]
+      if (!('value' in container) || !('value' in index)) return { diagnostics }
+      if (container.value.kind !== 'container')
+        throw new TypeError('Indexing requires a container.')
+      const offset = scalarInteger(index.value, 'Container index')
+      const value =
+        container.value.values[offset < 0 ? container.value.values.length + offset : offset]
+      if (!value) throw new RangeError('Container index is out of range.')
+      return { value, diagnostics }
+    }
+    if (node.type === 'ConditionalExpression') {
+      const condition = evaluateExpression(node.condition, mapping, environment)
+      if (!('value' in condition)) return condition
+      const truthy =
+        condition.value.kind !== 'undefined' &&
+        (condition.value.kind === 'absolutePitch'
+          ? true
+          : condition.value.kind === 'container'
+            ? condition.value.values.length > 0
+            : condition.value.value.valueOf() !== 0)
+      const branch = evaluateExpression(
+        truthy ? node.consequent : node.alternate,
+        mapping,
+        environment,
+      )
+      return { ...branch, diagnostics: [...condition.diagnostics, ...branch.diagnostics] }
+    }
     if (node.type === 'CallExpression') {
       const prepared = prepareFunctionCall(node, mapping, environment)
       if (prepared) {
@@ -747,6 +955,21 @@ export function evaluateExpression(
         return {
           ...body,
           diagnostics: [...prepared.diagnostics, ...body.diagnostics],
+        }
+      }
+      const containerBuiltins = ['kCombinations', 'sort']
+      if (containerBuiltins.includes(node.callee)) {
+        const evaluated = node.arguments.map((argument) =>
+          containerItems(argument, mapping, environment),
+        )
+        const diagnostics = evaluated.flatMap((argument) => argument.diagnostics)
+        if (!evaluated.every((argument) => 'value' in argument)) return { diagnostics }
+        return {
+          value: callContainerBuiltin(
+            node.callee,
+            evaluated.map((argument) => (argument as { value: EvaluatedLiteral }).value),
+          ),
+          diagnostics,
         }
       }
       if (!['pitch', 'ratio'].includes(node.callee))

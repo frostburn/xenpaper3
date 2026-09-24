@@ -217,6 +217,21 @@ export interface FrequencyPitchValue {
   readonly origins: readonly SourceOrigin[]
 }
 
+/** A first-class collection used by scale-construction helpers. */
+export interface ContainerValue {
+  readonly kind: 'container'
+  readonly values: readonly EvaluatedLiteral[]
+  readonly value: Value
+  readonly origins: readonly SourceOrigin[]
+}
+
+/** Xenpaper's missing value (`niente`). */
+export interface UndefinedValue {
+  readonly kind: 'undefined'
+  readonly value: Value
+  readonly origins: readonly SourceOrigin[]
+}
+
 export type PrimeMonzo = ReadonlyMap<number, Fraction>
 
 export interface IntervalSpelling {
@@ -304,7 +319,12 @@ export interface MosContext {
   readonly degrees: readonly MosDegree[]
 }
 
-export type EvaluatedLiteral = ScalarValue | PitchOffsetValue | AbsolutePitchValue
+export type EvaluatedLiteral =
+  | ScalarValue
+  | PitchOffsetValue
+  | AbsolutePitchValue
+  | ContainerValue
+  | UndefinedValue
 
 /** Renderer-independent description of a note on a treble/bass staff. */
 export interface StaffPitch {

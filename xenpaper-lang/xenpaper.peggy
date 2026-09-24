@@ -185,8 +185,11 @@ EnumeratedChordArithmetic
     }
 
 AdditiveExpression
-  = first:MultiplicativeExpression rest:AdditiveTail* {
-      return foldBinary(first, rest);
+  = condition:(first:MultiplicativeExpression rest:AdditiveTail* { return foldBinary(first, rest); })
+    alternative:(Spacing "?" Spacing consequent:AdditiveExpression Spacing ":" Spacing alternate:AdditiveExpression {
+      return { consequent, alternate };
+    })? {
+      return alternative ? node('ConditionalExpression', { condition, ...alternative }) : condition;
     }
 
 // Compact pitch arithmetic such as `G-n3` is accepted when the right operand
@@ -195,6 +198,9 @@ AdditiveExpression
 AdditiveTail
   = operator:$("+" / "-") ![0-9] Spacing right:MultiplicativeExpression {
       return { operator, right };
+    }
+  / RequiredSpacing operator:$("al"i) !IdentifierContinue RequiredSpacing right:MultiplicativeExpression {
+      return { operator: operator.toLowerCase(), right };
     }
   / RequiredSpacing operator:$("+" / "-") RequiredSpacing right:MultiplicativeExpression {
       return { operator, right };
@@ -247,16 +253,19 @@ UnaryExpression
     }
 
 UnaryOperator
-  = "+" { return "+"; }
+  = "*~" { return "*~"; }
+  / "+" { return "+"; }
   / "-" { return "-"; }
   / "~" { return "~"; }
   / "√" { return "√"; }
   / $("'" / '"' / "`" / "^" / "v" / "/" / "\\")
 
 PostfixExpression
-  = expression:PrimaryExpression marks:AttachedPostfixMark* {
-      if (!marks.length) return expression;
-      return node('PostfixExpression', { expression, marks });
+  = expression:PrimaryExpression indexes:("[" Spacing index:AdditiveExpression Spacing "]" { return index; })* marks:AttachedPostfixMark* {
+      let result = expression;
+      for (const index of indexes) result = node('IndexExpression', { container: result, index });
+      if (!marks.length) return result;
+      return node('PostfixExpression', { expression: result, marks });
     }
 
 AttachedPostfixMark

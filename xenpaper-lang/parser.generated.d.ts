@@ -23,6 +23,7 @@ export type Expression =
   | BarRest
   | BinaryExpression
   | CallExpression
+  | ConditionalExpression
   | ContextAssignment
   | ContextExpression
   | ContextDegreeMapping
@@ -43,6 +44,7 @@ export type Expression =
   | Identifier
   | IntegerLiteral
   | IntervalLiteral
+  | IndexExpression
   | MappingLiteral
   | MonzoLiteral
   | MosDeclaration
@@ -87,6 +89,19 @@ export interface BinaryExpression extends Node {
   operator: string
   left: Expression
   right: Expression
+}
+
+export interface ConditionalExpression extends Node {
+  type: 'ConditionalExpression'
+  condition: Expression
+  consequent: Expression
+  alternate: Expression
+}
+
+export interface IndexExpression extends Node {
+  type: 'IndexExpression'
+  container: Expression
+  index: Expression
 }
 
 export interface EnumeratedChord extends Node {

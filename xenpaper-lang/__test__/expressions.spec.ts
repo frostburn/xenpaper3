@@ -156,6 +156,60 @@ describe('arithmetic expression evaluation', () => {
     expect(evaluate('sqrt(pi)').value.valueOf()).toBe(Math.sqrt(Math.PI))
   })
 
+  it('supports niente and al fallback coercion', () => {
+    expect(evaluate('niente').kind).toBe('undefined')
+    expect(evaluate('niente al 3/2').value.equals(new Value(3n, 2n))).toBe(true)
+    expect(evaluate('5/4 al 3/2').value.equals(new Value(5n, 4n))).toBe(true)
+  })
+
+  it('provides combination and sorting container built-ins', () => {
+    const combinations = evaluate('kCombinations([1, 3, 5], 2)')
+    expect(combinations.kind).toBe('container')
+    if (combinations.kind !== 'container') throw new Error('Expected a container.')
+    expect(combinations.values).toHaveLength(3)
+
+    const sorted = evaluate('sort([3, 1, 2])')
+    if (sorted.kind !== 'container') throw new Error('Expected a container.')
+    expect(sorted.values.map((item) => item.value.valueOf())).toEqual([1, 2, 3])
+  })
+
+  it('implements scale construction helpers in the Xenpaper prelude', () => {
+    const values = (source: string) => {
+      const evaluated = evaluate(source)
+      if (evaluated.kind !== 'container') throw new Error('Expected a container.')
+      return evaluated.values.map((item) => item.value)
+    }
+    const expectRatios = (source: string, ratios: readonly [bigint, bigint][]) =>
+      expect(
+        values(source).map((value, index) => value.equals(new Value(...ratios[index]!))),
+      ).toEqual(ratios.map(() => true))
+
+    expect(evaluate('prod([3, 5, 7])').value.equals(105)).toBe(true)
+    expectRatios('ground([3, 5, 7])', [
+      [1n, 1n],
+      [5n, 3n],
+      [7n, 3n],
+    ])
+    expectRatios('equaveReduce([1, 3/2, 2], 2)', [
+      [2n, 1n],
+      [3n, 2n],
+      [2n, 1n],
+    ])
+    expectRatios('equaveReduce([1, 3/2, 2])', [
+      [2n, 1n],
+      [3n, 2n],
+      [2n, 1n],
+    ])
+    expectRatios('cps([1, 3, 5, 7], 2)', [
+      [7n, 6n],
+      [5n, 4n],
+      [35n, 24n],
+      [5n, 3n],
+      [7n, 4n],
+      [2n, 1n],
+    ])
+  })
+
   it('applies pitch operators uniformly without coercing scalars to pitches', () => {
     expect(evaluate("'sqrt(2)").value.equals(evaluate('sqrt(8)').value)).toBe(true)
     const up = evaluate('^3/2')

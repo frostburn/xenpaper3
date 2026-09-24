@@ -464,14 +464,17 @@ export function applyPitchContextChange(
         }
       }
       const values = statement.values.flatMap((value) => expandDegreeExpression(value).values)
-      const degrees = values.map(({ expression, environment: valueEnvironment }) => {
+      const evaluatedDegrees = values.flatMap(({ expression, environment: valueEnvironment }) => {
         const evaluated = evaluateExpression(expression, context, valueEnvironment)
         if (!('value' in evaluated))
           throw new TypeError('Degree assignments require pitch intervals.')
-        if (evaluated.value.kind === 'absolutePitch') return evaluated.value.rootOffset
-        return evaluated.value.kind === 'pitchOffset'
-          ? evaluated.value.value
-          : Value.pitch(evaluated.value.value)
+        return evaluated.value.kind === 'container' ? evaluated.value.values : [evaluated.value]
+      })
+      const degrees = evaluatedDegrees.map((value) => {
+        if (value.kind === 'absolutePitch') return value.rootOffset
+        if (value.kind === 'undefined' || value.kind === 'container')
+          throw new TypeError('Degree assignments require pitch intervals.')
+        return value.kind === 'pitchOffset' ? value.value : Value.pitch(value.value)
       })
       if (!degrees.length) throw new TypeError('A degree assignment cannot be empty.')
       context = { ...context, degrees, degreeEquave: degrees[degrees.length - 1]! }
