@@ -3,7 +3,12 @@ import type { Diagnostic } from '../../../xenpaper-lang'
 import type { GlobalTrack } from '../../daw/project'
 import XenpaperSourceEditor from './XenpaperSourceEditor.vue'
 
-defineProps<{ track: GlobalTrack; diagnostics?: readonly Diagnostic[] }>()
+defineProps<{
+  track: GlobalTrack
+  diagnostics?: readonly Diagnostic[]
+  sourceOpen?: boolean
+  sourceTarget?: HTMLElement
+}>()
 defineEmits<{
   'update-source': [source: string]
   'update-tempo': [bpm: number]
@@ -13,16 +18,24 @@ defineEmits<{
 
 <template>
   <section class="global-lane" aria-label="Global track">
-    <label class="source-control">
-      Global source
-      <XenpaperSourceEditor
-        editor-label="Global source"
-        :source="track.source"
-        :diagnostics="diagnostics"
-        :rows="3"
-        @update:source="$emit('update-source', $event)"
-      />
-    </label>
+    <Teleport v-if="sourceOpen && sourceTarget" :to="sourceTarget">
+      <section class="global-source-settings" aria-label="Global source editor">
+        <header>
+          <p>GLOBAL TRACK</p>
+          <h2>Global source</h2>
+        </header>
+        <XenpaperSourceEditor
+          editor-label="Global source"
+          :source="track.source"
+          :diagnostics="diagnostics"
+          :rows="14"
+          @update:source="$emit('update-source', $event)"
+        />
+        <p class="source-help">
+          Set the tuning, tempo changes, meter changes, and defaults shared by every lane and clip.
+        </p>
+      </section>
+    </Teleport>
     <label v-for="tempo in track.tempoChanges" :key="tempo.id">
       ♩
       <input
@@ -75,14 +88,30 @@ defineEmits<{
   padding: 0.5rem;
   background: var(--xenpaper-slate-875);
 }
-.source-control {
-  flex: 1;
-  align-items: stretch !important;
-  flex-direction: column;
+.global-source-settings {
+  min-width: 0;
 }
-.source-control .xenpaper-source-editor {
-  min-width: 20rem;
+.global-source-settings header {
+  margin-bottom: 1rem;
+}
+.global-source-settings h2 {
+  margin: 0.15rem 0;
+  font-size: 1.15rem;
+}
+.global-source-settings header p {
+  margin: 0;
+  color: var(--xenpaper-cyan);
+  font-size: 0.7rem;
+}
+.global-source-settings .xenpaper-source-editor {
+  box-sizing: border-box;
+  width: 100%;
   font-family: monospace;
+}
+.source-help {
+  color: var(--xenpaper-slate-400);
+  font-size: 0.75rem;
+  line-height: 1.6;
 }
 .global-lane label {
   display: flex;

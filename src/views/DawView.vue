@@ -53,6 +53,7 @@ const project = ref(createDefaultProject())
 const projectLoadError = ref('')
 const selectedClipId = ref<string>()
 const settingsLaneId = ref<string>()
+const globalSourceOpen = ref(false)
 const playhead = ref(0)
 const pixelsPerBeat = ref(64)
 const scrollLeft = ref(0)
@@ -367,6 +368,7 @@ const finishPlayback = () => {
 
 const insertClip = async (lane: InstrumentLane, rawBeat: number) => {
   beginEdit()
+  globalSourceOpen.value = false
   settingsLaneId.value = undefined
   const start = snapBeat(Math.max(0, rawBeat), grid.value)
   const clip = createClip(lane, start)
@@ -380,6 +382,7 @@ const insertClip = async (lane: InstrumentLane, rawBeat: number) => {
 }
 
 const selectClip = (lane: InstrumentLane, clip: SourceClip) => {
+  globalSourceOpen.value = false
   settingsLaneId.value = undefined
   selectedClipId.value = clip.id
   selectedLaneId.value = lane.id
@@ -387,9 +390,18 @@ const selectClip = (lane: InstrumentLane, clip: SourceClip) => {
 }
 
 const editLaneSettings = (lane: InstrumentLane) => {
+  globalSourceOpen.value = false
   settingsLaneId.value = lane.id
   selectedClipId.value = undefined
   selectedLaneId.value = lane.id
+}
+
+const toggleGlobalSource = () => {
+  globalSourceOpen.value = !globalSourceOpen.value
+  if (!globalSourceOpen.value) return
+  settingsLaneId.value = undefined
+  selectedClipId.value = undefined
+  selectedLaneId.value = undefined
 }
 
 const startPlayback = async (
@@ -886,8 +898,8 @@ onBeforeUnmount(() => {
       "
     >
       <section class="arranger" aria-label="Arrangement">
-        <details class="project-settings">
-          <summary>
+        <details class="project-settings" :open="globalSourceOpen">
+          <summary @click.prevent="toggleGlobalSource">
             <strong>{{ project.globalTrack.tempoChanges[0]!.bpm }} BPM</strong>
             <span
               >{{ project.globalTrack.timeSignatureChanges[0]!.numerator }}/{{
@@ -899,6 +911,8 @@ onBeforeUnmount(() => {
           <GlobalLane
             :track="project.globalTrack"
             :diagnostics="globalSourceDiagnostics"
+            :source-open="globalSourceOpen"
+            :source-target="laneSettingsInspector"
             @update-source="project.globalTrack.source = $event"
             @update-tempo="project.globalTrack.tempoChanges[0]!.bpm = $event"
             @update-time-signature="
@@ -1014,11 +1028,13 @@ onBeforeUnmount(() => {
       <aside
         ref="clipInspector"
         class="clip-inspector"
-        :aria-label="settingsLaneId ? 'Lane editor' : 'Clip editor'"
+        :aria-label="
+          globalSourceOpen ? 'Global source editor' : settingsLaneId ? 'Lane editor' : 'Clip editor'
+        "
       >
         <div id="lane-settings-inspector" ref="laneSettingsInspector" />
         <ClipSourceEditor
-          v-if="!settingsLaneId"
+          v-if="!settingsLaneId && !globalSourceOpen"
           ref="editor"
           :clip="selectedClip"
           :lane-name="selectedLane?.name"
@@ -1233,13 +1249,6 @@ onBeforeUnmount(() => {
 .project-settings :deep(.global-lane) {
   flex-wrap: wrap;
   gap: 0.75rem;
-}
-.project-settings :deep(.source-control) {
-  min-width: 0;
-  flex-basis: 100%;
-}
-.project-settings :deep(.xenpaper-source-editor) {
-  min-width: 0;
 }
 .clip-inspector {
   min-width: 0;
