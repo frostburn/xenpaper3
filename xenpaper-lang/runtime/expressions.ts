@@ -140,6 +140,7 @@ export function evaluateDeclaration(
     minimumArguments: prelude
       ? (optionalPreludeParameters[node.name.name] ?? names.length)
       : names.length,
+    prelude,
   }
   return {
     environment: extendLexicalEnvironment(environment, {
@@ -174,6 +175,7 @@ export function prepareFunctionCall(
   node: Extract<Expression, { type: 'CallExpression' }>,
   mapping: PrimeMapping | PitchContext = DEFAULT_PITCH_CONTEXT,
   environment: LexicalEnvironment = preludeEnvironment(),
+  scaleDegreeArguments = false,
 ): FunctionCallPreparation | undefined {
   let definition
   let variable = false
@@ -223,9 +225,22 @@ export function prepareFunctionCall(
         },
       ],
     }
-  const evaluated = node.arguments.map((argument) =>
-    evaluateExpression(argument, mapping, environment),
-  )
+  const evaluated = node.arguments.map((argument) => {
+    if (scaleDegreeArguments && !definition.prelude && argument.type === 'IntegerLiteral') {
+      return evaluateExpression(
+        {
+          type: 'DegreeLiteral',
+          degree: argument.value,
+          modifiers: [],
+          raw: argument.raw,
+          location: argument.location,
+        },
+        mapping,
+        environment,
+      )
+    }
+    return evaluateExpression(argument, mapping, environment)
+  })
   const diagnostics = evaluated.flatMap((result) => result.diagnostics)
   if (!evaluated.every((result) => 'value' in result)) return { diagnostics }
   const variables = new Map(
