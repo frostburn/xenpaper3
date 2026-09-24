@@ -244,8 +244,54 @@ describe('arithmetic expression evaluation', () => {
       [2n, 1n],
     ])
     expect(evaluateExpression(expression('cps([1/1, 3/1, 5/1, 7/1], 2)'))).toMatchObject({
-      diagnostics: [{ code: 'XP_TYPE_MISMATCH', message: 'Combination size must be an integer.' }],
+      diagnostics: [
+        { code: 'XP_PARAMETER_COERCION', message: 'count: Value cannot be coerced to integer.' },
+      ],
     })
+  })
+
+  it('coerces annotated parameters and evaluates declared defaults', () => {
+    const declaration = parse(
+      'fn power(value: ratio, exponent: integer = 2/1) { ret value ** exponent }',
+    ).body[0]
+    if (declaration.type !== 'FunctionDeclaration') throw new Error('Expected a function.')
+    const declared = evaluateDeclaration(declaration)
+    expect(declared.diagnostics).toEqual([])
+
+    const squared = evaluateExpression(
+      expression('power(3/2)'),
+      DEFAULT_PITCH_CONTEXT,
+      declared.environment,
+    )
+    expect('value' in squared && squared.value.value.equals(new Value(9n, 4n))).toBe(true)
+    const cubed = evaluateExpression(
+      expression('power(3/2, 3/1)'),
+      DEFAULT_PITCH_CONTEXT,
+      declared.environment,
+    )
+    expect('value' in cubed && cubed.value.value.equals(new Value(27n, 8n))).toBe(true)
+
+    const degree = evaluateExpression(
+      expression('power(7)'),
+      DEFAULT_PITCH_CONTEXT,
+      declared.environment,
+    )
+    expect('value' in degree && degree.value.kind === 'scalar').toBe(true)
+    expect(
+      'value' in degree && degree.value.value.equals(Value.ratio(Value.cents(700)).pow(2)),
+    ).toBe(true)
+
+    const invalidOrder = parse('fn invalid(optional = 1/1, required) { ret required }').body[0]
+    if (invalidOrder.type !== 'FunctionDeclaration') throw new Error('Expected a function.')
+    expect(evaluateDeclaration(invalidOrder).diagnostics).toMatchObject([
+      { code: 'XP_REQUIRED_PARAMETER_AFTER_DEFAULT' },
+    ])
+
+    const unknown = parse('fn invalid(value: mystery) { ret value }').body[0]
+    if (unknown.type !== 'FunctionDeclaration') throw new Error('Expected a function.')
+    expect(evaluateDeclaration(unknown).diagnostics).toMatchObject([
+      { code: 'XP_UNKNOWN_COERCION' },
+    ])
   })
 
   it('applies pitch operators uniformly without coercing scalars to pitches', () => {

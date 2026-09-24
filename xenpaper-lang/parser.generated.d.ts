@@ -137,8 +137,15 @@ export interface VariableDeclaration extends Node {
 export interface FunctionDeclaration extends Node {
   type: 'FunctionDeclaration'
   name: Identifier
-  parameters: Identifier[]
+  parameters: FunctionParameter[]
   body: FunctionBody
+}
+
+export interface FunctionParameter extends Node {
+  type: 'FunctionParameter'
+  name: Identifier
+  coercion: string | null
+  defaultValue: Expression | null
 }
 
 export interface FunctionBody extends Node {

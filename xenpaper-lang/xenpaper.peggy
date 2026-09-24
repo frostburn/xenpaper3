@@ -762,8 +762,19 @@ VariableDeclaration
 
 FunctionDeclaration
   = "fn" !IdentifierContinue RequiredSpacing name:LocatedIdentifier Spacing "(" Spacing
-    parameters:(first:LocatedIdentifier rest:(Spacing "," Spacing parameter:LocatedIdentifier { return parameter; })* { return [first, ...rest]; })? Spacing ")" Spacing body:FunctionBody {
+    parameters:(first:FunctionParameter rest:(Spacing "," Spacing parameter:FunctionParameter { return parameter; })* { return [first, ...rest]; })? Spacing ")" Spacing body:FunctionBody {
       return node('FunctionDeclaration', { name, parameters: parameters ?? [], body });
+    }
+
+FunctionParameter
+  = name:LocatedIdentifier
+    coercion:(Spacing ":" Spacing annotation:Identifier { return annotation; })?
+    defaultValue:(Spacing "=" Spacing value:AdditiveExpression { return value; })? {
+      return node('FunctionParameter', {
+        name,
+        coercion: coercion ?? null,
+        defaultValue: defaultValue ?? null,
+      });
     }
 
 FunctionBody

@@ -111,6 +111,19 @@ fn transpose(interval, note) { ret note + interval }
 transpose(fifth, C) transpose(fifth, D)
 ```
 
+Parameters may declare coercions and trailing defaults:
+
+```text
+fn power(value: ratio, exponent: integer = 2/1) { ret value ** exponent }
+power(3/2) power(3/2, 3/1)
+```
+
+The supported coercions are `ratio`, `pitch`, `integer`, `container`, and
+`boolean`. Coercions are applied after evaluating the argument; for example, a
+scale-degree pitch offset passed to a `ratio` parameter is converted back to its
+frequency ratio. `niente` passes through a coercion so it can be used as an
+optional default. Required parameters cannot follow defaulted parameters.
+
 `let name = expression` evaluates the initializer once. `fn name(parameters) {
 ... ret expression }` creates a lexical closure. A function body contains zero
 or more local `let` or `fn` declarations followed by exactly one `ret`, whose
@@ -121,8 +134,8 @@ pitch spellings are likewise unavailable for declarations: music always wins and
 the meaning of a pitch token never depends on lexical scope.
 
 Every evaluation starts with a prelude written in Xenpaper itself. It currently
-declares `pi` and defines `sqrt(radicand)` as `radicand ** 1/2`; ordinary lexical
-shadowing can replace either name in a narrower scope.
+declares `pi` and defines `sqrt(radicand: ratio)` as `radicand ** 1/2`; ordinary
+lexical shadowing can replace either name in a narrower scope.
 
 `ret` has lower precedence than score sequencing and parallel composition, so a
 function may return an entire musical fragment:

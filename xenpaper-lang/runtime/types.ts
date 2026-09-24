@@ -3,6 +3,7 @@ import type {
   Expression,
   FunctionBody,
   FunctionDeclaration,
+  FunctionParameter,
   PitchLiteral,
   Program,
 } from '../parser.generated.js'
@@ -99,13 +100,9 @@ export interface LexicalEnvironment {
 
 export interface FunctionDefinition {
   readonly declaration: FunctionDeclaration
-  readonly parameters: readonly string[]
+  readonly parameters: readonly FunctionParameter[]
   readonly body: FunctionBody
   readonly environment: LexicalEnvironment
-  /** Minimum arity; only prelude definitions currently supply optional trailing parameters. */
-  readonly minimumArguments: number
-  /** Whether this definition belongs to the language prelude. */
-  readonly prelude: boolean
 }
 
 export const EMPTY_LEXICAL_ENVIRONMENT: LexicalEnvironment = {

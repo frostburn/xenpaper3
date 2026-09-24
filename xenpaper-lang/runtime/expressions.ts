@@ -56,14 +56,14 @@ export type ExpressionEvaluationResult =
 /** Xenpaper declarations installed as the outermost lexical scope by default. */
 export const PRELUDE = `
 let pi = 3.141592653589793r
-fn sqrt(radicand) { ret ratio(radicand) ** 1/2 }
-fn prod(factors) { ret arrayReduce((total, element) => total * ratio(element), factors, 1/1) }
-fn ground(scale) { ret scale - pitch(scale[0]) }
-fn equaveReduce(scale, equave) {
+fn sqrt(radicand: ratio) { ret radicand ** 1/2 }
+fn prod(factors: container) { ret arrayReduce((total, element) => total * ratio(element), factors, 1/1) }
+fn ground(scale: container) { ret scale - pitch(scale[0]) }
+fn equaveReduce(scale: container, equave: ratio = niente) {
   let actualEquave = equave al scale[-1]
   ret ratio(scale) rd ratio(actualEquave)
 }
-fn cps(factors, count, equave, withUnity) {
+fn cps(factors: container, count: integer, equave: ratio = niente, withUnity: boolean = false) {
   let products = sort(arrayMap((combination) => prod(combination), kCombinations(factors, count)))
   let grounded = products if (withUnity al false) else ground(products)
   let actualEquave = equave al (pitch(2/1) + grounded[0])
@@ -83,7 +83,7 @@ function preludeEnvironment(): LexicalEnvironment {
     if (declaration.type !== 'VariableDeclaration' && declaration.type !== 'FunctionDeclaration') {
       throw new TypeError('The Xenpaper prelude may only contain declarations.')
     }
-    const evaluated = evaluateDeclaration(declaration, DEFAULT_PITCH_CONTEXT, environment, true)
+    const evaluated = evaluateDeclaration(declaration, DEFAULT_PITCH_CONTEXT, environment)
     if (evaluated.diagnostics.length) {
       throw new TypeError(`Invalid Xenpaper prelude: ${evaluated.diagnostics[0]!.message}`)
     }
@@ -97,7 +97,6 @@ export function evaluateDeclaration(
   node: Extract<Expression, { type: 'VariableDeclaration' | 'FunctionDeclaration' }>,
   mapping: PrimeMapping | PitchContext = DEFAULT_PITCH_CONTEXT,
   environment: LexicalEnvironment = preludeEnvironment(),
-  prelude = false,
 ): { readonly environment: LexicalEnvironment; readonly diagnostics: readonly Diagnostic[] } {
   if (node.type === 'VariableDeclaration') {
     const evaluated = evaluateExpression(node.value, mapping, environment)
@@ -109,7 +108,7 @@ export function evaluateDeclaration(
       diagnostics: evaluated.diagnostics,
     }
   }
-  const names = node.parameters.map((parameter) => parameter.name)
+  const names = node.parameters.map((parameter) => parameter.name.name)
   const duplicate = names.find((name, index) => names.indexOf(name) !== index)
   if (duplicate) {
     return {
@@ -120,27 +119,51 @@ export function evaluateDeclaration(
           severity: 'error',
           message: `Duplicate parameter ${duplicate}.`,
           locations: node.parameters
-            .filter((parameter) => parameter.name === duplicate)
-            .map((parameter) => parameter.location),
+            .filter((parameter) => parameter.name.name === duplicate)
+            .map((parameter) => parameter.name.location),
         },
       ],
     }
   }
+  const firstDefault = node.parameters.findIndex((parameter) => parameter.defaultValue)
+  const requiredAfterDefault = node.parameters.find(
+    (parameter, index) => firstDefault >= 0 && index > firstDefault && !parameter.defaultValue,
+  )
+  if (requiredAfterDefault)
+    return {
+      environment,
+      diagnostics: [
+        {
+          code: 'XP_REQUIRED_PARAMETER_AFTER_DEFAULT',
+          severity: 'error',
+          message: `Required parameter ${requiredAfterDefault.name.name} cannot follow a defaulted parameter.`,
+          locations: [requiredAfterDefault.location],
+        },
+      ],
+    }
+  const supportedCoercions = new Set(['ratio', 'pitch', 'integer', 'container', 'boolean'])
+  const unsupported = node.parameters.find(
+    (parameter) => parameter.coercion && !supportedCoercions.has(parameter.coercion),
+  )
+  if (unsupported)
+    return {
+      environment,
+      diagnostics: [
+        {
+          code: 'XP_UNKNOWN_COERCION',
+          severity: 'error',
+          message: `Unknown parameter coercion ${unsupported.coercion}.`,
+          locations: [unsupported.location],
+        },
+      ],
+    }
   // Capture before installing the definition: ordinary lexical closures work,
   // while direct and mutual recursion remain unavailable by policy.
-  const optionalPreludeParameters: Readonly<Record<string, number>> = {
-    cps: 2,
-    equaveReduce: 1,
-  }
   const definition = {
     declaration: node,
-    parameters: names,
+    parameters: node.parameters,
     body: node.body,
     environment,
-    minimumArguments: prelude
-      ? (optionalPreludeParameters[node.name.name] ?? names.length)
-      : names.length,
-    prelude,
   }
   return {
     environment: extendLexicalEnvironment(environment, {
@@ -169,6 +192,43 @@ export type FunctionCallPreparation =
       readonly diagnostics: readonly Diagnostic[]
     }
   | { readonly diagnostics: readonly Diagnostic[] }
+
+function coerceParameter(value: EvaluatedLiteral, coercion: string | null): EvaluatedLiteral {
+  if (!coercion || value.kind === 'undefined') return value
+  switch (coercion) {
+    case 'ratio':
+      if (value.kind === 'scalar') return value
+      if (value.kind === 'pitchOffset')
+        return result('scalar', Value.ratio(value.value), value.origins)
+      break
+    case 'pitch':
+      if (value.kind === 'pitchOffset') return value
+      if (value.kind === 'scalar' && value.value.isPositiveExactRatio())
+        return {
+          ...result('pitchOffset', Value.pitch(value.value), value.origins),
+          justIntonation: true,
+        }
+      break
+    case 'integer': {
+      if (value.kind !== 'scalar' || !value.value.dimensions.isDimensionless) break
+      const exact = value.value.exactRational()
+      if (exact?.d === 1) return value
+      break
+    }
+    case 'container':
+      if (value.kind === 'container') return value
+      break
+    case 'boolean': {
+      if (value.kind !== 'scalar' || !value.value.dimensions.isDimensionless) break
+      const exact = value.value.exactRational()
+      if (exact?.d === 1 && (exact.n === 0 || exact.n === 1)) return value
+      break
+    }
+    default:
+      throw new TypeError(`Unknown parameter coercion ${coercion}.`)
+  }
+  throw new TypeError(`Value cannot be coerced to ${coercion}.`)
+}
 
 /** Prepare a user function once; score and scalar consumers evaluate its returned AST themselves. */
 export function prepareFunctionCall(
@@ -206,7 +266,9 @@ export function prepareFunctionCall(
         },
       ],
     }
-  const minimumArguments = definition.minimumArguments
+  const minimumArguments = definition.parameters.filter(
+    (parameter) => !parameter.defaultValue,
+  ).length
   if (
     node.arguments.length < minimumArguments ||
     node.arguments.length > definition.parameters.length
@@ -224,25 +286,44 @@ export function prepareFunctionCall(
         },
       ],
     }
-  const evaluated = node.arguments.map((argument) =>
+  const supplied = node.arguments.map((argument) =>
     evaluateExpression(argument, mapping, environment),
   )
-  const diagnostics = evaluated.flatMap((result) => result.diagnostics)
-  if (!evaluated.every((result) => 'value' in result)) return { diagnostics }
-  const variables = new Map(
-    definition.parameters.map((name, index) => [
-      name,
-      index < evaluated.length
-        ? (evaluated[index] as { value: EvaluatedLiteral }).value
-        : ({ kind: 'undefined', value: new Value(0), origins: [] } as EvaluatedLiteral),
-    ]),
-  )
+  const diagnostics = supplied.flatMap((result) => result.diagnostics)
+  if (!supplied.every((result) => 'value' in result)) return { diagnostics }
   const calls = new Set(environment.calls).add(definition)
   let bodyEnvironment = extendLexicalEnvironment(definition.environment, {
-    variables,
     functions: new Map([[node.callee, definition]]),
     calls,
   })
+  for (const [index, parameter] of definition.parameters.entries()) {
+    let evaluated: ExpressionEvaluationResult | undefined = supplied[index]
+    if (!evaluated) {
+      const defaultValue = parameter.defaultValue
+      if (!defaultValue) continue
+      evaluated = evaluateExpression(defaultValue, mapping, bodyEnvironment)
+      diagnostics.push(...evaluated.diagnostics)
+      if (!('value' in evaluated)) return { diagnostics }
+    }
+    if (!('value' in evaluated)) return { diagnostics }
+    let value: EvaluatedLiteral
+    try {
+      value = coerceParameter(evaluated.value, parameter.coercion)
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Parameter coercion failed.'
+      diagnostics.push({
+        code: 'XP_PARAMETER_COERCION',
+        severity: 'error',
+        message: `${parameter.name.name}: ${message}`,
+        locations: [node.arguments[index]?.location ?? parameter.location, parameter.location],
+      })
+      return { diagnostics }
+    }
+    bodyEnvironment = extendLexicalEnvironment(bodyEnvironment, {
+      variables: new Map([[parameter.name.name, value]]),
+      calls,
+    })
+  }
   for (const declaration of definition.body.declarations) {
     const declared = evaluateDeclaration(declaration, mapping, bodyEnvironment)
     bodyEnvironment = declared.environment

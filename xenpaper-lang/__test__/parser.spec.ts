@@ -8,7 +8,7 @@ describe('lexical declarations', () => {
     expect(declaration).toMatchObject({
       type: 'FunctionDeclaration',
       name: { name: 'transpose' },
-      parameters: [{ name: 'note' }, { name: 'interval' }],
+      parameters: [{ name: { name: 'note' } }, { name: { name: 'interval' } }],
       body: {
         type: 'FunctionBody',
         returnStatement: { type: 'ReturnStatement', value: { operator: '+' } },
@@ -20,6 +20,19 @@ describe('lexical declarations', () => {
     expect(declaration.parameters.map((parameter) => parameter.location.start.offset)).toEqual([
       13, 19,
     ])
+  })
+
+  it('parses parameter coercions and defaults', () => {
+    const declaration = parse(
+      'fn choose(value: ratio, fallback: ratio = 3/2) { ret value al fallback }',
+    ).body[0]
+    expect(declaration).toMatchObject({
+      type: 'FunctionDeclaration',
+      parameters: [
+        { name: { name: 'value' }, coercion: 'ratio', defaultValue: null },
+        { name: { name: 'fallback' }, coercion: 'ratio', defaultValue: { type: 'RatioLiteral' } },
+      ],
+    })
   })
 
   it('binds ret loosely across complete score sequences', () => {
