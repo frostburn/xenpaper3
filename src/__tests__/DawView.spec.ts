@@ -618,7 +618,7 @@ describe('DAW project model', () => {
     expect(notes[1]!.envelope).toEqual({ attack: 0.03, decay: 0.4, sustain: 0.9, release: 0.8 })
   })
 
-  it('rejects pitch-bearing global and duration-bearing lane initialization sources', () => {
+  it('rejects pitch-bearing initialization sources', () => {
     const project = createDefaultProject()
     project.instrumentLanes[0]!.clips.push({
       id: 'clip',
@@ -630,12 +630,26 @@ describe('DAW project model', () => {
     expect(() => parseProjectNotes(project)).toThrow(
       'Initialization sources cannot contain pitch-bearing expressions.',
     )
+  })
 
-    project.globalTrack.source = ''
-    project.instrumentLanes[0]!.source = '.='
-    expect(() => parseProjectNotes(project)).toThrow(
-      'Initialization sources cannot contain duration-bearing expressions.',
-    )
+  it('applies timed tuning and ADSR changes authored in lane sources', () => {
+    const project = createDefaultProject()
+    const lane = project.instrumentLanes[0]! as PitchedInstrumentLane
+    lane.source =
+      '|: {19edo} @adsr(10ms, 20ms, 30%, 40ms); {12edo} @adsr(50ms, 60ms, 70%, 80ms); :|'
+    lane.clips.push({
+      id: 'lane-time',
+      start: beat(0),
+      length: beat(9),
+      source: '@2 D D D D D D D D D D D D D D D D D D',
+    })
+
+    const notes = parseProjectNotes(project)
+    expect(notes[0]!.envelope.attack).toBeCloseTo(0.01)
+    expect(notes[8]!.envelope.attack).toBeCloseTo(0.05)
+    expect(notes[16]!.envelope.attack).toBeCloseTo(0.01)
+    expect(notes[0]!.cents).not.toBeCloseTo(notes[8]!.cents)
+    expect(notes[16]!.cents).toBeCloseTo(notes[0]!.cents)
   })
 
   it('initializes every lane clip from the global and instrument sources', () => {

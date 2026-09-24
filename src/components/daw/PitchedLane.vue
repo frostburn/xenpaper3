@@ -2,7 +2,11 @@
 import { computed, ref, watch } from 'vue'
 import { clamp, frequencyToCentOffset } from 'xen-dev-utils'
 import { githubRawUrl, parseDoughSampleMap } from '../../../sw-seq'
-import { compileSourceInitialization, parseClipNotes } from '../../daw/score'
+import {
+  compileLaneSourceInitialization,
+  compileSourceInitialization,
+  parseClipNotes,
+} from '../../daw/score'
 import type { SourceRange } from '../../daw/score'
 import { easeGlissando } from '../../daw/easing'
 import {
@@ -196,7 +200,11 @@ const pianoRoll = computed(() => {
       true,
       props.timeSignature,
     )
-    initialization = compileSourceInitialization(props.lane.source, globalInitialization)
+    initialization = compileLaneSourceInitialization(
+      props.lane.source,
+      globalInitialization,
+      props.timeSignature,
+    )
   } catch {
     initialization = undefined
   }

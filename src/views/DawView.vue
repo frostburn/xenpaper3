@@ -24,6 +24,7 @@ import { globalTimeSignatureChanges, measureBoundaries } from '../daw/timeline'
 import { demoProjects } from '../demo-projects'
 import {
   clipSourceDiagnostics,
+  compileLaneSourceInitialization,
   compileSourceInitialization,
   drumSamplesForLane,
   parseClipNotes,
@@ -159,7 +160,11 @@ const selectedClipDiagnostics = computed(() => {
       true,
       project.value.globalTrack.timeSignatureChanges[0],
     )
-    const initialization = compileSourceInitialization(lane.source, global)
+    const initialization = compileLaneSourceInitialization(
+      lane.source,
+      global,
+      project.value.globalTrack.timeSignatureChanges[0],
+    )
     return clipSourceDiagnostics(
       clip.source,
       drumSamplesForLane(lane),
@@ -188,7 +193,11 @@ const clipNotes = computed(() => {
   for (const lane of project.value.instrumentLanes) {
     let initialization
     try {
-      initialization = compileSourceInitialization(lane.source, global)
+      initialization = compileLaneSourceInitialization(
+        lane.source,
+        global,
+        project.value.globalTrack.timeSignatureChanges[0],
+      )
     } catch {
       continue
     }
@@ -302,7 +311,7 @@ watchEffect(() => {
   for (const lane of project.value.instrumentLanes) {
     let initialization
     try {
-      initialization = compileSourceInitialization(lane.source, globalInitialization)
+      initialization = compileLaneSourceInitialization(lane.source, globalInitialization, signature)
     } catch {
       initialization = undefined
     }

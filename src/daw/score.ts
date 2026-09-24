@@ -227,6 +227,13 @@ export const compileSourceInitialization = (
   return result.initialization ?? parent
 }
 
+/** Compile a lane source, whose duration-bearing score acts as that lane's timeline. */
+export const compileLaneSourceInitialization = (
+  source: string,
+  parent: SourceInitialization = {},
+  timeSignature?: { readonly numerator: number; readonly denominator: number },
+): SourceInitialization => compileSourceInitialization(source, parent, true, timeSignature)
+
 /** Convert the exact language score at the sound/preview boundary. */
 const realizeClipNotes = (
   source: string,
@@ -380,7 +387,11 @@ export const parseLaneNotes = (
   timeSignatureChanges?: readonly TimeSignatureChange[],
 ): ScheduledLaneNote[] => {
   const samples = drumSamplesForLane(lane)
-  const laneInitialization = compileSourceInitialization(lane.source, globalInitialization)
+  const laneInitialization = compileLaneSourceInitialization(
+    lane.source,
+    globalInitialization,
+    timeSignature,
+  )
   const notes = lane.clips.flatMap((clip) =>
     realizeClipNotes(
       clip.source,
