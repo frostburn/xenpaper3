@@ -36,7 +36,7 @@ context-dependent meanings.
 | U+002F         | /        | Lift pitch modifier; ratio slash; spaced division; inverted enumerated chord; logdivision operator `/_`; monzo component fraction                        |
 | U+0030–U+0039  | 0–9      | Scale degrees and numeric literals; identifier continuation                                                                                              |
 | U+003A         | :        | Enumerated-chord separator (`:` or `::`); repeat delimiters `\|:` and `:\|`; named directive argument and MOS hardness separator; articulation shorthand |
-| U+003B         | ;        | Context and MOS statement separator                                                                                                                      |
+| U+003B         | ;        | Bar rest; context and MOS statement separator                                                                                                            |
 | U+003C         | <        | Opens an equal-division equave suffix, mapping, or MOS equave                                                                                            |
 | U+003D         | =        | Assignment; note continuation/hold postfix                                                                                                               |
 | U+003E         | >        | Closes an equal-division equave suffix, mapping, MOS equave, or monzo (`>@`)                                                                             |
