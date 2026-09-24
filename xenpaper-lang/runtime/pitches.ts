@@ -350,8 +350,9 @@ export function applyPitchContextChange(
       ): { expression: Expression; environment?: LexicalEnvironment }[] => {
         if (expression.type === 'CallExpression') {
           const prepared = prepareFunctionCall(expression, context, expressionEnvironment)
-          if (!prepared)
-            throw new TypeError(`${expression.callee} is not a defined scale constructor.`)
+          // Calls without user definitions may still be scalar built-ins such as pitch() and
+          // ratio(); leave those intact for ordinary expression evaluation below.
+          if (!prepared) return [{ expression, environment: expressionEnvironment }]
           if (!('expression' in prepared))
             throw new TypeError(
               prepared.diagnostics[0]?.message ?? 'The scale constructor could not be evaluated.',

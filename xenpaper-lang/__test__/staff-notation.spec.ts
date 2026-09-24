@@ -421,6 +421,23 @@ describe('staff notation construction', () => {
     expect(cents).toEqual([0, 498, 702, 1200])
   })
 
+  it('retains built-in calls as individual scale degree expressions', () => {
+    const evaluated = evaluateProgramShape(
+      parse('{scale = pitch(4/3) ratio(pitch(3/2)) pitch(2/1)}\n0 1 2 3'),
+    )
+    if (!('shape' in evaluated)) throw new Error('Expected a shape.')
+
+    expect(evaluated.diagnostics).toEqual([])
+    const cents: number[] = []
+    const collect = (shape: ReturnType<typeof constructStaffNotationShape>) => {
+      if (shape.kind === 'note') cents.push(Math.round(shape.pitch.cents))
+      else if (shape.kind === 'sequence') shape.children.forEach(collect)
+      else if (shape.kind === 'parallel') shape.branches.forEach(collect)
+    }
+    collect(constructStaffNotationShape(evaluated.shape))
+    expect(cents).toEqual([0, 498, 702, 1200])
+  })
+
   it('carries exact durations and rests from score construction', () => {
     const node = parse('1/1 []').body[0] as Expression
     const evaluated = evaluateScoreShape(node, { pulse: 2 })
