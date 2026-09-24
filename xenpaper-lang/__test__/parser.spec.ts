@@ -236,6 +236,18 @@ describe('enumerated chords', () => {
     })
   })
 
+  it('parses an expression-based scale construction', () => {
+    expect(parse('{scale = myScale()}').body[0]).toMatchObject({
+      type: 'PitchContextChange',
+      statements: [
+        {
+          type: 'ContextDegreeMapping',
+          values: [{ type: 'CallExpression', callee: 'myScale' }],
+        },
+      ],
+    })
+  })
+
   it('parses degree mappings with the ordinary sequence and parallel grammar', () => {
     expect(parse('{3/2 5/4, 7/4}').body[0]).toMatchObject({
       statements: [
