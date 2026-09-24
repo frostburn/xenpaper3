@@ -932,6 +932,9 @@ describe('DawView', () => {
 
     createObjectURL.mockClear()
     click.mockClear()
+    await wrapper
+      .get('[aria-label="Edit global tempo, time signature, and source"]')
+      .trigger('click')
     await wrapper.get('[aria-label="Tempo in BPM"]').setValue('')
     await wrapper.get('button.project-file-button').trigger('click')
 
@@ -1055,8 +1058,10 @@ describe('DawView', () => {
   it('syntax-highlights every DAW source editor and tolerates incomplete input', async () => {
     const wrapper = mount(DawView)
 
-    await wrapper.get('.project-settings summary').trigger('click')
-    expect(wrapper.get('.global-source-settings [data-highlight="comment"]').text()).toContain(
+    await wrapper
+      .get('[aria-label="Edit global tempo, time signature, and source"]')
+      .trigger('click')
+    expect(wrapper.get('.global-settings [data-highlight="comment"]').text()).toContain(
       'Shared tuning',
     )
     await wrapper.get('[aria-label="Edit sound and source for Instrument 1"]').trigger('click')
@@ -1268,24 +1273,23 @@ describe('DawView', () => {
   it('edits global controls, the instrument name, waveform, and the clip preview mode', async () => {
     const wrapper = mount(DawView)
     await wrapper.get('[aria-label="Instrument lane name"]').setValue('Lead')
+    await wrapper
+      .get('[aria-label="Edit global tempo, time signature, and source"]')
+      .trigger('click')
     await wrapper.get('[aria-label="Tempo in BPM"]').setValue('144')
     await wrapper.get('[aria-label="Time signature numerator"]').setValue('7')
     await wrapper.get('[aria-label="Time signature denominator"]').setValue('8')
-    await wrapper.get('[aria-label="Edit sound and source for Lead"]').trigger('click')
-    await wrapper.get('[aria-label="Waveform"]').setValue('triangle')
-    await wrapper.get('[aria-label="Instrument gain"]').setValue('0.42')
-    await wrapper.get('.project-settings summary').trigger('click')
     await wrapper.get('[aria-label="Global source"]').setValue('{31edo}')
     expect((wrapper.get('[aria-label="Global source"]').element as HTMLTextAreaElement).value).toBe(
       '{31edo}',
     )
-    await wrapper.get('.project-settings summary').trigger('click')
     await wrapper.get('[aria-label="Edit sound and source for Lead"]').trigger('click')
+    await wrapper.get('[aria-label="Waveform"]').setValue('triangle')
+    await wrapper.get('[aria-label="Instrument gain"]').setValue('0.42')
     await wrapper.get('[aria-label="Instrument lane source"]').setValue('@patch(sustain: 45%)')
 
-    expect((wrapper.get('[aria-label="Tempo in BPM"]').element as HTMLInputElement).value).toBe(
-      '144',
-    )
+    expect(wrapper.get('.global-summary').text()).toContain('144 BPM')
+    expect(wrapper.get('.global-summary').text()).toContain('7/8')
     expect((wrapper.get('[aria-label="Waveform"]').element as HTMLSelectElement).value).toBe(
       'triangle',
     )
@@ -1455,21 +1459,25 @@ describe('DawView', () => {
 
   it('highlights off-cycle barlines in the global source', async () => {
     const wrapper = mount(DawView)
-    await wrapper.get('.project-settings summary').trigger('click')
+    await wrapper
+      .get('[aria-label="Edit global tempo, time signature, and source"]')
+      .trigger('click')
     const source = wrapper.get('[aria-label="Global source"]')
 
     await source.setValue('C==|')
     await source.trigger('blur')
-    expect(wrapper.get('.global-source-settings [data-highlight="warning"]').text()).toBe('|')
+    expect(wrapper.get('.global-settings [data-highlight="warning"]').text()).toBe('|')
 
     await source.setValue('.... @time(3/4) C==|')
     await source.trigger('blur')
-    expect(wrapper.find('.global-source-settings [data-highlight="warning"]').exists()).toBe(false)
+    expect(wrapper.find('.global-settings [data-highlight="warning"]').exists()).toBe(false)
   })
 
   it('resizes a MOS clip using the global source context', async () => {
     const wrapper = mount(DawView)
-    await wrapper.get('.project-settings summary').trigger('click')
+    await wrapper
+      .get('[aria-label="Edit global tempo, time signature, and source"]')
+      .trigger('click')
     await wrapper.get('[aria-label="Global source"]').setValue('MOS{5L4s}')
     await wrapper.get('[aria-label="Global source"]').trigger('blur')
     await wrapper.getComponent(PitchedLane).trigger('dblclick', { clientX: 64 })
@@ -1482,7 +1490,9 @@ describe('DawView', () => {
 
   it('recalculates an invalid MOS clip when the global source becomes compatible', async () => {
     const wrapper = mount(DawView)
-    await wrapper.get('.project-settings summary').trigger('click')
+    await wrapper
+      .get('[aria-label="Edit global tempo, time signature, and source"]')
+      .trigger('click')
     await wrapper.get('[aria-label="Global source"]').setValue('MOS{2L 1s}')
     await wrapper.get('[aria-label="Global source"]').trigger('blur')
     await wrapper.getComponent(PitchedLane).trigger('dblclick', { clientX: 64 })
@@ -1492,7 +1502,9 @@ describe('DawView', () => {
     expect(wrapper.get('button.clip').attributes('style')).toContain('width: 256px')
     expect(wrapper.findAll('[aria-label="Piano roll preview"] i')).toHaveLength(0)
 
-    await wrapper.get('.project-settings summary').trigger('click')
+    await wrapper
+      .get('[aria-label="Edit global tempo, time signature, and source"]')
+      .trigger('click')
     await wrapper.get('[aria-label="Global source"]').setValue('MOS{3L 1s}')
     await wrapper.get('[aria-label="Global source"]').trigger('blur')
 
@@ -1502,7 +1514,9 @@ describe('DawView', () => {
 
   it('isolates incomplete clip syntax while recalculating other clips', async () => {
     const wrapper = mount(DawView)
-    await wrapper.get('.project-settings summary').trigger('click')
+    await wrapper
+      .get('[aria-label="Edit global tempo, time signature, and source"]')
+      .trigger('click')
     await wrapper.get('[aria-label="Global source"]').setValue('MOS{2L 1s}')
     await wrapper.get('[aria-label="Global source"]').trigger('blur')
     const lane = wrapper.getComponent(PitchedLane)
@@ -1512,7 +1526,9 @@ describe('DawView', () => {
     await wrapper.get('textarea[aria-label="Xenpaper clip source"]').setValue('J K L M j')
     await wrapper.get('textarea[aria-label="Xenpaper clip source"]').trigger('blur')
 
-    await wrapper.get('.project-settings summary').trigger('click')
+    await wrapper
+      .get('[aria-label="Edit global tempo, time signature, and source"]')
+      .trigger('click')
     await wrapper.get('[aria-label="Global source"]').setValue('MOS{3L 1s}')
     await wrapper.get('[aria-label="Global source"]').trigger('blur')
 
@@ -1523,7 +1539,9 @@ describe('DawView', () => {
 
   it('falls back safely when resizing with an invalid initialization source', async () => {
     const wrapper = mount(DawView)
-    await wrapper.get('.project-settings summary').trigger('click')
+    await wrapper
+      .get('[aria-label="Edit global tempo, time signature, and source"]')
+      .trigger('click')
     await wrapper.get('[aria-label="Global source"]').setValue('MOS{')
     await wrapper.get('[aria-label="Global source"]').trigger('blur')
     await wrapper.getComponent(PitchedLane).trigger('dblclick', { clientX: 64 })

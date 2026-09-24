@@ -53,7 +53,7 @@ const project = ref(createDefaultProject())
 const projectLoadError = ref('')
 const selectedClipId = ref<string>()
 const settingsLaneId = ref<string>()
-const globalSourceOpen = ref(false)
+const globalSettingsOpen = ref(false)
 const playhead = ref(0)
 const pixelsPerBeat = ref(64)
 const scrollLeft = ref(0)
@@ -368,7 +368,7 @@ const finishPlayback = () => {
 
 const insertClip = async (lane: InstrumentLane, rawBeat: number) => {
   beginEdit()
-  globalSourceOpen.value = false
+  globalSettingsOpen.value = false
   settingsLaneId.value = undefined
   const start = snapBeat(Math.max(0, rawBeat), grid.value)
   const clip = createClip(lane, start)
@@ -382,7 +382,7 @@ const insertClip = async (lane: InstrumentLane, rawBeat: number) => {
 }
 
 const selectClip = (lane: InstrumentLane, clip: SourceClip) => {
-  globalSourceOpen.value = false
+  globalSettingsOpen.value = false
   settingsLaneId.value = undefined
   selectedClipId.value = clip.id
   selectedLaneId.value = lane.id
@@ -390,15 +390,14 @@ const selectClip = (lane: InstrumentLane, clip: SourceClip) => {
 }
 
 const editLaneSettings = (lane: InstrumentLane) => {
-  globalSourceOpen.value = false
+  globalSettingsOpen.value = false
   settingsLaneId.value = lane.id
   selectedClipId.value = undefined
   selectedLaneId.value = lane.id
 }
 
-const toggleGlobalSource = () => {
-  globalSourceOpen.value = !globalSourceOpen.value
-  if (!globalSourceOpen.value) return
+const editGlobalSettings = () => {
+  globalSettingsOpen.value = true
   settingsLaneId.value = undefined
   selectedClipId.value = undefined
   selectedLaneId.value = undefined
@@ -898,21 +897,13 @@ onBeforeUnmount(() => {
       "
     >
       <section class="arranger" aria-label="Arrangement">
-        <details class="project-settings" :open="globalSourceOpen">
-          <summary @click.prevent="toggleGlobalSource">
-            <strong>{{ project.globalTrack.tempoChanges[0]!.bpm }} BPM</strong>
-            <span
-              >{{ project.globalTrack.timeSignatureChanges[0]!.numerator }}/{{
-                project.globalTrack.timeSignatureChanges[0]!.denominator
-              }}</span
-            >
-            <span>Global tuning &amp; defaults</span>
-          </summary>
+        <div class="project-settings">
           <GlobalLane
             :track="project.globalTrack"
             :diagnostics="globalSourceDiagnostics"
-            :source-open="globalSourceOpen"
-            :source-target="laneSettingsInspector"
+            :settings-open="globalSettingsOpen"
+            :settings-target="laneSettingsInspector"
+            @edit-settings="editGlobalSettings"
             @update-source="project.globalTrack.source = $event"
             @update-tempo="project.globalTrack.tempoChanges[0]!.bpm = $event"
             @update-time-signature="
@@ -922,7 +913,7 @@ onBeforeUnmount(() => {
               }
             "
           />
-        </details>
+        </div>
         <ArrangementTimeline
           ref="timeline"
           v-model:scroll-left="scrollLeft"
@@ -1029,12 +1020,12 @@ onBeforeUnmount(() => {
         ref="clipInspector"
         class="clip-inspector"
         :aria-label="
-          globalSourceOpen ? 'Global source editor' : settingsLaneId ? 'Lane editor' : 'Clip editor'
+          globalSettingsOpen ? 'Global settings' : settingsLaneId ? 'Lane editor' : 'Clip editor'
         "
       >
         <div id="lane-settings-inspector" ref="laneSettingsInspector" />
         <ClipSourceEditor
-          v-if="!settingsLaneId && !globalSourceOpen"
+          v-if="!settingsLaneId && !globalSettingsOpen"
           ref="editor"
           :clip="selectedClip"
           :lane-name="selectedLane?.name"
@@ -1238,13 +1229,6 @@ onBeforeUnmount(() => {
 .project-settings {
   border-bottom: 1px solid var(--xenpaper-slate-500);
   background: var(--xenpaper-slate-925);
-}
-.project-settings summary {
-  padding: 0.7rem;
-}
-.project-settings summary span {
-  margin-left: 1rem;
-  color: var(--xenpaper-slate-400);
 }
 .project-settings :deep(.global-lane) {
   flex-wrap: wrap;
