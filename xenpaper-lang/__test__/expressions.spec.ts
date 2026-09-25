@@ -138,8 +138,17 @@ describe('arithmetic expression evaluation', () => {
 
   it('supports explicit pitch and ratio coercion calls', () => {
     expect(evaluate('pitch(3/2)').value.equals(Value.pitch(new Value(3n, 2n)))).toBe(true)
+    expect(evaluate('pitch(2)').value.equals(Value.cents(1200))).toBe(true)
     expect(evaluate('ratio(700c)').value.equals(Value.ratio(Value.cents(700)))).toBe(true)
+    expect(evaluate('ratio(2)').value.equals(Value.ratio(Value.cents(200)))).toBe(true)
     expect(evaluate(String.raw`ratio(13 * (1\13<3>))`).value.equals(3)).toBe(true)
+
+    const pitches = evaluate('pitch([1 3/2 2])')
+    if (pitches.kind !== 'container') throw new Error('Expected a container.')
+    const cents = pitches.values.map((item) => item.value.valueOf())
+    expect(cents[0]).toBe(0)
+    expect(cents[1]).toBeCloseTo(701.955)
+    expect(cents[2]).toBe(1200)
   })
 
   it('evaluates square roots while preserving exact values and dimensions', () => {
@@ -170,9 +179,10 @@ describe('arithmetic expression evaluation', () => {
     expect(combinations.kind).toBe('container')
     if (combinations.kind !== 'container') throw new Error('Expected a container.')
     expect(combinations.values).toHaveLength(3)
-    expect(evaluateExpression(expression('kCombinations([1/1, 3/1, 5/1], 2)'))).toMatchObject({
-      diagnostics: [{ code: 'XP_TYPE_MISMATCH', message: 'Combination size must be an integer.' }],
-    })
+    const integerCombinations = evaluate('kCombinations([1/1, 3/1, 5/1], 2)')
+    expect(integerCombinations.kind).toBe('container')
+    if (integerCombinations.kind !== 'container') throw new Error('Expected a container.')
+    expect(integerCombinations.values).toHaveLength(3)
 
     const sorted = evaluate('sort([3/1, 1/1, 2/1])')
     if (sorted.kind !== 'container') throw new Error('Expected a container.')
@@ -193,6 +203,36 @@ describe('arithmetic expression evaluation', () => {
       diagnostics: [{ code: 'XP_TYPE_MISMATCH', message: 'sort() expects numeric values.' }],
     })
   })
+
+  it('validates built-in arities consistently', () => {
+    expect(evaluateExpression(expression('sort()'))).toMatchObject({
+      diagnostics: [
+        { code: 'XP_TYPE_MISMATCH', message: 'sort() expects 1 argument, but received 0.' },
+      ],
+    })
+    expect(evaluateExpression(expression('sort([1/1], [2/1])'))).toMatchObject({
+      diagnostics: [
+        { code: 'XP_TYPE_MISMATCH', message: 'sort() expects 1 argument, but received 2.' },
+      ],
+    })
+    expect(
+      evaluate('arrayReduce((total, element) => total + element, [1/1])').value.equals(1),
+    ).toBe(true)
+  })
+
+  it.each(['toString', 'constructor', 'hasOwnProperty'])(
+    'does not treat Object.prototype.%s as a built-in',
+    (name) => {
+      expect(evaluateExpression(expression(`${name}(1 / 0)`))).toMatchObject({
+        diagnostics: [
+          {
+            code: 'XP_UNDEFINED_NAME',
+            message: `Undefined function ${name}().`,
+          },
+        ],
+      })
+    },
+  )
 
   it('does not apply prelude optional arity to shadowing functions', () => {
     const declaration = parse('fn cps(foo) { ret foo }').body[0]

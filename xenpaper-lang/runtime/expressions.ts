@@ -840,6 +840,53 @@ function callContainerBuiltin(
   throw new TypeError(`Unknown call ${name}().`)
 }
 
+type BuiltinCoercion = 'ratio' | 'pitch' | 'integer' | 'container' | undefined
+
+interface BuiltinSignature {
+  readonly minimumArguments: number
+  readonly maximumArguments: number
+  readonly coercions: readonly BuiltinCoercion[]
+}
+
+const BUILTIN_SIGNATURES = new Map<string, BuiltinSignature>([
+  ['pitch', { minimumArguments: 1, maximumArguments: 1, coercions: ['ratio'] }],
+  ['ratio', { minimumArguments: 1, maximumArguments: 1, coercions: ['pitch'] }],
+  [
+    'kCombinations',
+    {
+      minimumArguments: 2,
+      maximumArguments: 2,
+      coercions: ['container', 'integer'],
+    },
+  ],
+  [
+    'arrayReduce',
+    {
+      minimumArguments: 2,
+      maximumArguments: 3,
+      coercions: [undefined, 'container', undefined],
+    },
+  ],
+  [
+    'arrayMap',
+    {
+      minimumArguments: 2,
+      maximumArguments: 2,
+      coercions: [undefined, 'container'],
+    },
+  ],
+  ['sort', { minimumArguments: 1, maximumArguments: 1, coercions: ['container'] }],
+])
+
+function builtinArityMessage(name: string, signature: BuiltinSignature, received: number): string {
+  const { minimumArguments: minimum, maximumArguments: maximum } = signature
+  const expected =
+    minimum === maximum
+      ? `${minimum} argument${minimum === 1 ? '' : 's'}`
+      : `${minimum} to ${maximum} arguments`
+  return `${name}() expects ${expected}, but received ${received}.`
+}
+
 /** Evaluate the arithmetic subset of the parser AST without throwing for source errors. */
 export function evaluateExpression(
   node: Expression,
@@ -1164,23 +1211,8 @@ export function evaluateExpression(
           diagnostics: [...prepared.diagnostics, ...body.diagnostics],
         }
       }
-      const containerBuiltins = ['kCombinations', 'arrayReduce', 'arrayMap', 'sort']
-      if (containerBuiltins.includes(node.callee)) {
-        const evaluated = node.arguments.map((argument) =>
-          containerItems(argument, mapping, environment),
-        )
-        const diagnostics = evaluated.flatMap((argument) => argument.diagnostics)
-        if (!evaluated.every((argument) => 'value' in argument)) return { diagnostics }
-        return {
-          value: callContainerBuiltin(
-            node.callee,
-            evaluated.map((argument) => (argument as { value: EvaluatedLiteral }).value),
-            mapping,
-          ),
-          diagnostics,
-        }
-      }
-      if (!['pitch', 'ratio'].includes(node.callee))
+      const signature = BUILTIN_SIGNATURES.get(node.callee)
+      if (!signature)
         return {
           diagnostics: [
             {
@@ -1191,10 +1223,26 @@ export function evaluateExpression(
             },
           ],
         }
-      if (node.arguments.length !== 1) throw new TypeError(`${node.callee}() expects one argument.`)
-      const argumentNode = node.arguments[0]!
-      const argument = evaluateExpression(argumentNode, mapping, environment)
-      if (!('value' in argument)) return argument
+      if (
+        node.arguments.length < signature.minimumArguments ||
+        node.arguments.length > signature.maximumArguments
+      )
+        throw new TypeError(builtinArityMessage(node.callee, signature, node.arguments.length))
+      const evaluated = node.arguments.map((argument, index) =>
+        containerItems(argument, mapping, environment, signature.coercions[index]),
+      )
+      const diagnostics = evaluated.flatMap((argument) => argument.diagnostics)
+      if (!evaluated.every((argument) => 'value' in argument)) return { diagnostics }
+      const arguments_ = evaluated.map(
+        (argument) => (argument as { value: EvaluatedLiteral }).value,
+      )
+      if (['kCombinations', 'arrayReduce', 'arrayMap', 'sort'].includes(node.callee)) {
+        return {
+          value: callContainerBuiltin(node.callee, arguments_, mapping),
+          diagnostics,
+        }
+      }
+      const argument = { value: arguments_[0]!, diagnostics }
       if (node.callee === 'pitch') {
         if (argument.value.kind === 'container') {
           const convert = (value: EvaluatedLiteral): EvaluatedLiteral => {
