@@ -1,7 +1,9 @@
 import type {
   Directive,
+  Expression,
   FunctionBody,
   FunctionDeclaration,
+  FunctionParameter,
   PitchLiteral,
   Program,
 } from '../parser.generated.js'
@@ -98,7 +100,7 @@ export interface LexicalEnvironment {
 
 export interface FunctionDefinition {
   readonly declaration: FunctionDeclaration
-  readonly parameters: readonly string[]
+  readonly parameters: readonly FunctionParameter[]
   readonly body: FunctionBody
   readonly environment: LexicalEnvironment
 }
@@ -217,6 +219,31 @@ export interface FrequencyPitchValue {
   readonly origins: readonly SourceOrigin[]
 }
 
+/** A first-class collection used by scale-construction helpers. */
+export interface ContainerValue {
+  readonly kind: 'container'
+  readonly values: readonly EvaluatedLiteral[]
+  readonly value: Value
+  readonly origins: readonly SourceOrigin[]
+}
+
+/** Xenpaper's missing value (`niente`). */
+export interface UndefinedValue {
+  readonly kind: 'undefined'
+  readonly value: Value
+  readonly origins: readonly SourceOrigin[]
+}
+
+/** Lexically captured anonymous function used by higher-order container helpers. */
+export interface LambdaValue {
+  readonly kind: 'lambda'
+  readonly parameters: readonly string[]
+  readonly body: Expression
+  readonly environment: LexicalEnvironment
+  readonly value: Value
+  readonly origins: readonly SourceOrigin[]
+}
+
 export type PrimeMonzo = ReadonlyMap<number, Fraction>
 
 export interface IntervalSpelling {
@@ -304,7 +331,13 @@ export interface MosContext {
   readonly degrees: readonly MosDegree[]
 }
 
-export type EvaluatedLiteral = ScalarValue | PitchOffsetValue | AbsolutePitchValue
+export type EvaluatedLiteral =
+  | ScalarValue
+  | PitchOffsetValue
+  | AbsolutePitchValue
+  | ContainerValue
+  | UndefinedValue
+  | LambdaValue
 
 /** Renderer-independent description of a note on a treble/bass staff. */
 export interface StaffPitch {

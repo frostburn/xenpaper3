@@ -185,8 +185,11 @@ EnumeratedChordArithmetic
     }
 
 AdditiveExpression
-  = first:MultiplicativeExpression rest:AdditiveTail* {
-      return foldBinary(first, rest);
+  = consequent:(first:MultiplicativeExpression rest:AdditiveTail* { return foldBinary(first, rest); })
+    alternative:(RequiredSpacing "if" !IdentifierContinue RequiredSpacing condition:AdditiveExpression RequiredSpacing "else" !IdentifierContinue RequiredSpacing alternate:AdditiveExpression {
+      return { condition, alternate };
+    })? {
+      return alternative ? node('ConditionalExpression', { consequent, ...alternative }) : consequent;
     }
 
 // Compact pitch arithmetic such as `G-n3` is accepted when the right operand
@@ -195,6 +198,9 @@ AdditiveExpression
 AdditiveTail
   = operator:$("+" / "-") ![0-9] Spacing right:MultiplicativeExpression {
       return { operator, right };
+    }
+  / RequiredSpacing operator:$("al"i) !IdentifierContinue RequiredSpacing right:MultiplicativeExpression {
+      return { operator: operator.toLowerCase(), right };
     }
   / RequiredSpacing operator:$("+" / "-") RequiredSpacing right:MultiplicativeExpression {
       return { operator, right };
@@ -254,9 +260,11 @@ UnaryOperator
   / $("'" / '"' / "`" / "^" / "v" / "/" / "\\")
 
 PostfixExpression
-  = expression:PrimaryExpression marks:AttachedPostfixMark* {
-      if (!marks.length) return expression;
-      return node('PostfixExpression', { expression, marks });
+  = expression:PrimaryExpression indexes:("[" Spacing index:AdditiveExpression Spacing "]" { return index; })* marks:AttachedPostfixMark* {
+      let result = expression;
+      for (const index of indexes) result = node('IndexExpression', { container: result, index });
+      if (!marks.length) return result;
+      return node('PostfixExpression', { expression: result, marks });
     }
 
 AttachedPostfixMark
@@ -274,6 +282,7 @@ PrimaryExpression
   / PitchContextChange
   / Directive
   / NormalizedGroup
+  / LambdaExpression
   / ParenthesizedExpression
   / Rest
   / BarRest
@@ -298,6 +307,13 @@ PrimaryExpression
   // such as `bd` to take precedence over pitch spellings when requested.
   / DrumSampleLiteral
   / IdentifierExpression
+
+LambdaExpression
+  = "(" Spacing parameters:(first:LocatedIdentifier rest:(Spacing "," Spacing parameter:LocatedIdentifier { return parameter; })* {
+      return [first, ...rest];
+    })? Spacing ")" Spacing "=>" Spacing body:AdditiveExpression {
+      return node('LambdaExpression', { parameters: parameters ?? [], body });
+    }
 
 DrumSampleLiteral
   = sample:Identifier &{ return options.drumSamples?.includes(sample) ?? false; } {
@@ -746,8 +762,24 @@ VariableDeclaration
 
 FunctionDeclaration
   = "fn" !IdentifierContinue RequiredSpacing name:LocatedIdentifier Spacing "(" Spacing
-    parameters:(first:LocatedIdentifier rest:(Spacing "," Spacing parameter:LocatedIdentifier { return parameter; })* { return [first, ...rest]; })? Spacing ")" Spacing body:FunctionBody {
+    parameters:(first:FunctionParameter rest:(Spacing "," Spacing parameter:FunctionParameter { return parameter; })* { return [first, ...rest]; })? Spacing ")" Spacing body:FunctionBody {
       return node('FunctionDeclaration', { name, parameters: parameters ?? [], body });
+    }
+
+FunctionParameter
+  = name:LocatedIdentifier
+    coercion:(Spacing ":" Spacing annotation:CoercionAnnotation { return annotation; })?
+    defaultValue:(Spacing "=" Spacing value:AdditiveExpression { return value; })? {
+      return node('FunctionParameter', {
+        name,
+        coercion: coercion ?? null,
+        defaultValue: defaultValue ?? null,
+      });
+    }
+
+CoercionAnnotation
+  = outer:Identifier inner:(Spacing "<" Spacing value:CoercionAnnotation Spacing ">" { return value; })? {
+      return inner ? `${outer}<${inner}>` : outer;
     }
 
 FunctionBody
@@ -769,8 +801,8 @@ LocatedIdentifier
   = !(MosPitchLiteral / PitchLiteral) name:Identifier { return node('Identifier', { name }); }
 
 CallArgumentList
-  = first:AdditiveExpression
-    rest:(Spacing "," Spacing argument:AdditiveExpression { return argument; })* {
+  = first:(ScaleDegreeLiteral / AdditiveExpression)
+    rest:(Spacing "," Spacing argument:(ScaleDegreeLiteral / AdditiveExpression) { return argument; })* {
       return [first, ...rest];
     }
 

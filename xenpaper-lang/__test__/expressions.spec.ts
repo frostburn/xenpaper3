@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { Fraction } from 'xen-dev-utils/fraction'
 import { parse, type Expression } from '../parser.js'
-import { evaluateExpression } from '../runtime/expressions'
+import { evaluateDeclaration, evaluateExpression } from '../runtime/expressions'
 import { fjsInflection, groupFjsInflections } from '../runtime/fjs'
 import {
   DEFAULT_PITCH_CONTEXT,
@@ -156,6 +156,153 @@ describe('arithmetic expression evaluation', () => {
     expect(evaluate('sqrt(pi)').value.valueOf()).toBe(Math.sqrt(Math.PI))
   })
 
+  it('supports niente and al fallback coercion', () => {
+    expect(evaluate('niente').kind).toBe('undefined')
+    expect(evaluate('niente al 3/2').value.equals(new Value(3n, 2n))).toBe(true)
+    expect(evaluate('5/4 al 3/2').value.equals(new Value(5n, 4n))).toBe(true)
+    expect(evaluate('1 al (1 / 0)').value.equals(1)).toBe(true)
+    expect(evaluate('3/2 if true else (1 / 0)').value.equals(new Value(3n, 2n))).toBe(true)
+    expect(evaluate('3/2 if false else 5/4').value.equals(new Value(5n, 4n))).toBe(true)
+  })
+
+  it('provides combination and sorting container built-ins', () => {
+    const combinations = evaluate('kCombinations([1/1, 3/1, 5/1], 2/1)')
+    expect(combinations.kind).toBe('container')
+    if (combinations.kind !== 'container') throw new Error('Expected a container.')
+    expect(combinations.values).toHaveLength(3)
+    expect(evaluateExpression(expression('kCombinations([1/1, 3/1, 5/1], 2)'))).toMatchObject({
+      diagnostics: [{ code: 'XP_TYPE_MISMATCH', message: 'Combination size must be an integer.' }],
+    })
+
+    const sorted = evaluate('sort([3/1, 1/1, 2/1])')
+    if (sorted.kind !== 'container') throw new Error('Expected a container.')
+    expect(sorted.values.map((item) => item.value.valueOf())).toEqual([1, 2, 3])
+    const singleton = evaluate('sort([2/1])')
+    if (singleton.kind !== 'container') throw new Error('Expected a container.')
+    expect(singleton.values.map((item) => item.value.valueOf())).toEqual([2])
+    expect(evaluate('[1/1][0]').value.equals(1)).toBe(true)
+    const degree = evaluate('[1][0]')
+    expect(degree.kind).toBe('pitchOffset')
+    expect(degree.value.equals(Value.cents(100))).toBe(true)
+    expect(evaluate('prod([1 2])').value.equals(Value.ratio(Value.cents(300)))).toBe(true)
+    expect(
+      evaluate('arrayReduce((total, element) => total + element, [1/1, 2/1, 3/1])').value.equals(6),
+    ).toBe(true)
+
+    expect(evaluateExpression(expression('sort([niente, 2/1, 1/1])'))).toMatchObject({
+      diagnostics: [{ code: 'XP_TYPE_MISMATCH', message: 'sort() expects numeric values.' }],
+    })
+  })
+
+  it('does not apply prelude optional arity to shadowing functions', () => {
+    const declaration = parse('fn cps(foo) { ret foo }').body[0]
+    if (declaration.type !== 'FunctionDeclaration') throw new Error('Expected a function.')
+    const declared = evaluateDeclaration(declaration)
+    expect(declared.diagnostics).toEqual([])
+    const called = evaluateExpression(
+      expression('cps(3/2)'),
+      DEFAULT_PITCH_CONTEXT,
+      declared.environment,
+    )
+    expect(called.diagnostics).toEqual([])
+    expect('value' in called && called.value.value.equals(new Value(3n, 2n))).toBe(true)
+  })
+
+  it('implements scale construction helpers in the Xenpaper prelude', () => {
+    const values = (source: string) => {
+      const evaluated = evaluate(source)
+      if (evaluated.kind !== 'container') throw new Error('Expected a container.')
+      return evaluated.values.map((item) => item.value)
+    }
+    const expectRatios = (source: string, ratios: readonly [bigint, bigint][]) =>
+      expect(
+        values(source).map((value, index) => value.equals(new Value(...ratios[index]!))),
+      ).toEqual(ratios.map(() => true))
+
+    expect(evaluate('prod([3/1, 5/1, 7/1])').value.equals(105)).toBe(true)
+    expectRatios('ground([3/1, 5/1, 7/1])', [
+      [1n, 1n],
+      [5n, 3n],
+      [7n, 3n],
+    ])
+    expectRatios('equaveReduce([1/1, 3/2, 2/1], 2/1)', [
+      [2n, 1n],
+      [3n, 2n],
+      [2n, 1n],
+    ])
+    expectRatios('equaveReduce([1/1, 3/2, 2/1])', [
+      [2n, 1n],
+      [3n, 2n],
+      [2n, 1n],
+    ])
+    expectRatios('cps([1/1, 3/1, 5/1, 7/1], 2/1)', [
+      [7n, 6n],
+      [5n, 4n],
+      [35n, 24n],
+      [5n, 3n],
+      [7n, 4n],
+      [2n, 1n],
+    ])
+    expectRatios('cps([1/1, 3/1, 5/1, 7/1], 2)', [
+      [7n, 6n],
+      [5n, 4n],
+      [35n, 24n],
+      [5n, 3n],
+      [7n, 4n],
+      [2n, 1n],
+    ])
+    expectRatios('cps([1 3 5 7], 2)', [
+      [7n, 6n],
+      [5n, 4n],
+      [35n, 24n],
+      [5n, 3n],
+      [7n, 4n],
+      [2n, 1n],
+    ])
+  })
+
+  it('coerces annotated parameters and evaluates declared defaults', () => {
+    const declaration = parse(
+      'fn power(value: ratio, exponent: integer = 2/1) { ret value ** exponent }',
+    ).body[0]
+    if (declaration.type !== 'FunctionDeclaration') throw new Error('Expected a function.')
+    const declared = evaluateDeclaration(declaration)
+    expect(declared.diagnostics).toEqual([])
+
+    const squared = evaluateExpression(
+      expression('power(3/2)'),
+      DEFAULT_PITCH_CONTEXT,
+      declared.environment,
+    )
+    expect('value' in squared && squared.value.value.equals(new Value(9n, 4n))).toBe(true)
+    const cubed = evaluateExpression(
+      expression('power(3/2, 3)'),
+      DEFAULT_PITCH_CONTEXT,
+      declared.environment,
+    )
+    expect('value' in cubed && cubed.value.value.equals(new Value(27n, 8n))).toBe(true)
+
+    const integer = evaluateExpression(
+      expression('power(7)'),
+      DEFAULT_PITCH_CONTEXT,
+      declared.environment,
+    )
+    expect('value' in integer && integer.value.kind === 'scalar').toBe(true)
+    expect('value' in integer && integer.value.value.equals(49)).toBe(true)
+
+    const invalidOrder = parse('fn invalid(optional = 1/1, required) { ret required }').body[0]
+    if (invalidOrder.type !== 'FunctionDeclaration') throw new Error('Expected a function.')
+    expect(evaluateDeclaration(invalidOrder).diagnostics).toMatchObject([
+      { code: 'XP_REQUIRED_PARAMETER_AFTER_DEFAULT' },
+    ])
+
+    const unknown = parse('fn invalid(value: mystery) { ret value }').body[0]
+    if (unknown.type !== 'FunctionDeclaration') throw new Error('Expected a function.')
+    expect(evaluateDeclaration(unknown).diagnostics).toMatchObject([
+      { code: 'XP_UNKNOWN_COERCION' },
+    ])
+  })
+
   it('applies pitch operators uniformly without coercing scalars to pitches', () => {
     expect(evaluate("'sqrt(2)").value.equals(evaluate('sqrt(8)').value)).toBe(true)
     const up = evaluate('^3/2')
@@ -232,14 +379,10 @@ describe('arithmetic expression evaluation', () => {
   })
 
   it('rejects pitch arguments and invalid arity for conversion functions', () => {
-    expect(evaluateExpression(expression('ratio(3/2)'))).toMatchObject({
-      diagnostics: [{ code: 'XP_TYPE_MISMATCH', message: 'ratio() expects a pitch offset.' }],
-    })
-    expect(evaluateExpression(expression('sqrt(700c)'))).toMatchObject({
-      diagnostics: [
-        { code: 'XP_TYPE_MISMATCH', message: 'Exponentiation requires scalar operands.' },
-      ],
-    })
+    expect(evaluate('ratio(3/2)').value.equals(new Value(3n, 2n))).toBe(true)
+    expect(
+      evaluate('sqrt(700c)').value.equals(Value.ratio(Value.cents(700)).pow(new Fraction(1, 2))),
+    ).toBe(true)
     expect(evaluateExpression(expression('sqrt(1, 2)'))).toMatchObject({
       diagnostics: [{ code: 'XP_ARITY', message: 'sqrt() expects 1 argument, but received 2.' }],
     })

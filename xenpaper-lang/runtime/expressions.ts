@@ -1,5 +1,6 @@
 import { parse, type Expression } from '../parser.js'
 import { Fraction, mmod } from 'xen-dev-utils/fraction'
+import { kCombinations } from 'xen-dev-utils'
 import type { Diagnostic } from '../diagnostics'
 import { Value } from '../value'
 import { evaluateLiteral, type NumericLiteralNode } from './literals'
@@ -55,7 +56,19 @@ export type ExpressionEvaluationResult =
 /** Xenpaper declarations installed as the outermost lexical scope by default. */
 export const PRELUDE = `
 let pi = 3.141592653589793r
-fn sqrt(radicand) { ret radicand ** 1/2 }
+fn sqrt(radicand: ratio) { ret radicand ** 1/2 }
+fn prod(factors: container) { ret arrayReduce((total, element) => total * ratio(element), factors, 1/1) }
+fn ground(scale: container) { ret scale - pitch(scale[0]) }
+fn equaveReduce(scale: container, equave: ratio = niente) {
+  let actualEquave = equave al scale[-1]
+  ret ratio(scale) rd ratio(actualEquave)
+}
+fn cps(factors: container<ratio>, count: integer, equave: ratio = niente, withUnity: boolean = false) {
+  let products = sort(arrayMap((combination) => prod(combination), kCombinations(factors, count)))
+  let grounded = products if (withUnity al false) else ground(products)
+  let actualEquave = equave al (pitch(2/1) + grounded[0])
+  ret sort(equaveReduce(grounded, actualEquave))
+}
 `
 
 let cachedPreludeEnvironment: LexicalEnvironment | undefined
@@ -95,7 +108,7 @@ export function evaluateDeclaration(
       diagnostics: evaluated.diagnostics,
     }
   }
-  const names = node.parameters.map((parameter) => parameter.name)
+  const names = node.parameters.map((parameter) => parameter.name.name)
   const duplicate = names.find((name, index) => names.indexOf(name) !== index)
   if (duplicate) {
     return {
@@ -106,15 +119,57 @@ export function evaluateDeclaration(
           severity: 'error',
           message: `Duplicate parameter ${duplicate}.`,
           locations: node.parameters
-            .filter((parameter) => parameter.name === duplicate)
-            .map((parameter) => parameter.location),
+            .filter((parameter) => parameter.name.name === duplicate)
+            .map((parameter) => parameter.name.location),
         },
       ],
     }
   }
+  const firstDefault = node.parameters.findIndex((parameter) => parameter.defaultValue)
+  const requiredAfterDefault = node.parameters.find(
+    (parameter, index) => firstDefault >= 0 && index > firstDefault && !parameter.defaultValue,
+  )
+  if (requiredAfterDefault)
+    return {
+      environment,
+      diagnostics: [
+        {
+          code: 'XP_REQUIRED_PARAMETER_AFTER_DEFAULT',
+          severity: 'error',
+          message: `Required parameter ${requiredAfterDefault.name.name} cannot follow a defaulted parameter.`,
+          locations: [requiredAfterDefault.location],
+        },
+      ],
+    }
+  const scalarCoercions = new Set(['ratio', 'pitch', 'integer', 'boolean'])
+  const supportedCoercion = (coercion: string): boolean => {
+    if (scalarCoercions.has(coercion) || coercion === 'container') return true
+    const element = /^container<(.+)>$/.exec(coercion)?.[1]
+    return element ? supportedCoercion(element) : false
+  }
+  const unsupported = node.parameters.find(
+    (parameter) => parameter.coercion && !supportedCoercion(parameter.coercion),
+  )
+  if (unsupported)
+    return {
+      environment,
+      diagnostics: [
+        {
+          code: 'XP_UNKNOWN_COERCION',
+          severity: 'error',
+          message: `Unknown parameter coercion ${unsupported.coercion}.`,
+          locations: [unsupported.location],
+        },
+      ],
+    }
   // Capture before installing the definition: ordinary lexical closures work,
   // while direct and mutual recursion remain unavailable by policy.
-  const definition = { declaration: node, parameters: names, body: node.body, environment }
+  const definition = {
+    declaration: node,
+    parameters: node.parameters,
+    body: node.body,
+    environment,
+  }
   return {
     environment: extendLexicalEnvironment(environment, {
       functions: new Map([[node.name.name, definition]]),
@@ -142,6 +197,51 @@ export type FunctionCallPreparation =
       readonly diagnostics: readonly Diagnostic[]
     }
   | { readonly diagnostics: readonly Diagnostic[] }
+
+function coerceParameter(value: EvaluatedLiteral, coercion: string | null): EvaluatedLiteral {
+  if (!coercion || value.kind === 'undefined') return value
+  const elementCoercion = /^container<(.+)>$/.exec(coercion)?.[1]
+  if (elementCoercion) {
+    if (value.kind !== 'container') throw new TypeError(`Value cannot be coerced to ${coercion}.`)
+    return {
+      ...value,
+      values: value.values.map((element) => coerceParameter(element, elementCoercion)),
+    }
+  }
+  switch (coercion) {
+    case 'ratio':
+      if (value.kind === 'scalar') return value
+      if (value.kind === 'pitchOffset')
+        return result('scalar', Value.ratio(value.value), value.origins)
+      break
+    case 'pitch':
+      if (value.kind === 'pitchOffset') return value
+      if (value.kind === 'scalar' && value.value.isPositiveExactRatio())
+        return {
+          ...result('pitchOffset', Value.pitch(value.value), value.origins),
+          justIntonation: true,
+        }
+      break
+    case 'integer': {
+      if (value.kind !== 'scalar' || !value.value.dimensions.isDimensionless) break
+      const exact = value.value.exactRational()
+      if (exact?.d === 1) return value
+      break
+    }
+    case 'container':
+      if (value.kind === 'container') return value
+      break
+    case 'boolean': {
+      if (value.kind !== 'scalar' || !value.value.dimensions.isDimensionless) break
+      const exact = value.value.exactRational()
+      if (exact?.d === 1 && (exact.n === 0 || exact.n === 1)) return value
+      break
+    }
+    default:
+      throw new TypeError(`Unknown parameter coercion ${coercion}.`)
+  }
+  throw new TypeError(`Value cannot be coerced to ${coercion}.`)
+}
 
 /** Prepare a user function once; score and scalar consumers evaluate its returned AST themselves. */
 export function prepareFunctionCall(
@@ -179,38 +279,82 @@ export function prepareFunctionCall(
         },
       ],
     }
-  if (node.arguments.length !== definition.parameters.length)
+  const minimumArguments = definition.parameters.filter(
+    (parameter) => !parameter.defaultValue,
+  ).length
+  if (
+    node.arguments.length < minimumArguments ||
+    node.arguments.length > definition.parameters.length
+  )
     return {
       diagnostics: [
         {
           code: 'XP_ARITY',
           severity: 'error',
-          message: `${node.callee}() expects ${definition.parameters.length} argument${definition.parameters.length === 1 ? '' : 's'}, but received ${node.arguments.length}.`,
+          message:
+            minimumArguments === definition.parameters.length
+              ? `${node.callee}() expects ${definition.parameters.length} argument${definition.parameters.length === 1 ? '' : 's'}, but received ${node.arguments.length}.`
+              : `${node.callee}() expects ${minimumArguments} to ${definition.parameters.length} arguments, but received ${node.arguments.length}.`,
           locations: [node.location, definition.declaration.location],
         },
       ],
     }
-  const evaluated = node.arguments.map((argument) =>
-    evaluateExpression(argument, mapping, environment),
-  )
-  const diagnostics = evaluated.flatMap((result) => result.diagnostics)
-  if (!evaluated.every((result) => 'value' in result)) return { diagnostics }
-  const variables = new Map(
-    definition.parameters.map((name, index) => [
-      name,
-      (evaluated[index] as { value: EvaluatedLiteral }).value,
-    ]),
-  )
+  const supplied = node.arguments.map((argument, index) => {
+    const coercion = definition.parameters[index]?.coercion
+    if (coercion?.startsWith('container'))
+      return containerItems(argument, mapping, environment, coercion)
+    if (
+      argument.type === 'DegreeLiteral' &&
+      (coercion === 'ratio' || coercion === 'integer' || coercion === 'boolean')
+    )
+      return evaluateLiteral({
+        type: 'IntegerLiteral',
+        value: argument.degree,
+        raw: argument.raw,
+        location: argument.location,
+      })
+    return evaluateExpression(argument, mapping, environment)
+  })
+  const diagnostics = supplied.flatMap((result) => result.diagnostics)
+  if (!supplied.every((result) => 'value' in result)) return { diagnostics }
   const calls = new Set(environment.calls).add(definition)
   let bodyEnvironment = extendLexicalEnvironment(definition.environment, {
-    variables,
     functions: new Map([[node.callee, definition]]),
     calls,
   })
+  for (const [index, parameter] of definition.parameters.entries()) {
+    let evaluated: ExpressionEvaluationResult | undefined = supplied[index]
+    if (!evaluated) {
+      const defaultValue = parameter.defaultValue
+      if (!defaultValue) continue
+      evaluated = evaluateExpression(defaultValue, mapping, bodyEnvironment)
+      diagnostics.push(...evaluated.diagnostics)
+      if (!('value' in evaluated)) return { diagnostics }
+    }
+    if (!('value' in evaluated)) return { diagnostics }
+    let value: EvaluatedLiteral
+    try {
+      value = coerceParameter(evaluated.value, parameter.coercion)
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Parameter coercion failed.'
+      diagnostics.push({
+        code: 'XP_PARAMETER_COERCION',
+        severity: 'error',
+        message: `${parameter.name.name}: ${message}`,
+        locations: [node.arguments[index]?.location ?? parameter.location, parameter.location],
+      })
+      return { diagnostics }
+    }
+    bodyEnvironment = extendLexicalEnvironment(bodyEnvironment, {
+      variables: new Map([[parameter.name.name, value]]),
+      calls,
+    })
+  }
   for (const declaration of definition.body.declarations) {
     const declared = evaluateDeclaration(declaration, mapping, bodyEnvironment)
     bodyEnvironment = declared.environment
     diagnostics.push(...declared.diagnostics)
+    if (declared.diagnostics.some((item) => item.severity === 'error')) break
   }
   if (diagnostics.some((item) => item.severity === 'error')) return { diagnostics }
   return {
@@ -475,6 +619,48 @@ function binary(
   right: EvaluatedLiteral,
   node: Expression,
 ): EvaluatedLiteral {
+  if (operator === 'al') return left.kind === 'undefined' ? right : left
+  if (left.kind === 'container' || right.kind === 'container') {
+    if (left.kind === 'container' && right.kind === 'container') {
+      if (left.values.length !== right.values.length)
+        throw new TypeError('Container operands must have the same length.')
+      return {
+        ...left,
+        values: left.values.map((value, index) =>
+          binary(operator, value, right.values[index]!, node),
+        ),
+      }
+    }
+    const container = (left.kind === 'container' ? left : right) as Extract<
+      EvaluatedLiteral,
+      { kind: 'container' }
+    >
+    const scalar = left.kind === 'container' ? right : left
+    return {
+      ...container,
+      values: container.values.map((value) => {
+        const reduced =
+          left.kind === 'container'
+            ? binary(operator, value, scalar, node)
+            : binary(operator, scalar, value, node)
+        if (
+          operator === 'rd' &&
+          reduced.kind === 'scalar' &&
+          reduced.value.equals(new Value(1)) &&
+          scalar.kind === 'scalar'
+        )
+          return scalar
+        return reduced
+      }),
+    }
+  }
+  if (
+    left.kind === 'undefined' ||
+    right.kind === 'undefined' ||
+    left.kind === 'lambda' ||
+    right.kind === 'lambda'
+  )
+    throw new TypeError(`Operator ${operator} requires numeric operands.`)
   switch (operator) {
     case '+':
       return addOrSubtract(left, right, false, node)
@@ -500,6 +686,158 @@ function binary(
     default:
       throw new TypeError(`Unknown binary operator ${operator}.`)
   }
+}
+
+function containerItems(
+  node: Expression,
+  mapping: PrimeMapping | PitchContext,
+  environment: LexicalEnvironment,
+  coercion?: string,
+): ExpressionEvaluationResult {
+  if (
+    node.type === 'DegreeLiteral' &&
+    (coercion === 'ratio' || coercion === 'integer' || coercion === 'boolean')
+  )
+    return evaluateLiteral({
+      type: 'IntegerLiteral',
+      value: node.degree,
+      raw: node.raw,
+      location: node.location,
+    })
+  if (node.type === 'Group') return containerItems(node.expression, mapping, environment, coercion)
+  if (node.type === 'NormalizeToSlot') {
+    if (!node.expression)
+      return {
+        value: { kind: 'container', values: [], value: new Value(0), origins: [] },
+        diagnostics: [],
+      }
+    const elementCoercion = /^container<(.+)>$/.exec(coercion ?? '')?.[1] ?? coercion
+    if (node.expression.type === 'Sequence' || node.expression.type === 'Parallel')
+      return containerItems(node.expression, mapping, environment, elementCoercion)
+    const item = containerItems(node.expression, mapping, environment, elementCoercion)
+    if (!('value' in item)) return item
+    return {
+      value: {
+        kind: 'container',
+        values: [item.value],
+        value: new Value(0),
+        origins: [{ location: node.location, role: 'literal' }],
+      },
+      diagnostics: item.diagnostics,
+    }
+  }
+  if (node.type === 'Sequence' || node.type === 'Parallel') {
+    const nodes = node.type === 'Sequence' ? node.items : node.branches
+    const results = nodes.map((item) => containerItems(item, mapping, environment, coercion))
+    const diagnostics = results.flatMap((item) => item.diagnostics)
+    if (!results.every((item) => 'value' in item)) return { diagnostics }
+    return {
+      value: {
+        kind: 'container',
+        values: results.map((item) => (item as { value: EvaluatedLiteral }).value),
+        value: new Value(0),
+        origins: [{ location: node.location, role: 'literal' }],
+      },
+      diagnostics,
+    }
+  }
+  return evaluateExpression(node, mapping, environment)
+}
+
+const scalarInteger = (value: EvaluatedLiteral, name: string): number => {
+  if (value.kind !== 'scalar') throw new TypeError(`${name} must be an integer.`)
+  const exact = value.value.exactRational()
+  if (!exact || exact.d !== 1) throw new TypeError(`${name} must be an integer.`)
+  return Number(exact.s * exact.n)
+}
+
+function callContainerBuiltin(
+  name: string,
+  args: readonly EvaluatedLiteral[],
+  mapping: PrimeMapping | PitchContext,
+): EvaluatedLiteral {
+  const origin = args.flatMap((argument) => argument.origins)
+  const requireContainer = (index = 0) => {
+    const argument = args[index]
+    if (!argument || argument.kind !== 'container')
+      throw new TypeError(`${name}() expects a container.`)
+    return argument.values
+  }
+  if (name === 'kCombinations') {
+    const items = requireContainer()
+    const count = scalarInteger(args[1]!, 'Combination size')
+    return {
+      kind: 'container',
+      values: kCombinations(items, count).map((values) => ({
+        kind: 'container',
+        values,
+        value: new Value(0),
+        origins: origin,
+      })),
+      value: new Value(0),
+      origins: origin,
+    }
+  }
+  if (name === 'arrayReduce') {
+    const callback = args[0]
+    if (callback?.kind !== 'lambda' || callback.parameters.length !== 2)
+      throw new TypeError('arrayReduce() expects a two-parameter lambda.')
+    const items = requireContainer(1)
+    const initial = args[2]
+    if (!items.length && !initial)
+      throw new TypeError(
+        'arrayReduce() cannot reduce an empty container without an initial value.',
+      )
+    let accumulator = initial ?? items[0]!
+    for (const item of initial ? items : items.slice(1)) {
+      const environment = extendLexicalEnvironment(callback.environment, {
+        variables: new Map([
+          [callback.parameters[0]!, accumulator],
+          [callback.parameters[1]!, item],
+        ]),
+      })
+      const reduced = evaluateExpression(callback.body, mapping, environment)
+      if (!('value' in reduced))
+        throw new TypeError(reduced.diagnostics[0]?.message ?? 'arrayReduce() callback failed.')
+      accumulator = reduced.value
+    }
+    return accumulator
+  }
+  if (name === 'arrayMap') {
+    const callback = args[0]
+    if (callback?.kind !== 'lambda' || callback.parameters.length !== 1)
+      throw new TypeError('arrayMap() expects a one-parameter lambda.')
+    return {
+      kind: 'container',
+      values: requireContainer(1).map((item) => {
+        const environment = extendLexicalEnvironment(callback.environment, {
+          variables: new Map([[callback.parameters[0]!, item]]),
+        })
+        const mapped = evaluateExpression(callback.body, mapping, environment)
+        if (!('value' in mapped))
+          throw new TypeError(mapped.diagnostics[0]?.message ?? 'arrayMap() callback failed.')
+        return mapped.value
+      }),
+      value: new Value(0),
+      origins: origin,
+    }
+  }
+  if (name === 'sort') {
+    const values = requireContainer()
+    if (values.some((item) => item.kind !== 'scalar' && item.kind !== 'pitchOffset'))
+      throw new TypeError('sort() expects numeric values.')
+    const numeric = values as readonly Extract<
+      EvaluatedLiteral,
+      { kind: 'scalar' | 'pitchOffset' }
+    >[]
+    return {
+      kind: 'container',
+      values: [...numeric].sort((a, b) => a.value.valueOf() - b.value.valueOf()),
+      value: new Value(0),
+      origins: origin,
+    }
+  }
+  throw new TypeError(`Unknown call ${name}().`)
 }
 
 /** Evaluate the arithmetic subset of the parser AST without throwing for source errors. */
@@ -551,6 +889,38 @@ export function evaluateExpression(
         if (value) return { value, diagnostics: [] }
       }
     }
+    if (node.type === 'Identifier' && node.name === 'niente')
+      return {
+        value: {
+          kind: 'undefined',
+          value: new Value(0),
+          origins: [{ location: node.location, role: 'literal' }],
+        },
+        diagnostics: [],
+      }
+    if (node.type === 'Identifier' && (node.name === 'true' || node.name === 'false'))
+      return {
+        value: result('scalar', new Value(node.name === 'true' ? 1 : 0), [
+          { location: node.location, role: 'literal' },
+        ]),
+        diagnostics: [],
+      }
+    if (node.type === 'LambdaExpression') {
+      const parameters = node.parameters.map((parameter) => parameter.name)
+      if (new Set(parameters).size !== parameters.length)
+        throw new TypeError('Lambda parameters must be unique.')
+      return {
+        value: {
+          kind: 'lambda',
+          parameters,
+          body: node.body,
+          environment,
+          value: new Value(0),
+          origins: [{ location: node.location, role: 'literal' }],
+        },
+        diagnostics: [],
+      }
+    }
     if (node.type === 'Identifier')
       return {
         diagnostics: [
@@ -563,9 +933,16 @@ export function evaluateExpression(
         ],
       }
     if (node.type === 'Group') return evaluateExpression(node.expression, mapping, environment)
+    if (node.type === 'NormalizeToSlot') return containerItems(node, mapping, environment)
     if (node.type === 'PitchModifierExpression') {
       const operand = evaluateExpression(node.operand, mapping, environment)
       if (!('value' in operand)) return operand
+      if (
+        operand.value.kind === 'container' ||
+        operand.value.kind === 'undefined' ||
+        operand.value.kind === 'lambda'
+      )
+        throw new TypeError('Pitch modifiers require a numeric operand.')
       const context = 'rootPitch' in mapping ? mapping : createPitchContext(mapping)
       const modifier = node.modifier.kind
       const equaveShift = EQUAVE_SHIFT_BY_MODIFIER[modifier] ?? 0
@@ -656,6 +1033,12 @@ export function evaluateExpression(
     if (node.type === 'UnaryExpression') {
       const operand = evaluateExpression(node.operand, mapping, environment)
       if (!('value' in operand)) return operand
+      if (
+        operand.value.kind === 'container' ||
+        operand.value.kind === 'undefined' ||
+        operand.value.kind === 'lambda'
+      )
+        throw new TypeError('Unary operators require a numeric operand.')
       if (node.operator === '+') return operand
       if (node.operator === '√') {
         if (operand.value.kind !== 'scalar')
@@ -734,10 +1117,42 @@ export function evaluateExpression(
     }
     if (node.type === 'BinaryExpression') {
       const left = evaluateExpression(node.left, mapping, environment)
+      if (!('value' in left)) return left
+      if (node.operator === 'al' && left.value.kind !== 'undefined') return left
       const right = evaluateExpression(node.right, mapping, environment)
       const diagnostics = [...left.diagnostics, ...right.diagnostics]
-      if (!('value' in left) || !('value' in right)) return { diagnostics }
+      if (!('value' in right)) return { diagnostics }
       return { value: binary(node.operator, left.value, right.value, node), diagnostics }
+    }
+    if (node.type === 'IndexExpression') {
+      const container = evaluateExpression(node.container, mapping, environment)
+      const index = evaluateExpression(node.index, mapping, environment)
+      const diagnostics = [...container.diagnostics, ...index.diagnostics]
+      if (!('value' in container) || !('value' in index)) return { diagnostics }
+      if (container.value.kind !== 'container')
+        throw new TypeError('Indexing requires a container.')
+      const offset = scalarInteger(index.value, 'Container index')
+      const value =
+        container.value.values[offset < 0 ? container.value.values.length + offset : offset]
+      if (!value) throw new RangeError('Container index is out of range.')
+      return { value, diagnostics }
+    }
+    if (node.type === 'ConditionalExpression') {
+      const condition = evaluateExpression(node.condition, mapping, environment)
+      if (!('value' in condition)) return condition
+      const truthy =
+        condition.value.kind !== 'undefined' &&
+        (condition.value.kind === 'absolutePitch'
+          ? true
+          : condition.value.kind === 'container'
+            ? condition.value.values.length > 0
+            : condition.value.value.valueOf() !== 0)
+      const branch = evaluateExpression(
+        truthy ? node.consequent : node.alternate,
+        mapping,
+        environment,
+      )
+      return { ...branch, diagnostics: [...condition.diagnostics, ...branch.diagnostics] }
     }
     if (node.type === 'CallExpression') {
       const prepared = prepareFunctionCall(node, mapping, environment)
@@ -747,6 +1162,22 @@ export function evaluateExpression(
         return {
           ...body,
           diagnostics: [...prepared.diagnostics, ...body.diagnostics],
+        }
+      }
+      const containerBuiltins = ['kCombinations', 'arrayReduce', 'arrayMap', 'sort']
+      if (containerBuiltins.includes(node.callee)) {
+        const evaluated = node.arguments.map((argument) =>
+          containerItems(argument, mapping, environment),
+        )
+        const diagnostics = evaluated.flatMap((argument) => argument.diagnostics)
+        if (!evaluated.every((argument) => 'value' in argument)) return { diagnostics }
+        return {
+          value: callContainerBuiltin(
+            node.callee,
+            evaluated.map((argument) => (argument as { value: EvaluatedLiteral }).value),
+            mapping,
+          ),
+          diagnostics,
         }
       }
       if (!['pitch', 'ratio'].includes(node.callee))
@@ -765,6 +1196,17 @@ export function evaluateExpression(
       const argument = evaluateExpression(argumentNode, mapping, environment)
       if (!('value' in argument)) return argument
       if (node.callee === 'pitch') {
+        if (argument.value.kind === 'container') {
+          const convert = (value: EvaluatedLiteral): EvaluatedLiteral => {
+            if (value.kind === 'container') return { ...value, values: value.values.map(convert) }
+            if (value.kind !== 'scalar') throw new TypeError('pitch() expects scalar ratios.')
+            return {
+              ...result('pitchOffset', Value.pitch(value.value), value.origins),
+              ...(value.value.isPositiveExactRatio() ? { justIntonation: true } : {}),
+            }
+          }
+          return { value: convert(argument.value), diagnostics: argument.diagnostics }
+        }
         if (argument.value.kind !== 'scalar') throw new TypeError('pitch() expects a scalar ratio.')
         return {
           value: {
@@ -775,6 +1217,16 @@ export function evaluateExpression(
         }
       }
       if (node.callee === 'ratio') {
+        if (argument.value.kind === 'container') {
+          const convert = (value: EvaluatedLiteral): EvaluatedLiteral => {
+            if (value.kind === 'container') return { ...value, values: value.values.map(convert) }
+            if (value.kind === 'scalar') return value
+            if (value.kind !== 'pitchOffset') throw new TypeError('ratio() expects pitch offsets.')
+            return result('scalar', Value.ratio(value.value), value.origins)
+          }
+          return { value: convert(argument.value), diagnostics: argument.diagnostics }
+        }
+        if (argument.value.kind === 'scalar') return argument
         if (argument.value.kind !== 'pitchOffset')
           throw new TypeError('ratio() expects a pitch offset.')
         return {

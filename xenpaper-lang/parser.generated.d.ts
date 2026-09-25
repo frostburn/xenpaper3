@@ -23,6 +23,7 @@ export type Expression =
   | BarRest
   | BinaryExpression
   | CallExpression
+  | ConditionalExpression
   | ContextAssignment
   | ContextExpression
   | ContextDegreeMapping
@@ -42,7 +43,9 @@ export type Expression =
   | HardBoundary
   | Identifier
   | IntegerLiteral
+  | LambdaExpression
   | IntervalLiteral
+  | IndexExpression
   | MappingLiteral
   | MonzoLiteral
   | MosDeclaration
@@ -89,6 +92,25 @@ export interface BinaryExpression extends Node {
   right: Expression
 }
 
+export interface ConditionalExpression extends Node {
+  type: 'ConditionalExpression'
+  condition: Expression
+  consequent: Expression
+  alternate: Expression
+}
+
+export interface IndexExpression extends Node {
+  type: 'IndexExpression'
+  container: Expression
+  index: Expression
+}
+
+export interface LambdaExpression extends Node {
+  type: 'LambdaExpression'
+  parameters: Identifier[]
+  body: Expression
+}
+
 export interface EnumeratedChord extends Node {
   type: 'EnumeratedChord'
   inverted: boolean
@@ -115,8 +137,15 @@ export interface VariableDeclaration extends Node {
 export interface FunctionDeclaration extends Node {
   type: 'FunctionDeclaration'
   name: Identifier
-  parameters: Identifier[]
+  parameters: FunctionParameter[]
   body: FunctionBody
+}
+
+export interface FunctionParameter extends Node {
+  type: 'FunctionParameter'
+  name: Identifier
+  coercion: string | null
+  defaultValue: Expression | null
 }
 
 export interface FunctionBody extends Node {

@@ -8,7 +8,7 @@ describe('lexical declarations', () => {
     expect(declaration).toMatchObject({
       type: 'FunctionDeclaration',
       name: { name: 'transpose' },
-      parameters: [{ name: 'note' }, { name: 'interval' }],
+      parameters: [{ name: { name: 'note' } }, { name: { name: 'interval' } }],
       body: {
         type: 'FunctionBody',
         returnStatement: { type: 'ReturnStatement', value: { operator: '+' } },
@@ -20,6 +20,19 @@ describe('lexical declarations', () => {
     expect(declaration.parameters.map((parameter) => parameter.location.start.offset)).toEqual([
       13, 19,
     ])
+  })
+
+  it('parses parameter coercions and defaults', () => {
+    const declaration = parse(
+      'fn choose(values: container<ratio>, fallback: ratio = 3/2) { ret values[0] al fallback }',
+    ).body[0]
+    expect(declaration).toMatchObject({
+      type: 'FunctionDeclaration',
+      parameters: [
+        { name: { name: 'values' }, coercion: 'container<ratio>', defaultValue: null },
+        { name: { name: 'fallback' }, coercion: 'ratio', defaultValue: { type: 'RatioLiteral' } },
+      ],
+    })
   })
 
   it('binds ret loosely across complete score sequences', () => {
@@ -100,7 +113,7 @@ describe('grammar boundary roles', () => {
       type: 'Sequence',
       items: [
         { type: 'Identifier', name: 'pi' },
-        { type: 'CallExpression', callee: 'sqrt', arguments: [{ type: 'IntegerLiteral' }] },
+        { type: 'CallExpression', callee: 'sqrt', arguments: [{ type: 'DegreeLiteral' }] },
       ],
     })
     expect(parse('pi sqrt(2)').body[0]).toMatchObject({
