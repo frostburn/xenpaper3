@@ -251,6 +251,14 @@ describe('arithmetic expression evaluation', () => {
       [7n, 4n],
       [2n, 1n],
     ])
+    expectRatios('cps([1 3 5 7], 2)', [
+      [7n, 6n],
+      [5n, 4n],
+      [35n, 24n],
+      [5n, 3n],
+      [7n, 4n],
+      [2n, 1n],
+    ])
   })
 
   it('coerces annotated parameters and evaluates declared defaults', () => {

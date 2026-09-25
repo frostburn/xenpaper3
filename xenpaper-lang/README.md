@@ -119,10 +119,11 @@ power(3/2) power(3/2, 3/1)
 ```
 
 The supported coercions are `ratio`, `pitch`, `integer`, `container`, and
-`boolean`. Coercions are applied after evaluating the argument; for example, a
-scale-degree pitch offset passed to a `ratio` parameter is converted back to its
-frequency ratio. `niente` passes through a coercion so it can be used as an
-optional default. Required parameters cannot follow defaulted parameters.
+`boolean`. Container element coercions may be nested, as in `container<ratio>`.
+Coercions are applied while evaluating the argument; for example, bare integers
+inside a `container<ratio>` argument are ratios rather than scale degrees.
+`niente` passes through a coercion so it can be used as an optional default.
+Required parameters cannot follow defaulted parameters.
 For the otherwise ambiguous bare integer syntax in a call, `ratio`, `integer`,
 and `boolean` parameters interpret the argument as an integer scalar, while an
 unannotated or `pitch` parameter receives the active scale degree. Consequently,

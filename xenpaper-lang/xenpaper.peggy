@@ -768,13 +768,18 @@ FunctionDeclaration
 
 FunctionParameter
   = name:LocatedIdentifier
-    coercion:(Spacing ":" Spacing annotation:Identifier { return annotation; })?
+    coercion:(Spacing ":" Spacing annotation:CoercionAnnotation { return annotation; })?
     defaultValue:(Spacing "=" Spacing value:AdditiveExpression { return value; })? {
       return node('FunctionParameter', {
         name,
         coercion: coercion ?? null,
         defaultValue: defaultValue ?? null,
       });
+    }
+
+CoercionAnnotation
+  = outer:Identifier inner:(Spacing "<" Spacing value:CoercionAnnotation Spacing ">" { return value; })? {
+      return inner ? `${outer}<${inner}>` : outer;
     }
 
 FunctionBody

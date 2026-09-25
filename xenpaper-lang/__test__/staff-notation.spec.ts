@@ -458,9 +458,7 @@ describe('staff notation construction', () => {
   })
 
   it('constructs a combination product set as the active scale', () => {
-    const evaluated = evaluateProgramShape(
-      parse('{scale = cps([1/1 3/1 5/1 7/1], 2/1)}\n1 2 3 4 5 6'),
-    )
+    const evaluated = evaluateProgramShape(parse('{scale = cps([1 3 5 7], 2)}\n1 2 3 4 5 6'))
     if (!('shape' in evaluated)) throw new Error('Expected a shape.')
 
     expect(evaluated.diagnostics).toEqual([])

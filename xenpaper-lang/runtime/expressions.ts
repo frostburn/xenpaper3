@@ -63,7 +63,7 @@ fn equaveReduce(scale: container, equave: ratio = niente) {
   let actualEquave = equave al scale[-1]
   ret ratio(scale) rd ratio(actualEquave)
 }
-fn cps(factors: container, count: integer, equave: ratio = niente, withUnity: boolean = false) {
+fn cps(factors: container<ratio>, count: integer, equave: ratio = niente, withUnity: boolean = false) {
   let products = sort(arrayMap((combination) => prod(combination), kCombinations(factors, count)))
   let grounded = products if (withUnity al false) else ground(products)
   let actualEquave = equave al (pitch(2/1) + grounded[0])
@@ -141,9 +141,14 @@ export function evaluateDeclaration(
         },
       ],
     }
-  const supportedCoercions = new Set(['ratio', 'pitch', 'integer', 'container', 'boolean'])
+  const scalarCoercions = new Set(['ratio', 'pitch', 'integer', 'boolean'])
+  const supportedCoercion = (coercion: string): boolean => {
+    if (scalarCoercions.has(coercion) || coercion === 'container') return true
+    const element = /^container<(.+)>$/.exec(coercion)?.[1]
+    return element ? supportedCoercion(element) : false
+  }
   const unsupported = node.parameters.find(
-    (parameter) => parameter.coercion && !supportedCoercions.has(parameter.coercion),
+    (parameter) => parameter.coercion && !supportedCoercion(parameter.coercion),
   )
   if (unsupported)
     return {
@@ -195,6 +200,14 @@ export type FunctionCallPreparation =
 
 function coerceParameter(value: EvaluatedLiteral, coercion: string | null): EvaluatedLiteral {
   if (!coercion || value.kind === 'undefined') return value
+  const elementCoercion = /^container<(.+)>$/.exec(coercion)?.[1]
+  if (elementCoercion) {
+    if (value.kind !== 'container') throw new TypeError(`Value cannot be coerced to ${coercion}.`)
+    return {
+      ...value,
+      values: value.values.map((element) => coerceParameter(element, elementCoercion)),
+    }
+  }
   switch (coercion) {
     case 'ratio':
       if (value.kind === 'scalar') return value
@@ -288,6 +301,8 @@ export function prepareFunctionCall(
     }
   const supplied = node.arguments.map((argument, index) => {
     const coercion = definition.parameters[index]?.coercion
+    if (coercion?.startsWith('container'))
+      return containerItems(argument, mapping, environment, coercion)
     if (
       argument.type === 'DegreeLiteral' &&
       (coercion === 'ratio' || coercion === 'integer' || coercion === 'boolean')
@@ -677,17 +692,29 @@ function containerItems(
   node: Expression,
   mapping: PrimeMapping | PitchContext,
   environment: LexicalEnvironment,
+  coercion?: string,
 ): ExpressionEvaluationResult {
-  if (node.type === 'Group') return containerItems(node.expression, mapping, environment)
+  if (
+    node.type === 'DegreeLiteral' &&
+    (coercion === 'ratio' || coercion === 'integer' || coercion === 'boolean')
+  )
+    return evaluateLiteral({
+      type: 'IntegerLiteral',
+      value: node.degree,
+      raw: node.raw,
+      location: node.location,
+    })
+  if (node.type === 'Group') return containerItems(node.expression, mapping, environment, coercion)
   if (node.type === 'NormalizeToSlot') {
     if (!node.expression)
       return {
         value: { kind: 'container', values: [], value: new Value(0), origins: [] },
         diagnostics: [],
       }
+    const elementCoercion = /^container<(.+)>$/.exec(coercion ?? '')?.[1] ?? coercion
     if (node.expression.type === 'Sequence' || node.expression.type === 'Parallel')
-      return containerItems(node.expression, mapping, environment)
-    const item = containerItems(node.expression, mapping, environment)
+      return containerItems(node.expression, mapping, environment, elementCoercion)
+    const item = containerItems(node.expression, mapping, environment, elementCoercion)
     if (!('value' in item)) return item
     return {
       value: {
@@ -701,7 +728,7 @@ function containerItems(
   }
   if (node.type === 'Sequence' || node.type === 'Parallel') {
     const nodes = node.type === 'Sequence' ? node.items : node.branches
-    const results = nodes.map((item) => containerItems(item, mapping, environment))
+    const results = nodes.map((item) => containerItems(item, mapping, environment, coercion))
     const diagnostics = results.flatMap((item) => item.diagnostics)
     if (!results.every((item) => 'value' in item)) return { diagnostics }
     return {

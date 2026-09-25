@@ -24,12 +24,12 @@ describe('lexical declarations', () => {
 
   it('parses parameter coercions and defaults', () => {
     const declaration = parse(
-      'fn choose(value: ratio, fallback: ratio = 3/2) { ret value al fallback }',
+      'fn choose(values: container<ratio>, fallback: ratio = 3/2) { ret values[0] al fallback }',
     ).body[0]
     expect(declaration).toMatchObject({
       type: 'FunctionDeclaration',
       parameters: [
-        { name: { name: 'value' }, coercion: 'ratio', defaultValue: null },
+        { name: { name: 'values' }, coercion: 'container<ratio>', defaultValue: null },
         { name: { name: 'fallback' }, coercion: 'ratio', defaultValue: { type: 'RatioLiteral' } },
       ],
     })
