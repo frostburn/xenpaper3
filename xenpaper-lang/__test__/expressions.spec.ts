@@ -220,6 +220,20 @@ describe('arithmetic expression evaluation', () => {
     ).toBe(true)
   })
 
+  it.each(['toString', 'constructor', 'hasOwnProperty'])(
+    'does not treat Object.prototype.%s as a built-in',
+    (name) => {
+      expect(evaluateExpression(expression(`${name}(1 / 0)`))).toMatchObject({
+        diagnostics: [
+          {
+            code: 'XP_UNDEFINED_NAME',
+            message: `Undefined function ${name}().`,
+          },
+        ],
+      })
+    },
+  )
+
   it('does not apply prelude optional arity to shadowing functions', () => {
     const declaration = parse('fn cps(foo) { ret foo }').body[0]
     if (declaration.type !== 'FunctionDeclaration') throw new Error('Expected a function.')

@@ -848,26 +848,35 @@ interface BuiltinSignature {
   readonly coercions: readonly BuiltinCoercion[]
 }
 
-const BUILTIN_SIGNATURES: Readonly<Record<string, BuiltinSignature>> = {
-  pitch: { minimumArguments: 1, maximumArguments: 1, coercions: ['ratio'] },
-  ratio: { minimumArguments: 1, maximumArguments: 1, coercions: ['pitch'] },
-  kCombinations: {
-    minimumArguments: 2,
-    maximumArguments: 2,
-    coercions: ['container', 'integer'],
-  },
-  arrayReduce: {
-    minimumArguments: 2,
-    maximumArguments: 3,
-    coercions: [undefined, 'container', undefined],
-  },
-  arrayMap: {
-    minimumArguments: 2,
-    maximumArguments: 2,
-    coercions: [undefined, 'container'],
-  },
-  sort: { minimumArguments: 1, maximumArguments: 1, coercions: ['container'] },
-}
+const BUILTIN_SIGNATURES = new Map<string, BuiltinSignature>([
+  ['pitch', { minimumArguments: 1, maximumArguments: 1, coercions: ['ratio'] }],
+  ['ratio', { minimumArguments: 1, maximumArguments: 1, coercions: ['pitch'] }],
+  [
+    'kCombinations',
+    {
+      minimumArguments: 2,
+      maximumArguments: 2,
+      coercions: ['container', 'integer'],
+    },
+  ],
+  [
+    'arrayReduce',
+    {
+      minimumArguments: 2,
+      maximumArguments: 3,
+      coercions: [undefined, 'container', undefined],
+    },
+  ],
+  [
+    'arrayMap',
+    {
+      minimumArguments: 2,
+      maximumArguments: 2,
+      coercions: [undefined, 'container'],
+    },
+  ],
+  ['sort', { minimumArguments: 1, maximumArguments: 1, coercions: ['container'] }],
+])
 
 function builtinArityMessage(name: string, signature: BuiltinSignature, received: number): string {
   const { minimumArguments: minimum, maximumArguments: maximum } = signature
@@ -1202,7 +1211,7 @@ export function evaluateExpression(
           diagnostics: [...prepared.diagnostics, ...body.diagnostics],
         }
       }
-      const signature = BUILTIN_SIGNATURES[node.callee]
+      const signature = BUILTIN_SIGNATURES.get(node.callee)
       if (!signature)
         return {
           diagnostics: [
