@@ -123,6 +123,10 @@ The supported coercions are `ratio`, `pitch`, `integer`, `container`, and
 scale-degree pitch offset passed to a `ratio` parameter is converted back to its
 frequency ratio. `niente` passes through a coercion so it can be used as an
 optional default. Required parameters cannot follow defaulted parameters.
+For the otherwise ambiguous bare integer syntax in a call, `ratio`, `integer`,
+and `boolean` parameters interpret the argument as an integer scalar, while an
+unannotated or `pitch` parameter receives the active scale degree. Consequently,
+`sqrt(4)` is always `2`, while an unannotated `identity(4)` receives degree 4.
 
 `let name = expression` evaluates the initializer once. `fn name(parameters) {
 ... ret expression }` creates a lexical closure. A function body contains zero

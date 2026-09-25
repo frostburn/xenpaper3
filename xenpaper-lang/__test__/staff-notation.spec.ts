@@ -245,7 +245,7 @@ describe('staff notation construction', () => {
   })
 
   it('constructs notation for positive irrational scalar ratios', () => {
-    expect(notation('sqrt(2/1)')).toMatchObject({
+    expect(notation('sqrt(2)')).toMatchObject({
       staffPosition: 4,
       accidentals: [],
       cents: 600,

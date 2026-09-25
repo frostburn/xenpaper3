@@ -68,7 +68,7 @@ describe('arithmetic expression evaluation', () => {
     expect(tempered.value.kind).toBe('pitchOffset')
     expect(tempered.value.value.equals(Value.cents(400))).toBe(true)
 
-    const radical = evaluateExpression(expression('~sqrt(2/1)'), edoMapping(12))
+    const radical = evaluateExpression(expression('~sqrt(2)'), edoMapping(12))
     expect(radical.diagnostics).toEqual([])
     if (!('value' in radical)) throw new Error('Expected a value.')
     expect(radical.value.value.equals(Value.cents(600))).toBe(true)
@@ -143,8 +143,8 @@ describe('arithmetic expression evaluation', () => {
   })
 
   it('evaluates square roots while preserving exact values and dimensions', () => {
-    expect(evaluate('sqrt(4/1)').value.equals(2)).toBe(true)
-    expect(evaluate('sqrt(2/1) * sqrt(2/1)').value.equals(2)).toBe(true)
+    expect(evaluate('sqrt(4)').value.equals(2)).toBe(true)
+    expect(evaluate('sqrt(2) * sqrt(2)').value.equals(2)).toBe(true)
     expect(evaluate('√2 * √2').value.equals(2)).toBe(true)
 
     const duration = evaluate('sqrt(4 * 1s**2)')
@@ -243,11 +243,14 @@ describe('arithmetic expression evaluation', () => {
       [7n, 4n],
       [2n, 1n],
     ])
-    expect(evaluateExpression(expression('cps([1/1, 3/1, 5/1, 7/1], 2)'))).toMatchObject({
-      diagnostics: [
-        { code: 'XP_PARAMETER_COERCION', message: 'count: Value cannot be coerced to integer.' },
-      ],
-    })
+    expectRatios('cps([1/1, 3/1, 5/1, 7/1], 2)', [
+      [7n, 6n],
+      [5n, 4n],
+      [35n, 24n],
+      [5n, 3n],
+      [7n, 4n],
+      [2n, 1n],
+    ])
   })
 
   it('coerces annotated parameters and evaluates declared defaults', () => {
@@ -265,21 +268,19 @@ describe('arithmetic expression evaluation', () => {
     )
     expect('value' in squared && squared.value.value.equals(new Value(9n, 4n))).toBe(true)
     const cubed = evaluateExpression(
-      expression('power(3/2, 3/1)'),
+      expression('power(3/2, 3)'),
       DEFAULT_PITCH_CONTEXT,
       declared.environment,
     )
     expect('value' in cubed && cubed.value.value.equals(new Value(27n, 8n))).toBe(true)
 
-    const degree = evaluateExpression(
+    const integer = evaluateExpression(
       expression('power(7)'),
       DEFAULT_PITCH_CONTEXT,
       declared.environment,
     )
-    expect('value' in degree && degree.value.kind === 'scalar').toBe(true)
-    expect(
-      'value' in degree && degree.value.value.equals(Value.ratio(Value.cents(700)).pow(2)),
-    ).toBe(true)
+    expect('value' in integer && integer.value.kind === 'scalar').toBe(true)
+    expect('value' in integer && integer.value.value.equals(49)).toBe(true)
 
     const invalidOrder = parse('fn invalid(optional = 1/1, required) { ret required }').body[0]
     if (invalidOrder.type !== 'FunctionDeclaration') throw new Error('Expected a function.')
@@ -295,7 +296,7 @@ describe('arithmetic expression evaluation', () => {
   })
 
   it('applies pitch operators uniformly without coercing scalars to pitches', () => {
-    expect(evaluate("'sqrt(2/1)").value.equals(evaluate('sqrt(8/1)').value)).toBe(true)
+    expect(evaluate("'sqrt(2)").value.equals(evaluate('sqrt(8)').value)).toBe(true)
     const up = evaluate('^3/2')
     expect(up.kind).toBe('scalar')
     expect(up.value.equals(new Value(3n, 2n).mul(Value.ratio(DEFAULT_PITCH_CONTEXT.up)))).toBe(true)
@@ -363,7 +364,7 @@ describe('arithmetic expression evaluation', () => {
   })
 
   it('falls back to real arithmetic for sums of unrelated square roots', () => {
-    const sum = evaluate('sqrt(2/1) + sqrt(3/1)')
+    const sum = evaluate('sqrt(2) + sqrt(3)')
 
     expect(sum.value.magnitude.kind).toBe('real')
     expect(sum.value.valueOf()).toBeCloseTo(Math.sqrt(2) + Math.sqrt(3))

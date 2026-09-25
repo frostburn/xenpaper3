@@ -286,9 +286,20 @@ export function prepareFunctionCall(
         },
       ],
     }
-  const supplied = node.arguments.map((argument) =>
-    evaluateExpression(argument, mapping, environment),
-  )
+  const supplied = node.arguments.map((argument, index) => {
+    const coercion = definition.parameters[index]?.coercion
+    if (
+      argument.type === 'DegreeLiteral' &&
+      (coercion === 'ratio' || coercion === 'integer' || coercion === 'boolean')
+    )
+      return evaluateLiteral({
+        type: 'IntegerLiteral',
+        value: argument.degree,
+        raw: argument.raw,
+        location: argument.location,
+      })
+    return evaluateExpression(argument, mapping, environment)
+  })
   const diagnostics = supplied.flatMap((result) => result.diagnostics)
   if (!supplied.every((result) => 'value' in result)) return { diagnostics }
   const calls = new Set(environment.calls).add(definition)
