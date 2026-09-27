@@ -1,8 +1,8 @@
 import { parse, type Expression } from '../parser.js'
 import { Fraction, mmod } from 'xen-dev-utils/fraction'
-import { kCombinations } from 'xen-dev-utils'
 import type { Diagnostic } from '../diagnostics'
 import { Value } from '../value'
+import { evaluateBuiltinArgument, evaluateBuiltinCall, requireInteger } from './builtins'
 import { evaluateLiteral, type NumericLiteralNode } from './literals'
 import type {
   EvaluatedLiteral,
@@ -688,203 +688,19 @@ function binary(
   }
 }
 
+function scalarInteger(value: EvaluatedLiteral, name: string): number {
+  return requireInteger(value, name)
+}
+
 function containerItems(
   node: Expression,
   mapping: PrimeMapping | PitchContext,
   environment: LexicalEnvironment,
   coercion?: string,
 ): ExpressionEvaluationResult {
-  if (
-    node.type === 'DegreeLiteral' &&
-    (coercion === 'ratio' || coercion === 'integer' || coercion === 'boolean')
+  return evaluateBuiltinArgument(node, coercion, environment, (expression, scope = environment) =>
+    evaluateExpression(expression, mapping, scope),
   )
-    return evaluateLiteral({
-      type: 'IntegerLiteral',
-      value: node.degree,
-      raw: node.raw,
-      location: node.location,
-    })
-  if (node.type === 'Group') return containerItems(node.expression, mapping, environment, coercion)
-  if (node.type === 'NormalizeToSlot') {
-    if (!node.expression)
-      return {
-        value: { kind: 'container', values: [], value: new Value(0), origins: [] },
-        diagnostics: [],
-      }
-    const elementCoercion = /^container<(.+)>$/.exec(coercion ?? '')?.[1] ?? coercion
-    if (node.expression.type === 'Sequence' || node.expression.type === 'Parallel')
-      return containerItems(node.expression, mapping, environment, elementCoercion)
-    const item = containerItems(node.expression, mapping, environment, elementCoercion)
-    if (!('value' in item)) return item
-    return {
-      value: {
-        kind: 'container',
-        values: [item.value],
-        value: new Value(0),
-        origins: [{ location: node.location, role: 'literal' }],
-      },
-      diagnostics: item.diagnostics,
-    }
-  }
-  if (node.type === 'Sequence' || node.type === 'Parallel') {
-    const nodes = node.type === 'Sequence' ? node.items : node.branches
-    const results = nodes.map((item) => containerItems(item, mapping, environment, coercion))
-    const diagnostics = results.flatMap((item) => item.diagnostics)
-    if (!results.every((item) => 'value' in item)) return { diagnostics }
-    return {
-      value: {
-        kind: 'container',
-        values: results.map((item) => (item as { value: EvaluatedLiteral }).value),
-        value: new Value(0),
-        origins: [{ location: node.location, role: 'literal' }],
-      },
-      diagnostics,
-    }
-  }
-  return evaluateExpression(node, mapping, environment)
-}
-
-const scalarInteger = (value: EvaluatedLiteral, name: string): number => {
-  if (value.kind !== 'scalar') throw new TypeError(`${name} must be an integer.`)
-  const exact = value.value.exactRational()
-  if (!exact || exact.d !== 1) throw new TypeError(`${name} must be an integer.`)
-  return Number(exact.s * exact.n)
-}
-
-function callContainerBuiltin(
-  name: string,
-  args: readonly EvaluatedLiteral[],
-  mapping: PrimeMapping | PitchContext,
-): EvaluatedLiteral {
-  const origin = args.flatMap((argument) => argument.origins)
-  const requireContainer = (index = 0) => {
-    const argument = args[index]
-    if (!argument || argument.kind !== 'container')
-      throw new TypeError(`${name}() expects a container.`)
-    return argument.values
-  }
-  if (name === 'kCombinations') {
-    const items = requireContainer()
-    const count = scalarInteger(args[1]!, 'Combination size')
-    return {
-      kind: 'container',
-      values: kCombinations(items, count).map((values) => ({
-        kind: 'container',
-        values,
-        value: new Value(0),
-        origins: origin,
-      })),
-      value: new Value(0),
-      origins: origin,
-    }
-  }
-  if (name === 'arrayReduce') {
-    const callback = args[0]
-    if (callback?.kind !== 'lambda' || callback.parameters.length !== 2)
-      throw new TypeError('arrayReduce() expects a two-parameter lambda.')
-    const items = requireContainer(1)
-    const initial = args[2]
-    if (!items.length && !initial)
-      throw new TypeError(
-        'arrayReduce() cannot reduce an empty container without an initial value.',
-      )
-    let accumulator = initial ?? items[0]!
-    for (const item of initial ? items : items.slice(1)) {
-      const environment = extendLexicalEnvironment(callback.environment, {
-        variables: new Map([
-          [callback.parameters[0]!, accumulator],
-          [callback.parameters[1]!, item],
-        ]),
-      })
-      const reduced = evaluateExpression(callback.body, mapping, environment)
-      if (!('value' in reduced))
-        throw new TypeError(reduced.diagnostics[0]?.message ?? 'arrayReduce() callback failed.')
-      accumulator = reduced.value
-    }
-    return accumulator
-  }
-  if (name === 'arrayMap') {
-    const callback = args[0]
-    if (callback?.kind !== 'lambda' || callback.parameters.length !== 1)
-      throw new TypeError('arrayMap() expects a one-parameter lambda.')
-    return {
-      kind: 'container',
-      values: requireContainer(1).map((item) => {
-        const environment = extendLexicalEnvironment(callback.environment, {
-          variables: new Map([[callback.parameters[0]!, item]]),
-        })
-        const mapped = evaluateExpression(callback.body, mapping, environment)
-        if (!('value' in mapped))
-          throw new TypeError(mapped.diagnostics[0]?.message ?? 'arrayMap() callback failed.')
-        return mapped.value
-      }),
-      value: new Value(0),
-      origins: origin,
-    }
-  }
-  if (name === 'sort') {
-    const values = requireContainer()
-    if (values.some((item) => item.kind !== 'scalar' && item.kind !== 'pitchOffset'))
-      throw new TypeError('sort() expects numeric values.')
-    const numeric = values as readonly Extract<
-      EvaluatedLiteral,
-      { kind: 'scalar' | 'pitchOffset' }
-    >[]
-    return {
-      kind: 'container',
-      values: [...numeric].sort((a, b) => a.value.valueOf() - b.value.valueOf()),
-      value: new Value(0),
-      origins: origin,
-    }
-  }
-  throw new TypeError(`Unknown call ${name}().`)
-}
-
-type BuiltinCoercion = 'ratio' | 'pitch' | 'integer' | 'container' | undefined
-
-interface BuiltinSignature {
-  readonly minimumArguments: number
-  readonly maximumArguments: number
-  readonly coercions: readonly BuiltinCoercion[]
-}
-
-const BUILTIN_SIGNATURES = new Map<string, BuiltinSignature>([
-  ['pitch', { minimumArguments: 1, maximumArguments: 1, coercions: ['ratio'] }],
-  ['ratio', { minimumArguments: 1, maximumArguments: 1, coercions: ['pitch'] }],
-  [
-    'kCombinations',
-    {
-      minimumArguments: 2,
-      maximumArguments: 2,
-      coercions: ['container', 'integer'],
-    },
-  ],
-  [
-    'arrayReduce',
-    {
-      minimumArguments: 2,
-      maximumArguments: 3,
-      coercions: [undefined, 'container', undefined],
-    },
-  ],
-  [
-    'arrayMap',
-    {
-      minimumArguments: 2,
-      maximumArguments: 2,
-      coercions: [undefined, 'container'],
-    },
-  ],
-  ['sort', { minimumArguments: 1, maximumArguments: 1, coercions: ['container'] }],
-])
-
-function builtinArityMessage(name: string, signature: BuiltinSignature, received: number): string {
-  const { minimumArguments: minimum, maximumArguments: maximum } = signature
-  const expected =
-    minimum === maximum
-      ? `${minimum} argument${minimum === 1 ? '' : 's'}`
-      : `${minimum} to ${maximum} arguments`
-  return `${name}() expects ${expected}, but received ${received}.`
 }
 
 /** Evaluate the arithmetic subset of the parser AST without throwing for source errors. */
@@ -1211,78 +1027,9 @@ export function evaluateExpression(
           diagnostics: [...prepared.diagnostics, ...body.diagnostics],
         }
       }
-      const signature = BUILTIN_SIGNATURES.get(node.callee)
-      if (!signature)
-        return {
-          diagnostics: [
-            {
-              code: 'XP_UNDEFINED_NAME',
-              severity: 'error',
-              message: `Undefined function ${node.callee}().`,
-              locations: [node.location],
-            },
-          ],
-        }
-      if (
-        node.arguments.length < signature.minimumArguments ||
-        node.arguments.length > signature.maximumArguments
+      return evaluateBuiltinCall(node, environment, (expression, scope = environment) =>
+        evaluateExpression(expression, mapping, scope),
       )
-        throw new TypeError(builtinArityMessage(node.callee, signature, node.arguments.length))
-      const evaluated = node.arguments.map((argument, index) =>
-        containerItems(argument, mapping, environment, signature.coercions[index]),
-      )
-      const diagnostics = evaluated.flatMap((argument) => argument.diagnostics)
-      if (!evaluated.every((argument) => 'value' in argument)) return { diagnostics }
-      const arguments_ = evaluated.map(
-        (argument) => (argument as { value: EvaluatedLiteral }).value,
-      )
-      if (['kCombinations', 'arrayReduce', 'arrayMap', 'sort'].includes(node.callee)) {
-        return {
-          value: callContainerBuiltin(node.callee, arguments_, mapping),
-          diagnostics,
-        }
-      }
-      const argument = { value: arguments_[0]!, diagnostics }
-      if (node.callee === 'pitch') {
-        if (argument.value.kind === 'container') {
-          const convert = (value: EvaluatedLiteral): EvaluatedLiteral => {
-            if (value.kind === 'container') return { ...value, values: value.values.map(convert) }
-            if (value.kind !== 'scalar') throw new TypeError('pitch() expects scalar ratios.')
-            return {
-              ...result('pitchOffset', Value.pitch(value.value), value.origins),
-              ...(value.value.isPositiveExactRatio() ? { justIntonation: true } : {}),
-            }
-          }
-          return { value: convert(argument.value), diagnostics: argument.diagnostics }
-        }
-        if (argument.value.kind !== 'scalar') throw new TypeError('pitch() expects a scalar ratio.')
-        return {
-          value: {
-            ...result('pitchOffset', Value.pitch(argument.value.value), argument.value.origins),
-            ...(argument.value.value.isPositiveExactRatio() ? { justIntonation: true } : {}),
-          },
-          diagnostics: argument.diagnostics,
-        }
-      }
-      if (node.callee === 'ratio') {
-        if (argument.value.kind === 'container') {
-          const convert = (value: EvaluatedLiteral): EvaluatedLiteral => {
-            if (value.kind === 'container') return { ...value, values: value.values.map(convert) }
-            if (value.kind === 'scalar') return value
-            if (value.kind !== 'pitchOffset') throw new TypeError('ratio() expects pitch offsets.')
-            return result('scalar', Value.ratio(value.value), value.origins)
-          }
-          return { value: convert(argument.value), diagnostics: argument.diagnostics }
-        }
-        if (argument.value.kind === 'scalar') return argument
-        if (argument.value.kind !== 'pitchOffset')
-          throw new TypeError('ratio() expects a pitch offset.')
-        return {
-          value: result('scalar', Value.ratio(argument.value.value), argument.value.origins),
-          diagnostics: argument.diagnostics,
-        }
-      }
-      throw new TypeError(`Unknown call ${node.callee}().`)
     }
     throw new TypeError(`${node.type} is not an arithmetic expression.`)
   } catch (error) {
