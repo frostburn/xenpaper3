@@ -401,7 +401,9 @@ Rest
   = raw:$("."+) { return node('Rest', { raw }); }
 
 BarRest
-  = ";" { return node('BarRest', { raw: ";" }); }
+  // A semicolon followed by another pitch-context statement is the separator
+  // for that statement, rather than a bar rest in a preceding `scale` value.
+  = ";" !(Spacing ContextStatement) { return node('BarRest', { raw: ";" }); }
 
 DetachedContinue
   = "=" { return node('DetachedContinue', { raw: "=" }); }
