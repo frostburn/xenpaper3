@@ -1,4 +1,4 @@
-import { parse, type Expression } from '../parser.js'
+import { parse, type Expression, type FunctionParameter } from '../parser.js'
 import { Fraction, mmod } from 'xen-dev-utils/fraction'
 import type { Diagnostic } from '../diagnostics'
 import { Value } from '../value'
@@ -142,10 +142,11 @@ export function evaluateDeclaration(
       ],
     }
   const scalarCoercions = new Set(['ratio', 'pitch', 'integer', 'boolean'])
-  const supportedCoercion = (coercion: string): boolean => {
-    if (scalarCoercions.has(coercion) || coercion === 'container') return true
-    const element = /^container<(.+)>$/.exec(coercion)?.[1]
-    return element ? supportedCoercion(element) : false
+  const supportedCoercion = (coercion: NonNullable<FunctionParameter['coercion']>): boolean => {
+    if (scalarCoercions.has(coercion.name)) return !coercion.element
+    if (coercion.name === 'container')
+      return coercion.element ? supportedCoercion(coercion.element) : true
+    return false
   }
   const unsupported = node.parameters.find(
     (parameter) => parameter.coercion && !supportedCoercion(parameter.coercion),
@@ -157,7 +158,7 @@ export function evaluateDeclaration(
         {
           code: 'XP_UNKNOWN_COERCION',
           severity: 'error',
-          message: `Unknown parameter coercion ${unsupported.coercion}.`,
+          message: `Unknown parameter coercion ${unsupported.coercion!.raw}.`,
           locations: [unsupported.location],
         },
       ],
@@ -198,17 +199,20 @@ export type FunctionCallPreparation =
     }
   | { readonly diagnostics: readonly Diagnostic[] }
 
-function coerceParameter(value: EvaluatedLiteral, coercion: string | null): EvaluatedLiteral {
+function coerceParameter(
+  value: EvaluatedLiteral,
+  coercion: FunctionParameter['coercion'],
+): EvaluatedLiteral {
   if (!coercion || value.kind === 'undefined') return value
-  const elementCoercion = /^container<(.+)>$/.exec(coercion)?.[1]
-  if (elementCoercion) {
-    if (value.kind !== 'container') throw new TypeError(`Value cannot be coerced to ${coercion}.`)
+  if (coercion.name === 'container' && coercion.element) {
+    if (value.kind !== 'container')
+      throw new TypeError(`Value cannot be coerced to ${coercion.raw}.`)
     return {
       ...value,
-      values: value.values.map((element) => coerceParameter(element, elementCoercion)),
+      values: value.values.map((element) => coerceParameter(element, coercion.element)),
     }
   }
-  switch (coercion) {
+  switch (coercion.name) {
     case 'ratio':
       if (value.kind === 'scalar') return value
       if (value.kind === 'pitchOffset')
@@ -238,9 +242,9 @@ function coerceParameter(value: EvaluatedLiteral, coercion: string | null): Eval
       break
     }
     default:
-      throw new TypeError(`Unknown parameter coercion ${coercion}.`)
+      throw new TypeError(`Unknown parameter coercion ${coercion.raw}.`)
   }
-  throw new TypeError(`Value cannot be coerced to ${coercion}.`)
+  throw new TypeError(`Value cannot be coerced to ${coercion.raw}.`)
 }
 
 /** Prepare a user function once; score and scalar consumers evaluate its returned AST themselves. */
@@ -301,11 +305,11 @@ export function prepareFunctionCall(
     }
   const supplied = node.arguments.map((argument, index) => {
     const coercion = definition.parameters[index]?.coercion
-    if (coercion?.startsWith('container'))
+    if (coercion?.name === 'container')
       return containerItems(argument, mapping, environment, coercion)
     if (
       argument.type === 'DegreeLiteral' &&
-      (coercion === 'ratio' || coercion === 'integer' || coercion === 'boolean')
+      (coercion?.name === 'ratio' || coercion?.name === 'integer' || coercion?.name === 'boolean')
     )
       return evaluateLiteral({
         type: 'IntegerLiteral',
@@ -696,7 +700,7 @@ function containerItems(
   node: Expression,
   mapping: PrimeMapping | PitchContext,
   environment: LexicalEnvironment,
-  coercion?: string,
+  coercion?: FunctionParameter['coercion'],
 ): ExpressionEvaluationResult {
   return evaluateBuiltinArgument(node, coercion, environment, (expression, scope = environment) =>
     evaluateExpression(expression, mapping, scope),

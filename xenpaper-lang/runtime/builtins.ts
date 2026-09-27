@@ -1,5 +1,5 @@
 import { kCombinations } from 'xen-dev-utils'
-import type { Expression } from '../parser.js'
+import type { CoercionAnnotation, Expression } from '../parser.js'
 import { Value } from '../value'
 import type { ExpressionEvaluationResult } from './expressions'
 import { evaluateLiteral } from './literals'
@@ -13,6 +13,16 @@ export type ExpressionEvaluator = (
 
 type BuiltinCoercion = 'ratio' | 'pitch' | 'integer' | 'container' | undefined
 
+type Coercion = BuiltinCoercion | CoercionAnnotation | null
+
+const coercionName = (coercion: Coercion): string | undefined =>
+  typeof coercion === 'string' ? coercion : coercion?.name
+
+const elementCoercion = (coercion: Coercion): Coercion =>
+  coercion && typeof coercion === 'object' && coercion.name === 'container' && coercion.element
+    ? coercion.element
+    : coercion
+
 export function requireInteger(value: EvaluatedLiteral, name: string): number {
   if (value.kind !== 'scalar') throw new TypeError(`${name} must be an integer.`)
   const exact = value.value.exactRational()
@@ -23,13 +33,15 @@ export function requireInteger(value: EvaluatedLiteral, name: string): number {
 /** Evaluate an argument using Xenpaper's container syntax and parameter coercion rules. */
 export function evaluateBuiltinArgument(
   node: Expression,
-  coercion: string | undefined,
+  coercion: Coercion,
   environment: LexicalEnvironment,
   evaluate: ExpressionEvaluator,
 ): ExpressionEvaluationResult {
   if (
     node.type === 'DegreeLiteral' &&
-    (coercion === 'ratio' || coercion === 'integer' || coercion === 'boolean')
+    (coercionName(coercion) === 'ratio' ||
+      coercionName(coercion) === 'integer' ||
+      coercionName(coercion) === 'boolean')
   )
     return evaluateLiteral({
       type: 'IntegerLiteral',
@@ -45,10 +57,10 @@ export function evaluateBuiltinArgument(
         value: { kind: 'container', values: [], value: new Value(0), origins: [] },
         diagnostics: [],
       }
-    const elementCoercion = /^container<(.+)>$/.exec(coercion ?? '')?.[1] ?? coercion
+    const element = elementCoercion(coercion)
     if (node.expression.type === 'Sequence' || node.expression.type === 'Parallel')
-      return evaluateBuiltinArgument(node.expression, elementCoercion, environment, evaluate)
-    const item = evaluateBuiltinArgument(node.expression, elementCoercion, environment, evaluate)
+      return evaluateBuiltinArgument(node.expression, element, environment, evaluate)
+    const item = evaluateBuiltinArgument(node.expression, element, environment, evaluate)
     if (!('value' in item)) return item
     return {
       value: {

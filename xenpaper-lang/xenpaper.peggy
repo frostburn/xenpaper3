@@ -779,7 +779,11 @@ FunctionParameter
 
 CoercionAnnotation
   = outer:Identifier inner:(Spacing "<" Spacing value:CoercionAnnotation Spacing ">" { return value; })? {
-      return inner ? `${outer}<${inner}>` : outer;
+      return node('CoercionAnnotation', {
+        name: outer,
+        element: inner ?? null,
+        raw: text(),
+      });
     }
 
 FunctionBody
