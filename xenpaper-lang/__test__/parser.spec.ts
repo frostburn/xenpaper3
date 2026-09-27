@@ -29,8 +29,21 @@ describe('lexical declarations', () => {
     expect(declaration).toMatchObject({
       type: 'FunctionDeclaration',
       parameters: [
-        { name: { name: 'values' }, coercion: 'container<ratio>', defaultValue: null },
-        { name: { name: 'fallback' }, coercion: 'ratio', defaultValue: { type: 'RatioLiteral' } },
+        {
+          name: { name: 'values' },
+          coercion: {
+            type: 'CoercionAnnotation',
+            name: 'container',
+            element: { type: 'CoercionAnnotation', name: 'ratio', element: null, raw: 'ratio' },
+            raw: 'container<ratio>',
+          },
+          defaultValue: null,
+        },
+        {
+          name: { name: 'fallback' },
+          coercion: { type: 'CoercionAnnotation', name: 'ratio', element: null, raw: 'ratio' },
+          defaultValue: { type: 'RatioLiteral' },
+        },
       ],
     })
   })

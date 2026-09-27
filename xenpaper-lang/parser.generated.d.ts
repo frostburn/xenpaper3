@@ -144,8 +144,15 @@ export interface FunctionDeclaration extends Node {
 export interface FunctionParameter extends Node {
   type: 'FunctionParameter'
   name: Identifier
-  coercion: string | null
+  coercion: CoercionAnnotation | null
   defaultValue: Expression | null
+}
+
+export interface CoercionAnnotation extends Node {
+  type: 'CoercionAnnotation'
+  name: string
+  element: CoercionAnnotation | null
+  raw: string
 }
 
 export interface FunctionBody extends Node {
