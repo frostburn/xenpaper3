@@ -155,6 +155,85 @@ ScopedSequenceExpression
     }
   / SequenceExpression
 
+// Scale assignments use the ordinary scoped score grammar, except that a
+// semicolon introducing another context statement terminates the scale value.
+// Keeping this distinction here preserves semicolon bar rests in normal scores.
+ContextScaleParallelExpression
+  = repeated:ContextScaleParallelBody Spacing ":|" !(Spacing ",")
+    remainder:(Spacing item:ContextScaleParallelExpression { return item; })? {
+      const repeat = node('Repeat', {
+        count: null,
+        body: [repeated],
+        endings: [],
+        terminal: ":|",
+        incompleteEndings: false,
+      });
+      implicitRepeats.add(repeat);
+      if (remainder) prependImplicitRepeatScope(remainder, [repeat]);
+      return sequence(remainder ? [repeat, remainder] : [repeat]);
+    }
+  / body:ContextScaleParallelBody result:RepeatEndings !(Spacing ",")
+    remainder:(Spacing item:ContextScaleParallelExpression { return item; })? {
+      const repeat = node('Repeat', {
+        count: null,
+        body: [body],
+        endings: result.endings,
+        terminal: result.terminal,
+        incompleteEndings: result.incomplete,
+      });
+      implicitRepeats.add(repeat);
+      if (remainder) prependImplicitRepeatScope(remainder, [repeat]);
+      return sequence(remainder ? [repeat, remainder] : [repeat]);
+    }
+  / first:ContextScaleScopedSequenceExpression
+    rest:(Spacing "," Spacing branch:ContextScaleScopedSequenceExpression { return branch; })* {
+      return parallel([first, ...rest]);
+    }
+
+ContextScaleParallelBody
+  = first:ContextScaleSequenceExpression
+    rest:(Spacing "," Spacing branch:ContextScaleSequenceExpression { return branch; })* {
+      return parallel([first, ...rest]);
+    }
+
+ContextScaleScopedSequenceExpression
+  = repeated:ContextScaleSequenceExpression Spacing ":|"
+    remainder:(Spacing item:ContextScaleScopedSequenceExpression { return item; })? {
+      const repeat = node('Repeat', {
+        count: null,
+        body: [repeated],
+        endings: [],
+        terminal: ":|",
+        incompleteEndings: false,
+      });
+      implicitRepeats.add(repeat);
+      if (remainder) prependImplicitRepeatScope(remainder, [repeat]);
+      return sequence(remainder ? [repeat, remainder] : [repeat]);
+    }
+  / body:ContextScaleSequenceExpression result:RepeatEndings
+    remainder:(Spacing item:ContextScaleScopedSequenceExpression { return item; })? {
+      const repeat = node('Repeat', {
+        count: null,
+        body: [body],
+        endings: result.endings,
+        terminal: result.terminal,
+        incompleteEndings: result.incomplete,
+      });
+      implicitRepeats.add(repeat);
+      if (remainder) prependImplicitRepeatScope(remainder, [repeat]);
+      return sequence(remainder ? [repeat, remainder] : [repeat]);
+    }
+  / ContextScaleSequenceExpression
+
+ContextScaleSequenceExpression
+  = first:SequenceItem
+    rest:(Spacing !ContextStatementSeparator item:SequenceItem { return item; })* {
+      return sequence([first, ...rest]);
+    }
+
+ContextStatementSeparator
+  = ";" &(Spacing ContextStatement)
+
 // Sequencing needs no synthetic separator token. `Spacing` may be empty, so
 // adjacent self-delimiting items (`0.2`, `C[D E]F`, `C=F`) are parsed by
 // ordinary PEG repetition. Individual literal rules decide where tokens end.
@@ -401,9 +480,7 @@ Rest
   = raw:$("."+) { return node('Rest', { raw }); }
 
 BarRest
-  // A semicolon followed by another pitch-context statement is the separator
-  // for that statement, rather than a bar rest in a preceding `scale` value.
-  = ";" !(Spacing ContextStatement) { return node('BarRest', { raw: ";" }); }
+  = ";" { return node('BarRest', { raw: ";" }); }
 
 DetachedContinue
   = "=" { return node('DetachedContinue', { raw: "=" }); }
@@ -643,7 +720,7 @@ ContextStatement
   = name:$('tuning'i) !IdentifierContinue Spacing '*=' Spacing value:AdditiveExpression {
       return node('TuningStretch', { factor: value, raw: text() });
     }
-  / "scale"i !IdentifierContinue Spacing "=" Spacing value:ScopedParallelExpression {
+  / "scale"i !IdentifierContinue Spacing "=" Spacing value:ContextScaleParallelExpression {
       return node('ContextDegreeMapping', { values: [value] });
     }
   / operator:$("'") Spacing "=" Spacing value:ContextValue {

@@ -291,6 +291,19 @@ describe('enumerated chords', () => {
     })
   })
 
+  it('keeps semicolon bar rests outside pitch-context blocks', () => {
+    expect(parse('C; A = D').body[0]).toMatchObject({
+      type: 'Sequence',
+      items: [
+        { type: 'PitchLiteral', nominal: { value: 'C' } },
+        { type: 'BarRest' },
+        { type: 'PitchLiteral', nominal: { value: 'A' } },
+        { type: 'DetachedContinue' },
+        { type: 'PitchLiteral', nominal: { value: 'D' } },
+      ],
+    })
+  })
+
   it('parses degree mappings with the ordinary sequence and parallel grammar', () => {
     expect(parse('{3/2 5/4, 7/4}').body[0]).toMatchObject({
       statements: [
