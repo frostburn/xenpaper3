@@ -100,6 +100,12 @@ ratio to a pitch displacement, `ratio(offset)` for the inverse conversion, and
 `sqrt(quantity)` for a square root. `sqrt()` retains an exact monomial when the
 value model is closed under the operation and halves the quantity's dimensions.
 The built-in identifier `pi` evaluates to the dimensionless real constant π.
+Built-in calls use the same contextual coercions as annotated function
+parameters: a bare integer passed to `pitch()` is a scalar ratio, one passed to
+`ratio()` is a scale degree, and the combination count in `kCombinations()` is
+an integer. `sort(container)`, `arrayMap(callback, container)`, and
+`arrayReduce(callback, container, initial?)` likewise require containers in
+their container positions and diagnose missing or extra arguments.
 
 ## Local declarations and functions
 
