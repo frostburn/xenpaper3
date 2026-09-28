@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { createPlaybackPlan } from '../daw/playback-plan'
 import { beat, createDefaultProject } from '../daw/project'
-import { parseClipNotes, parseProjectScoreNotes } from '../daw/score'
+import { compileEffectSettings, parseClipNotes, parseProjectScoreNotes } from '../daw/score'
 import { globalTempoChanges, TempoMap } from '../daw/timeline'
 import {
   applyPitchAutomation,
@@ -10,6 +10,46 @@ import {
 } from '../daw/web-audio-automation'
 
 describe('DAW playback planning', () => {
+  it('compiles ping-pong delay directives into effect config signals', () => {
+    expect(compileEffectSettings('@delay(375ms) @feedback(62%) @wet(40%)')).toEqual({
+      delayTime: 0.375,
+      feedback: 0.62,
+      wet: 0.4,
+    })
+    expect(() => compileEffectSettings('@feedback(120%)')).toThrow('between 0% and 100%')
+    expect(() => compileEffectSettings('@delay(4beats)')).toThrow('requires a time value')
+  })
+
+  it('snapshots effect buses and lane routing in the playback plan', () => {
+    const project = createDefaultProject()
+    project.effectLanes.push({
+      id: 'delay',
+      kind: 'effect',
+      name: 'Delay',
+      patchPreset: 'ping-pong-delay',
+      gain: 0.75,
+      source: '@delay(500ms) @feedback(50%) @wet(25%)',
+    })
+    project.instrumentLanes[0]!.effectBusId = 'delay'
+    project.instrumentLanes[0]!.clips.push({
+      id: 'note',
+      start: beat(0),
+      length: beat(1),
+      source: 'C',
+    })
+
+    const plan = createPlaybackPlan(project)
+    expect(plan.lanes[0]!.effectBusId).toBe('delay')
+    expect(plan.effects).toEqual([
+      expect.objectContaining({
+        id: 'delay',
+        patchPreset: 'ping-pong-delay',
+        gain: 0.75,
+        config: { delayTime: 0.5, feedback: 0.5, wet: 0.25 },
+      }),
+    ])
+  })
+
   it('derives tempo changes from the duration-bearing global source', () => {
     const project = createDefaultProject()
     project.globalTrack.source = ';;;;@tempo(200bpm);;;;@tempo(120bpm)'

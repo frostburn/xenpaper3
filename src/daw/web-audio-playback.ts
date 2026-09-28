@@ -4,6 +4,7 @@ import {
   isAperiodicTimbre,
   type PlayableDrumkitPatch,
   type PlayableSynthPatch,
+  type EffectPatch,
   type SynthPatch,
 } from '../../sw-patch'
 import { SampledDrumkit, SampledInstrument, Transport, type TransportOptions } from '../../sw-seq'
@@ -11,6 +12,7 @@ import { isAppleWebKit } from '../browser'
 import DEFAULT_PATCH_SOURCE from '../patches/default.swpatch?raw'
 import DRIVEN_NOISE_PATCH_SOURCE from '../patches/driven-noise.swpatch?raw'
 import DRUMKIT_PATCH_SOURCE from '../patches/drumkit.swpatch?raw'
+import PING_PONG_DELAY_PATCH_SOURCE from '../patches/ping-pong-delay.swpatch?raw'
 import type { PlaybackLane, PlaybackPlan } from './playback-plan'
 import { applyPitchAutomation } from './web-audio-automation'
 
@@ -32,6 +34,7 @@ export interface WebAudioPlaybackOptions {
   /** Destination for the session mix. Defaults to the audio context destination. */
   readonly output?: AudioNode
   readonly patchFactory?: PatchFactory
+  readonly effectFactory?: PatchFactory
   readonly drumkitFactory?: DrumkitFactory
   readonly sampledDrumkits?: ReadonlyMap<string, SampledDrumkit>
   readonly sampledInstruments?: ReadonlyMap<string, SampledInstrument>
@@ -48,7 +51,9 @@ const defaultPatchSource = (source: string): string =>
       ? DRIVEN_NOISE_PATCH_SOURCE
       : source === 'drumkit'
         ? DRUMKIT_PATCH_SOURCE
-        : source
+        : source === 'ping-pong-delay'
+          ? PING_PONG_DELAY_PATCH_SOURCE
+          : source
 
 const requirePlayableSynth = (patch: SynthPatch, lane: PlaybackLane): PlayableSynthPatch => {
   if (typeof (patch as Partial<PlayableSynthPatch>).on === 'function')
@@ -65,6 +70,7 @@ export class WebAudioPlaybackSession {
 
   private readonly output: GainNode
   private readonly patchFactory: PatchFactory
+  private readonly effectFactory: PatchFactory
   private readonly drumkitFactory: DrumkitFactory
   private readonly resolvePatchSource: (source: string) => string
   private readonly nativePatchNoise: boolean
@@ -74,6 +80,8 @@ export class WebAudioPlaybackSession {
   private readonly sampledDrumkits: ReadonlyMap<string, SampledDrumkit>
   private readonly sampledInstruments: ReadonlyMap<string, SampledInstrument>
   private readonly pitchSignals: ConstantSourceNode[] = []
+  private readonly effects: EffectPatch[] = []
+  private readonly effectInputs = new Map<string, AudioNode>()
   private completionTimer: ReturnType<typeof setTimeout> | undefined
   private latestCutoff = 0
   private state: PlaybackState = 'ready'
@@ -90,6 +98,7 @@ export class WebAudioPlaybackSession {
       ...options.transportOptions,
     })
     this.patchFactory = options.patchFactory ?? createPatch
+    this.effectFactory = options.effectFactory ?? options.patchFactory ?? createPatch
     this.drumkitFactory = options.drumkitFactory ?? createDrumkit
     this.sampledDrumkits = options.sampledDrumkits ?? new Map()
     this.sampledInstruments = options.sampledInstruments ?? new Map()
@@ -98,6 +107,20 @@ export class WebAudioPlaybackSession {
     this.onEnded = options.onEnded
     this.output = new GainNode(context, { gain: options.outputGain ?? DEFAULT_OUTPUT_GAIN })
     this.output.connect(options.output ?? context.destination)
+    for (const effect of plan.effects ?? []) {
+      const busOutput = new GainNode(context, { gain: effect.gain })
+      busOutput.connect(this.output)
+      const patch = this.effectFactory(this.resolvePatchSource(effect.patchPreset), context, {
+        config: { ...effect.config },
+      }) as EffectPatch
+      if (typeof patch.connect !== 'function') {
+        patch.dispose()
+        throw new TypeError(`Patch for effect lane "${effect.name}" must expose input and output`)
+      }
+      patch.connect(busOutput)
+      this.effects.push(patch)
+      this.effectInputs.set(effect.id, patch)
+    }
   }
 
   get positionTime(): number {
@@ -135,6 +158,9 @@ export class WebAudioPlaybackSession {
 
   private schedulePlan(): void {
     for (const lane of this.plan.lanes) {
+      const destination = lane.effectBusId
+        ? (this.effectInputs.get(lane.effectBusId) ?? this.output)
+        : this.output
       if (lane.kind === 'drum') {
         const sampledKit = this.sampledDrumkits.get(lane.id)
         if (sampledKit) {
@@ -145,7 +171,7 @@ export class WebAudioPlaybackSession {
               when: note.when,
               duration: note.duration,
               noteOn: (time) =>
-                sampledKit.hit(note.sample!, this.output, time, {
+                sampledKit.hit(note.sample!, destination, time, {
                   gain: note.velocity * lane.gain,
                 }),
             })
@@ -169,7 +195,7 @@ export class WebAudioPlaybackSession {
               const { attack, decay, sustain, release } = note.envelope
               const off = kit.hit(
                 note.sample!,
-                this.output,
+                destination,
                 time,
                 note.velocity * lane.gain,
                 attack,
@@ -202,7 +228,7 @@ export class WebAudioPlaybackSession {
             duration: note.duration,
             noteOn: (time) => {
               const initialPitch = note.pitch.initialValue
-              const off = sampledInstrument.note(60 + initialPitch / 100, this.output, time, {
+              const off = sampledInstrument.note(60 + initialPitch / 100, destination, time, {
                 velocity: note.velocity * lane.gain,
                 release: note.envelope.release,
                 configureDetune: (detune) =>
@@ -262,7 +288,7 @@ export class WebAudioPlaybackSession {
             let off: ReturnType<PlayableSynthPatch['on']>
             try {
               off = synth.on(
-                this.output,
+                destination,
                 time,
                 pitch,
                 note.velocity * lane.gain,
@@ -327,6 +353,9 @@ export class WebAudioPlaybackSession {
     this.synths.length = 0
     for (const drumkit of this.drumkits) drumkit.dispose()
     this.drumkits.length = 0
+    for (const effect of this.effects) effect.dispose()
+    this.effects.length = 0
+    this.effectInputs.clear()
     for (const drumkit of this.sampledDrumkits.values()) drumkit.dispose()
     for (const instrument of this.sampledInstruments.values()) instrument.dispose()
     for (const pitch of this.pitchSignals) {

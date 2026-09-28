@@ -57,6 +57,17 @@ interface BaseLane {
   gain: number
   source: string
   clips: SourceClip[]
+  /** Effect bus receiving this lane, or the master output when omitted. */
+  effectBusId?: string
+}
+
+export interface EffectLane {
+  id: string
+  kind: 'effect'
+  name: string
+  patchPreset: 'ping-pong-delay'
+  gain: number
+  source: string
 }
 
 export interface PitchedInstrumentLane extends BaseLane {
@@ -100,6 +111,7 @@ export interface DawProject {
   title: string
   globalTrack: GlobalTrack
   instrumentLanes: InstrumentLane[]
+  effectLanes: EffectLane[]
 }
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
@@ -153,6 +165,23 @@ export const parseDawProject = (source: string): DawProject => {
         isPositiveInteger(change.denominator),
     )
 
+  const effectLanes = project.effectLanes ?? []
+  const validEffectLanes =
+    Array.isArray(effectLanes) &&
+    hasUniqueIds(effectLanes) &&
+    effectLanes.every(
+      (lane) =>
+        isRecord(lane) &&
+        lane.kind === 'effect' &&
+        isId(lane.id) &&
+        isString(lane.name) &&
+        lane.patchPreset === 'ping-pong-delay' &&
+        isFiniteNumber(lane.gain) &&
+        isString(lane.source),
+    )
+  const effectIds = new Set(
+    validEffectLanes ? (effectLanes as unknown as EffectLane[]).map(({ id }) => id) : [],
+  )
   const validInstrumentLanes =
     Array.isArray(project.instrumentLanes) &&
     hasUniqueIds(project.instrumentLanes) &&
@@ -197,6 +226,8 @@ export const parseDawProject = (source: string): DawProject => {
                   }
                 })()))) &&
         isFiniteNumber(lane.gain) &&
+        (lane.effectBusId === undefined ||
+          (isString(lane.effectBusId) && effectIds.has(lane.effectBusId))) &&
         isString(lane.source) &&
         Array.isArray(lane.clips) &&
         hasUniqueIds(lane.clips) &&
@@ -217,11 +248,12 @@ export const parseDawProject = (source: string): DawProject => {
     !isString(project.xenpaperVersion) ||
     !isString(project.title) ||
     !validGlobalTrack ||
-    !validInstrumentLanes
+    !validInstrumentLanes ||
+    !validEffectLanes
   ) {
     throw new TypeError('Invalid Xenpaper project file')
   }
-  return project as unknown as DawProject
+  return { ...project, effectLanes } as unknown as DawProject
 }
 
 export const serializeDawProject = (project: DawProject): string => {
@@ -233,6 +265,7 @@ export const serializeDawProject = (project: DawProject): string => {
       gain: lane.gain,
       source: lane.source,
       clips: lane.clips,
+      ...(lane.effectBusId === undefined ? {} : { effectBusId: lane.effectBusId }),
     }
     return lane.kind === 'instrument'
       ? {
@@ -286,6 +319,11 @@ export const DEFAULT_INSTRUMENT_SOURCE = `# Defaults inherited by every clip in 
 `
 export const DEFAULT_DRUM_SOURCE = `# Defaults inherited by every clip in this lane
 `
+export const DEFAULT_EFFECT_SOURCE = `# Ping-pong delay configuration
+@delay(250ms)
+@feedback(55%)
+@wet(35%)
+`
 
 export const beat = (numerator: number, denominator = 1): Beat => {
   if (!Number.isInteger(numerator) || !Number.isInteger(denominator) || denominator <= 0) {
@@ -338,6 +376,20 @@ export const createDrumLane = (project: DawProject): DrumLane => {
   }
 }
 
+export const createEffectLane = (project: DawProject): EffectLane => {
+  const usedIds = new Set(project.effectLanes.map(({ id }) => id))
+  let suffix = 1
+  while (usedIds.has(`effect-${suffix}`)) suffix += 1
+  return {
+    id: `effect-${suffix}`,
+    kind: 'effect',
+    name: `Ping-pong delay ${suffix}`,
+    patchPreset: 'ping-pong-delay',
+    gain: 1,
+    source: DEFAULT_EFFECT_SOURCE,
+  }
+}
+
 export const createDefaultProject = (): DawProject => {
   const project: DawProject = {
     format: 'xenpaper3-daw',
@@ -353,6 +405,7 @@ export const createDefaultProject = (): DawProject => {
       ],
     },
     instrumentLanes: [],
+    effectLanes: [],
   }
   project.instrumentLanes.push(createInstrumentLane(project))
   return project

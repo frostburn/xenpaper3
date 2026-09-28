@@ -1,6 +1,7 @@
 import { easeGlissando } from './easing'
 import type { DawProject, DrumkitSource, InstrumentSource } from './project'
 import {
+  compileEffectSettings,
   compileSourceInitialization,
   parseLaneNotes,
   type EnvelopeSettings,
@@ -47,6 +48,15 @@ interface BasePlaybackLane {
   readonly name: string
   readonly gain: number
   readonly notes: readonly PlaybackNote[]
+  readonly effectBusId?: string
+}
+
+export interface PlaybackEffectLane {
+  readonly id: string
+  readonly name: string
+  readonly patchPreset: 'ping-pong-delay'
+  readonly gain: number
+  readonly config: ReturnType<typeof compileEffectSettings>
 }
 
 export type PlaybackLane =
@@ -63,6 +73,7 @@ export interface PlaybackPlan {
   readonly endTime: number
   readonly tempoMap: TempoMap
   readonly lanes: readonly PlaybackLane[]
+  readonly effects?: readonly PlaybackEffectLane[]
 }
 
 export function notePlaybackWindow(
@@ -213,7 +224,13 @@ export const createPlaybackPlan = (project: DawProject, fromBeat = 0): PlaybackP
       )
     }
     if (!notes.length) continue
-    const common = { id: lane.id, name: lane.name, gain: lane.gain, notes: Object.freeze(notes) }
+    const common = {
+      id: lane.id,
+      name: lane.name,
+      gain: lane.gain,
+      notes: Object.freeze(notes),
+      ...(lane.effectBusId === undefined ? {} : { effectBusId: lane.effectBusId }),
+    }
     lanes.push(
       lane.kind === 'drum'
         ? Object.freeze({ ...common, kind: 'drum', drumkit: lane.drumkit })
@@ -232,5 +249,16 @@ export const createPlaybackPlan = (project: DawProject, fromBeat = 0): PlaybackP
     endTime: tempoMap.beatToSeconds(endBeat),
     tempoMap,
     lanes: Object.freeze(lanes),
+    effects: Object.freeze(
+      project.effectLanes.map((effect) =>
+        Object.freeze({
+          id: effect.id,
+          name: effect.name,
+          patchPreset: effect.patchPreset,
+          gain: effect.gain,
+          config: Object.freeze({ ...compileEffectSettings(effect.source) }),
+        }),
+      ),
+    ),
   })
 }
