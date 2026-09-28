@@ -17,6 +17,9 @@ import type { PlaybackLane, PlaybackPlan } from './playback-plan'
 import { applyPitchAutomation } from './web-audio-automation'
 
 const DEFAULT_OUTPUT_GAIN = 0.35
+// Treat feedback repeats below -60 dB as silent, while bounding non-decaying feedback.
+const EFFECT_TAIL_SILENCE_LEVEL = 0.001
+const MAX_EFFECT_TAIL_SECONDS = 30
 
 type PlaybackState = 'ready' | 'playing' | 'tail' | 'stopped' | 'ended'
 
@@ -84,6 +87,7 @@ export class WebAudioPlaybackSession {
   private readonly effectInputs = new Map<string, AudioNode>()
   private completionTimer: ReturnType<typeof setTimeout> | undefined
   private latestCutoff = 0
+  private readonly effectTailDuration: number
   private state: PlaybackState = 'ready'
 
   constructor(
@@ -107,6 +111,7 @@ export class WebAudioPlaybackSession {
     this.onEnded = options.onEnded
     this.output = new GainNode(context, { gain: options.outputGain ?? DEFAULT_OUTPUT_GAIN })
     this.output.connect(options.output ?? context.destination)
+    let effectTailDuration = 0
     for (const effect of plan.effects ?? []) {
       const busOutput = new GainNode(context, { gain: effect.gain })
       busOutput.connect(this.output)
@@ -120,7 +125,25 @@ export class WebAudioPlaybackSession {
       patch.connect(busOutput)
       this.effects.push(patch)
       this.effectInputs.set(effect.id, patch)
+      if (
+        effect.config.delayTime > 0 &&
+        effect.config.wet > 0 &&
+        plan.lanes.some(({ effectBusId }) => effectBusId === effect.id)
+      ) {
+        const repeats =
+          effect.config.feedback === 0
+            ? 1
+            : effect.config.feedback >= 1
+              ? Number.POSITIVE_INFINITY
+              : 1 +
+                Math.ceil(Math.log(EFFECT_TAIL_SILENCE_LEVEL) / Math.log(effect.config.feedback))
+        effectTailDuration = Math.max(
+          effectTailDuration,
+          Math.min(MAX_EFFECT_TAIL_SECONDS, effect.config.delayTime * repeats),
+        )
+      }
     }
+    this.effectTailDuration = effectTailDuration
   }
 
   get positionTime(): number {
@@ -332,7 +355,8 @@ export class WebAudioPlaybackSession {
     this.state = 'tail'
     // A fractional millisecond timeout is rounded down by some hosts. Rounding up keeps
     // teardown from racing the scheduled release cutoff.
-    const delay = Math.max(0, Math.ceil((this.latestCutoff - this.context.currentTime) * 1000))
+    const tailCutoff = this.latestCutoff + this.effectTailDuration
+    const delay = Math.max(0, Math.ceil((tailCutoff - this.context.currentTime) * 1000))
     this.completionTimer = setTimeout(() => {
       this.completionTimer = undefined
       if (this.state !== 'tail') return

@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import type { PlayableDrumkitPatch, PlayableSynthPatch } from '../../sw-patch'
+import type { EffectPatch, PlayableDrumkitPatch, PlayableSynthPatch } from '../../sw-patch'
 import type { SampledDrumkit, SampledInstrument } from '../../sw-seq'
 import { DawAudioEngine } from '../daw/audio-engine'
 import type { PlaybackPlan } from '../daw/playback-plan'
@@ -427,6 +427,69 @@ describe('Web Audio playback session', () => {
     vi.advanceTimersByTime(1)
     expect(onEnded).toHaveBeenCalledOnce()
     expect(dispose).toHaveBeenCalledOnce()
+  })
+
+  it('passes scalar effect settings to the ping-pong patch and waits for its decay', () => {
+    vi.useFakeTimers()
+    const context = new MockAudioContext()
+    const plan = createPlan()
+    const lane = plan.lanes[0]!
+    const effectDispose = vi.fn<() => void>()
+    const effectFactory = vi.fn<
+      (
+        source: string,
+        context: BaseAudioContext,
+        options: { config: Record<string, unknown> },
+      ) => EffectPatch
+    >(
+      () =>
+        ({
+          connect: vi.fn<EffectPatch['connect']>(),
+          dispose: effectDispose,
+          ready: Promise.resolve(),
+        }) as unknown as EffectPatch,
+    )
+    const onEnded = vi.fn<() => void>()
+    const session = new WebAudioPlaybackSession(
+      context as unknown as AudioContext,
+      {
+        ...plan,
+        lanes: [{ ...lane, effectBusId: 'delay' }],
+        effects: [
+          {
+            id: 'delay',
+            name: 'Delay',
+            patchPreset: 'ping-pong-delay',
+            gain: 1,
+            config: { delayTime: 0.25, feedback: 0.5, wet: 0.35 },
+          },
+        ],
+      },
+      {
+        patchFactory: () =>
+          ({
+            on: () => (end: number) => end + 0.5,
+            dispose: vi.fn<() => void>(),
+          }) as unknown as PlayableSynthPatch,
+        effectFactory,
+        onEnded,
+      },
+    )
+
+    expect(effectFactory.mock.calls[0]?.[2]).toEqual({
+      config: { delayTime: 0.25, feedback: 0.5, wet: 0.35 },
+    })
+
+    session.start()
+    context.currentTime = 1.7
+    session.transport.stop()
+    vi.advanceTimersByTime(2749)
+    expect(onEnded).not.toHaveBeenCalled()
+    expect(effectDispose).not.toHaveBeenCalled()
+
+    vi.advanceTimersByTime(1)
+    expect(onEnded).toHaveBeenCalledOnce()
+    expect(effectDispose).toHaveBeenCalledOnce()
   })
 
   it('lets patches remove targeted pitch connections before disconnecting the source', () => {
