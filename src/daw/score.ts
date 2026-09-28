@@ -34,6 +34,7 @@ export interface EffectSettings {
   readonly delayTime: number
   readonly feedback: number
   readonly wet: number
+  readonly separation: number
 }
 
 export interface TimedEffectSettings {
@@ -45,6 +46,7 @@ export const DEFAULT_EFFECT_SETTINGS: EffectSettings = Object.freeze({
   delayTime: 0.25,
   feedback: 0.55,
   wet: 0.35,
+  separation: 1,
 })
 
 export interface ScheduledLaneNote {
@@ -224,7 +226,7 @@ const adsrExtension: DirectiveExtension = {
 const ENVELOPE_EXTENSIONS = [envelopeExtension, adsrExtension]
 
 const effectExtension = (
-  name: 'delay' | 'feedback' | 'wet',
+  name: 'delay' | 'feedback' | 'wet' | 'separation',
   property: keyof EffectSettings,
 ): DirectiveExtension => ({
   name,
@@ -262,6 +264,7 @@ const EFFECT_EXTENSIONS = [
   effectExtension('delay', 'delayTime'),
   effectExtension('feedback', 'feedback'),
   effectExtension('wet', 'wet'),
+  effectExtension('separation', 'separation'),
 ]
 
 /** Compile the control directives supported by the ping-pong delay effect lane. */

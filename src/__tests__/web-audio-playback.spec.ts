@@ -461,8 +461,13 @@ describe('Web Audio playback session', () => {
             name: 'Delay',
             patchPreset: 'ping-pong-delay',
             gain: 1,
-            config: { delayTime: 0.25, feedback: 0.5, wet: 0.35 },
-            configChanges: [{ when: 0.75, config: { delayTime: 0.25, feedback: 0.5, wet: 0.7 } }],
+            config: { delayTime: 0.25, feedback: 0.5, wet: 0.35, separation: 1 },
+            configChanges: [
+              {
+                when: 0.75,
+                config: { delayTime: 0.25, feedback: 0.5, wet: 0.7, separation: 0.5 },
+              },
+            ],
           },
         ],
       },
@@ -482,11 +487,15 @@ describe('Web Audio playback session', () => {
       delayTime: context.sources[0],
       feedback: context.sources[1],
       wet: context.sources[2],
+      separation: context.sources[3],
     })
-    expect(context.sources.slice(0, 3).map(({ offset }) => offset.value)).toEqual([0.25, 0.5, 0.35])
+    expect(context.sources.slice(0, 4).map(({ offset }) => offset.value)).toEqual([
+      0.25, 0.5, 0.35, 1,
+    ])
 
     session.start()
     expect(context.sources[2]!.offset.values).toEqual([{ value: 0.7, time: 0.75 }])
+    expect(context.sources[3]!.offset.values).toEqual([{ value: 0.5, time: 0.75 }])
     context.currentTime = 1.7
     session.transport.stop()
     vi.advanceTimersByTime(2749)
