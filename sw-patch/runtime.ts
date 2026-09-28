@@ -309,6 +309,23 @@ interface AudioSignalGraph {
   cleanup(cleanup: () => void): void
 }
 
+/** Disconnect one owned edge, tolerating an edge that has already been removed. */
+function disconnectEdge(
+  node: Pick<Connectable, 'disconnect'>,
+  target: unknown,
+  output?: number,
+  input?: number,
+): void {
+  try {
+    if (output === undefined && input === undefined) node.disconnect(target)
+    else node.disconnect(target, output ?? 0, input ?? 0)
+  } catch (error) {
+    // AudioNode.disconnect(destination) throws when another cleanup path already removed
+    // the edge. The desired teardown state has nevertheless been reached.
+    if (!(error instanceof DOMException) || error.name !== 'InvalidAccessError') throw error
+  }
+}
+
 /** Builds the implicit Web Audio graph for arithmetic involving audio signals. */
 class AudioSignal {
   private constructor(
@@ -384,7 +401,7 @@ class AudioSignal {
 
   private connect(target: unknown): void {
     this.node.connect(target)
-    this.graph.cleanup(() => this.node.disconnect(target))
+    this.graph.cleanup(() => disconnectEdge(this.node, target))
   }
 
   private static constant(value: unknown, graph: AudioSignalGraph): AudioSignal {
@@ -772,7 +789,7 @@ export class PatchRuntime {
       const signal = AudioSignal.from(value, this.audioSignalGraph)
       const node = signal?.node ?? this.createAndStartAudioSignal(value)
       node.connect(converter, 0, index)
-      this.registerCleanup(() => node.disconnect(converter, 0, index))
+      this.registerCleanup(() => disconnectEdge(node, converter, 0, index))
       if (!signal)
         this.registerCleanup(() => (node as Connectable & { stop?: () => void }).stop?.())
     })
@@ -788,7 +805,7 @@ export class PatchRuntime {
     if (!signal) return Quantity.scalar(scalar(value))
     const converter = this.audioSignalGraph.convert(processor)
     signal.node.connect(converter)
-    this.registerCleanup(() => signal.node.disconnect(converter))
+    this.registerCleanup(() => disconnectEdge(signal.node, converter))
     return converter
   }
 
@@ -827,7 +844,7 @@ export class PatchRuntime {
       const node: Connectable & { stop?: () => void } =
         signal?.node ?? this.createAndStartAudioSignal(value)
       node.connect(converter, 0, index)
-      this.registerCleanup(() => node.disconnect(converter, 0, index))
+      this.registerCleanup(() => disconnectEdge(node, converter, 0, index))
       if (!signal) this.registerCleanup(() => node.stop?.())
     })
     return converter
@@ -1337,8 +1354,7 @@ export class PatchRuntime {
         const disconnect = connectedSource.disconnect.bind(connectedSource)
         // Retain each connection immediately: a later link in this chain may fail.
         this.registerCleanup(() => {
-          if (link.output === undefined && link.input === undefined) disconnect(target)
-          else disconnect(target, link.output ?? 0, link.input ?? 0)
+          disconnectEdge({ disconnect }, target, link.output, link.input)
         })
       }
       source = target as Connectable
