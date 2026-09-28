@@ -16,6 +16,7 @@ import { EditorHistory } from '../daw/editor-history'
 import ClipSourceEditor from '../components/daw/ClipSourceEditor.vue'
 import DrumLane from '../components/daw/DrumLane.vue'
 import GlobalLane from '../components/daw/GlobalLane.vue'
+import MixerView from '../components/daw/MixerView.vue'
 import PitchedLane from '../components/daw/PitchedLane.vue'
 import TransportControls from '../components/daw/TransportControls.vue'
 import TimeDomainVisualiser from '../components/TimeDomainVisualiser.vue'
@@ -40,6 +41,7 @@ import {
   createClip,
   createDefaultProject,
   createDrumLane,
+  createEffectLane,
   createInstrumentLane,
   parseDawProject,
   serializeDawProject,
@@ -47,6 +49,7 @@ import {
   type DawProject,
   type ClipDisplayMode,
   type InstrumentLane,
+  type EffectLane,
   type SourceClip,
 } from '../daw/project'
 
@@ -65,6 +68,7 @@ const followPlayhead = ref(true)
 const timeline = ref<InstanceType<typeof ArrangementTimeline>>()
 const shortcutsOpen = ref(false)
 const displayMode = ref<ClipDisplayMode>('piano-roll')
+const workspaceView = ref<'arrangement' | 'mixer'>('arrangement')
 const playing = ref(false)
 const soloClipKey = ref<string>()
 const soloSelectedClip = ref(false)
@@ -535,6 +539,17 @@ const addInstrumentLane = () => {
   beginEdit()
   project.value.instrumentLanes.push(createInstrumentLane(project.value))
 }
+
+const addEffectLane = () => {
+  project.value.effectLanes.push(createEffectLane(project.value))
+}
+
+const deleteEffectLane = (effect: EffectLane) => {
+  project.value.effectLanes = project.value.effectLanes.filter(({ id }) => id !== effect.id)
+  for (const lane of project.value.instrumentLanes) {
+    if (lane.effectBusId === effect.id) lane.effectBusId = undefined
+  }
+}
 const addDrumLane = () => {
   beginEdit()
   project.value.instrumentLanes.push(createDrumLane(project.value))
@@ -875,6 +890,22 @@ onBeforeUnmount(() => {
           <option value="source">Source</option>
         </select>
       </label>
+      <div class="view-tabs" aria-label="DAW view">
+        <button
+          type="button"
+          :aria-pressed="workspaceView === 'arrangement'"
+          @click="workspaceView = 'arrangement'"
+        >
+          Arrangement
+        </button>
+        <button
+          type="button"
+          :aria-pressed="workspaceView === 'mixer'"
+          @click="workspaceView = 'mixer'"
+        >
+          Mixer
+        </button>
+      </div>
       <label class="zoom-control"
         >Zoom
         <input
@@ -896,7 +927,15 @@ onBeforeUnmount(() => {
     </div>
     <p v-if="projectLoadError" class="playback-error" role="alert">{{ projectLoadError }}</p>
     <p v-if="playbackError" class="playback-error" role="alert">{{ playbackError }}</p>
+    <MixerView
+      v-if="workspaceView === 'mixer'"
+      :project="project"
+      @add-effect="addEffectLane"
+      @delete-effect="deleteEffectLane"
+      @update-route="(lane, effectBusId) => (lane.effectBusId = effectBusId)"
+    />
     <div
+      v-else
       ref="workspace"
       class="workspace"
       :style="
@@ -1196,6 +1235,10 @@ onBeforeUnmount(() => {
   display: flex;
   gap: 0.25rem;
   margin-right: 0.5rem;
+}
+.view-tabs {
+  display: flex;
+  gap: 0.25rem;
 }
 .output-visualiser {
   width: min(15rem, 25vw);

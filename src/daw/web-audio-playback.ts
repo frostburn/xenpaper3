@@ -4,6 +4,7 @@ import {
   isAperiodicTimbre,
   type PlayableDrumkitPatch,
   type PlayableSynthPatch,
+  type EffectPatch,
   type SynthPatch,
 } from '../../sw-patch'
 import { SampledDrumkit, SampledInstrument, Transport, type TransportOptions } from '../../sw-seq'
@@ -11,10 +12,14 @@ import { isAppleWebKit } from '../browser'
 import DEFAULT_PATCH_SOURCE from '../patches/default.swpatch?raw'
 import DRIVEN_NOISE_PATCH_SOURCE from '../patches/driven-noise.swpatch?raw'
 import DRUMKIT_PATCH_SOURCE from '../patches/drumkit.swpatch?raw'
+import PING_PONG_DELAY_PATCH_SOURCE from '../patches/ping-pong-delay.swpatch?raw'
 import type { PlaybackLane, PlaybackPlan } from './playback-plan'
 import { applyPitchAutomation } from './web-audio-automation'
 
 const DEFAULT_OUTPUT_GAIN = 0.35
+// Treat feedback repeats below -60 dB as silent, while bounding non-decaying feedback.
+const EFFECT_TAIL_SILENCE_LEVEL = 0.001
+const MAX_EFFECT_TAIL_SECONDS = 30
 
 type PlaybackState = 'ready' | 'playing' | 'tail' | 'stopped' | 'ended'
 
@@ -32,6 +37,7 @@ export interface WebAudioPlaybackOptions {
   /** Destination for the session mix. Defaults to the audio context destination. */
   readonly output?: AudioNode
   readonly patchFactory?: PatchFactory
+  readonly effectFactory?: PatchFactory
   readonly drumkitFactory?: DrumkitFactory
   readonly sampledDrumkits?: ReadonlyMap<string, SampledDrumkit>
   readonly sampledInstruments?: ReadonlyMap<string, SampledInstrument>
@@ -48,7 +54,9 @@ const defaultPatchSource = (source: string): string =>
       ? DRIVEN_NOISE_PATCH_SOURCE
       : source === 'drumkit'
         ? DRUMKIT_PATCH_SOURCE
-        : source
+        : source === 'ping-pong-delay'
+          ? PING_PONG_DELAY_PATCH_SOURCE
+          : source
 
 const requirePlayableSynth = (patch: SynthPatch, lane: PlaybackLane): PlayableSynthPatch => {
   if (typeof (patch as Partial<PlayableSynthPatch>).on === 'function')
@@ -65,6 +73,7 @@ export class WebAudioPlaybackSession {
 
   private readonly output: GainNode
   private readonly patchFactory: PatchFactory
+  private readonly effectFactory: PatchFactory
   private readonly drumkitFactory: DrumkitFactory
   private readonly resolvePatchSource: (source: string) => string
   private readonly nativePatchNoise: boolean
@@ -74,8 +83,16 @@ export class WebAudioPlaybackSession {
   private readonly sampledDrumkits: ReadonlyMap<string, SampledDrumkit>
   private readonly sampledInstruments: ReadonlyMap<string, SampledInstrument>
   private readonly pitchSignals: ConstantSourceNode[] = []
+  private readonly effectSignals: ConstantSourceNode[] = []
+  private readonly effectAutomations: Array<{
+    readonly signal: ConstantSourceNode
+    readonly values: readonly { readonly when: number; readonly value: number }[]
+  }> = []
+  private readonly effects: EffectPatch[] = []
+  private readonly effectInputs = new Map<string, AudioNode>()
   private completionTimer: ReturnType<typeof setTimeout> | undefined
   private latestCutoff = 0
+  private readonly effectTailDuration: number
   private state: PlaybackState = 'ready'
 
   constructor(
@@ -90,6 +107,7 @@ export class WebAudioPlaybackSession {
       ...options.transportOptions,
     })
     this.patchFactory = options.patchFactory ?? createPatch
+    this.effectFactory = options.effectFactory ?? options.patchFactory ?? createPatch
     this.drumkitFactory = options.drumkitFactory ?? createDrumkit
     this.sampledDrumkits = options.sampledDrumkits ?? new Map()
     this.sampledInstruments = options.sampledInstruments ?? new Map()
@@ -98,6 +116,56 @@ export class WebAudioPlaybackSession {
     this.onEnded = options.onEnded
     this.output = new GainNode(context, { gain: options.outputGain ?? DEFAULT_OUTPUT_GAIN })
     this.output.connect(options.output ?? context.destination)
+    let effectTailDuration = 0
+    for (const effect of plan.effects ?? []) {
+      const busOutput = new GainNode(context, { gain: effect.gain })
+      busOutput.connect(this.output)
+      const config: Record<string, ConstantSourceNode> = {}
+      for (const property of ['delayTime', 'feedback', 'wet'] as const) {
+        const signal = context.createConstantSource()
+        signal.offset.value = effect.config[property]
+        signal.start()
+        config[property] = signal
+        this.effectSignals.push(signal)
+        this.effectAutomations.push({
+          signal,
+          values: effect.configChanges.map(({ when, config }) => ({
+            when,
+            value: config[property],
+          })),
+        })
+      }
+      const patch = this.effectFactory(this.resolvePatchSource(effect.patchPreset), context, {
+        config,
+      }) as EffectPatch
+      if (typeof patch.connect !== 'function') {
+        patch.dispose()
+        throw new TypeError(`Patch for effect lane "${effect.name}" must expose input and output`)
+      }
+      patch.connect(busOutput)
+      this.effects.push(patch)
+      this.effectInputs.set(effect.id, patch)
+      const configs = [effect.config, ...effect.configChanges.map(({ config }) => config)]
+      for (const effectConfig of configs) {
+        if (
+          effectConfig.delayTime <= 0 ||
+          effectConfig.wet <= 0 ||
+          !plan.lanes.some(({ effectBusId }) => effectBusId === effect.id)
+        )
+          continue
+        const repeats =
+          effectConfig.feedback === 0
+            ? 1
+            : effectConfig.feedback >= 1
+              ? Number.POSITIVE_INFINITY
+              : 1 + Math.ceil(Math.log(EFFECT_TAIL_SILENCE_LEVEL) / Math.log(effectConfig.feedback))
+        effectTailDuration = Math.max(
+          effectTailDuration,
+          Math.min(MAX_EFFECT_TAIL_SECONDS, effectConfig.delayTime * repeats),
+        )
+      }
+    }
+    this.effectTailDuration = effectTailDuration
   }
 
   get positionTime(): number {
@@ -107,6 +175,10 @@ export class WebAudioPlaybackSession {
   start(): void {
     if (this.state !== 'ready') throw new Error('A Web Audio playback session is one-shot')
     try {
+      const contextStart = this.context.currentTime
+      for (const { signal, values } of this.effectAutomations)
+        for (const { when, value } of values)
+          signal.offset.setValueAtTime(value, contextStart + when - this.plan.startTime)
       this.schedulePlan()
       this.state = 'playing'
       this.transport.addEventListener('ended', this.handleTransportEnded, { once: true })
@@ -135,6 +207,9 @@ export class WebAudioPlaybackSession {
 
   private schedulePlan(): void {
     for (const lane of this.plan.lanes) {
+      const destination = lane.effectBusId
+        ? (this.effectInputs.get(lane.effectBusId) ?? this.output)
+        : this.output
       if (lane.kind === 'drum') {
         const sampledKit = this.sampledDrumkits.get(lane.id)
         if (sampledKit) {
@@ -145,7 +220,7 @@ export class WebAudioPlaybackSession {
               when: note.when,
               duration: note.duration,
               noteOn: (time) =>
-                sampledKit.hit(note.sample!, this.output, time, {
+                sampledKit.hit(note.sample!, destination, time, {
                   gain: note.velocity * lane.gain,
                 }),
             })
@@ -169,7 +244,7 @@ export class WebAudioPlaybackSession {
               const { attack, decay, sustain, release } = note.envelope
               const off = kit.hit(
                 note.sample!,
-                this.output,
+                destination,
                 time,
                 note.velocity * lane.gain,
                 attack,
@@ -202,7 +277,7 @@ export class WebAudioPlaybackSession {
             duration: note.duration,
             noteOn: (time) => {
               const initialPitch = note.pitch.initialValue
-              const off = sampledInstrument.note(60 + initialPitch / 100, this.output, time, {
+              const off = sampledInstrument.note(60 + initialPitch / 100, destination, time, {
                 velocity: note.velocity * lane.gain,
                 release: note.envelope.release,
                 configureDetune: (detune) =>
@@ -262,7 +337,7 @@ export class WebAudioPlaybackSession {
             let off: ReturnType<PlayableSynthPatch['on']>
             try {
               off = synth.on(
-                this.output,
+                destination,
                 time,
                 pitch,
                 note.velocity * lane.gain,
@@ -306,7 +381,8 @@ export class WebAudioPlaybackSession {
     this.state = 'tail'
     // A fractional millisecond timeout is rounded down by some hosts. Rounding up keeps
     // teardown from racing the scheduled release cutoff.
-    const delay = Math.max(0, Math.ceil((this.latestCutoff - this.context.currentTime) * 1000))
+    const tailCutoff = this.latestCutoff + this.effectTailDuration
+    const delay = Math.max(0, Math.ceil((tailCutoff - this.context.currentTime) * 1000))
     this.completionTimer = setTimeout(() => {
       this.completionTimer = undefined
       if (this.state !== 'tail') return
@@ -327,6 +403,15 @@ export class WebAudioPlaybackSession {
     this.synths.length = 0
     for (const drumkit of this.drumkits) drumkit.dispose()
     this.drumkits.length = 0
+    for (const effect of this.effects) effect.dispose()
+    this.effects.length = 0
+    this.effectInputs.clear()
+    for (const signal of this.effectSignals) {
+      signal.stop(this.context.currentTime)
+      signal.disconnect()
+    }
+    this.effectSignals.length = 0
+    this.effectAutomations.length = 0
     for (const drumkit of this.sampledDrumkits.values()) drumkit.dispose()
     for (const instrument of this.sampledInstruments.values()) instrument.dispose()
     for (const pitch of this.pitchSignals) {

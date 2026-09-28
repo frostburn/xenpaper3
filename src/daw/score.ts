@@ -30,6 +30,23 @@ export interface EnvelopeSettings {
   readonly release: number
 }
 
+export interface EffectSettings {
+  readonly delayTime: number
+  readonly feedback: number
+  readonly wet: number
+}
+
+export interface TimedEffectSettings {
+  readonly beat: number
+  readonly settings: EffectSettings
+}
+
+export const DEFAULT_EFFECT_SETTINGS: EffectSettings = Object.freeze({
+  delayTime: 0.25,
+  feedback: 0.55,
+  wet: 0.35,
+})
+
 export interface ScheduledLaneNote {
   readonly beat: number
   readonly duration: number
@@ -205,6 +222,83 @@ const adsrExtension: DirectiveExtension = {
 }
 
 const ENVELOPE_EXTENSIONS = [envelopeExtension, adsrExtension]
+
+const effectExtension = (
+  name: 'delay' | 'feedback' | 'wet',
+  property: keyof EffectSettings,
+): DirectiveExtension => ({
+  name,
+  stateKey: 'effect',
+  initialState: DEFAULT_EFFECT_SETTINGS,
+  apply(directive, context, previousState) {
+    if (directive.arguments.length !== 1 || directive.arguments[0]?.type === 'NamedArgument')
+      throw new Error(`@${name} requires exactly one positional argument.`)
+    const expression = directive.arguments[0] as Expression
+    const result = evaluateExpression(expression, context)
+    if (!('value' in result) || result.value.kind !== 'scalar')
+      throw new Error(`@${name} requires a scalar value.`)
+    const value = result.value.value
+    const validDimension =
+      property === 'delayTime'
+        ? value.dimensions.equals({ seconds: 1 })
+        : value.dimensions.isDimensionless
+    if (!validDimension)
+      throw new Error(
+        `@${name} requires ${property === 'delayTime' ? 'a time value' : 'a dimensionless level'}.`,
+      )
+    const numeric = value.valueOf()
+    if (!Number.isFinite(numeric) || numeric < 0 || (property !== 'delayTime' && numeric > 1))
+      throw new Error(
+        `@${name} must be ${property === 'delayTime' ? 'non-negative' : 'between 0% and 100%'}.`,
+      )
+    return {
+      state: Object.freeze({ ...(previousState as EffectSettings), [property]: numeric }),
+      diagnostics: result.diagnostics,
+    }
+  },
+})
+
+const EFFECT_EXTENSIONS = [
+  effectExtension('delay', 'delayTime'),
+  effectExtension('feedback', 'feedback'),
+  effectExtension('wet', 'wet'),
+]
+
+/** Compile the control directives supported by the ping-pong delay effect lane. */
+export const compileEffectSettingsTimeline = (
+  source: string,
+  timeSignature = { numerator: 4, denominator: 4 },
+): readonly TimedEffectSettings[] => {
+  const result = evaluateInitialization(parse(source), {
+    directiveExtensions: EFFECT_EXTENSIONS,
+    allowDuration: true,
+    timeSignature,
+  })
+  const errors = result.diagnostics.filter(({ severity }) => severity === 'error')
+  if (errors.length) throw new Error(errors.map(({ message }) => message).join('\n'))
+  const timeline = [{ beat: 0, settings: DEFAULT_EFFECT_SETTINGS }]
+  const changes = result.initialization?.changes ?? []
+  if (!changes.length) {
+    const settings = result.initialization?.context?.directiveState.effect as
+      | EffectSettings
+      | undefined
+    if (settings) timeline.push({ beat: 0, settings })
+  }
+  for (const change of changes) {
+    const settings = change.context.directiveState.effect as EffectSettings | undefined
+    if (settings) timeline.push({ beat: change.start.valueOf(), settings })
+  }
+  return Object.freeze(timeline.map((change) => Object.freeze(change)))
+}
+
+/** Compile the settings prevailing at the end of an effect source. */
+export const compileEffectSettings = (
+  source: string,
+  timeSignature = { numerator: 4, denominator: 4 },
+): EffectSettings => {
+  const timeline = compileEffectSettingsTimeline(source, timeSignature)
+  return timeline[timeline.length - 1]!.settings
+}
 
 export type SourceInitialization = ScoreInitialization
 
