@@ -36,6 +36,11 @@ export interface EffectSettings {
   readonly wet: number
 }
 
+export interface TimedEffectSettings {
+  readonly beat: number
+  readonly settings: EffectSettings
+}
+
 export const DEFAULT_EFFECT_SETTINGS: EffectSettings = Object.freeze({
   delayTime: 0.25,
   feedback: 0.55,
@@ -260,10 +265,10 @@ const EFFECT_EXTENSIONS = [
 ]
 
 /** Compile the control directives supported by the ping-pong delay effect lane. */
-export const compileEffectSettings = (
+export const compileEffectSettingsTimeline = (
   source: string,
   timeSignature = { numerator: 4, denominator: 4 },
-): EffectSettings => {
+): readonly TimedEffectSettings[] => {
   const result = evaluateInitialization(parse(source), {
     directiveExtensions: EFFECT_EXTENSIONS,
     allowDuration: true,
@@ -271,12 +276,28 @@ export const compileEffectSettings = (
   })
   const errors = result.diagnostics.filter(({ severity }) => severity === 'error')
   if (errors.length) throw new Error(errors.map(({ message }) => message).join('\n'))
-  const changes = result.initialization?.changes
-  const prevailingContext = changes?.[changes.length - 1]?.context ?? result.initialization?.context
-  return (
-    (prevailingContext?.directiveState.effect as EffectSettings | undefined) ??
-    DEFAULT_EFFECT_SETTINGS
-  )
+  const timeline = [{ beat: 0, settings: DEFAULT_EFFECT_SETTINGS }]
+  const changes = result.initialization?.changes ?? []
+  if (!changes.length) {
+    const settings = result.initialization?.context?.directiveState.effect as
+      | EffectSettings
+      | undefined
+    if (settings) timeline.push({ beat: 0, settings })
+  }
+  for (const change of changes) {
+    const settings = change.context.directiveState.effect as EffectSettings | undefined
+    if (settings) timeline.push({ beat: change.start.valueOf(), settings })
+  }
+  return Object.freeze(timeline.map((change) => Object.freeze(change)))
+}
+
+/** Compile the settings prevailing at the end of an effect source. */
+export const compileEffectSettings = (
+  source: string,
+  timeSignature = { numerator: 4, denominator: 4 },
+): EffectSettings => {
+  const timeline = compileEffectSettingsTimeline(source, timeSignature)
+  return timeline[timeline.length - 1]!.settings
 }
 
 export type SourceInitialization = ScoreInitialization

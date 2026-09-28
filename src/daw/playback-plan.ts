@@ -2,6 +2,7 @@ import { easeGlissando } from './easing'
 import type { DawProject, DrumkitSource, InstrumentSource } from './project'
 import {
   compileEffectSettings,
+  compileEffectSettingsTimeline,
   compileSourceInitialization,
   parseLaneNotes,
   type EnvelopeSettings,
@@ -57,6 +58,10 @@ export interface PlaybackEffectLane {
   readonly patchPreset: 'ping-pong-delay'
   readonly gain: number
   readonly config: ReturnType<typeof compileEffectSettings>
+  readonly configChanges: readonly {
+    readonly when: number
+    readonly config: ReturnType<typeof compileEffectSettings>
+  }[]
 }
 
 export type PlaybackLane =
@@ -250,17 +255,31 @@ export const createPlaybackPlan = (project: DawProject, fromBeat = 0): PlaybackP
     tempoMap,
     lanes: Object.freeze(lanes),
     effects: Object.freeze(
-      project.effectLanes.map((effect) =>
-        Object.freeze({
+      project.effectLanes.map((effect) => {
+        const timeline = compileEffectSettingsTimeline(
+          effect.source,
+          project.globalTrack.timeSignatureChanges[0],
+        )
+        const initialTimeline = timeline.filter(({ beat }) => beat <= fromBeat)
+        const initial = initialTimeline[initialTimeline.length - 1]!.settings
+        return Object.freeze({
           id: effect.id,
           name: effect.name,
           patchPreset: effect.patchPreset,
           gain: effect.gain,
-          config: Object.freeze({
-            ...compileEffectSettings(effect.source, project.globalTrack.timeSignatureChanges[0]),
-          }),
-        }),
-      ),
+          config: Object.freeze({ ...initial }),
+          configChanges: Object.freeze(
+            timeline
+              .filter(({ beat }) => beat > fromBeat)
+              .map(({ beat, settings }) =>
+                Object.freeze({
+                  when: tempoMap.beatToSeconds(beat),
+                  config: Object.freeze({ ...settings }),
+                }),
+              ),
+          ),
+        })
+      }),
     ),
   })
 }

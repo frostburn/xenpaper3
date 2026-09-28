@@ -429,7 +429,7 @@ describe('Web Audio playback session', () => {
     expect(dispose).toHaveBeenCalledOnce()
   })
 
-  it('passes scalar effect settings to the ping-pong patch and waits for its decay', () => {
+  it('automates effect signals at authored times and waits for the effect decay', () => {
     vi.useFakeTimers()
     const context = new MockAudioContext()
     const plan = createPlan()
@@ -462,6 +462,7 @@ describe('Web Audio playback session', () => {
             patchPreset: 'ping-pong-delay',
             gain: 1,
             config: { delayTime: 0.25, feedback: 0.5, wet: 0.35 },
+            configChanges: [{ when: 0.75, config: { delayTime: 0.25, feedback: 0.5, wet: 0.7 } }],
           },
         ],
       },
@@ -476,11 +477,16 @@ describe('Web Audio playback session', () => {
       },
     )
 
-    expect(effectFactory.mock.calls[0]?.[2]).toEqual({
-      config: { delayTime: 0.25, feedback: 0.5, wet: 0.35 },
+    const effectConfig = effectFactory.mock.calls[0]?.[2].config
+    expect(effectConfig).toEqual({
+      delayTime: context.sources[0],
+      feedback: context.sources[1],
+      wet: context.sources[2],
     })
+    expect(context.sources.slice(0, 3).map(({ offset }) => offset.value)).toEqual([0.25, 0.5, 0.35])
 
     session.start()
+    expect(context.sources[2]!.offset.values).toEqual([{ value: 0.7, time: 0.75 }])
     context.currentTime = 1.7
     session.transport.stop()
     vi.advanceTimersByTime(2749)

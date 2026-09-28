@@ -83,6 +83,11 @@ export class WebAudioPlaybackSession {
   private readonly sampledDrumkits: ReadonlyMap<string, SampledDrumkit>
   private readonly sampledInstruments: ReadonlyMap<string, SampledInstrument>
   private readonly pitchSignals: ConstantSourceNode[] = []
+  private readonly effectSignals: ConstantSourceNode[] = []
+  private readonly effectAutomations: Array<{
+    readonly signal: ConstantSourceNode
+    readonly values: readonly { readonly when: number; readonly value: number }[]
+  }> = []
   private readonly effects: EffectPatch[] = []
   private readonly effectInputs = new Map<string, AudioNode>()
   private completionTimer: ReturnType<typeof setTimeout> | undefined
@@ -115,8 +120,23 @@ export class WebAudioPlaybackSession {
     for (const effect of plan.effects ?? []) {
       const busOutput = new GainNode(context, { gain: effect.gain })
       busOutput.connect(this.output)
+      const config: Record<string, ConstantSourceNode> = {}
+      for (const property of ['delayTime', 'feedback', 'wet'] as const) {
+        const signal = context.createConstantSource()
+        signal.offset.value = effect.config[property]
+        signal.start()
+        config[property] = signal
+        this.effectSignals.push(signal)
+        this.effectAutomations.push({
+          signal,
+          values: effect.configChanges.map(({ when, config }) => ({
+            when,
+            value: config[property],
+          })),
+        })
+      }
       const patch = this.effectFactory(this.resolvePatchSource(effect.patchPreset), context, {
-        config: { ...effect.config },
+        config,
       }) as EffectPatch
       if (typeof patch.connect !== 'function') {
         patch.dispose()
@@ -125,21 +145,23 @@ export class WebAudioPlaybackSession {
       patch.connect(busOutput)
       this.effects.push(patch)
       this.effectInputs.set(effect.id, patch)
-      if (
-        effect.config.delayTime > 0 &&
-        effect.config.wet > 0 &&
-        plan.lanes.some(({ effectBusId }) => effectBusId === effect.id)
-      ) {
+      const configs = [effect.config, ...effect.configChanges.map(({ config }) => config)]
+      for (const effectConfig of configs) {
+        if (
+          effectConfig.delayTime <= 0 ||
+          effectConfig.wet <= 0 ||
+          !plan.lanes.some(({ effectBusId }) => effectBusId === effect.id)
+        )
+          continue
         const repeats =
-          effect.config.feedback === 0
+          effectConfig.feedback === 0
             ? 1
-            : effect.config.feedback >= 1
+            : effectConfig.feedback >= 1
               ? Number.POSITIVE_INFINITY
-              : 1 +
-                Math.ceil(Math.log(EFFECT_TAIL_SILENCE_LEVEL) / Math.log(effect.config.feedback))
+              : 1 + Math.ceil(Math.log(EFFECT_TAIL_SILENCE_LEVEL) / Math.log(effectConfig.feedback))
         effectTailDuration = Math.max(
           effectTailDuration,
-          Math.min(MAX_EFFECT_TAIL_SECONDS, effect.config.delayTime * repeats),
+          Math.min(MAX_EFFECT_TAIL_SECONDS, effectConfig.delayTime * repeats),
         )
       }
     }
@@ -153,6 +175,10 @@ export class WebAudioPlaybackSession {
   start(): void {
     if (this.state !== 'ready') throw new Error('A Web Audio playback session is one-shot')
     try {
+      const contextStart = this.context.currentTime
+      for (const { signal, values } of this.effectAutomations)
+        for (const { when, value } of values)
+          signal.offset.setValueAtTime(value, contextStart + when - this.plan.startTime)
       this.schedulePlan()
       this.state = 'playing'
       this.transport.addEventListener('ended', this.handleTransportEnded, { once: true })
@@ -380,6 +406,12 @@ export class WebAudioPlaybackSession {
     for (const effect of this.effects) effect.dispose()
     this.effects.length = 0
     this.effectInputs.clear()
+    for (const signal of this.effectSignals) {
+      signal.stop(this.context.currentTime)
+      signal.disconnect()
+    }
+    this.effectSignals.length = 0
+    this.effectAutomations.length = 0
     for (const drumkit of this.sampledDrumkits.values()) drumkit.dispose()
     for (const instrument of this.sampledInstruments.values()) instrument.dispose()
     for (const pitch of this.pitchSignals) {

@@ -1,7 +1,12 @@
 import { describe, expect, it } from 'vitest'
 import { createPlaybackPlan } from '../daw/playback-plan'
 import { beat, createDefaultProject } from '../daw/project'
-import { compileEffectSettings, parseClipNotes, parseProjectScoreNotes } from '../daw/score'
+import {
+  compileEffectSettings,
+  compileEffectSettingsTimeline,
+  parseClipNotes,
+  parseProjectScoreNotes,
+} from '../daw/score'
 import { globalTempoChanges, TempoMap } from '../daw/timeline'
 import {
   applyPitchAutomation,
@@ -33,6 +38,12 @@ describe('DAW playback planning', () => {
       feedback: 0.55,
     })
     expect(settings.wet).toBeCloseTo(0.7)
+    const timeline = compileEffectSettingsTimeline(source, { numerator: 3, denominator: 4 })
+    expect(timeline.map(({ beat, settings }) => ({ beat, wet: settings.wet }))).toEqual([
+      { beat: 0, wet: 0.35 },
+      { beat: 0, wet: 0.1 },
+      { beat: 6, wet: 0.7000000000000001 },
+    ])
   })
 
   it('snapshots effect buses and lane routing in the playback plan', () => {
