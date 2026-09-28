@@ -57,6 +57,28 @@ describe('SW Patch runtime', () => {
     expect(source.disconnect).toHaveBeenCalledWith(middle)
   })
 
+  it('tolerates connections that were already removed before patch disposal', () => {
+    const destination = {}
+    let connected = false
+    const source = {
+      connect: vi.fn<() => void>(() => {
+        connected = true
+      }),
+      disconnect: vi.fn<() => void>(() => {
+        if (!connected) {
+          throw new DOMException('The given destination is not connected.', 'InvalidAccessError')
+        }
+        connected = false
+      }),
+    }
+    const patch = createPatch('source -> destination\nsource !-> destination\n', {} as BaseAudioContext, {
+      globals: { source, destination },
+    })
+
+    expect(() => patch.dispose()).not.toThrow()
+    expect(source.disconnect).toHaveBeenCalledTimes(2)
+  })
+
   it('retries worklet registration after a failed attempt', async () => {
     const addModule = vi
       .fn<(_: string) => Promise<void>>()
