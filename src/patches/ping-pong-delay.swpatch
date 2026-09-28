@@ -1,6 +1,7 @@
 config delayTime: AudioSignal<Duration> = AudioSignal(250ms)
 config feedback: AudioSignal<Level> = AudioSignal(55%)
 config wet: AudioSignal<Level> = AudioSignal(35%)
+config separation: AudioSignal<Level> = AudioSignal(100%)
 
 input = GainNode()
 output = GainNode()
@@ -14,8 +15,10 @@ delayTime -> rightDelay.delayTime
 
 input * (1 - wet) -> output
 input -> leftDelay
-leftDelay:0 -> merger:0
-rightDelay:0 -> merger:1
+leftDelay * (0.5 + 0.5 * separation) -> merger:0
+leftDelay * (0.5 - 0.5 * separation) -> merger:1
+rightDelay * (0.5 - 0.5 * separation) -> merger:0
+rightDelay * (0.5 + 0.5 * separation) -> merger:1
 leftDelay * feedback -> rightDelay
 rightDelay * feedback -> leftDelay
 merger * wet -> output

@@ -16,10 +16,13 @@ import {
 
 describe('DAW playback planning', () => {
   it('compiles ping-pong delay directives into effect config signals', () => {
-    expect(compileEffectSettings('@delay(375ms) @feedback(62%) @wet(40%)')).toEqual({
+    expect(
+      compileEffectSettings('@delay(375ms) @feedback(62%) @wet(40%) @separation(75%)'),
+    ).toEqual({
       delayTime: 0.375,
       feedback: 0.62,
       wet: 0.4,
+      separation: 0.75,
     })
     expect(() => compileEffectSettings('@feedback(120%)')).toThrow('between 0% and 100%')
     expect(() => compileEffectSettings('@delay(4beats)')).toThrow('requires a time value')
@@ -71,7 +74,7 @@ describe('DAW playback planning', () => {
         id: 'delay',
         patchPreset: 'ping-pong-delay',
         gain: 0.75,
-        config: { delayTime: 0.5, feedback: 0.5, wet: 0.25 },
+        config: { delayTime: 0.5, feedback: 0.5, wet: 0.25, separation: 1 },
       }),
     ])
   })

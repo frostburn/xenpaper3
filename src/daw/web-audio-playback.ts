@@ -121,7 +121,7 @@ export class WebAudioPlaybackSession {
       const busOutput = new GainNode(context, { gain: effect.gain })
       busOutput.connect(this.output)
       const config: Record<string, ConstantSourceNode> = {}
-      for (const property of ['delayTime', 'feedback', 'wet'] as const) {
+      for (const property of ['delayTime', 'feedback', 'wet', 'separation'] as const) {
         const signal = context.createConstantSource()
         signal.offset.value = effect.config[property]
         signal.start()

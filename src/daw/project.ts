@@ -323,6 +323,7 @@ export const DEFAULT_EFFECT_SOURCE = `# Ping-pong delay configuration
 @delay(250ms)
 @feedback(55%)
 @wet(35%)
+@separation(100%)
 `
 
 export const beat = (numerator: number, denominator = 1): Beat => {
