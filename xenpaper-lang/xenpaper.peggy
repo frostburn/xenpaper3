@@ -155,75 +155,14 @@ ScopedSequenceExpression
     }
   / SequenceExpression
 
-// Scale assignments use the ordinary scoped score grammar, except that a
-// semicolon introducing another context statement terminates the scale value.
-// Keeping this distinction here preserves semicolon bar rests in normal scores.
+// Scale assignments use the ordinary sequence and parallel grammar, except
+// that a semicolon introducing another context statement terminates the scale
+// value. Keeping this distinction here preserves bar rests in normal scores.
 ContextScaleParallelExpression
-  = repeated:ContextScaleParallelBody Spacing ":|" !(Spacing ",")
-    remainder:(Spacing item:ContextScaleParallelExpression { return item; })? {
-      const repeat = node('Repeat', {
-        count: null,
-        body: [repeated],
-        endings: [],
-        terminal: ":|",
-        incompleteEndings: false,
-      });
-      implicitRepeats.add(repeat);
-      if (remainder) prependImplicitRepeatScope(remainder, [repeat]);
-      return sequence(remainder ? [repeat, remainder] : [repeat]);
-    }
-  / body:ContextScaleParallelBody result:RepeatEndings !(Spacing ",")
-    remainder:(Spacing item:ContextScaleParallelExpression { return item; })? {
-      const repeat = node('Repeat', {
-        count: null,
-        body: [body],
-        endings: result.endings,
-        terminal: result.terminal,
-        incompleteEndings: result.incomplete,
-      });
-      implicitRepeats.add(repeat);
-      if (remainder) prependImplicitRepeatScope(remainder, [repeat]);
-      return sequence(remainder ? [repeat, remainder] : [repeat]);
-    }
-  / first:ContextScaleScopedSequenceExpression
-    rest:(Spacing "," Spacing branch:ContextScaleScopedSequenceExpression { return branch; })* {
-      return parallel([first, ...rest]);
-    }
-
-ContextScaleParallelBody
   = first:ContextScaleSequenceExpression
     rest:(Spacing "," Spacing branch:ContextScaleSequenceExpression { return branch; })* {
       return parallel([first, ...rest]);
     }
-
-ContextScaleScopedSequenceExpression
-  = repeated:ContextScaleSequenceExpression Spacing ":|"
-    remainder:(Spacing item:ContextScaleScopedSequenceExpression { return item; })? {
-      const repeat = node('Repeat', {
-        count: null,
-        body: [repeated],
-        endings: [],
-        terminal: ":|",
-        incompleteEndings: false,
-      });
-      implicitRepeats.add(repeat);
-      if (remainder) prependImplicitRepeatScope(remainder, [repeat]);
-      return sequence(remainder ? [repeat, remainder] : [repeat]);
-    }
-  / body:ContextScaleSequenceExpression result:RepeatEndings
-    remainder:(Spacing item:ContextScaleScopedSequenceExpression { return item; })? {
-      const repeat = node('Repeat', {
-        count: null,
-        body: [body],
-        endings: result.endings,
-        terminal: result.terminal,
-        incompleteEndings: result.incomplete,
-      });
-      implicitRepeats.add(repeat);
-      if (remainder) prependImplicitRepeatScope(remainder, [repeat]);
-      return sequence(remainder ? [repeat, remainder] : [repeat]);
-    }
-  / ContextScaleSequenceExpression
 
 ContextScaleSequenceExpression
   = first:SequenceItem
