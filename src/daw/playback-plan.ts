@@ -256,7 +256,9 @@ export const createPlaybackPlan = (project: DawProject, fromBeat = 0): PlaybackP
           name: effect.name,
           patchPreset: effect.patchPreset,
           gain: effect.gain,
-          config: Object.freeze({ ...compileEffectSettings(effect.source) }),
+          config: Object.freeze({
+            ...compileEffectSettings(effect.source, project.globalTrack.timeSignatureChanges[0]),
+          }),
         }),
       ),
     ),

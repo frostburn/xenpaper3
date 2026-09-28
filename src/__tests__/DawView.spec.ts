@@ -1120,6 +1120,13 @@ describe('DawView', () => {
     expect(wrapper.get('.source-editor code').attributes('style')).toContain(
       'translate(-24px, -12px)',
     )
+
+    await wrapper.get('[aria-label="DAW view"] button:nth-child(2)').trigger('click')
+    await wrapper.get('.effect-bank header button').trigger('click')
+    expect(wrapper.get('.effect-source [data-highlight="comment"]').text()).toContain(
+      'Ping-pong delay configuration',
+    )
+    expect(wrapper.get('.effect-source [data-highlight="directive"]').text()).toContain('@delay')
   })
 
   it('uses a single click for playhead placement and an existing clip click for selection', async () => {

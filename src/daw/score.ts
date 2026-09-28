@@ -260,12 +260,21 @@ const EFFECT_EXTENSIONS = [
 ]
 
 /** Compile the control directives supported by the ping-pong delay effect lane. */
-export const compileEffectSettings = (source: string): EffectSettings => {
-  const result = evaluateInitialization(parse(source), { directiveExtensions: EFFECT_EXTENSIONS })
+export const compileEffectSettings = (
+  source: string,
+  timeSignature = { numerator: 4, denominator: 4 },
+): EffectSettings => {
+  const result = evaluateInitialization(parse(source), {
+    directiveExtensions: EFFECT_EXTENSIONS,
+    allowDuration: true,
+    timeSignature,
+  })
   const errors = result.diagnostics.filter(({ severity }) => severity === 'error')
   if (errors.length) throw new Error(errors.map(({ message }) => message).join('\n'))
+  const changes = result.initialization?.changes
+  const prevailingContext = changes?.[changes.length - 1]?.context ?? result.initialization?.context
   return (
-    (result.initialization?.context?.directiveState.effect as EffectSettings | undefined) ??
+    (prevailingContext?.directiveState.effect as EffectSettings | undefined) ??
     DEFAULT_EFFECT_SETTINGS
   )
 }

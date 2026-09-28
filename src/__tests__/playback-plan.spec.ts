@@ -20,6 +20,21 @@ describe('DAW playback planning', () => {
     expect(() => compileEffectSettings('@delay(4beats)')).toThrow('requires a time value')
   })
 
+  it('allows timed effect directives using the global source meter', () => {
+    const source = `# Ping-pong delay configuration
+@delay(250ms)
+@feedback(55%)
+@wet(10%)
+;;@wet(70%)`
+
+    const settings = compileEffectSettings(source, { numerator: 3, denominator: 4 })
+    expect(settings).toMatchObject({
+      delayTime: 0.25,
+      feedback: 0.55,
+    })
+    expect(settings.wet).toBeCloseTo(0.7)
+  })
+
   it('snapshots effect buses and lane routing in the playback plan', () => {
     const project = createDefaultProject()
     project.effectLanes.push({

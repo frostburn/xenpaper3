@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { DawProject, EffectLane, InstrumentLane } from '../../daw/project'
+import XenpaperSourceEditor from './XenpaperSourceEditor.vue'
 
 defineProps<{ project: DawProject }>()
 const emit = defineEmits<{
@@ -80,10 +81,11 @@ const emit = defineEmits<{
         </label>
         <label class="effect-source">
           Config directives
-          <textarea
-            v-model="effect.source"
-            :aria-label="`${effect.name} config directives`"
-            spellcheck="false"
+          <XenpaperSourceEditor
+            :source="effect.source"
+            :editor-label="`${effect.name} config directives`"
+            :rows="8"
+            @update:source="effect.source = $event"
           />
         </label>
       </article>
@@ -147,15 +149,10 @@ output {
   min-width: 0;
   width: 100%;
 }
-.effect-source textarea {
+.effect-source :deep(.xenpaper-source-editor) {
   box-sizing: border-box;
   width: 100%;
   min-height: 8rem;
-  resize: vertical;
-  border: 1px solid var(--xenpaper-slate-500);
-  padding: 0.5rem;
-  color: inherit;
-  background: var(--xenpaper-slate-950);
   font: 0.75rem/1.5 monospace;
 }
 .empty-effects {
