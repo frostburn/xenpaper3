@@ -274,6 +274,36 @@ describe('enumerated chords', () => {
     })
   })
 
+  it('keeps semicolon-separated assignments after an expression-based scale', () => {
+    expect(parse('{scale = cps([1 7 11 13], 2); mode = 4}').body[0]).toMatchObject({
+      type: 'PitchContextChange',
+      statements: [
+        {
+          type: 'ContextDegreeMapping',
+          values: [{ type: 'CallExpression', callee: 'cps' }],
+        },
+        {
+          type: 'ContextAssignment',
+          target: { type: 'ContextNameTarget', name: 'mode' },
+          value: { type: 'IntegerLiteral', value: '4' },
+        },
+      ],
+    })
+  })
+
+  it('keeps semicolon bar rests outside pitch-context blocks', () => {
+    expect(parse('C; A = D').body[0]).toMatchObject({
+      type: 'Sequence',
+      items: [
+        { type: 'PitchLiteral', nominal: { value: 'C' } },
+        { type: 'BarRest' },
+        { type: 'PitchLiteral', nominal: { value: 'A' } },
+        { type: 'DetachedContinue' },
+        { type: 'PitchLiteral', nominal: { value: 'D' } },
+      ],
+    })
+  })
+
   it('parses degree mappings with the ordinary sequence and parallel grammar', () => {
     expect(parse('{3/2 5/4, 7/4}').body[0]).toMatchObject({
       statements: [

@@ -472,6 +472,23 @@ describe('staff notation construction', () => {
     expect(cents).toEqual([267, 386, 653, 884, 969, 1200])
   })
 
+  it('applies a mode in the same context block as a constructed scale', () => {
+    const evaluated = evaluateProgramShape(
+      parse('{scale = cps([1 7 11 13], 2); mode = 4}\n0 1 2 3 4 5 6'),
+    )
+    if (!('shape' in evaluated)) throw new Error('Expected a shape.')
+
+    expect(evaluated.diagnostics).toEqual([])
+    const cents: number[] = []
+    const collect = (shape: ReturnType<typeof constructStaffNotationShape>) => {
+      if (shape.kind === 'note') cents.push(Math.round(shape.pitch.cents))
+      else if (shape.kind === 'sequence') shape.children.forEach(collect)
+      else if (shape.kind === 'parallel') shape.branches.forEach(collect)
+    }
+    collect(constructStaffNotationShape(evaluated.shape))
+    expect(cents).toEqual([0, 231, 359, 782, 911, 1142, 1200])
+  })
+
   it('passes scale degrees through functions while constructing a scale', () => {
     const evaluated = evaluateProgramShape(
       parse('fn twice(interval) { ret interval * 2 } {scale = twice(1) twice(2)}\n1 2'),

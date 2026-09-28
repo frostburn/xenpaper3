@@ -155,6 +155,24 @@ ScopedSequenceExpression
     }
   / SequenceExpression
 
+// Scale assignments use the ordinary sequence and parallel grammar, except
+// that a semicolon introducing another context statement terminates the scale
+// value. Keeping this distinction here preserves bar rests in normal scores.
+ContextScaleParallelExpression
+  = first:ContextScaleSequenceExpression
+    rest:(Spacing "," Spacing branch:ContextScaleSequenceExpression { return branch; })* {
+      return parallel([first, ...rest]);
+    }
+
+ContextScaleSequenceExpression
+  = first:SequenceItem
+    rest:(Spacing !ContextStatementSeparator item:SequenceItem { return item; })* {
+      return sequence([first, ...rest]);
+    }
+
+ContextStatementSeparator
+  = ";" &(Spacing ContextStatement)
+
 // Sequencing needs no synthetic separator token. `Spacing` may be empty, so
 // adjacent self-delimiting items (`0.2`, `C[D E]F`, `C=F`) are parsed by
 // ordinary PEG repetition. Individual literal rules decide where tokens end.
@@ -641,7 +659,7 @@ ContextStatement
   = name:$('tuning'i) !IdentifierContinue Spacing '*=' Spacing value:AdditiveExpression {
       return node('TuningStretch', { factor: value, raw: text() });
     }
-  / "scale"i !IdentifierContinue Spacing "=" Spacing value:ScopedParallelExpression {
+  / "scale"i !IdentifierContinue Spacing "=" Spacing value:ContextScaleParallelExpression {
       return node('ContextDegreeMapping', { values: [value] });
     }
   / operator:$("'") Spacing "=" Spacing value:ContextValue {
