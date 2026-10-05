@@ -33,6 +33,7 @@ const props = defineProps<{
   selectedClipId?: string
   pixelsPerBeat: number
   scrollLeft: number
+  gridDenominator?: number
   displayMode: ClipDisplayMode
   collapsed?: boolean
   playingRangesByClip?: Readonly<Record<string, readonly SourceRange[]>>
@@ -350,6 +351,7 @@ const clipPreview = (clipId: string) => pianoRoll.value.notesByClip[clipId]!
     :selected-clip-id="selectedClipId"
     :pixels-per-beat="pixelsPerBeat"
     :scroll-left="scrollLeft"
+    :grid-denominator="gridDenominator"
     :display-mode="displayMode"
     :collapsed="collapsed"
     :playing-ranges-by-clip="playingRangesByClip"

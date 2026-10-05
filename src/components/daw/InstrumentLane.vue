@@ -2,8 +2,10 @@
 import { ref } from 'vue'
 import type { SourceRange } from '../../daw/score'
 import {
+  beat,
   beatToNumber,
   pointerXToBeat,
+  snapBeat,
   type ClipDisplayMode,
   type InstrumentLane as InstrumentLaneModel,
   type SourceClip,
@@ -17,6 +19,7 @@ const props = withDefaults(
     selectedClipId?: string
     pixelsPerBeat: number
     scrollLeft: number
+    gridDenominator?: number
     displayMode: ClipDisplayMode
     collapsed?: boolean
     laneLabel: string
@@ -29,7 +32,7 @@ const props = withDefaults(
     canMoveUp?: boolean
     canMoveDown?: boolean
   }>(),
-  { collapsed: false, selectedClipId: undefined, drumSamples: undefined },
+  { collapsed: false, selectedClipId: undefined, drumSamples: undefined, gridDenominator: 1 },
 )
 const emit = defineEmits<{
   insert: [beat: number]
@@ -55,6 +58,7 @@ const dragging = ref<{
   startX: number
   pointerId: number
   active: boolean
+  beat: number
 }>()
 
 const appendClip = () =>
@@ -80,7 +84,7 @@ const pointerBeat = (event: MouseEvent) =>
   )
 
 const clipVisibleStart = (clip: SourceClip) =>
-  Math.max(0, props.scrollLeft - beatToNumber(clip.start) * props.pixelsPerBeat)
+  Math.max(0, props.scrollLeft - clipStart(clip) * props.pixelsPerBeat)
 
 const onClick = (event: MouseEvent) => {
   if ((event.target as HTMLElement).closest('.clip')) return
@@ -101,6 +105,7 @@ const startDrag = (event: PointerEvent, clip: SourceClip) => {
     startX: event.clientX,
     pointerId: event.pointerId,
     active: false,
+    beat: beatToNumber(clip.start),
   }
   const clipElement = event.currentTarget as HTMLElement
   clipElement.focus({ preventScroll: true })
@@ -111,8 +116,27 @@ const moveDrag = (event: PointerEvent) => {
   if (!dragging.value || event.pointerId !== dragging.value.pointerId) return
   if (!dragging.value.active && Math.abs(event.clientX - dragging.value.startX) < 4) return
   dragging.value.active = true
-  emit('move', dragging.value.clip, Math.max(0, pointerBeat(event) - dragging.value.pointerOffset))
+  // Keep pointer-frequency updates local. Mutating the project here would re-run score
+  // parsing, clip sizing, previews, and history serialization for every pointer event.
+  dragging.value.beat = beatToNumber(
+    snapBeat(
+      Math.max(0, pointerBeat(event) - dragging.value.pointerOffset),
+      beat(1, props.gridDenominator),
+    ),
+  )
 }
+
+const finishDrag = (event: PointerEvent) => {
+  const drag = dragging.value
+  if (!drag || event.pointerId !== drag.pointerId) return
+  dragging.value = undefined
+  if (drag.active) emit('move', drag.clip, drag.beat)
+}
+
+const clipStart = (clip: SourceClip) =>
+  dragging.value?.clip === clip && dragging.value.active
+    ? dragging.value.beat
+    : beatToNumber(clip.start)
 
 const onKeyDown = (event: KeyboardEvent) => {
   if (event.key !== 'Delete' || !props.selectedClipId) return
@@ -131,7 +155,7 @@ const onKeyDown = (event: KeyboardEvent) => {
     @click.self="onClick"
     @dblclick.self="onDoubleClick"
     @pointermove.self="moveDrag"
-    @pointerup.self="dragging = undefined"
+    @pointerup.self="finishDrag"
     @pointercancel.self="dragging = undefined"
     @keydown.self="onKeyDown"
   >
@@ -255,7 +279,7 @@ const onKeyDown = (event: KeyboardEvent) => {
       @click="onClick"
       @dblclick="onDoubleClick"
       @pointermove="moveDrag"
-      @pointerup="dragging = undefined"
+      @pointerup="finishDrag"
       @pointercancel="dragging = undefined"
       @lostpointercapture="dragging = undefined"
       @keydown="onKeyDown"
@@ -267,10 +291,10 @@ const onKeyDown = (event: KeyboardEvent) => {
         class="clip"
         :class="{ selected: selectedClipId === clip.id }"
         :aria-pressed="selectedClipId === clip.id"
-        :aria-label="`${lane.name}: ${clipCaption(clip)}, beat ${beatToNumber(clip.start)}, ${beatToNumber(clip.length)} beats`"
+        :aria-label="`${lane.name}: ${clipCaption(clip)}, beat ${clipStart(clip)}, ${beatToNumber(clip.length)} beats`"
         :title="`${clipCaption(clip)} — drag to move; Delete to remove`"
         :style="{
-          left: `${beatToNumber(clip.start) * pixelsPerBeat - scrollLeft}px`,
+          left: `${clipStart(clip) * pixelsPerBeat - scrollLeft}px`,
           width: `${beatToNumber(clip.length) * pixelsPerBeat}px`,
           zIndex: selectedClipId === clip.id ? 1 : undefined,
         }"
