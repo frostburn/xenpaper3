@@ -55,6 +55,7 @@ const dragging = ref<{
   startX: number
   pointerId: number
   active: boolean
+  beat: number
 }>()
 
 const appendClip = () =>
@@ -101,6 +102,7 @@ const startDrag = (event: PointerEvent, clip: SourceClip) => {
     startX: event.clientX,
     pointerId: event.pointerId,
     active: false,
+    beat: beatToNumber(clip.start),
   }
   const clipElement = event.currentTarget as HTMLElement
   clipElement.focus({ preventScroll: true })
@@ -111,8 +113,22 @@ const moveDrag = (event: PointerEvent) => {
   if (!dragging.value || event.pointerId !== dragging.value.pointerId) return
   if (!dragging.value.active && Math.abs(event.clientX - dragging.value.startX) < 4) return
   dragging.value.active = true
-  emit('move', dragging.value.clip, Math.max(0, pointerBeat(event) - dragging.value.pointerOffset))
+  // Keep pointer-frequency updates local. Mutating the project here would re-run score
+  // parsing, clip sizing, previews, and history serialization for every pointer event.
+  dragging.value.beat = Math.max(0, pointerBeat(event) - dragging.value.pointerOffset)
 }
+
+const finishDrag = (event: PointerEvent) => {
+  const drag = dragging.value
+  if (!drag || event.pointerId !== drag.pointerId) return
+  dragging.value = undefined
+  if (drag.active) emit('move', drag.clip, drag.beat)
+}
+
+const clipStart = (clip: SourceClip) =>
+  dragging.value?.clip === clip && dragging.value.active
+    ? dragging.value.beat
+    : beatToNumber(clip.start)
 
 const onKeyDown = (event: KeyboardEvent) => {
   if (event.key !== 'Delete' || !props.selectedClipId) return
@@ -131,7 +147,7 @@ const onKeyDown = (event: KeyboardEvent) => {
     @click.self="onClick"
     @dblclick.self="onDoubleClick"
     @pointermove.self="moveDrag"
-    @pointerup.self="dragging = undefined"
+    @pointerup.self="finishDrag"
     @pointercancel.self="dragging = undefined"
     @keydown.self="onKeyDown"
   >
@@ -255,7 +271,7 @@ const onKeyDown = (event: KeyboardEvent) => {
       @click="onClick"
       @dblclick="onDoubleClick"
       @pointermove="moveDrag"
-      @pointerup="dragging = undefined"
+      @pointerup="finishDrag"
       @pointercancel="dragging = undefined"
       @lostpointercapture="dragging = undefined"
       @keydown="onKeyDown"
@@ -270,7 +286,7 @@ const onKeyDown = (event: KeyboardEvent) => {
         :aria-label="`${lane.name}: ${clipCaption(clip)}, beat ${beatToNumber(clip.start)}, ${beatToNumber(clip.length)} beats`"
         :title="`${clipCaption(clip)} — drag to move; Delete to remove`"
         :style="{
-          left: `${beatToNumber(clip.start) * pixelsPerBeat - scrollLeft}px`,
+          left: `${clipStart(clip) * pixelsPerBeat - scrollLeft}px`,
           width: `${beatToNumber(clip.length) * pixelsPerBeat}px`,
           zIndex: selectedClipId === clip.id ? 1 : undefined,
         }"
