@@ -5,6 +5,7 @@ import { Fraction } from 'xen-dev-utils'
 import DawView from '../views/DawView.vue'
 import PitchedLane from '../components/daw/PitchedLane.vue'
 import InstrumentLane from '../components/daw/InstrumentLane.vue'
+import ClipSourcePreview from '../components/daw/ClipSourcePreview.vue'
 import XenpaperSourceEditor from '../components/daw/XenpaperSourceEditor.vue'
 import ArrangementTimeline from '../components/daw/ArrangementTimeline.vue'
 import { globalTimeSignatureChanges, measureBoundaries } from '../daw/timeline'
@@ -304,10 +305,41 @@ describe('DAW workspace', () => {
     pointer(track, 'pointermove', 22)
     expect(wrapper.emitted('move')).toBeUndefined()
     pointer(track, 'pointermove', 84)
-    expect(wrapper.emitted('move')).toEqual([[expect.objectContaining({ id: clip.id }), 1]])
+    expect(wrapper.emitted('move')).toBeUndefined()
+    await nextTick()
+    expect(wrapper.get('button.clip').attributes('style')).toContain('left: 64px')
     pointer(track, 'pointerup', 84)
+    expect(wrapper.emitted('move')).toEqual([[expect.objectContaining({ id: clip.id }), 1]])
     pointer(track, 'pointermove', 148)
     expect(wrapper.emitted('move')).toHaveLength(1)
+  })
+
+  it('previews a dragged clip on the active snap grid', async () => {
+    const project = createDefaultProject()
+    const lane = project.instrumentLanes[0]!
+    lane.clips.push(createClip(lane, beat(0)))
+    const wrapper = mount(InstrumentLane, {
+      props: {
+        lane,
+        pixelsPerBeat: 60,
+        scrollLeft: 120,
+        gridDenominator: 3,
+        displayMode: 'source',
+        laneLabel: 'Instrument lane',
+        timelineLabel: 'Test timeline',
+        editorLabel: 'Lane source',
+      },
+    })
+    const clip = wrapper.get('button.clip')
+    clip.element.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, clientX: 0 }))
+    wrapper
+      .get('.lane')
+      .element.dispatchEvent(new MouseEvent('pointermove', { bubbles: true, clientX: 45 }))
+    await nextTick()
+
+    expect(clip.attributes('style')).toContain('left: -80px')
+    expect(clip.attributes('aria-label')).toContain('beat 0.6666666666666666')
+    expect(wrapper.getComponent(ClipSourcePreview).props('visibleStart')).toBeCloseTo(80)
   })
 
   it('keeps selected overlapping clips and their contents in one stacking context', () => {
