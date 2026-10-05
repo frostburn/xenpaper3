@@ -280,7 +280,7 @@ const eventsByClip = computed(() => {
           :data-beat="event.beat"
           :style="{
             left: `${(event.beat / beatToNumber(clip.length)) * 100}%`,
-            width: `${Math.max(2, (event.duration / beatToNumber(clip.length)) * 100)}%`,
+            width: `${(event.duration / beatToNumber(clip.length)) * 100}%`,
             height: `${60 / samples.length}%`,
             top: `${(samples.indexOf(event.sample ?? '') * 100 + 20) / samples.length}%`,
           }"
@@ -355,6 +355,7 @@ const eventsByClip = computed(() => {
 .drum-preview i {
   position: absolute;
   z-index: 1;
+  min-width: 2px;
   border-radius: 0.2rem;
   background: var(--xenpaper-lavender);
 }
