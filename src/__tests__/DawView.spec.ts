@@ -1724,6 +1724,27 @@ describe('DawView', () => {
     expect(wrapper.findAll('[aria-label="Drum pattern preview"] i')).toHaveLength(1)
   })
 
+  it('keeps highly repeated drum hits at their beat-scaled widths', () => {
+    const project = createDefaultProject()
+    const lane = createDrumLane(project)
+    lane.clips = [
+      { id: 'dense-repeat', start: beat(0), length: beat(100), source: '|:@x100 bd :|' },
+    ]
+    const wrapper = mount(DrumLane, {
+      props: {
+        lane,
+        pixelsPerBeat: 64,
+        scrollLeft: 0,
+        displayMode: 'piano-roll',
+      },
+    })
+
+    const notes = wrapper.findAll('[aria-label="Drum pattern preview"] i')
+    expect(notes).toHaveLength(100)
+    expect((notes[0]!.element as HTMLElement).style.width).toBe('1%')
+    expect((notes[1]!.element as HTMLElement).style.left).toBe('1%')
+  })
+
   it('does not let an extreme pitch fold an audible clip out of view', () => {
     const project = createDefaultProject()
     const lane = project.instrumentLanes[0]! as PitchedInstrumentLane
