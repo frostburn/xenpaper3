@@ -263,7 +263,35 @@ const selectedClipLineCarets = computed(() => {
   const lane = selectedLane.value
   const clip = selectedClip.value
   if (!lane || !clip) return []
-  return sourceLineCarets(clip.source, clipNotes.value.get(clipSourceKey(lane.id, clip.id)) ?? [])
+  try {
+    const signature = project.value.globalTrack.timeSignatureChanges[0]!
+    const global = compileSourceInitialization(project.value.globalTrack.source, {}, true, signature)
+    const initialization = compileLaneSourceInitialization(lane.source, global, signature)
+    const samples = drumSamplesForLane(lane)
+    const notes = samples.length
+      ? parseDrumClipNotes(
+          clip.source,
+          samples,
+          beatToNumber(clip.length),
+          initialization,
+          clip.start,
+          signature,
+          globalMeterChanges.value,
+        )
+      : parseClipNotes(
+          clip.source,
+          beatToNumber(clip.length),
+          initialization,
+          clip.start,
+          signature,
+          globalMeterChanges.value,
+        )
+    // The editor only needs the selected clip. Avoid evaluating clipNotes here: that
+    // would parse every clip in the project after each source edit or clip move.
+    return sourceLineCarets(clip.source, notes)
+  } catch {
+    return []
+  }
 })
 const projectEndBeat = computed(() =>
   Math.max(
@@ -987,6 +1015,7 @@ onBeforeUnmount(() => {
               :selected-clip-id="selectedLaneId === lane.id ? selectedClipId : undefined"
               :pixels-per-beat="pixelsPerBeat"
               :scroll-left="scrollLeft"
+              :grid-denominator="gridDenominator"
               :display-mode="displayMode"
               :collapsed="collapsedLaneIds.has(lane.id)"
               :playing-ranges-by-clip="playingRangesByLane.get(lane.id)"
@@ -1019,6 +1048,7 @@ onBeforeUnmount(() => {
                 :selected-clip-id="selectedLaneId === lane.id ? selectedClipId : undefined"
                 :pixels-per-beat="pixelsPerBeat"
                 :scroll-left="scrollLeft"
+                :grid-denominator="gridDenominator"
                 :display-mode="displayMode"
                 :playing-ranges-by-clip="playingRangesByLane.get(lane.id)"
                 :settings-open="settingsLaneId === lane.id"
