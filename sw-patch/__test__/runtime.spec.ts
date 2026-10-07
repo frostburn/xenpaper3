@@ -71,9 +71,13 @@ describe('SW Patch runtime', () => {
         connected = false
       }),
     }
-    const patch = createPatch('source -> destination\nsource !-> destination\n', {} as BaseAudioContext, {
-      globals: { source, destination },
-    })
+    const patch = createPatch(
+      'source -> destination\nsource !-> destination\n',
+      {} as BaseAudioContext,
+      {
+        globals: { source, destination },
+      },
+    )
 
     expect(() => patch.dispose()).not.toThrow()
     expect(source.disconnect).toHaveBeenCalledTimes(2)

@@ -265,7 +265,12 @@ const selectedClipLineCarets = computed(() => {
   if (!lane || !clip) return []
   try {
     const signature = project.value.globalTrack.timeSignatureChanges[0]!
-    const global = compileSourceInitialization(project.value.globalTrack.source, {}, true, signature)
+    const global = compileSourceInitialization(
+      project.value.globalTrack.source,
+      {},
+      true,
+      signature,
+    )
     const initialization = compileLaneSourceInitialization(lane.source, global, signature)
     const samples = drumSamplesForLane(lane)
     const notes = samples.length
