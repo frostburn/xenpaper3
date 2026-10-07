@@ -17,6 +17,9 @@ import TheFooter from './components/TheFooter.vue'
         <RouterLink :to="{ path: '/daw', query: { demo: 'cosmic-wavelength' } }">
           Open "Cosmic Wavelength"
         </RouterLink>
+        <RouterLink :to="{ path: '/daw', query: { demo: 'negative-carry' } }">
+          Open "Negative Carry"
+        </RouterLink>
         <RouterLink to="/xenpaper-lang-testing"
           >xenpaper-lang debugging/development view</RouterLink
         >

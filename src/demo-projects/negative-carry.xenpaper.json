@@ -1,0 +1,269 @@
+{
+  "format": "xenpaper3-daw",
+  "version": 3,
+  "createdAt": "2026-09-27T16:18:44.082Z",
+  "xenpaperVersion": "3.0.0-beta.16",
+  "title": "Negative Carry",
+  "globalTrack": {
+    "source": "{scale = cps([1 7 11 13], 2)}\n{mode = 1}",
+    "tempoChanges": [
+      {
+        "id": "tempo-1",
+        "beat": {
+          "n": 0,
+          "d": 1
+        },
+        "bpm": 180
+      }
+    ],
+    "timeSignatureChanges": [
+      {
+        "id": "time-signature-1",
+        "beat": {
+          "n": 0,
+          "d": 1
+        },
+        "numerator": 4,
+        "denominator": 4
+      }
+    ]
+  },
+  "instrumentLanes": [
+    {
+      "kind": "instrument",
+      "id": "instrument-1",
+      "name": "Golden Bell",
+      "gain": 1,
+      "source": "# Defaults inherited by every clip in this lane\n@adsr(5ms, 350ms, 10%, 50ms)\n@legato\n@2",
+      "clips": [
+        {
+          "id": "clip-1",
+          "start": {
+            "n": 0,
+            "d": 1
+          },
+          "length": {
+            "n": 96,
+            "d": 1
+          },
+          "source": "2===    1===   |\n0=  2 1 2 1 0= |\n==  2 1 2=  3= |\n2 1 0=  ==  .. |\n\n-1===  1===  |\n0= 2 3 4= 5= |\n4 3 2= == .. |\n.. 7=  6= 5= |\n\n0= 2 1 2 1 0=  |\n== 7 8 9=  10= |\n7 6 2= ==  ..  |\n3= . 4 = . 5= :|"
+        },
+        {
+          "id": "clip-3",
+          "start": {
+            "n": 96,
+            "d": 1
+          },
+          "length": {
+            "n": 64,
+            "d": 1
+          },
+          "source": "|:@x3\n6=.6=.6= |\n.6=.6=.7 |\n=.5=.4=. |\n3=.2=.0=:|\n\n[6,8]=. [6,9]=.[6,10]=|\n.[6,11]=.[6,8]=.7     |\n=.[7,5] =.[7,4]=.     |\n[7,3]=. [7,2]=...     |\n"
+        },
+        {
+          "id": "clip-4",
+          "start": {
+            "n": 224,
+            "d": 1
+          },
+          "length": {
+            "n": 16,
+            "d": 1
+          },
+          "source": "# Loops from here\n2===   1===   |\n0= 2 1 2 1 0= |\n== 2 1 2=  3= |\n2 1 0= ==  .. ||"
+        },
+        {
+          "id": "clip-5",
+          "start": {
+            "n": 184,
+            "d": 1
+          },
+          "length": {
+            "n": 4,
+            "d": 1
+          },
+          "source": "@pp [-1 2 4]!======= |"
+        },
+        {
+          "id": "clip-6",
+          "start": {
+            "n": 216,
+            "d": 1
+          },
+          "length": {
+            "n": 8,
+            "d": 1
+          },
+          "source": "@pp 5== 7== 3=      |\n@pp [1 3 5]=!====== |"
+        }
+      ],
+      "effectBusId": "effect-1",
+      "instrument": {
+        "type": "patch",
+        "patchPreset": "default",
+        "oscillatorType": "gold"
+      }
+    },
+    {
+      "kind": "instrument",
+      "id": "instrument-2",
+      "name": "Bass",
+      "gain": 0.92,
+      "source": "# Defaults inherited by every clip in this lane\n@adsr(10ms, 200ms, 10%, 30ms)\n{root = ``0}\n",
+      "clips": [
+        {
+          "id": "clip-1",
+          "start": {
+            "n": 44,
+            "d": 1
+          },
+          "length": {
+            "n": 4,
+            "d": 1
+          },
+          "source": "5. 3 2 |"
+        },
+        {
+          "id": "clip-2",
+          "start": {
+            "n": 48,
+            "d": 1
+          },
+          "length": {
+            "n": 48,
+            "d": 1
+          },
+          "source": "0= . 0 |\n0= . 0 |\n0= . 0 |\n2= 3=  |\n\n-1= . 1 |\n0=  . 0 |\n0=  . 0 |\n2=  1=  |\n\n0= . 0 |\n0= . 0 |\n0= . 0 |\n2= 3=  |"
+        },
+        {
+          "id": "clip-3",
+          "start": {
+            "n": 96,
+            "d": 1
+          },
+          "length": {
+            "n": 64,
+            "d": 1
+          },
+          "source": "|:@x3\n5 [5 5] [5 5] . |\n4 [4 4] [4 4] . |\n0 [0 0] [0 0] . |\n(@2 0=.0=.0=)  :|\n\n5 [5 5] [5 5] . |\n4 [4 4] [4 4] 3 |\n0 [0 0] [0 0] . |\n(@2 0=.-1=.-2=) |"
+        },
+        {
+          "id": "clip-4",
+          "start": {
+            "n": 160,
+            "d": 1
+          },
+          "length": {
+            "n": 64,
+            "d": 1
+          },
+          "source": "@. |:@x16 -1 -1 -1 -1 :|"
+        }
+      ],
+      "effectBusId": "effect-1",
+      "instrument": {
+        "type": "patch",
+        "patchPreset": "default",
+        "oscillatorType": "fmtriangle"
+      }
+    },
+    {
+      "kind": "drum",
+      "id": "drum-1",
+      "name": "Drums",
+      "gain": 0.73,
+      "source": "# Defaults inherited by every clip in this lane\n",
+      "clips": [
+        {
+          "id": "clip-1",
+          "start": {
+            "n": 108,
+            "d": 1
+          },
+          "length": {
+            "n": 4,
+            "d": 1
+          },
+          "source": "[. hh] [ht hh] [sd,mt,hh hh] [lt,hh hh]\n"
+        },
+        {
+          "id": "clip-2",
+          "start": {
+            "n": 112,
+            "d": 1
+          },
+          "length": {
+            "n": 48,
+            "d": 1
+          },
+          "source": "|:@x6\n[bd,. hh] [hh hh] [sd,hh @f hh] [hh @p hh]             |\n[bd,. hh] [hh hh] [sd,@f hh @mf hh @mp hh] [hh @p hh] :|"
+        },
+        {
+          "id": "clip-3",
+          "start": {
+            "n": 92,
+            "d": 1
+          },
+          "length": {
+            "n": 14,
+            "d": 1
+          },
+          "source": "    .     ht     mt lt |\n@mp lt @p lt @pp lt .  |\n@2/3 @mp mt @p lt @pp lt @ppp lt"
+        },
+        {
+          "id": "clip-5",
+          "start": {
+            "n": 160,
+            "d": 1
+          },
+          "length": {
+            "n": 64,
+            "d": 1
+          },
+          "source": "[hh.] . [sd hh] [hh @mp hh @p hh @pp hh]\n\n|:@x14 [hh .] [lt, hh hh] [sd,. hh] [hh .] :|\n\n[hh.] . [sd hh] [hh @mp hh @p hh @pp hh] |"
+        }
+      ],
+      "drumkit": {
+        "type": "patch",
+        "patchPreset": "drumkit"
+      }
+    },
+    {
+      "kind": "instrument",
+      "id": "instrument-3",
+      "name": "Glide Triangle",
+      "gain": 0.9,
+      "source": "# Defaults inherited by every clip in this lane\n@adsr(100ms, 200ms, 70%, 300ms)\n{root = '0}",
+      "clips": [
+        {
+          "id": "clip-1",
+          "start": {
+            "n": 156,
+            "d": 1
+          },
+          "length": {
+            "n": 68,
+            "d": 1
+          },
+          "source": "@p @gliss(ease) .0== |\n\n6= 7 6 |\n5 6==  |\n.. 7 6 |\n4 5= 4 |\n@gliss 3 @gliss 3== |\n=== 2  |\n..  .. |\n..  0= |\n\n6= 7 6      |\n5 6==       |\n.. [7 6 5]= |\n3 4= 3      |\n@gliss 2=== |\n@gliss 2=== |\n5===        |\n..  ..      |"
+        }
+      ],
+      "effectBusId": "effect-1",
+      "instrument": {
+        "type": "patch",
+        "patchPreset": "default",
+        "oscillatorType": "triangle"
+      }
+    }
+  ],
+  "effectLanes": [
+    {
+      "id": "effect-1",
+      "kind": "effect",
+      "name": "Ping-pong delay 1",
+      "patchPreset": "ping-pong-delay",
+      "gain": 1,
+      "source": "# Ping-pong delay configuration\n@delay(230ms)\n@feedback(65%)\n@wet(40%)\n@separation(20%)\n"
+    }
+  ]
+}
