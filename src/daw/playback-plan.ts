@@ -1,7 +1,9 @@
+import { compileSpreadAutomation, type SpreadAutomationPlan } from './spread-automation'
 import { easeGlissando } from './easing'
 import type { DawProject, DrumkitSource, InstrumentSource } from './project'
 import {
   compileEffectSettings,
+  compileLaneSourceInitialization,
   compileEffectSettingsTimeline,
   compileSourceInitialization,
   parseLaneNotes,
@@ -68,6 +70,7 @@ export type PlaybackLane =
   | (BasePlaybackLane & {
       readonly kind: 'instrument'
       readonly instrument: InstrumentSource
+      readonly spread?: SpreadAutomationPlan
     })
   | (BasePlaybackLane & { readonly kind: 'drum'; readonly drumkit: DrumkitSource })
 
@@ -243,6 +246,19 @@ export const createPlaybackPlan = (project: DawProject, fromBeat = 0): PlaybackP
             ...common,
             kind: 'instrument',
             instrument: lane.instrument,
+            ...(lane.instrument.type === 'patch' && lane.instrument.patchPreset === 'unison'
+              ? {
+                  spread: compileSpreadAutomation(
+                    compileLaneSourceInitialization(
+                      lane.source,
+                      globalInitialization,
+                      project.globalTrack.timeSignatureChanges[0],
+                    ),
+                    tempoMap,
+                    fromBeat,
+                  ),
+                }
+              : {}),
           }),
     )
   }

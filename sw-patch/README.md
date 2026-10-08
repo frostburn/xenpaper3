@@ -249,3 +249,32 @@ const synth = createPatch(source, context, {
   globals: {/* application-provided functions */},
 })
 ```
+
+## Unison instrument lanes
+
+Select **Unison oscillator** in an instrument lane's sound settings. The bundled
+`unison.swpatch` supports native sine, triangle, square and sawtooth waves, plus
+all bundled periodic timbres. The voice count (1–32, default 5) is fixed lane
+configuration. Notes use the usual `@adsr(attack, decay, sustain, release)` envelope.
+
+Spread is a shared audio-rate signal measured in cents, with a default of 20c.
+Use `@spread(value)` to set it immediately, or `@spread(value, duration)` to ramp
+linearly from its current value. Author these directives in the **lane source**;
+rests and barlines place changes on the lane timeline. For example:
+
+```xenpaper
+@adsr(10ms, 200ms, 70%, 300ms)
+@spread(0c)
+; @spread(40c, 2s)
+; @spread(10c, 500ms)
+```
+
+Ramps affect every sounding note in the lane, including release tails, and
+playback resumed during a ramp continues from the interpolated spread. A new
+ramp interrupts the previous one at its current value. Ramp durations are in
+seconds; directive positions follow the project's tempo and meter.
+
+When using the patch directly, pass an AudioNode as the `spread` configuration
+and automate its output (for example, a ConstantSourceNode's `offset`). It connects
+to each note's unison spread AudioParam. The patch owns its oscillators and ADSR
+nodes; the caller owns any supplied pitch and spread sources.

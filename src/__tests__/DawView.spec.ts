@@ -1618,12 +1618,39 @@ describe('DawView', () => {
     await wrapper.get('[aria-label="Edit sound and source for Instrument 1"]').trigger('click')
 
     expect(wrapper.get('fieldset legend').text()).toBe('Instrument sound source')
-    expect(wrapper.findAll('input[type="radio"]')).toHaveLength(3)
+    expect(wrapper.findAll('input[type="radio"]')).toHaveLength(4)
     await wrapper.get('input[type="radio"][value="samples"]').setValue()
 
     expect(wrapper.find('[aria-label="Sampled instrument source"]').exists()).toBe(true)
     expect(wrapper.find('[aria-label="Instrument JSON URL"]').exists()).toBe(true)
     expect(wrapper.find('[aria-label="Upload instrument JSON"]').exists()).toBe(true)
+  })
+
+  it('selects a periodic unison waveform and preserves fixed voices across mode changes', async () => {
+    const wrapper = mount(DawView)
+    await wrapper.get('[aria-label="Edit sound and source for Instrument 1"]').trigger('click')
+    await wrapper.get('input[type="radio"][value="unison"]').setValue()
+    await wrapper.get('[aria-label="Unison waveform"]').setValue('rich')
+    await wrapper.get('[aria-label="Unison voices"]').setValue('7')
+    expect(wrapper.getComponent(PitchedLane).props('lane').instrument).toEqual({
+      type: 'patch',
+      patchPreset: 'unison',
+      oscillatorType: 'rich',
+      numberOfVoices: 7,
+    })
+    expect(
+      wrapper
+        .get('[aria-label="Unison waveform"]')
+        .findAll('option')
+        .map((option) => option.text()),
+    ).not.toContain('piano')
+    await wrapper.get('input[type="radio"][value="patch"]').setValue()
+    await wrapper.get('input[type="radio"][value="unison"]').setValue()
+    expect(wrapper.get('[aria-label="Unison voices"]').element).toHaveProperty('value', '7')
+    await wrapper.get('[aria-label="Unison voices"]').setValue('0')
+    expect(wrapper.getComponent(PitchedLane).props('lane').instrument).toMatchObject({
+      numberOfVoices: 7,
+    })
   })
 
   it('selects the driven-noise patch from a pitched lane', async () => {

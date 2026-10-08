@@ -223,7 +223,41 @@ const adsrExtension: DirectiveExtension = {
   },
 }
 
-const ENVELOPE_EXTENSIONS = [envelopeExtension, adsrExtension]
+export interface SpreadSettings {
+  readonly value: number
+  readonly duration: number
+}
+export const DEFAULT_SPREAD: SpreadSettings = Object.freeze({ value: 20, duration: 0 })
+const spreadExtension: DirectiveExtension = {
+  name: 'spread',
+  stateKey: 'spread',
+  initialState: DEFAULT_SPREAD,
+  apply(directive, context) {
+    if (
+      directive.arguments.length < 1 ||
+      directive.arguments.length > 2 ||
+      directive.arguments.some((argument) => argument.type === 'NamedArgument')
+    )
+      throw new Error('@spread requires a cent value and an optional ramp duration in seconds.')
+    const values = directive.arguments.map((expression, index) => {
+      const result = evaluateExpression(expression as Expression, context)
+      if (
+        !('value' in result) ||
+        (result.value.kind !== 'scalar' && result.value.kind !== 'pitchOffset')
+      )
+        throw new Error('@spread requires scalar values.')
+      const value = result.value.value
+      if (!value.dimensions.equals(index === 0 ? { pitch: 1 } : { seconds: 1 }))
+        throw new Error('@spread requires a cent value and an optional ramp duration in seconds.')
+      const numeric = Number(value)
+      if (!Number.isFinite(numeric) || numeric < 0)
+        throw new Error('@spread values must be finite and non-negative.')
+      return numeric
+    })
+    return { state: Object.freeze({ value: values[0]!, duration: values[1] ?? 0 }) }
+  },
+}
+const ENVELOPE_EXTENSIONS = [envelopeExtension, adsrExtension, spreadExtension]
 
 const effectExtension = (
   name: 'delay' | 'feedback' | 'wet' | 'separation',

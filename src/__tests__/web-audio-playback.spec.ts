@@ -23,6 +23,11 @@ class MockAudioParam {
     return this
   }
 
+  linearRampToValueAtTime(value: number, time: number): MockAudioParam {
+    this.values.push({ value, time })
+    return this
+  }
+
   cancelScheduledValues(time: number): MockAudioParam {
     this.cancellations.push(time)
     return this
@@ -287,6 +292,55 @@ describe('Web Audio playback session', () => {
     expect(detune.curves[0]!.values).toEqual([100, 200])
     session.stop()
     expect(dispose).toHaveBeenCalledOnce()
+  })
+
+  it('provides a shared rampable spread signal and fixed voice count to the unison patch', () => {
+    const context = new MockAudioContext()
+    const plan = createPlan()
+    const lane = plan.lanes[0]!
+    if (lane.kind !== 'instrument') throw new Error('Expected instrument')
+    const patchFactory = vi.fn<() => PlayableSynthPatch>(() => ({
+      on: () => (end) => end,
+      dispose: vi.fn(),
+      ready: Promise.resolve(),
+    }))
+    const session = new WebAudioPlaybackSession(
+      context as unknown as AudioContext,
+      {
+        ...plan,
+        lanes: [
+          {
+            ...lane,
+            instrument: {
+              type: 'patch',
+              patchPreset: 'unison',
+              oscillatorType: 'rich',
+              numberOfVoices: 7,
+            },
+            spread: { initialValue: 0, changes: [{ when: 0, value: 40, duration: 2 }] },
+          },
+        ],
+      },
+      { patchFactory },
+    )
+    session.start()
+    const [source, , options] = (
+      patchFactory.mock.calls as unknown as [string, unknown, { config: Record<string, unknown> }][]
+    )[0]!
+    expect(source).toContain('UnisonOscillator(numberOfVoices = numberOfVoices, spread = 0c)')
+    expect(options.config).toEqual({
+      oscillatorType: 'rich',
+      numberOfVoices: 7,
+      spread: context.sources[0],
+    })
+    expect(context.sources[0]!.offset.values).toEqual([
+      { value: 0, time: 0 },
+      { value: 0, time: 0 },
+      { value: 40, time: 2 },
+    ])
+    session.stop()
+    expect(context.sources[0]!.disconnected).toBe(true)
+    expect(context.sources[0]!.stops).toContain(0)
   })
 
   it('passes driven-noise settings to the bundled patch', () => {

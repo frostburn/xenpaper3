@@ -961,7 +961,18 @@ export class PatchRuntime {
     const oscillator = new Constructor(this.context, options as never) as {
       dispose(): void
     }
-    this.registerCleanup(() => oscillator.dispose())
+    this.registerCleanup(() => {
+      // UnisonOscillator inherits disposal that stops the voices but omits its
+      // additional spread source. Stop the whole oscillator before disposing it.
+      if (oscillator instanceof UnisonOscillator) {
+        try {
+          oscillator.stop(this.context.currentTime)
+        } catch (error) {
+          if (!(error instanceof Error) || error.name !== 'InvalidStateError') throw error
+        }
+      }
+      oscillator.dispose()
+    })
     return oscillator
   }
 
