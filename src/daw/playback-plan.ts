@@ -2,7 +2,8 @@ import { easeGlissando } from './easing'
 import type { DawProject, DrumkitSource, InstrumentSource } from './project'
 import {
   compileEffectSettings,
-  compileEffectSettingsTimeline,
+  compileEffectTimeline,
+  type EffectSettings,
   compileSourceInitialization,
   parseLaneNotes,
   type EnvelopeSettings,
@@ -58,6 +59,7 @@ export interface PlaybackEffectLane {
   readonly patchPreset: 'ping-pong-delay'
   readonly gain: number
   readonly config: ReturnType<typeof compileEffectSettings>
+  readonly automation?: Readonly<Record<keyof EffectSettings, PitchAutomationPlan>>
   readonly configChanges: readonly {
     readonly when: number
     readonly config: ReturnType<typeof compileEffectSettings>
@@ -256,17 +258,64 @@ export const createPlaybackPlan = (project: DawProject, fromBeat = 0): PlaybackP
     lanes: Object.freeze(lanes),
     effects: Object.freeze(
       project.effectLanes.map((effect) => {
-        const timeline = compileEffectSettingsTimeline(
+        const effectTimeline = compileEffectTimeline(
           effect.source,
           project.globalTrack.timeSignatureChanges[0],
         )
-        const initialTimeline = timeline.filter(({ beat }) => beat <= fromBeat)
-        const initial = initialTimeline[initialTimeline.length - 1]!.settings
+        const { changes: timeline, ramps } = effectTimeline
+        const properties = ['delayTime', 'feedback', 'wet', 'separation'] as const
+        const settingsAt = (atBeat: number): EffectSettings => {
+          const preceding = timeline.filter(({ beat }) => beat <= atBeat)
+          const prevailing = preceding[preceding.length - 1]!.settings
+          const settings = { ...prevailing }
+          for (const ramp of ramps) {
+            if (atBeat < ramp.start || atBeat >= ramp.start + ramp.duration) continue
+            for (const property of properties)
+              if (ramp.from[property] !== ramp.to[property])
+                settings[property] =
+                  ramp.from[property] +
+                  (ramp.to[property] - ramp.from[property]) *
+                    easeGlissando(ramp.easing, (atBeat - ramp.start) / ramp.duration)
+          }
+          return settings
+        }
+        const initial = settingsAt(fromBeat)
+        const automation = Object.fromEntries(
+          properties.map((property) => {
+            const curves = ramps.flatMap((ramp) => {
+              if (ramp.from[property] === ramp.to[property]) return []
+              const note: ScheduledLaneNote = {
+                beat: 0,
+                duration: ramp.start + ramp.duration,
+                cents: ramp.from[property],
+                velocity: 0,
+                envelope: { attack: 0, decay: 0, sustain: 0, release: 0 },
+                sourceRanges: [],
+                glissando: [
+                  {
+                    start: ramp.start,
+                    duration: ramp.duration,
+                    from: ramp.from[property],
+                    to: ramp.to[property],
+                    easing: ramp.easing,
+                  },
+                ],
+              }
+              return compilePitchAutomation(note, tempoMap, fromBeat, ramp.start + ramp.duration)
+                .curves
+            })
+            return [
+              property,
+              Object.freeze({ initialValue: initial[property], curves: Object.freeze(curves) }),
+            ]
+          }),
+        ) as unknown as Readonly<Record<keyof EffectSettings, PitchAutomationPlan>>
         return Object.freeze({
           id: effect.id,
           name: effect.name,
           patchPreset: effect.patchPreset,
           gain: effect.gain,
+          automation,
           config: Object.freeze({ ...initial }),
           configChanges: Object.freeze(
             timeline

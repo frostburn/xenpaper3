@@ -3,6 +3,8 @@ import type { Program } from '../parser.generated.js'
 import type { Diagnostic } from '../diagnostics'
 import { evaluateProgramSemantics } from './score-shape'
 import type {
+  DirectiveRamp,
+  DirectiveRampMarker,
   ScoreInitialization,
   ScoreShape,
   ScoreShapeOptions,
@@ -23,8 +25,10 @@ export function contextAt(initialization: ScoreInitialization | undefined, start
 }
 
 /** Collect exact grid positions, restoring state when explicit scopes end. */
-function timelineContexts(shape: ScoreShape, base: ScoreVisitorContext): TimedScoreContext[] {
+function timelineContexts(shape: ScoreShape, base: ScoreVisitorContext) {
   const changes: TimedScoreContext[] = []
+  const ramps: DirectiveRamp[] = []
+  const starts = new Map<DirectiveRampMarker, { start: Fraction; state: unknown }>()
   const visit = (
     current: ScoreShape,
     start: Fraction,
@@ -32,6 +36,22 @@ function timelineContexts(shape: ScoreShape, base: ScoreVisitorContext): TimedSc
   ): ScoreVisitorContext => {
     let active = current.visitorContextChange ?? context
     if (current.visitorContextChange) changes.push({ start, context: active })
+    const end = current.directiveRampEnd
+    if (end) {
+      const source = starts.get(end)
+      if (source)
+        ramps.push({
+          start: source.start,
+          duration: start.sub(source.start),
+          curve: end.curve,
+          stateKey: end.stateKey,
+          directiveName: end.directiveName,
+          from: source.state,
+          to: active.directiveState[end.stateKey],
+        })
+    }
+    const begin = current.directiveRampStart
+    if (begin) starts.set(begin, { start, state: active.directiveState[begin.stateKey] })
     if (current.kind === 'sequence') {
       let cursor = start
       for (const child of current.children) {
@@ -50,13 +70,16 @@ function timelineContexts(shape: ScoreShape, base: ScoreVisitorContext): TimedSc
     return active
   }
   visit(shape, new Fraction(0), base)
-  return [
-    ...new Map(
-      changes
-        .sort((left, right) => left.start.compare(right.start))
-        .map((change) => [change.start.toFraction(), change]),
-    ).values(),
-  ]
+  return {
+    ramps,
+    changes: [
+      ...new Map(
+        changes
+          .sort((left, right) => left.start.compare(right.start))
+          .map((change) => [change.start.toFraction(), change]),
+      ).values(),
+    ],
+  }
 }
 
 function containsAttack(shape: ScoreShape): boolean {
@@ -122,9 +145,11 @@ export function evaluateInitialization(
       if (!evaluated || !('shape' in evaluated)) return { diagnostics }
       const base = evaluateProgramSemantics({ ...program, body: [] }, { ...settings, ...context })
       if (!('shape' in base) || !base.visitorContext) return { diagnostics }
+      const timeline = timelineContexts(evaluated.shape, base.visitorContext)
       variants.set(context, {
         context: base.visitorContext,
-        changes: timelineContexts(evaluated.shape, base.visitorContext),
+        changes: timeline.changes,
+        directiveRamps: timeline.ramps,
       })
     }
     const starts = new Map<string, Fraction>()
@@ -141,6 +166,7 @@ export function evaluateInitialization(
     initialization = {
       context: variants.get(initialParentContext)?.context,
       changes,
+      directiveRamps: variants.get(initialParentContext)?.directiveRamps,
       timelineShape: combineTimelineShapes(parent.timelineShape, result.shape),
       shape: parent.shape,
     }
@@ -152,6 +178,10 @@ export function evaluateInitialization(
     initialization = {
       context: result.visitorContext,
       changes,
+      directiveRamps: [
+        ...(parent.directiveRamps ?? []),
+        ...timelineContexts(result.shape, result.visitorContext!).ramps,
+      ],
       timelineShape: parent.timelineShape,
       shape: parent.shape
         ? {
@@ -163,6 +193,14 @@ export function evaluateInitialization(
         : result.shape,
     }
   }
+  for (const ramp of initialization.directiveRamps ?? [])
+    if (ramp.duration.compare(0) <= 0)
+      diagnostics.push({
+        code: 'XP_DIRECTIVE',
+        severity: 'error',
+        message: '@ramp requires a positive duration between signal directives.',
+        locations: [program.location],
+      })
   return diagnostics.some(({ severity }) => severity === 'error')
     ? { diagnostics }
     : { initialization, diagnostics }

@@ -4,6 +4,7 @@ import { beat, createDefaultProject } from '../daw/project'
 import {
   compileEffectSettings,
   compileEffectSettingsTimeline,
+  compileEffectTimeline,
   parseClipNotes,
   parseProjectScoreNotes,
 } from '../daw/score'
@@ -77,6 +78,84 @@ describe('DAW playback planning', () => {
         config: { delayTime: 0.5, feedback: 0.5, wet: 0.25, separation: 1 },
       }),
     ])
+  })
+
+  it.each(['linear', 'ease', 'ease-in', 'ease-out', 'ease-in-out'])(
+    'compiles the %s ramp curve without changing pitch',
+    (curve) => {
+      const timeline = compileEffectTimeline(`@ramp(${curve}) @feedback(20%) ;; @feedback(80%) ;`)
+      expect(timeline.ramps).toEqual([
+        expect.objectContaining({
+          start: 0,
+          duration: 8,
+          easing: curve,
+          from: expect.objectContaining({ feedback: 0.2 }),
+          to: expect.objectContaining({ feedback: 0.8 }),
+        }),
+      ])
+      expect(
+        compileEffectSettings(`@ramp(${curve}) @feedback(20%) ;; @feedback(80%) ;`).feedback,
+      ).toBeCloseTo(0.8)
+    },
+  )
+
+  it('chains ramps and keeps intervening effect changes separate', () => {
+    const timeline = compileEffectTimeline(
+      '@ramp(ease-in) @feedback(20%) ; @wet(70%) ; @ramp(ease-out) @feedback(80%) ; @feedback(40%)',
+    )
+    expect(
+      timeline.ramps.map(({ start, duration, easing }) => ({ start, duration, easing })),
+    ).toEqual([
+      { start: 0, duration: 8, easing: 'ease-in' },
+      { start: 8, duration: 4, easing: 'ease-out' },
+    ])
+    expect(timeline.ramps[0]!.to.wet).toBe(timeline.ramps[0]!.from.wet)
+  })
+
+  it('preserves ramp timing through normalized groups, repeats, and scope restoration', () => {
+    const normalized = compileEffectTimeline('[@ramp @feedback(20%) .. @feedback(80%)]')
+    expect(normalized.ramps[0]!.duration).toBe(1)
+    expect(compileEffectSettings('(@ramp @feedback(20%) ; @feedback(80%))').feedback).toBe(0.55)
+    const repeated = compileEffectTimeline('|:@x2 @ramp @feedback(20%) ; @feedback(80%) :|')
+    expect(repeated.ramps.map(({ start, duration }) => [start, duration])).toEqual([
+      [0, 4],
+      [4, 4],
+    ])
+  })
+
+  it.each([
+    ['@ramp(bounce-in) @feedback(20%) ; @feedback(80%)', 'ramp curve must be one of'],
+    ['@ramp(linear,ease) @feedback(20%) ; @feedback(80%)', 'at most one curve'],
+    ['@ramp @feedback(20%) ;', 'missing required following signal'],
+    ['@ramp C D', 'missing required following signal'],
+    ['@ramp @feedback(20%) @feedback(80%)', 'positive duration'],
+  ])('rejects invalid ramp source %s', (source, message) => {
+    expect(() => compileEffectTimeline(source)).toThrow(message)
+  })
+
+  it('samples resumed effect ramps in beats across tempo changes', () => {
+    const project = createDefaultProject()
+    project.globalTrack.source = ';@tempo(60bpm)'
+    project.effectLanes.push({
+      id: 'delay',
+      kind: 'effect',
+      name: 'Delay',
+      patchPreset: 'ping-pong-delay',
+      gain: 1,
+      source: '@ramp @feedback(20%) ;; @feedback(80%) ; @wet(70%)',
+    })
+    const plan = createPlaybackPlan(project, 2)
+    const effect = plan.effects![0]!
+    expect(effect.config.feedback).toBeCloseTo(0.35)
+    const curve = effect.automation!.feedback.curves[0]!
+    expect(curve.offset).toBe(0)
+    expect(curve.duration).toBe(5)
+    expect(curve.values[0]).toBeCloseTo(0.35)
+    expect(curve.values[curve.values.length - 1]).toBeCloseTo(0.8)
+    const index = Math.round((curve.values.length - 1) / 5)
+    expect(curve.values[index]).toBeCloseTo(0.5, 2)
+    expect(effect.automation!.wet.curves).toEqual([])
+    expect(createPlaybackPlan(project, 10).effects![0]!.config.feedback).toBeCloseTo(0.8)
   })
 
   it('derives tempo changes from the duration-bearing global source', () => {

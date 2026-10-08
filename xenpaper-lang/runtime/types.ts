@@ -156,6 +156,22 @@ export interface ScoreVisitorContext {
   readonly lexicalEnvironment?: LexicalEnvironment
 }
 
+export interface DirectiveRamp {
+  readonly start: Fraction
+  readonly duration: Fraction
+  readonly curve: string
+  readonly stateKey: string
+  readonly directiveName: string
+  readonly from: unknown
+  readonly to: unknown
+}
+
+export interface DirectiveRampMarker {
+  readonly directiveName: string
+  readonly curve: string
+  readonly stateKey: string
+}
+
 export interface TimedScoreContext {
   readonly start: Fraction
   readonly context: ScoreVisitorContext
@@ -166,6 +182,7 @@ export interface ScoreInitialization {
   readonly context?: ScoreVisitorContext
   readonly changes?: readonly TimedScoreContext[]
   readonly shape?: ScoreShape
+  readonly directiveRamps?: readonly DirectiveRamp[]
   readonly timelineShape?: ScoreShape
 }
 
@@ -436,6 +453,8 @@ export interface SourceOrigin {
 }
 
 export interface ShapeBase {
+  readonly directiveRampStart?: DirectiveRampMarker
+  readonly directiveRampEnd?: DirectiveRampMarker
   readonly duration: Fraction
   readonly origins: readonly SourceOrigin[]
   /** Directive state within this shape does not escape to its parent scope. */

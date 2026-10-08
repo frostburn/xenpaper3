@@ -28,6 +28,7 @@ export const DIRECTIVE_REGISTRY = Object.freeze({
   subdivision: 'subdivision',
   velocity: 'velocity',
   gliss: 'gliss',
+  ramp: 'ramp',
   groove: 'groove',
   drone: 'drone',
   clef: 'clef',
@@ -55,7 +56,7 @@ export type ResolvedDirective =
   | { kind: 'grace'; duration: Fraction; count: number }
   | { kind: 'dynamic'; mark: DynamicMark; velocity: Fraction }
   | { kind: 'velocity'; velocity: Fraction }
-  | { kind: 'gliss'; curve: string }
+  | { kind: 'gliss' | 'ramp'; curve: string }
   | { kind: 'groove'; argument?: Expression }
   | { kind: 'drone'; argument?: Expression }
   | { kind: 'articulation'; ratio: Fraction; mark?: string; shorthand: boolean }
@@ -210,8 +211,8 @@ export function resolveDirective(
       diagnostics: [...evaluated.diagnostics],
     }
   }
-  if (registered === 'gliss') {
-    if (node.arguments.length > 1) return fail('@gliss accepts at most one curve argument.')
+  if (registered === 'gliss' || registered === 'ramp') {
+    if (node.arguments.length > 1) return fail(`@${registered} accepts at most one curve argument.`)
     const argument = node.arguments[0]
     const curve =
       argument?.type === 'Identifier'
@@ -220,8 +221,10 @@ export function resolveDirective(
           ? 'linear'
           : undefined
     if (!curve || !GLISS_CURVES.includes(curve))
-      return fail(`The glissando curve must be one of: ${GLISS_CURVES.join(', ')}.`)
-    return { directive: { kind: 'gliss', curve }, diagnostics: [] }
+      return fail(
+        `The ${registered === 'gliss' ? 'glissando' : 'ramp'} curve must be one of: ${GLISS_CURVES.join(', ')}.`,
+      )
+    return { directive: { kind: registered, curve }, diagnostics: [] }
   }
   if (registered === 'velocity') {
     if (node.arguments.length !== 1 || node.arguments[0]?.type === 'NamedArgument')

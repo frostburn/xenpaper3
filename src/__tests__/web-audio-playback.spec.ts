@@ -136,6 +136,57 @@ afterEach(() => {
 })
 
 describe('Web Audio playback session', () => {
+  it('schedules continuous effect curves without pitch conversion or overlapping steps', () => {
+    const context = new MockAudioContext()
+    context.currentTime = 3
+    const config = { delayTime: 0.25, feedback: 0.2, wet: 0.35, separation: 1 }
+    const empty = { initialValue: 0, curves: [] }
+    const plan: PlaybackPlan = {
+      ...createPlan(),
+      effects: [
+        {
+          id: 'delay',
+          name: 'Delay',
+          patchPreset: 'ping-pong-delay',
+          gain: 1,
+          config,
+          automation: {
+            delayTime: { ...empty, initialValue: 0.25 },
+            wet: { ...empty, initialValue: 0.35 },
+            separation: { ...empty, initialValue: 1 },
+            feedback: {
+              initialValue: 0.2,
+              curves: [
+                { offset: 0, duration: 0.75, startValue: 0.2, values: [0.2, 0.5, 0.8] },
+                { offset: 0.75, duration: 0.25, startValue: 0.8, values: [0.8, 0.4] },
+              ],
+            },
+          },
+          configChanges: [
+            { when: 0.25, config: { ...config, wet: 0.7 } },
+            { when: 0.75, config: { ...config, feedback: 0.8, wet: 0.7 } },
+            { when: 1, config: { ...config, feedback: 0.4, wet: 0.7 } },
+          ],
+        },
+      ],
+    }
+    const session = new WebAudioPlaybackSession(context as unknown as AudioContext, plan, {
+      patchFactory: () =>
+        ({ on: () => (end: number) => end, dispose: vi.fn() }) as unknown as PlayableSynthPatch,
+      effectFactory: () => ({ connect: vi.fn(), dispose: vi.fn() }) as unknown as EffectPatch,
+    })
+    session.start()
+    const feedback = context.sources[1]!.offset
+    expect(feedback.curves).toHaveLength(2)
+    expect(feedback.curves[0]!.values[0]).toBeCloseTo(0.2)
+    expect(feedback.curves[0]!.values[2]).toBeCloseTo(0.8)
+    expect(feedback.curves[0]!.time).toBe(3)
+    expect(feedback.curves[0]!.time + feedback.curves[0]!.duration).toBeLessThan(3.75)
+    expect(feedback.values.some(({ time }) => time === 3.25)).toBe(false)
+    expect(context.sources[2]!.offset.values).toContainEqual({ value: 0.7, time: 3.25 })
+    session.dispose()
+  })
+
   it('uses timeout scheduling instead of Web Audio timing sources in Safari', () => {
     vi.useFakeTimers()
     vi.stubGlobal('navigator', {

@@ -245,3 +245,29 @@ beat events, and staff notation. Run them from the repository root:
 ```sh
 npm run test:unit -- --run
 ```
+
+## Signal ramps
+
+`@ramp` connects the next two occurrences of the same extension signal directive.
+The duration between them defines the ramp; the target value then holds until
+another change. It accepts the same curves as `@gliss`: `linear` (the default),
+`ease`, `ease-in`, `ease-out`, and `ease-in-out`. Another `@ramp` before a target
+chains the next segment, with its own curve. Ramps do not affect note pitches.
+
+For example, on a ping-pong delay effect lane:
+
+```text
+@ramp(ease-in) @feedback(20%)
+;;
+@ramp(ease-out) @feedback(80%)
+;
+@feedback(40%)
+```
+
+This ramps feedback over eight beats to 80%, then over four beats to 40%.
+`@delay`, `@wet`, and `@separation` can also be ramped. Intervening changes to
+other parameters retain their usual discrete behavior. A ramp requires both
+signal directives and a positive duration. Initialization exposes exact beat
+segments in `directiveRamps`; audio consumers choose how to interpolate the
+extension's state. The DAW samples curves in project beats through tempo changes
+and resumes at the interpolated value when playback starts during a ramp.
