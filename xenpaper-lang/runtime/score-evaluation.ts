@@ -1483,6 +1483,9 @@ export function evaluateScoreSemantics(
       let elapsed = new Fraction(0)
       let velocity: Fraction | undefined
       let grace: { duration: Fraction; count: number; indices: number[] } | undefined
+      let ramp:
+        | { curve: string; nextCurve?: string; source?: ScoreShape['directiveRampStart'] }
+        | undefined
       let gliss:
         | {
             indices: number[]
@@ -1573,10 +1576,28 @@ export function evaluateScoreSemantics(
                 throw new EvaluationError(applied.diagnostics)
               return { ...context, directiveState: applied.state }
             })
-            results.push({
-              shape: withVisitorContext(sequence([], [origin(item, 'directive')]), activeVisitor),
-              diagnostics: extended.diagnostics,
-            })
+            let shape = withVisitorContext(sequence([], [origin(item, 'directive')]), activeVisitor)
+            if (ramp && !extended.diagnostics.some(({ severity }) => severity === 'error')) {
+              const extension = extensions.get(item.name)!
+              const stateKey = extension.stateKey?.toLowerCase() ?? item.name
+              if (!ramp.source) {
+                ramp.source = { curve: ramp.curve, stateKey, directiveName: item.name }
+                shape = { ...shape, directiveRampStart: ramp.source }
+              } else if (
+                ramp.source.stateKey === stateKey &&
+                ramp.source.directiveName === item.name
+              ) {
+                shape = { ...shape, directiveRampEnd: ramp.source }
+                if (ramp.nextCurve) {
+                  ramp = {
+                    curve: ramp.nextCurve,
+                    source: { curve: ramp.nextCurve, stateKey, directiveName: item.name },
+                  }
+                  shape = { ...shape, directiveRampStart: ramp.source }
+                } else ramp = undefined
+              }
+            }
+            results.push({ shape, diagnostics: extended.diagnostics })
             continue
           }
           const resolved = resolveDirective(
@@ -1623,7 +1644,10 @@ export function evaluateScoreSemantics(
           else if (directive?.kind === 'velocity') velocity = directive.velocity
           else if (directive?.kind === 'grace')
             grace = { duration: directive.duration, count: directive.count, indices: [] }
-          else if (directive?.kind === 'gliss') {
+          else if (directive?.kind === 'ramp') {
+            if (!ramp) ramp = { curve: directive.curve }
+            else if (ramp.source) ramp.nextCurve = directive.curve
+          } else if (directive?.kind === 'gliss') {
             // A gliss directive between the source and target starts another segment at that
             // target. Keep collecting the current pair; completion below will seed the next pair.
             if (!gliss) gliss = { indices: [], curve: directive.curve }
@@ -1954,6 +1978,13 @@ export function evaluateScoreSemantics(
         activeVisitor = visitorAfter(result, activeVisitor)
       }
       const diagnostics = results.flatMap((result) => result.diagnostics)
+      if (ramp)
+        diagnostics.push({
+          code: 'XP_DIRECTIVE',
+          severity: 'error',
+          message: '@ramp is missing required following signal directives.',
+          locations: [current.location],
+        })
       if (grace || gliss)
         diagnostics.push({
           code: 'XP_DIRECTIVE',

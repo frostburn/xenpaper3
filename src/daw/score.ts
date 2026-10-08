@@ -37,6 +37,14 @@ export interface EffectSettings {
   readonly separation: number
 }
 
+export interface EffectRamp {
+  readonly start: number
+  readonly duration: number
+  readonly easing: string
+  readonly from: EffectSettings
+  readonly to: EffectSettings
+}
+
 export interface TimedEffectSettings {
   readonly beat: number
   readonly settings: EffectSettings
@@ -268,10 +276,10 @@ const EFFECT_EXTENSIONS = [
 ]
 
 /** Compile the control directives supported by the ping-pong delay effect lane. */
-export const compileEffectSettingsTimeline = (
+export const compileEffectTimeline = (
   source: string,
   timeSignature = { numerator: 4, denominator: 4 },
-): readonly TimedEffectSettings[] => {
+): { readonly changes: readonly TimedEffectSettings[]; readonly ramps: readonly EffectRamp[] } => {
   const result = evaluateInitialization(parse(source), {
     directiveExtensions: EFFECT_EXTENSIONS,
     allowDuration: true,
@@ -291,8 +299,42 @@ export const compileEffectSettingsTimeline = (
     const settings = change.context.directiveState.effect as EffectSettings | undefined
     if (settings) timeline.push({ beat: change.start.valueOf(), settings })
   }
-  return Object.freeze(timeline.map((change) => Object.freeze(change)))
+  const signalRamps = (result.initialization?.directiveRamps ?? [])
+    .filter(({ stateKey }) => stateKey === 'effect')
+    .sort((left, right) => left.start.compare(right.start))
+  const ends = new Map<string, Fraction>()
+  for (const ramp of signalRamps) {
+    const previousEnd = ends.get(ramp.directiveName)
+    if (previousEnd && ramp.start.compare(previousEnd) < 0)
+      throw new Error(`Overlapping @ramp segments for @${ramp.directiveName} are not supported.`)
+    ends.set(ramp.directiveName, ramp.start.add(ramp.duration))
+  }
+  const ramps = signalRamps.map((ramp) => {
+    if (ramp.duration.compare(0) <= 0)
+      throw new Error('@ramp requires a positive duration between signal directives.')
+    const property =
+      ramp.directiveName === 'delay' ? 'delayTime' : (ramp.directiveName as keyof EffectSettings)
+    const from = ramp.from as EffectSettings
+    const target = ramp.to as EffectSettings
+    return Object.freeze({
+      start: ramp.start.valueOf(),
+      duration: ramp.duration.valueOf(),
+      easing: ramp.curve,
+      from,
+      to: Object.freeze({ ...from, [property]: target[property] }),
+    })
+  })
+  return Object.freeze({
+    changes: Object.freeze(timeline.map((change) => Object.freeze(change))),
+    ramps: Object.freeze(ramps),
+  })
 }
+
+/** Compile discrete effect settings, preserving the existing timeline API. */
+export const compileEffectSettingsTimeline = (
+  source: string,
+  timeSignature = { numerator: 4, denominator: 4 },
+): readonly TimedEffectSettings[] => compileEffectTimeline(source, timeSignature).changes
 
 /** Compile the settings prevailing at the end of an effect source. */
 export const compileEffectSettings = (

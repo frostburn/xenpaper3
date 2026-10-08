@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { parse } from '../parser.js'
 import { expandToBeatEvents } from '../runtime/beat-events'
+import { evaluateInitialization } from '../runtime/initialization'
 import { evaluateExpression } from '../runtime/expressions'
 import { evaluateScoreShape } from '../runtime/score-shape'
 import type { BeatTimedNoteEvent, DirectiveExtension, PitchContext } from '../runtime/types'
@@ -85,6 +86,39 @@ const shapeNotes = (source: string, extensions: readonly DirectiveExtension[]) =
 }
 
 describe('second-party directive extensions', () => {
+  it.each(['.', '. @ramp(ease-in) @patch(sustain: 30%) . @patch(sustain: 70%)'])(
+    'preserves inherited ramps when composing duration-bearing initialization: %s',
+    (childSource) => {
+      const initialize = (
+        source: string,
+        initialization?: import('../runtime/types').ScoreInitialization,
+      ) => {
+        const result = evaluateInitialization(parse(source), {
+          allowDuration: true,
+          directiveExtensions: [patchExtension],
+          initialization,
+        })
+        expect(result.diagnostics).toEqual([])
+        expect(result.initialization).toBeDefined()
+        return result.initialization!
+      }
+      const parent = initialize('@ramp @patch(sustain: 20%) . @patch(sustain: 80%)')
+      const inherited = parent.directiveRamps![0]!
+      expect(inherited.start.toFraction()).toBe('0')
+      expect(inherited.duration.toFraction()).toBe('1')
+      const child = initialize(childSource, parent)
+      expect(child.directiveRamps![0]).toBe(inherited)
+      expect(child.directiveRamps).toHaveLength(childSource === '.' ? 1 : 2)
+      if (childSource !== '.') {
+        expect(child.directiveRamps![1]!.start.toFraction()).toBe('1')
+        expect(child.directiveRamps![1]!.curve).toBe('ease-in')
+      }
+      const grandchild = initialize('..', child)
+      expect(grandchild.directiveRamps).toEqual(child.directiveRamps)
+      expect(parent.directiveRamps).toEqual([inherited])
+    },
+  )
+
   it('lets an audio engine define unrelated and sustainless patch geometries', () => {
     const events = notes(
       'C @patch(name: adrBass, decay: 80ms, pitchDrop: 2) D @patch(click: 25%) E',
