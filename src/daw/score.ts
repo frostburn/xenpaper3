@@ -37,6 +37,14 @@ export interface EffectSettings {
   readonly separation: number
 }
 
+export interface EffectRamp {
+  readonly start: number
+  readonly duration: number
+  readonly easing: string
+  readonly from: EffectSettings
+  readonly to: EffectSettings
+}
+
 export interface TimedEffectSettings {
   readonly beat: number
   readonly settings: EffectSettings
@@ -225,36 +233,26 @@ const adsrExtension: DirectiveExtension = {
 
 export interface SpreadSettings {
   readonly value: number
-  readonly duration: number
 }
-export const DEFAULT_SPREAD: SpreadSettings = Object.freeze({ value: 20, duration: 0 })
+export const DEFAULT_SPREAD: SpreadSettings = Object.freeze({ value: 20 })
 const spreadExtension: DirectiveExtension = {
   name: 'spread',
   stateKey: 'spread',
   initialState: DEFAULT_SPREAD,
   apply(directive, context) {
+    if (directive.arguments.length !== 1 || directive.arguments[0]?.type === 'NamedArgument')
+      throw new Error('@spread requires exactly one cent value.')
+    const result = evaluateExpression(directive.arguments[0] as Expression, context)
     if (
-      directive.arguments.length < 1 ||
-      directive.arguments.length > 2 ||
-      directive.arguments.some((argument) => argument.type === 'NamedArgument')
+      !('value' in result) ||
+      result.value.kind !== 'pitchOffset' ||
+      !result.value.value.dimensions.equals({ pitch: 1 })
     )
-      throw new Error('@spread requires a cent value and an optional ramp duration in seconds.')
-    const values = directive.arguments.map((expression, index) => {
-      const result = evaluateExpression(expression as Expression, context)
-      if (
-        !('value' in result) ||
-        (result.value.kind !== 'scalar' && result.value.kind !== 'pitchOffset')
-      )
-        throw new Error('@spread requires scalar values.')
-      const value = result.value.value
-      if (!value.dimensions.equals(index === 0 ? { pitch: 1 } : { seconds: 1 }))
-        throw new Error('@spread requires a cent value and an optional ramp duration in seconds.')
-      const numeric = Number(value)
-      if (!Number.isFinite(numeric) || numeric < 0)
-        throw new Error('@spread values must be finite and non-negative.')
-      return numeric
-    })
-    return { state: Object.freeze({ value: values[0]!, duration: values[1] ?? 0 }) }
+      throw new Error('@spread requires a cent value.')
+    const value = Number(result.value.value)
+    if (!Number.isFinite(value) || value < 0)
+      throw new Error('@spread must be finite and non-negative.')
+    return { state: Object.freeze({ value }) }
   },
 }
 const ENVELOPE_EXTENSIONS = [envelopeExtension, adsrExtension, spreadExtension]
@@ -302,10 +300,10 @@ const EFFECT_EXTENSIONS = [
 ]
 
 /** Compile the control directives supported by the ping-pong delay effect lane. */
-export const compileEffectSettingsTimeline = (
+export const compileEffectTimeline = (
   source: string,
   timeSignature = { numerator: 4, denominator: 4 },
-): readonly TimedEffectSettings[] => {
+): { readonly changes: readonly TimedEffectSettings[]; readonly ramps: readonly EffectRamp[] } => {
   const result = evaluateInitialization(parse(source), {
     directiveExtensions: EFFECT_EXTENSIONS,
     allowDuration: true,
@@ -325,8 +323,42 @@ export const compileEffectSettingsTimeline = (
     const settings = change.context.directiveState.effect as EffectSettings | undefined
     if (settings) timeline.push({ beat: change.start.valueOf(), settings })
   }
-  return Object.freeze(timeline.map((change) => Object.freeze(change)))
+  const signalRamps = (result.initialization?.directiveRamps ?? [])
+    .filter(({ stateKey }) => stateKey === 'effect')
+    .sort((left, right) => left.start.compare(right.start))
+  const ends = new Map<string, Fraction>()
+  for (const ramp of signalRamps) {
+    const previousEnd = ends.get(ramp.directiveName)
+    if (previousEnd && ramp.start.compare(previousEnd) < 0)
+      throw new Error(`Overlapping @ramp segments for @${ramp.directiveName} are not supported.`)
+    ends.set(ramp.directiveName, ramp.start.add(ramp.duration))
+  }
+  const ramps = signalRamps.map((ramp) => {
+    if (ramp.duration.compare(0) <= 0)
+      throw new Error('@ramp requires a positive duration between signal directives.')
+    const property =
+      ramp.directiveName === 'delay' ? 'delayTime' : (ramp.directiveName as keyof EffectSettings)
+    const from = ramp.from as EffectSettings
+    const target = ramp.to as EffectSettings
+    return Object.freeze({
+      start: ramp.start.valueOf(),
+      duration: ramp.duration.valueOf(),
+      easing: ramp.curve,
+      from,
+      to: Object.freeze({ ...from, [property]: target[property] }),
+    })
+  })
+  return Object.freeze({
+    changes: Object.freeze(timeline.map((change) => Object.freeze(change))),
+    ramps: Object.freeze(ramps),
+  })
 }
+
+/** Compile discrete effect settings, preserving the existing timeline API. */
+export const compileEffectSettingsTimeline = (
+  source: string,
+  timeSignature = { numerator: 4, denominator: 4 },
+): readonly TimedEffectSettings[] => compileEffectTimeline(source, timeSignature).changes
 
 /** Compile the settings prevailing at the end of an effect source. */
 export const compileEffectSettings = (

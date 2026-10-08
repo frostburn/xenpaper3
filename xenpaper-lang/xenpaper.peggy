@@ -525,9 +525,9 @@ Directive
     }
 
 GlissDirectiveBody
-  = name:$('gliss'i) !IdentifierContinue args:GlissDirectiveArguments? {
+  = name:$('gliss'i / 'ramp'i) !IdentifierContinue args:GlissDirectiveArguments? {
       return {
-        name: 'gliss',
+        name: name.toLowerCase(),
         rawName: name,
         arguments: args ?? [],
         graceCount: 0,

@@ -488,7 +488,7 @@ const clipPreview = (clipId: string) => pianoRoll.value.notesByClip[clipId]!
           />
         </label>
         <span
-          >Spread defaults to 20 cents. Use @spread(0c) or @spread(40c, 2s) in lane source to ramp
+          >Spread defaults to 20 cents. Use @ramp @spread(0c) ; @spread(40c) in lane source to ramp
           it.</span
         >
       </section>

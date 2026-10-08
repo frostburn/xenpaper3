@@ -48,24 +48,41 @@ describe('Unison lane automation', () => {
     expect(() => serializeDawProject(project)).toThrow()
   })
 
-  it('plans timed cent ramps and resumes inside an interrupted ramp', () => {
-    const project = projectWithUnison('@spread(0c) ; @spread(40c, 4s) ; @spread(10c, 2s) ;')
-    const plan = createPlaybackPlan(project)
-    const lane = plan.lanes[0]!
+  it.each(['linear', 'ease', 'ease-in', 'ease-out', 'ease-in-out'])(
+    'plans %s cent ramps and resumes inside a chained ramp',
+    (easing) => {
+      const project = projectWithUnison(
+        `@ramp(${easing}) @spread(0c) ; @ramp @spread(40c) ; @spread(10c) ;`,
+      )
+      const lane = createPlaybackPlan(project).lanes[0]!
+      if (lane.kind !== 'instrument') throw new Error('Expected pitched lane')
+      expect(lane.spread!.initialValue).toBe(0)
+      expect(lane.spread!.curves).toHaveLength(2)
+      expect(lane.spread!.curves[0]).toMatchObject({ offset: 0, duration: 2, startValue: 0 })
+      expect(lane.spread!.curves[0]!.values.slice(-1)[0]).toBe(40)
+      const resumed = createPlaybackPlan(project, 6).lanes[0]!
+      if (resumed.kind !== 'instrument') throw new Error('Expected pitched lane')
+      expect(resumed.spread!.initialValue).toBe(25)
+      expect(resumed.spread!.curves[0]).toMatchObject({ offset: 0, duration: 1, startValue: 25 })
+      expect(resumed.spread!.curves[0]!.values.slice(-1)[0]).toBe(10)
+    },
+  )
+
+  it('follows project tempo changes and resumes with the prevailing cent value', () => {
+    const project = projectWithUnison('@ramp @spread(0c) ;; @spread(40c) ;')
+    project.globalTrack.source = '; @tempo(60bpm)'
+    const lane = createPlaybackPlan(project, 2).lanes[0]!
     if (lane.kind !== 'instrument') throw new Error('Expected pitched lane')
-    expect(lane.spread).toEqual({
-      initialValue: 0,
-      changes: [
-        { when: 2, value: 40, duration: 4 },
-        { when: 4, value: 10, duration: 2 },
-      ],
-    })
-    const resumed = createPlaybackPlan(project, 10).lanes[0]!
-    if (resumed.kind !== 'instrument') throw new Error('Expected pitched lane')
-    expect(resumed.spread).toEqual({
-      initialValue: 15,
-      changes: [{ when: 5, value: 10, duration: 1 }],
-    })
+    expect(lane.spread!.initialValue).toBe(10)
+    expect(lane.spread!.curves[0]!.duration).toBe(5)
+    expect(lane.spread!.curves[0]!.values.slice(-1)[0]).toBe(40)
+  })
+
+  it('rejects overlapping ramps for the shared lane signal', () => {
+    const project = projectWithUnison(
+      '(@ramp @spread(0c) ; @spread(40c), @ramp @spread(10c) ; @spread(20c))',
+    )
+    expect(() => createPlaybackPlan(project)).toThrow('Overlapping @ramp segments for @spread')
   })
 
   it('rejects wrong units, negative values and unsupported argument shapes', () => {
@@ -81,34 +98,27 @@ describe('Unison lane automation', () => {
       expect(() => compileLaneSourceInitialization(source)).toThrow('@spread')
   })
 
-  it('schedules ramps with no pitch reference offset and holds interrupted ramps', () => {
-    const target = {
-      setValueAtTime: vi.fn(),
-      linearRampToValueAtTime: vi.fn(),
-      cancelScheduledValues: vi.fn(),
-    }
+  it('schedules cent curves without pitch conversion or steps inside a curve', () => {
+    const target = { setValueAtTime: vi.fn(), setValueCurveAtTime: vi.fn() }
     applySpreadAutomation(
       target,
       {
         initialValue: 0,
+        curves: [{ offset: 0, duration: 2, startValue: 0, values: [0, 20, 40] }],
         changes: [
-          { when: 2, value: 40, duration: 4 },
-          { when: 4, value: 10, duration: 2 },
+          { when: 1, value: 0 },
+          { when: 2, value: 40 },
         ],
       },
       10,
       0,
     )
     expect(target.setValueAtTime.mock.calls).toEqual([
+      [40, 12],
       [0, 10],
-      [0, 12],
-      [20, 14],
+      [0, 10],
     ])
-    expect(target.cancelScheduledValues).toHaveBeenCalledWith(16)
-    expect(target.linearRampToValueAtTime.mock.calls).toEqual([
-      [40, 16],
-      [20, 14],
-      [10, 16],
-    ])
+    expect([...target.setValueCurveAtTime.mock.calls[0]![0]]).toEqual([0, 20, 40])
+    expect(target.setValueCurveAtTime.mock.calls[0]![2]).toBeLessThan(2)
   })
 })

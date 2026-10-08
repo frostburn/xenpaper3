@@ -90,6 +90,7 @@ export class WebAudioPlaybackSession {
   private readonly effectSignals: ConstantSourceNode[] = []
   private readonly effectAutomations: Array<{
     readonly signal: ConstantSourceNode
+    readonly automation?: import('./playback-plan').PitchAutomationPlan
     readonly values: readonly { readonly when: number; readonly value: number }[]
   }> = []
   private readonly effects: EffectPatch[] = []
@@ -133,6 +134,7 @@ export class WebAudioPlaybackSession {
         this.effectSignals.push(signal)
         this.effectAutomations.push({
           signal,
+          automation: effect.automation?.[property],
           values: effect.configChanges.map(({ when, config }) => ({
             when,
             value: config[property],
@@ -180,9 +182,19 @@ export class WebAudioPlaybackSession {
     if (this.state !== 'ready') throw new Error('A Web Audio playback session is one-shot')
     try {
       const contextStart = this.context.currentTime
-      for (const { signal, values } of this.effectAutomations)
-        for (const { when, value } of values)
-          signal.offset.setValueAtTime(value, contextStart + when - this.plan.startTime)
+      for (const { signal, values, automation } of this.effectAutomations) {
+        let previous = automation?.initialValue ?? signal.offset.value
+        for (const { when, value } of values) {
+          const offset = when - this.plan.startTime
+          const inCurve = automation?.curves.some(
+            (curve) => offset >= curve.offset && offset < curve.offset + curve.duration,
+          )
+          if (!inCurve && value !== previous)
+            signal.offset.setValueAtTime(value, contextStart + offset)
+          previous = value
+        }
+        if (automation) applyPitchAutomation(signal.offset, automation, contextStart, 0)
+      }
       this.schedulePlan()
       this.state = 'playing'
       this.transport.addEventListener('ended', this.handleTransportEnded, { once: true })
@@ -314,7 +326,7 @@ export class WebAudioPlaybackSession {
         spread = this.context.createConstantSource()
         this.effectSignals.push(spread)
         const start = this.context.currentTime
-        const automation = lane.spread ?? { initialValue: 20, changes: [] }
+        const automation = lane.spread ?? { initialValue: 20, curves: [], changes: [] }
         applySpreadAutomation(spread.offset, automation, start, this.plan.startTime)
         spread.start(start)
       }
