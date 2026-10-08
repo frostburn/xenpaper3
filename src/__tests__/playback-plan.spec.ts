@@ -133,6 +133,46 @@ describe('DAW playback planning', () => {
     expect(() => compileEffectTimeline(source)).toThrow(message)
   })
 
+  it.each([
+    '(@ramp @feedback(20%) ; @feedback(80%), @ramp @feedback(30%) ; @feedback(70%))',
+    '(@ramp @feedback(20%) ; @feedback(80%), . @ramp @feedback(30%) ; @feedback(70%))',
+    '(@ramp @feedback(20%) ; @feedback(20%), @ramp @feedback(30%) ; @feedback(70%))',
+  ])('rejects overlapping ramps for the same signal before audio scheduling: %s', (source) => {
+    expect(() => compileEffectTimeline(source)).toThrow('Overlapping @ramp segments for @feedback')
+    const project = createDefaultProject()
+    project.effectLanes.push({
+      id: 'delay',
+      kind: 'effect',
+      name: 'Delay',
+      patchPreset: 'ping-pong-delay',
+      gain: 1,
+      source,
+    })
+    expect(() => createPlaybackPlan(project)).toThrow('Overlapping @ramp segments for @feedback')
+  })
+
+  it('allows parallel ramps for different signals and sorts segments before scheduling', () => {
+    const project = createDefaultProject()
+    project.effectLanes.push({
+      id: 'delay',
+      kind: 'effect',
+      name: 'Delay',
+      patchPreset: 'ping-pong-delay',
+      gain: 1,
+      source:
+        '(; @ramp @feedback(30%) ; @feedback(70%), @ramp @feedback(20%) ; @feedback(80%), @ramp @wet(10%) ;; @wet(90%))',
+    })
+    const effect = createPlaybackPlan(project).effects![0]!
+    expect(
+      effect.automation!.feedback.curves.map(({ offset, duration }) => [offset, duration]),
+    ).toEqual([
+      [0, 2],
+      [2, 2],
+    ])
+    expect(effect.automation!.wet.curves).toHaveLength(1)
+    expect(effect.automation!.wet.curves[0]!.duration).toBe(4)
+  })
+
   it('samples resumed effect ramps in beats across tempo changes', () => {
     const project = createDefaultProject()
     project.globalTrack.source = ';@tempo(60bpm)'

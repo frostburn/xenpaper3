@@ -267,7 +267,9 @@ For example, on a ping-pong delay effect lane:
 This ramps feedback over eight beats to 80%, then over four beats to 40%.
 `@delay`, `@wet`, and `@separation` can also be ramped. Intervening changes to
 other parameters retain their usual discrete behavior. A ramp requires both
-signal directives and a positive duration. Initialization exposes exact beat
+signal directives and a positive duration. Overlapping ramps for the same effect
+parameter are rejected during compilation; parallel ramps for different
+parameters are supported. Initialization exposes exact beat
 segments in `directiveRamps`; audio consumers choose how to interpolate the
 extension's state. The DAW samples curves in project beats through tempo changes
 and resumes at the interpolated value when playback starts during a ramp.

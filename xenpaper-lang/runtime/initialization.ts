@@ -166,7 +166,10 @@ export function evaluateInitialization(
     initialization = {
       context: variants.get(initialParentContext)?.context,
       changes,
-      directiveRamps: variants.get(initialParentContext)?.directiveRamps,
+      directiveRamps: [
+        ...(parent.directiveRamps ?? []),
+        ...(variants.get(initialParentContext)?.directiveRamps ?? []),
+      ],
       timelineShape: combineTimelineShapes(parent.timelineShape, result.shape),
       shape: parent.shape,
     }

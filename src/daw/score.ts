@@ -299,23 +299,31 @@ export const compileEffectTimeline = (
     const settings = change.context.directiveState.effect as EffectSettings | undefined
     if (settings) timeline.push({ beat: change.start.valueOf(), settings })
   }
-  const ramps = (result.initialization?.directiveRamps ?? [])
+  const signalRamps = (result.initialization?.directiveRamps ?? [])
     .filter(({ stateKey }) => stateKey === 'effect')
-    .map((ramp) => {
-      if (ramp.duration.compare(0) <= 0)
-        throw new Error('@ramp requires a positive duration between signal directives.')
-      const property =
-        ramp.directiveName === 'delay' ? 'delayTime' : (ramp.directiveName as keyof EffectSettings)
-      const from = ramp.from as EffectSettings
-      const target = ramp.to as EffectSettings
-      return Object.freeze({
-        start: ramp.start.valueOf(),
-        duration: ramp.duration.valueOf(),
-        easing: ramp.curve,
-        from,
-        to: Object.freeze({ ...from, [property]: target[property] }),
-      })
+    .sort((left, right) => left.start.compare(right.start))
+  const ends = new Map<string, Fraction>()
+  for (const ramp of signalRamps) {
+    const previousEnd = ends.get(ramp.directiveName)
+    if (previousEnd && ramp.start.compare(previousEnd) < 0)
+      throw new Error(`Overlapping @ramp segments for @${ramp.directiveName} are not supported.`)
+    ends.set(ramp.directiveName, ramp.start.add(ramp.duration))
+  }
+  const ramps = signalRamps.map((ramp) => {
+    if (ramp.duration.compare(0) <= 0)
+      throw new Error('@ramp requires a positive duration between signal directives.')
+    const property =
+      ramp.directiveName === 'delay' ? 'delayTime' : (ramp.directiveName as keyof EffectSettings)
+    const from = ramp.from as EffectSettings
+    const target = ramp.to as EffectSettings
+    return Object.freeze({
+      start: ramp.start.valueOf(),
+      duration: ramp.duration.valueOf(),
+      easing: ramp.curve,
+      from,
+      to: Object.freeze({ ...from, [property]: target[property] }),
     })
+  })
   return Object.freeze({
     changes: Object.freeze(timeline.map((change) => Object.freeze(change))),
     ramps: Object.freeze(ramps),
