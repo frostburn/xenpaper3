@@ -29,11 +29,10 @@ export interface GlobalTrack {
   timeSignatureChanges: TimeSignatureChange[]
 }
 
-export const OSCILLATOR_TYPES = [
-  ...BASIC_OSCILLATOR_TYPES,
-  ...PERIODIC_TIMBRES,
-  ...APERIODIC_TIMBRES,
-] as const
+export const PERIODIC_OSCILLATOR_TYPES = [...BASIC_OSCILLATOR_TYPES, ...PERIODIC_TIMBRES] as const
+
+export const OSCILLATOR_TYPES = [...PERIODIC_OSCILLATOR_TYPES, ...APERIODIC_TIMBRES] as const
+export type PeriodicOscillatorType = (typeof PERIODIC_OSCILLATOR_TYPES)[number]
 export type OscillatorType = (typeof OSCILLATOR_TYPES)[number]
 
 export const NOISE_COLORS = ['brown', 'pink', 'white', 'blue', 'violet'] as const
@@ -86,6 +85,8 @@ export interface PatchInstrumentSource {
   type: 'patch'
   patchPreset: string
   oscillatorType: OscillatorType
+  /** Fixed number of voices in the bundled unison patch. */
+  numberOfVoices?: number
   color?: NoiseColor
   interpolation?: NoiseInterpolation
 }
@@ -196,6 +197,14 @@ export const parseDawProject = (source: string): DawProject => {
               isString(lane.instrument.patchPreset) &&
               isString(lane.instrument.oscillatorType) &&
               OSCILLATOR_TYPES.includes(lane.instrument.oscillatorType as OscillatorType) &&
+              (lane.instrument.numberOfVoices === undefined ||
+                (Number.isInteger(lane.instrument.numberOfVoices) &&
+                  (lane.instrument.numberOfVoices as number) >= 1 &&
+                  (lane.instrument.numberOfVoices as number) <= 32)) &&
+              (lane.instrument.patchPreset !== 'unison' ||
+                PERIODIC_OSCILLATOR_TYPES.includes(
+                  lane.instrument.oscillatorType as PeriodicOscillatorType,
+                )) &&
               (lane.instrument.color === undefined ||
                 NOISE_COLORS.includes(lane.instrument.color as NoiseColor)) &&
               (lane.instrument.interpolation === undefined ||
@@ -276,6 +285,9 @@ export const serializeDawProject = (project: DawProject): string => {
                   type: 'patch',
                   patchPreset: lane.instrument.patchPreset,
                   oscillatorType: lane.instrument.oscillatorType,
+                  ...(lane.instrument.numberOfVoices === undefined
+                    ? {}
+                    : { numberOfVoices: lane.instrument.numberOfVoices }),
                   ...(lane.instrument.color === undefined ? {} : { color: lane.instrument.color }),
                   ...(lane.instrument.interpolation === undefined
                     ? {}

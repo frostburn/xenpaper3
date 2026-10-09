@@ -231,7 +231,31 @@ const adsrExtension: DirectiveExtension = {
   },
 }
 
-const ENVELOPE_EXTENSIONS = [envelopeExtension, adsrExtension]
+export interface SpreadSettings {
+  readonly value: number
+}
+export const DEFAULT_SPREAD: SpreadSettings = Object.freeze({ value: 20 })
+const spreadExtension: DirectiveExtension = {
+  name: 'spread',
+  stateKey: 'spread',
+  initialState: DEFAULT_SPREAD,
+  apply(directive, context) {
+    if (directive.arguments.length !== 1 || directive.arguments[0]?.type === 'NamedArgument')
+      throw new Error('@spread requires exactly one cent value.')
+    const result = evaluateExpression(directive.arguments[0] as Expression, context)
+    if (
+      !('value' in result) ||
+      result.value.kind !== 'pitchOffset' ||
+      !result.value.value.dimensions.equals({ pitch: 1 })
+    )
+      throw new Error('@spread requires a cent value.')
+    const value = Number(result.value.value)
+    if (!Number.isFinite(value) || value < 0)
+      throw new Error('@spread must be finite and non-negative.')
+    return { state: Object.freeze({ value }) }
+  },
+}
+const ENVELOPE_EXTENSIONS = [envelopeExtension, adsrExtension, spreadExtension]
 
 const effectExtension = (
   name: 'delay' | 'feedback' | 'wet' | 'separation',

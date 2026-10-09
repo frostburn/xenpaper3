@@ -14,6 +14,7 @@ import {
   NOISE_COLORS,
   NOISE_INTERPOLATIONS,
   OSCILLATOR_TYPES,
+  PERIODIC_OSCILLATOR_TYPES,
   type ClipDisplayMode,
   type NoiseColor,
   type NoiseInterpolation,
@@ -62,12 +63,18 @@ const emit = defineEmits<{
 const sampleUrl = ref(props.lane.instrument.type === 'samples' ? props.lane.instrument.url : '')
 const sampleError = ref('')
 const loadingSamples = ref(false)
-type InstrumentMode = 'patch' | 'driven-noise' | 'samples'
+type InstrumentMode = 'patch' | 'unison' | 'driven-noise' | 'samples'
 const instrumentModeFor = (instrument: PitchedInstrumentLane['instrument']): InstrumentMode =>
-  instrument.type === 'patch' && instrument.patchPreset === 'driven-noise'
-    ? 'driven-noise'
+  instrument.type === 'patch' &&
+  (instrument.patchPreset === 'driven-noise' || instrument.patchPreset === 'unison')
+    ? instrument.patchPreset
     : instrument.type
 const instrumentMode = ref<InstrumentMode>(instrumentModeFor(props.lane.instrument))
+const unisonInstrument = ref<PatchInstrumentSource>(
+  props.lane.instrument.type === 'patch' && props.lane.instrument.patchPreset === 'unison'
+    ? { ...props.lane.instrument, numberOfVoices: props.lane.instrument.numberOfVoices ?? 5 }
+    : { type: 'patch', patchPreset: 'unison', oscillatorType: 'sawtooth', numberOfVoices: 5 },
+)
 const drivenNoiseInstrument = ref<PatchInstrumentSource>({
   type: 'patch',
   patchPreset: 'driven-noise',
@@ -83,7 +90,8 @@ const drivenNoiseInstrument = ref<PatchInstrumentSource>({
       : 'constant',
 })
 const patchInstrument = ref<PatchInstrumentSource>(
-  props.lane.instrument.type === 'patch' && props.lane.instrument.patchPreset !== 'driven-noise'
+  props.lane.instrument.type === 'patch' &&
+    !['driven-noise', 'unison'].includes(props.lane.instrument.patchPreset)
     ? { ...props.lane.instrument }
     : { type: 'patch', patchPreset: 'default', oscillatorType: 'sawtooth' },
 )
@@ -94,6 +102,8 @@ watch(
     instrumentMode.value = instrumentModeFor(source)
     if (source.type === 'samples') {
       sampleUrl.value = source.url
+    } else if (source.patchPreset === 'unison') {
+      unisonInstrument.value = { ...source, numberOfVoices: source.numberOfVoices ?? 5 }
     } else if (source.patchPreset === 'driven-noise') {
       drivenNoiseInstrument.value = {
         ...source,
@@ -110,6 +120,7 @@ const selectInstrumentMode = (mode: InstrumentMode) => {
   instrumentMode.value = mode
   sampleError.value = ''
   if (mode === 'patch') emit('update-instrument', { ...patchInstrument.value })
+  if (mode === 'unison') emit('update-instrument', { ...unisonInstrument.value })
   if (mode === 'driven-noise') {
     drivenNoiseInstrument.value.oscillatorType = patchInstrument.value.oscillatorType
     emit('update-instrument', { ...drivenNoiseInstrument.value })
@@ -119,6 +130,14 @@ const selectInstrumentMode = (mode: InstrumentMode) => {
 const updateOscillator = (oscillatorType: OscillatorType) => {
   patchInstrument.value = { ...patchInstrument.value, oscillatorType }
   emit('update-instrument', { ...patchInstrument.value })
+}
+
+const updateUnison = (updates: Partial<PatchInstrumentSource>) => {
+  unisonInstrument.value = { ...unisonInstrument.value, ...updates }
+  emit('update-instrument', { ...unisonInstrument.value })
+}
+const updateVoices = (value: number) => {
+  if (Number.isInteger(value) && value >= 1 && value <= 32) updateUnison({ numberOfVoices: value })
 }
 
 const updateDrivenNoise = (updates: { color?: NoiseColor; interpolation?: NoiseInterpolation }) => {
@@ -386,7 +405,16 @@ const clipPreview = (clipId: string) => pianoRoll.value.notesByClip[clipId]!
             :checked="instrumentMode === 'patch'"
             @change="selectInstrumentMode('patch')"
           />
-          SW Patch</label
+          Default</label
+        >
+        <label
+          ><input
+            type="radio"
+            value="unison"
+            :checked="instrumentMode === 'unison'"
+            @change="selectInstrumentMode('unison')"
+          />
+          Unison</label
         >
         <label
           ><input
@@ -395,7 +423,7 @@ const clipPreview = (clipId: string) => pianoRoll.value.notesByClip[clipId]!
             :checked="instrumentMode === 'driven-noise'"
             @change="selectInstrumentMode('driven-noise')"
           />
-          Driven noise</label
+          Noise</label
         >
         <label
           ><input
@@ -404,7 +432,7 @@ const clipPreview = (clipId: string) => pianoRoll.value.notesByClip[clipId]!
             :checked="instrumentMode === 'samples'"
             @change="selectInstrumentMode('samples')"
           />
-          Sampled instrument</label
+          Sampled</label
         >
       </fieldset>
       <section
@@ -425,6 +453,39 @@ const clipPreview = (clipId: string) => pianoRoll.value.notesByClip[clipId]!
           >
             <option v-for="type in OSCILLATOR_TYPES" :key="type">{{ type }}</option>
           </select>
+        </label>
+      </section>
+      <section
+        v-else-if="instrumentMode === 'unison'"
+        class="instrument-source"
+        aria-label="Unison instrument source"
+      >
+        <strong>Unison SW Patch</strong>
+        <label
+          >Waveform
+          <select
+            aria-label="Unison waveform"
+            :value="unisonInstrument.oscillatorType"
+            @change="
+              updateUnison({
+                oscillatorType: ($event.target as HTMLSelectElement).value as OscillatorType,
+              })
+            "
+          >
+            <option v-for="type in PERIODIC_OSCILLATOR_TYPES" :key="type">{{ type }}</option>
+          </select>
+        </label>
+        <label
+          >Voices
+          <input
+            aria-label="Unison voices"
+            type="number"
+            min="1"
+            max="32"
+            step="1"
+            :value="unisonInstrument.numberOfVoices"
+            @change="updateVoices(($event.target as HTMLInputElement).valueAsNumber)"
+          />
         </label>
       </section>
       <section

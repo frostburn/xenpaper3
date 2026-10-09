@@ -10,10 +10,12 @@ import {
 import { SampledDrumkit, SampledInstrument, Transport, type TransportOptions } from '../../sw-seq'
 import { isAppleWebKit } from '../browser'
 import DEFAULT_PATCH_SOURCE from '../patches/default.swpatch?raw'
+import UNISON_PATCH_SOURCE from '../patches/unison.swpatch?raw'
 import DRIVEN_NOISE_PATCH_SOURCE from '../patches/driven-noise.swpatch?raw'
 import DRUMKIT_PATCH_SOURCE from '../patches/drumkit.swpatch?raw'
 import PING_PONG_DELAY_PATCH_SOURCE from '../patches/ping-pong-delay.swpatch?raw'
 import type { PlaybackLane, PlaybackPlan } from './playback-plan'
+import { applySpreadAutomation } from './spread-automation'
 import { applyPitchAutomation } from './web-audio-automation'
 
 const DEFAULT_OUTPUT_GAIN = 0.35
@@ -50,13 +52,15 @@ export interface WebAudioPlaybackOptions {
 const defaultPatchSource = (source: string): string =>
   source === 'default'
     ? DEFAULT_PATCH_SOURCE
-    : source === 'driven-noise'
-      ? DRIVEN_NOISE_PATCH_SOURCE
-      : source === 'drumkit'
-        ? DRUMKIT_PATCH_SOURCE
-        : source === 'ping-pong-delay'
-          ? PING_PONG_DELAY_PATCH_SOURCE
-          : source
+    : source === 'unison'
+      ? UNISON_PATCH_SOURCE
+      : source === 'driven-noise'
+        ? DRIVEN_NOISE_PATCH_SOURCE
+        : source === 'drumkit'
+          ? DRUMKIT_PATCH_SOURCE
+          : source === 'ping-pong-delay'
+            ? PING_PONG_DELAY_PATCH_SOURCE
+            : source
 
 const requirePlayableSynth = (patch: SynthPatch, lane: PlaybackLane): PlayableSynthPatch => {
   if (typeof (patch as Partial<PlayableSynthPatch>).on === 'function')
@@ -317,20 +321,35 @@ export class WebAudioPlaybackSession {
         }
         continue
       }
+      let spread: ConstantSourceNode | undefined
+      if (lane.instrument.patchPreset === 'unison') {
+        spread = this.context.createConstantSource()
+        this.effectSignals.push(spread)
+        const start = this.context.currentTime
+        const automation = lane.spread ?? { initialValue: 20, curves: [], changes: [] }
+        applySpreadAutomation(spread.offset, automation, start, this.plan.startTime)
+        spread.start(start)
+      }
       const patch = this.patchFactory(
         this.resolvePatchSource(lane.instrument.patchPreset),
         this.context,
         {
           config:
-            lane.instrument.patchPreset === 'driven-noise'
+            lane.instrument.patchPreset === 'unison'
               ? {
-                  color: lane.instrument.color ?? 'white',
-                  interpolation: lane.instrument.interpolation ?? 'constant',
-                }
-              : {
                   oscillatorType: lane.instrument.oscillatorType,
-                  aperiodic: isAperiodicTimbre(lane.instrument.oscillatorType),
-                },
+                  numberOfVoices: lane.instrument.numberOfVoices ?? 5,
+                  spread,
+                }
+              : lane.instrument.patchPreset === 'driven-noise'
+                ? {
+                    color: lane.instrument.color ?? 'white',
+                    interpolation: lane.instrument.interpolation ?? 'constant',
+                  }
+                : {
+                    oscillatorType: lane.instrument.oscillatorType,
+                    aperiodic: isAperiodicTimbre(lane.instrument.oscillatorType),
+                  },
         },
       )
       const synth = requirePlayableSynth(patch, lane)
