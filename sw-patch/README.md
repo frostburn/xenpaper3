@@ -252,7 +252,7 @@ const synth = createPatch(source, context, {
 
 ## Unison instrument lanes
 
-Select **Unison oscillator** in an instrument lane's sound settings. The bundled
+Select **Unison** in an instrument lane's sound settings. The bundled
 `unison.swpatch` supports native sine, triangle, square and sawtooth waves, plus
 all bundled periodic timbres. The voice count (1–32, default 5) is fixed lane
 configuration. Notes use the usual `@adsr(attack, decay, sustain, release)` envelope.

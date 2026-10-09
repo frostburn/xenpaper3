@@ -405,7 +405,7 @@ const clipPreview = (clipId: string) => pianoRoll.value.notesByClip[clipId]!
             :checked="instrumentMode === 'patch'"
             @change="selectInstrumentMode('patch')"
           />
-          SW Patch</label
+          Default</label
         >
         <label
           ><input
@@ -414,7 +414,7 @@ const clipPreview = (clipId: string) => pianoRoll.value.notesByClip[clipId]!
             :checked="instrumentMode === 'unison'"
             @change="selectInstrumentMode('unison')"
           />
-          Unison oscillator</label
+          Unison</label
         >
         <label
           ><input
@@ -423,7 +423,7 @@ const clipPreview = (clipId: string) => pianoRoll.value.notesByClip[clipId]!
             :checked="instrumentMode === 'driven-noise'"
             @change="selectInstrumentMode('driven-noise')"
           />
-          Driven noise</label
+          Noise</label
         >
         <label
           ><input
@@ -432,7 +432,7 @@ const clipPreview = (clipId: string) => pianoRoll.value.notesByClip[clipId]!
             :checked="instrumentMode === 'samples'"
             @change="selectInstrumentMode('samples')"
           />
-          Sampled instrument</label
+          Sampled</label
         >
       </fieldset>
       <section
@@ -487,10 +487,6 @@ const clipPreview = (clipId: string) => pianoRoll.value.notesByClip[clipId]!
             @change="updateVoices(($event.target as HTMLInputElement).valueAsNumber)"
           />
         </label>
-        <span
-          >Spread defaults to 20 cents. Use @ramp @spread(0c) ; @spread(40c) in lane source to ramp
-          it.</span
-        >
       </section>
       <section
         v-else-if="instrumentMode === 'samples'"
