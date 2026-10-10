@@ -7,9 +7,14 @@ import TheFooter from './components/TheFooter.vue'
     <template v-if="$route.name === 'home'">
       <h1>Xenpaper 3</h1>
       <nav>
-        <RouterLink to="/snippet">Create a shareable Xenpaper snippet</RouterLink>
-        <RouterLink to="/tutorial">Interactive tutorial</RouterLink>
+        <h2>Application</h2>
         <RouterLink to="/daw">Open the Xenpaper DAW</RouterLink>
+        <RouterLink to="/snippet">Create a shareable Xenpaper snippet</RouterLink>
+
+        <h2>Learn</h2>
+        <RouterLink to="/tutorial">Interactive tutorial (stub)</RouterLink>
+
+        <h2>Remix</h2>
         <RouterLink :to="{ path: '/daw', query: { demo: 'minuet' } }">
           Open "Minuet in G Major"
         </RouterLink>
@@ -22,6 +27,7 @@ import TheFooter from './components/TheFooter.vue'
         <RouterLink :to="{ path: '/daw', query: { demo: 'negative-carry' } }">
           Open "Negative Carry"
         </RouterLink>
+        <h2>Debug</h2>
         <RouterLink to="/xenpaper-lang-testing"
           >xenpaper-lang debugging/development view</RouterLink
         >
