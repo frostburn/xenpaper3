@@ -8,6 +8,7 @@ import {
 } from '../daw/project'
 import { createPlaybackPlan } from '../daw/playback-plan'
 import { compileLaneSourceInitialization } from '../daw/score'
+import type { AudioParamAutomationTarget } from '../daw/web-audio-automation'
 import { applySpreadAutomation } from '../daw/spread-automation'
 
 function projectWithUnison(source = '') {
@@ -37,7 +38,7 @@ describe('Unison lane automation', () => {
         oscillatorType: 'rich',
         numberOfVoices,
       }
-      expect(() => serializeDawProject(project)).toThrow()
+      expect(() => serializeDawProject(project)).toThrow('Invalid Xenpaper project file')
     }
     lane.instrument = {
       type: 'patch',
@@ -45,7 +46,7 @@ describe('Unison lane automation', () => {
       oscillatorType: 'piano',
       numberOfVoices: 5,
     }
-    expect(() => serializeDawProject(project)).toThrow()
+    expect(() => serializeDawProject(project)).toThrow('Invalid Xenpaper project file')
   })
 
   it.each(['linear', 'ease', 'ease-in', 'ease-out', 'ease-in-out'])(
@@ -99,7 +100,10 @@ describe('Unison lane automation', () => {
   })
 
   it('schedules cent curves without pitch conversion or steps inside a curve', () => {
-    const target = { setValueAtTime: vi.fn(), setValueCurveAtTime: vi.fn() }
+    const target = {
+      setValueAtTime: vi.fn<AudioParamAutomationTarget['setValueAtTime']>(),
+      setValueCurveAtTime: vi.fn<AudioParamAutomationTarget['setValueCurveAtTime']>(),
+    }
     applySpreadAutomation(
       target,
       {

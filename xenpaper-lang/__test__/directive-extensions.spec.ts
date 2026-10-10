@@ -109,10 +109,12 @@ describe('second-party directive extensions', () => {
       const child = initialize(childSource, parent)
       expect(child.directiveRamps![0]).toBe(inherited)
       expect(child.directiveRamps).toHaveLength(childSource === '.' ? 1 : 2)
-      if (childSource !== '.') {
-        expect(child.directiveRamps![1]!.start.toFraction()).toBe('1')
-        expect(child.directiveRamps![1]!.curve).toBe('ease-in')
-      }
+      expect(
+        child.directiveRamps!.slice(1).map((ramp) => ({
+          start: ramp.start.toFraction(),
+          curve: ramp.curve,
+        })),
+      ).toEqual(childSource === '.' ? [] : [{ start: '1', curve: 'ease-in' }])
       const grandchild = initialize('..', child)
       expect(grandchild.directiveRamps).toEqual(child.directiveRamps)
       expect(parent.directiveRamps).toEqual([inherited])
