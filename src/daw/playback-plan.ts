@@ -185,13 +185,22 @@ const assertPlaybackStart = (fromBeat: number): void => {
     throw new RangeError('Playback start must be a finite, non-negative beat')
 }
 
+export interface PlaybackPlanOptions {
+  /** Snippets have one clip whose tempo directives control the whole timeline. */
+  readonly allowClipTempoDirective?: boolean
+}
+
 /**
  * Compile mutable editor state into one immutable, browser-independent playback snapshot.
  *
  * Parsing, clip placement, tempo integration, resume windows, and glissando sampling all
  * happen here. The Web Audio layer only translates this plan into nodes and automation.
  */
-export const createPlaybackPlan = (project: DawProject, fromBeat = 0): PlaybackPlan => {
+export const createPlaybackPlan = (
+  project: DawProject,
+  fromBeat = 0,
+  options: PlaybackPlanOptions = {},
+): PlaybackPlan => {
   assertPlaybackStart(fromBeat)
   const tempoMap = TempoMap.fromProject(project)
   const globalInitialization = compileSourceInitialization(
@@ -214,6 +223,7 @@ export const createPlaybackPlan = (project: DawProject, fromBeat = 0): PlaybackP
       globalInitialization,
       project.globalTrack.timeSignatureChanges[0],
       timeSignatureChanges,
+      options.allowClipTempoDirective,
     )) {
       const window = notePlaybackWindow(note.beat, note.duration, fromBeat)
       if (!window) continue

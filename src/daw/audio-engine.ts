@@ -1,6 +1,6 @@
 import type { DawProject } from './project'
 import audioBufferToWav from 'audiobuffer-to-wav'
-import { createPlaybackPlan, type PlaybackPlan } from './playback-plan'
+import { createPlaybackPlan, type PlaybackPlan, type PlaybackPlanOptions } from './playback-plan'
 import { parseProjectScoreNotes, type PitchGlideSegment, type ScheduledLaneNote } from './score'
 import { xenpaperPitchToPatchDetune } from './web-audio-automation'
 import { WebAudioPlaybackSession } from './web-audio-playback'
@@ -182,13 +182,13 @@ export class DawAudioEngine extends EventTarget {
     }
   }
 
-  async play(project: DawProject, fromBeat = 0): Promise<void> {
+  async play(project: DawProject, fromBeat = 0, options: PlaybackPlanOptions = {}): Promise<void> {
     if (this.disposed) throw new Error('Cannot play a disposed audio engine.')
 
     const requestId = ++this.playRequestId
     // Invalidate pending preparation before compiling, while delaying stop() so invalid
     // edits still do not tear down a currently audible session.
-    const plan = createPlaybackPlan(project, fromBeat)
+    const plan = createPlaybackPlan(project, fromBeat, options)
     const { sampledDrumkits, sampledInstruments } = await prepareSamples(this.context, plan)
     let samplesTransferred = false
     try {

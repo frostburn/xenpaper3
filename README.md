@@ -42,6 +42,30 @@ stable IDs with the `demo` query parameter, such as `/daw?demo=minuet` or
 `?project=URL` query parameter instead (for example,
 `/daw?project=https%3A%2F%2Fexample.com%2Fpiece.xenpaper.json`).
 
+### Shareable snippets
+
+Open `/snippet` for a single-clip editor with playback and a piano-roll preview.
+The clip supports `@tempo(120bpm)` and `@time(4/4)`, including changes partway
+through the score. Instrument config includes gain and the same default,
+unison, noise, or sampled instruments as the DAW. Write tuning and envelope
+directives in the clip source; there is no separate lane-source editor.
+
+Every edit updates the URL. Snippets use a versioned `#v1.` fragment followed
+by unpadded UTF-8 base64url JSON containing `[clipSource, laneSource, gain,
+instrument]`. Only letters, digits, hyphens, underscores, and the version dot
+appear in the encoded payload, so score punctuation cannot break chat links
+or MediaWiki markup. Opening a link restores all snippet settings without
+local storage or a project file. The sharing controls copy a plain URL,
+MediaWiki external link, or Discord angle-bracket link. Sampled instruments
+include their manifest in the URL; their audio files still load from the
+configured sample URLs.
+
+The `/tutorial` stub contains three mini-snippets using the same
+`SnippetEditor` component as `/snippet`. Parent templates configure the
+instrument and hidden `laneSource` prop. Bind `source`, `instrument`, and
+`gain` with `v-model`; `simplified` shows only Play, Stop, Gain, and the
+controls appropriate to that instrument, alongside the editable score.
+
 ## Playback architecture
 
 The DAW playback path is intentionally split at the browser boundary:

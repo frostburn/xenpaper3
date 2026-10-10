@@ -32,7 +32,7 @@ export {
   evaluateScoreShape,
 } from './runtime/score-shape'
 export { expandToBeatEvents } from './runtime/beat-events'
-export { evaluateInitialization } from './runtime/initialization'
+export { evaluateInitialization, scoreTimelineContexts } from './runtime/initialization'
 export { evaluateTimeline, gridMeasureBoundaries } from './runtime/timeline'
 export type { GridTempoChange, GridTimeSignatureChange } from './runtime/timeline'
 export type { ScoreInitialization, TimedScoreContext } from './runtime/types'
