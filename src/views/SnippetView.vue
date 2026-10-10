@@ -146,7 +146,6 @@ onBeforeUnmount(() => {
       <h1>Xenpaper snippet</h1>
       <RouterLink to="/daw">Open the DAW</RouterLink>
     </header>
-    <p class="intro">One clip. A whole musical idea. Edit, listen, and share it as a link.</p>
     <p v-if="urlError" role="alert" class="error">
       {{ urlError }} Edit the snippet to create a new link.
     </p>
@@ -199,7 +198,6 @@ onBeforeUnmount(() => {
           :rows="7"
           @update:source="snippet.lane.source = $event"
         />
-        <p class="help">Tuning and sound defaults inherited by the clip.</p>
       </aside>
     </div>
     <section class="preview" aria-label="Snippet piano roll">
@@ -207,7 +205,6 @@ onBeforeUnmount(() => {
     </section>
     <section class="share" aria-label="Share snippet">
       <h2>Share snippet</h2>
-      <p class="help">The clip and instrument settings are stored in the URL.</p>
       <div class="share-controls">
         <select v-model="shareFormat" aria-label="Share format">
           <option value="url">URL</option>
@@ -247,6 +244,7 @@ onBeforeUnmount(() => {
 }
 .snippet-header {
   justify-content: space-between;
+  margin-bottom: 1rem;
 }
 h1 {
   margin: 0;
@@ -256,13 +254,9 @@ h2 {
   margin: 0 0 1rem;
   font-size: 1.15rem;
 }
-.intro,
 .help,
 .duration {
   color: var(--xenpaper-slate-400);
-}
-.intro {
-  margin: 0.5rem 0 1.5rem;
 }
 .toolbar {
   border-block: 1px solid var(--xenpaper-slate-500);
