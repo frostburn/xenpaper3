@@ -46,8 +46,9 @@ stable IDs with the `demo` query parameter, such as `/daw?demo=minuet` or
 
 Open `/snippet` for a single-clip editor with playback and a piano-roll preview.
 The clip supports `@tempo(120bpm)` and `@time(4/4)`, including changes partway
-through the score. Instrument lane settings include tuning/envelope source,
-gain, and the same default, unison, noise, or sampled instruments as the DAW.
+through the score. Instrument config includes gain and the same default,
+unison, noise, or sampled instruments as the DAW. Write tuning and envelope
+directives in the clip source; there is no separate lane-source editor.
 
 Every edit updates the URL. Snippets use a versioned `#v1.` fragment followed
 by unpadded UTF-8 base64url JSON containing `[clipSource, laneSource, gain,
@@ -58,6 +59,12 @@ local storage or a project file. The sharing controls copy a plain URL,
 MediaWiki external link, or Discord angle-bracket link. Sampled instruments
 include their manifest in the URL; their audio files still load from the
 configured sample URLs.
+
+The `/tutorial` stub contains three mini-snippets using the same
+`SnippetEditor` component as `/snippet`. Parent templates configure the
+instrument and hidden `laneSource` prop. Bind `source`, `instrument`, and
+`gain` with `v-model`; `simplified` shows only Play, Stop, Gain, and the
+controls appropriate to that instrument, alongside the editable score.
 
 ## Playback architecture
 

@@ -12,7 +12,7 @@ import {
   type PatchInstrumentSource,
   type PitchedInstrumentLane,
 } from '../../daw/project'
-const props = defineProps<{ lane: PitchedInstrumentLane }>()
+const props = defineProps<{ lane: PitchedInstrumentLane; simplified?: boolean }>()
 const emit = defineEmits<{ 'update-instrument': [source: PitchedInstrumentLane['instrument']] }>()
 const sampleUrl = ref(props.lane.instrument.type === 'samples' ? props.lane.instrument.url : '')
 const sampleError = ref('')
@@ -94,7 +94,11 @@ const updateVoices = (value: number) => {
   if (Number.isInteger(value) && value >= 1 && value <= 32) updateUnison({ numberOfVoices: value })
 }
 
-const updateDrivenNoise = (updates: { color?: NoiseColor; interpolation?: NoiseInterpolation }) => {
+const updateDrivenNoise = (updates: {
+  color?: NoiseColor
+  interpolation?: NoiseInterpolation
+  oscillatorType?: OscillatorType
+}) => {
   drivenNoiseInstrument.value = { ...drivenNoiseInstrument.value, ...updates }
   emit('update-instrument', { ...drivenNoiseInstrument.value })
 }
@@ -141,7 +145,7 @@ const uploadSamples = async (event: Event) => {
 }
 </script>
 <template>
-  <fieldset class="instrument-kind">
+  <fieldset v-if="!simplified" class="instrument-kind">
     <legend>Instrument sound source</legend>
     <label
       ><input
@@ -185,7 +189,7 @@ const uploadSamples = async (event: Event) => {
     class="instrument-source"
     aria-label="SW Patch instrument source"
   >
-    <strong
+    <strong v-if="!simplified"
       >{{ lane.instrument.type === 'patch' ? lane.instrument.patchPreset : 'default' }} SW
       Patch</strong
     >
@@ -205,7 +209,7 @@ const uploadSamples = async (event: Event) => {
     class="instrument-source"
     aria-label="Unison instrument source"
   >
-    <strong>Unison SW Patch</strong>
+    <strong v-if="!simplified">Unison SW Patch</strong>
     <label
       >Waveform
       <select
@@ -238,10 +242,10 @@ const uploadSamples = async (event: Event) => {
     class="instrument-source"
     aria-label="Sampled instrument source"
   >
-    <strong>{{
+    <strong v-if="!simplified">{{
       lane.instrument.type === 'samples' ? 'Dough samples loaded' : 'Choose a Dough JSON manifest'
     }}</strong>
-    <span class="instrument-import">
+    <span v-if="!simplified" class="instrument-import">
       <input
         v-model="sampleUrl"
         aria-label="Instrument JSON URL"
@@ -282,7 +286,21 @@ const uploadSamples = async (event: Event) => {
     </label>
   </section>
   <section v-else class="instrument-source" aria-label="Driven noise instrument source">
-    <strong>Driven noise SW Patch</strong>
+    <strong v-if="!simplified">Driven noise SW Patch</strong>
+    <label
+      >Waveform
+      <select
+        aria-label="Noise waveform"
+        :value="drivenNoiseInstrument.oscillatorType"
+        @change="
+          updateDrivenNoise({
+            oscillatorType: ($event.target as HTMLSelectElement).value as OscillatorType,
+          })
+        "
+      >
+        <option v-for="type in OSCILLATOR_TYPES" :key="type">{{ type }}</option>
+      </select>
+    </label>
     <label
       >Color
       <select

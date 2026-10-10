@@ -3,6 +3,7 @@ import PatchTestingView from '../views/PatchTestingView.vue'
 import XenpaperLangTestingView from '../views/XenpaperLangTestingView.vue'
 import DawView from '../views/DawView.vue'
 import SnippetView from '../views/SnippetView.vue'
+import InteractiveTutorialView from '../views/InteractiveTutorialView.vue'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -10,6 +11,7 @@ const router = createRouter({
     { path: '/', name: 'home', component: { template: '<span />' } },
     { path: '/daw', name: 'daw', component: DawView },
     { path: '/snippet', name: 'snippet', component: SnippetView },
+    { path: '/tutorial', name: 'tutorial', component: InteractiveTutorialView },
     { path: '/patch-testing', name: 'patch-testing', component: PatchTestingView },
     {
       path: '/xenpaper-lang-testing',

@@ -51,6 +51,10 @@ describe('snippet view', () => {
     ).toBe(snippet.source)
     expect(wrapper.find('[aria-label="Duplicate clip"]').exists()).toBe(false)
     expect(wrapper.find('[aria-label="Delete clip"]').exists()).toBe(false)
+    expect(wrapper.find('[aria-label="Instrument lane source"]').exists()).toBe(false)
+    expect(wrapper.find('a[href="/daw"]').exists()).toBe(false)
+    expect(wrapper.get('h2').text()).toBe('Clip source')
+    expect(wrapper.text()).toContain('Instrument config')
     await wrapper.get('[aria-label="Instrument gain"]').setValue('0.4')
     await wrapper.get('[aria-label="Waveform"]').setValue('triangle')
     await flushPromises()
@@ -101,7 +105,7 @@ describe('snippet view', () => {
     expect(audio.dispose).toHaveBeenCalledOnce()
   })
 
-  it('plays through the snippet tempo path and pauses and stops', async () => {
+  it('plays through the snippet tempo path and restarts and stops', async () => {
     audio.resume.mockResolvedValue(undefined)
     audio.play.mockResolvedValue(undefined)
     const { wrapper } = await open()
@@ -110,8 +114,12 @@ describe('snippet view', () => {
     expect(audio.play.mock.calls[0]![2]).toEqual({ allowClipTempoDirective: true })
     expect(wrapper.get('[aria-label="Play"]').attributes('aria-pressed')).toBe('true')
     await wrapper.get('[aria-label="Play"]').trigger('click')
-    expect(wrapper.get('[aria-label="Play"]').attributes('aria-pressed')).toBe('false')
+    await flushPromises()
+    expect(audio.play).toHaveBeenCalledTimes(2)
+    expect(audio.play.mock.calls[1]![1]).toBe(0)
+    expect(wrapper.get('[aria-label="Play"]').text()).toBe('Play')
     await wrapper.get('[aria-label="Stop"]').trigger('click')
+    expect(wrapper.get('[aria-label="Play"]').attributes('aria-pressed')).toBe('false')
     expect(wrapper.get('.transport output').text()).toBe('Beat 0.00')
     wrapper.unmount()
   })
