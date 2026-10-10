@@ -255,7 +255,7 @@ const spreadExtension: DirectiveExtension = {
     return { state: Object.freeze({ value }) }
   },
 }
-const ENVELOPE_EXTENSIONS = [envelopeExtension, adsrExtension, spreadExtension]
+export const ENVELOPE_EXTENSIONS = [envelopeExtension, adsrExtension, spreadExtension]
 
 const effectExtension = (
   name: 'delay' | 'feedback' | 'wet' | 'separation',
@@ -408,6 +408,7 @@ const realizeClipNotes = (
   timeSignatureChanges?: readonly TimeSignatureChange[],
   samples: readonly string[] = [],
   placement = beat(0),
+  allowTempoDirective = false,
 ): ScheduledLaneNote[] => {
   const sourceIdentity = 'xenpaper:clip-source'
   const program = parse(source, { drumSamples: samples, grammarSource: sourceIdentity })
@@ -417,6 +418,7 @@ const realizeClipNotes = (
     beatOffset: clipOffset,
     timeSignature,
     timeSignatureChanges,
+    allowTempoDirective,
   })
   const errors = result.diagnostics.filter(({ severity }) => severity === 'error')
   if (errors.length) throw new Error(errors.map(({ message }) => message).join('\n'))
@@ -549,6 +551,7 @@ export const parseLaneNotes = (
   globalInitialization: SourceInitialization = {},
   timeSignature?: { readonly numerator: number; readonly denominator: number },
   timeSignatureChanges?: readonly TimeSignatureChange[],
+  allowTempoDirective = false,
 ): ScheduledLaneNote[] => {
   const samples = drumSamplesForLane(lane)
   const laneInitialization = compileLaneSourceInitialization(
@@ -566,6 +569,7 @@ export const parseLaneNotes = (
       timeSignatureChanges,
       samples,
       clip.start,
+      allowTempoDirective,
     ),
   )
   return notes.sort((left, right) => left.beat - right.beat)

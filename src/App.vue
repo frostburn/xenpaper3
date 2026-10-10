@@ -7,6 +7,7 @@ import TheFooter from './components/TheFooter.vue'
     <template v-if="$route.name === 'home'">
       <h1>Xenpaper 3</h1>
       <nav>
+        <RouterLink to="/snippet">Create a shareable Xenpaper snippet</RouterLink>
         <RouterLink to="/daw">Open the Xenpaper DAW</RouterLink>
         <RouterLink :to="{ path: '/daw', query: { demo: 'minuet' } }">
           Open "Minuet in G Major"

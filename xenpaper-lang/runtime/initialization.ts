@@ -25,7 +25,7 @@ export function contextAt(initialization: ScoreInitialization | undefined, start
 }
 
 /** Collect exact grid positions, restoring state when explicit scopes end. */
-function timelineContexts(shape: ScoreShape, base: ScoreVisitorContext) {
+export function scoreTimelineContexts(shape: ScoreShape, base: ScoreVisitorContext) {
   const changes: TimedScoreContext[] = []
   const ramps: DirectiveRamp[] = []
   const starts = new Map<DirectiveRampMarker, { start: Fraction; state: unknown }>()
@@ -145,7 +145,7 @@ export function evaluateInitialization(
       if (!evaluated || !('shape' in evaluated)) return { diagnostics }
       const base = evaluateProgramSemantics({ ...program, body: [] }, { ...settings, ...context })
       if (!('shape' in base) || !base.visitorContext) return { diagnostics }
-      const timeline = timelineContexts(evaluated.shape, base.visitorContext)
+      const timeline = scoreTimelineContexts(evaluated.shape, base.visitorContext)
       variants.set(context, {
         context: base.visitorContext,
         changes: timeline.changes,
@@ -183,7 +183,7 @@ export function evaluateInitialization(
       changes,
       directiveRamps: [
         ...(parent.directiveRamps ?? []),
-        ...timelineContexts(result.shape, result.visitorContext!).ramps,
+        ...scoreTimelineContexts(result.shape, result.visitorContext!).ramps,
       ],
       timelineShape: parent.timelineShape,
       shape: parent.shape
