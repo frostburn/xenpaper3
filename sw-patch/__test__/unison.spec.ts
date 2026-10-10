@@ -4,15 +4,15 @@ import SOURCE from '../../src/patches/unison.swpatch?raw'
 
 class Parameter {
   value = 0
-  setValueAtTime = vi.fn()
-  linearRampToValueAtTime = vi.fn()
-  setTargetAtTime = vi.fn()
-  cancelAndHoldAtTime = vi.fn()
+  setValueAtTime = vi.fn<AudioParam['setValueAtTime']>()
+  linearRampToValueAtTime = vi.fn<AudioParam['linearRampToValueAtTime']>()
+  setTargetAtTime = vi.fn<AudioParam['setTargetAtTime']>()
+  cancelAndHoldAtTime = vi.fn<AudioParam['cancelAndHoldAtTime']>()
 }
 class Node extends EventTarget {
-  connect = vi.fn((target: unknown) => target)
-  disconnect = vi.fn()
-  start = vi.fn()
+  connect = vi.fn<(target: unknown) => unknown>((target) => target)
+  disconnect = vi.fn<() => void>()
+  start = vi.fn<() => void>()
   stop = vi.fn<(...args: unknown[]) => void>()
 }
 class Gain extends Node {
@@ -38,7 +38,7 @@ class Oscillator extends Node {
   frequency = new Parameter()
   detune = new Parameter()
   type = 'sine'
-  setPeriodicWave = vi.fn()
+  setPeriodicWave = vi.fn<OscillatorNode['setPeriodicWave']>()
   constructor() {
     super()
     Oscillator.instances.push(this)
@@ -64,7 +64,7 @@ describe('Bundled unison patch', () => {
           const gain = new Gain(context)
           return gain
         },
-        createPeriodicWave: vi.fn(() => wave),
+        createPeriodicWave: vi.fn<() => typeof wave>(() => wave),
       } as unknown as BaseAudioContext
       const spread = new Constant(context, { offset: 30 })
       const pitch = new Constant(context)
@@ -85,8 +85,10 @@ describe('Bundled unison patch', () => {
       expect(Oscillator.instances).toHaveLength(3)
       for (const oscillator of Oscillator.instances) {
         expect(oscillator.start).toHaveBeenCalledWith(1)
-        if (waveform === 'triangle') expect(oscillator.type).toBe('triangle')
-        else expect(oscillator.setPeriodicWave).toHaveBeenCalledWith(wave)
+        expect(oscillator.type).toBe(waveform === 'triangle' ? 'triangle' : 'sine')
+        expect(oscillator.setPeriodicWave.mock.calls).toEqual(
+          waveform === 'triangle' ? [] : [[wave]],
+        )
       }
       const attack = Gain.instances.at(-2)!.gain
       const decay = Gain.instances.at(-1)!.gain

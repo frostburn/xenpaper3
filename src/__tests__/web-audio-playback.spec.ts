@@ -172,8 +172,15 @@ describe('Web Audio playback session', () => {
     }
     const session = new WebAudioPlaybackSession(context as unknown as AudioContext, plan, {
       patchFactory: () =>
-        ({ on: () => (end: number) => end, dispose: vi.fn() }) as unknown as PlayableSynthPatch,
-      effectFactory: () => ({ connect: vi.fn(), dispose: vi.fn() }) as unknown as EffectPatch,
+        ({
+          on: () => (end: number) => end,
+          dispose: vi.fn<PlayableSynthPatch['dispose']>(),
+        }) as unknown as PlayableSynthPatch,
+      effectFactory: () =>
+        ({
+          connect: vi.fn<EffectPatch['connect']>(),
+          dispose: vi.fn<EffectPatch['dispose']>(),
+        }) as unknown as EffectPatch,
     })
     session.start()
     const feedback = context.sources[1]!.offset
@@ -347,7 +354,7 @@ describe('Web Audio playback session', () => {
     if (lane.kind !== 'instrument') throw new Error('Expected instrument')
     const patchFactory = vi.fn<() => PlayableSynthPatch>(() => ({
       on: () => (end) => end,
-      dispose: vi.fn(),
+      dispose: vi.fn<PlayableSynthPatch['dispose']>(),
       ready: Promise.resolve(),
     }))
     const session = new WebAudioPlaybackSession(
