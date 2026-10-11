@@ -22,12 +22,13 @@ describe('score-shape timing', () => {
     expect(attacks.map((attack) => attack.pitch.value.valueOf())).toEqual([100, 100, 50, 50])
     expect(attacks[0]!.displayLabel).toBe('1d')
 
-    const custom = shape('{9/8 3/2 2/1} 2d sqrt(2d)') as SequenceShape
+    const custom = shape('{9/8 3/2 2/1} 2d sqrt(2d) pitch(2d)') as SequenceShape
     const customAttacks = custom.children.filter((child) => child.kind === 'attack')
     expect(customAttacks[0]!.pitch.value.equals(Value.pitch(new Value(3n, 2n)))).toBe(true)
     expect(customAttacks[1]!.pitch.value.valueOf()).toBeCloseTo(
       customAttacks[0]!.pitch.value.valueOf() / 2,
     )
+    expect(customAttacks[2]!.pitch.value.equals(customAttacks[0]!.pitch.value)).toBe(true)
   })
 
   it('evaluates zero-duration lexical declarations before musical calls', () => {

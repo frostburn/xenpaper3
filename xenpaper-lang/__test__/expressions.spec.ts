@@ -25,6 +25,29 @@ function evaluate(source: string) {
 }
 
 describe('arithmetic expression evaluation', () => {
+  it('coerces tuned pitches for ratio-taking built-ins', () => {
+    expect(evaluate('pitch(2d)').value.equals(evaluate('2d').value)).toBe(true)
+    expect(evaluate('pitch((2d))').value.equals(evaluate('2d').value)).toBe(true)
+    expect(evaluate('pitch(^2d)').value.equals(evaluate('^2d').value)).toBe(true)
+    expect(evaluate('pitch(200c)').value.equals(Value.cents(200))).toBe(true)
+    expect(evaluate('pitch(2)').value.equals(Value.cents(1200))).toBe(true)
+
+    for (const source of ['pitch([1d 2d])', 'pitch(sort([2d 1d]))']) {
+      const pitches = evaluate(source)
+      if (pitches.kind !== 'container') throw new Error('Expected a container.')
+      expect(pitches.values.map((item) => item.value.valueOf())).toEqual([100, 200])
+    }
+
+    const nested = evaluate('pitch([[1d] [2d]])')
+    if (nested.kind !== 'container') throw new Error('Expected a container.')
+    expect(
+      nested.values.map((item) => {
+        if (item.kind !== 'container') throw new Error('Expected a nested container.')
+        return item.values[0]!.value.valueOf()
+      }),
+    ).toEqual([100, 200])
+  })
+
   it('resolves explicit degrees as pitches before ratio coercion', () => {
     expect(evaluate('3d').kind).toBe('pitchOffset')
     expect(evaluate('3d').value.equals(Value.cents(300))).toBe(true)
