@@ -42,12 +42,9 @@ describe('shareable snippets', () => {
     ['#v1.%', 'Invalid or unsupported snippet URL.'],
     ['#v1.YWJj', 'Invalid snippet data in the URL.'],
     ['#v1.W10', 'Invalid snippet data in the URL.'],
-  ])(
-    'rejects malformed or unsupported fragments: %s',
-    (hash, message) => {
-      expect(() => decodeSnippet(hash)).toThrow(message)
-    },
-  )
+  ])('rejects malformed or unsupported fragments: %s', (hash, message) => {
+    expect(() => decodeSnippet(hash)).toThrow(message)
+  })
 
   it('validates instrument configuration before loading it', () => {
     const snippet = createDefaultSnippet()
