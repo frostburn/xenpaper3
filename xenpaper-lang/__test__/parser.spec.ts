@@ -2,6 +2,54 @@ import { describe, expect, it } from 'vitest'
 import { parse } from '../parser.js'
 
 describe('lexical declarations', () => {
+  it('distinguishes explicit degrees from contextual degrees and ratios', () => {
+    expect(parse('3d 3 3/1').body[0]).toMatchObject({
+      type: 'Sequence',
+      items: [
+        { type: 'DegreeLiteral', degree: '3', explicit: true, raw: '3d' },
+        { type: 'DegreeLiteral', degree: '3', raw: '3' },
+        { type: 'RatioLiteral', numerator: '3', denominator: '1', raw: '3/1' },
+      ],
+    })
+    expect(parse('0d -2d +3d').body[0]).toMatchObject({
+      type: 'Sequence',
+      items: [
+        { degree: '0', explicit: true, raw: '0d' },
+        { degree: '-2', explicit: true, raw: '-2d' },
+        { degree: '3', explicit: true, raw: '+3d' },
+      ],
+    })
+  })
+
+  it('allows explicit degrees in arithmetic and under existing inflections', () => {
+    expect(parse('2d * 3/1').body[0]).toMatchObject({
+      type: 'BinaryExpression',
+      operator: '*',
+      left: { type: 'DegreeLiteral', explicit: true },
+      right: { type: 'RatioLiteral' },
+    })
+    expect(parse('^1d').body[0]).toMatchObject({
+      type: 'PitchModifierExpression',
+      modifier: { kind: 'up' },
+      operand: { type: 'DegreeLiteral', degree: '1', explicit: true },
+    })
+    expect(parse('3/1 / 2d').body[0]).toMatchObject({
+      type: 'BinaryExpression',
+      operator: '/',
+      right: { type: 'DegreeLiteral', explicit: true },
+    })
+  })
+
+  it('uses numeric suffix boundaries without consuming decibel quantities', () => {
+    for (const source of ['3dog', '3d2']) expect(() => parse(source)).toThrow()
+    expect(parse('3dB').body[0]).toMatchObject({ type: 'QuantityLiteral', unit: 'dB' })
+    // A dot still separates score items as a rest; it cannot form a fractional degree.
+    expect(parse('1.5d').body[0]).toMatchObject({
+      type: 'Sequence',
+      items: [{ degree: '1' }, { type: 'Rest' }, { degree: '5', explicit: true }],
+    })
+  })
+
   it('retains complete declaration and parameter-name locations', () => {
     const source = 'fn transpose(note, interval) { ret note + interval } # closure'
     const declaration = parse(source).body[0]

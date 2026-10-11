@@ -23,6 +23,13 @@ const elementCoercion = (coercion: Coercion): Coercion =>
     ? coercion.element
     : coercion
 
+function ratioArgument(value: EvaluatedLiteral): EvaluatedLiteral {
+  if (value.kind === 'container') return { ...value, values: value.values.map(ratioArgument) }
+  if (value.kind === 'pitchOffset')
+    return { kind: 'scalar', value: Value.ratio(value.value), origins: value.origins }
+  return value
+}
+
 export function requireInteger(value: EvaluatedLiteral, name: string): number {
   if (value.kind !== 'scalar') throw new TypeError(`${name} must be an integer.`)
   const exact = value.value.exactRational()
@@ -39,6 +46,7 @@ export function evaluateBuiltinArgument(
 ): ExpressionEvaluationResult {
   if (
     node.type === 'DegreeLiteral' &&
+    !node.explicit &&
     (coercionName(coercion) === 'ratio' ||
       coercionName(coercion) === 'integer' ||
       coercionName(coercion) === 'boolean')
@@ -89,7 +97,10 @@ export function evaluateBuiltinArgument(
       diagnostics,
     }
   }
-  return evaluate(node, environment)
+  const evaluated = evaluate(node, environment)
+  if (coercionName(coercion) === 'ratio' && 'value' in evaluated)
+    return { ...evaluated, value: ratioArgument(evaluated.value) }
+  return evaluated
 }
 
 /** One callable built-in, including its signature, coercions, and implementation. */

@@ -135,6 +135,19 @@ and `boolean` parameters interpret the argument as an integer scalar, while an
 unannotated or `pitch` parameter receives the active scale degree. Consequently,
 `sqrt(4)` is always `2`, while an unannotated `identity(4)` receives degree 4.
 
+The integer suffix `d` explicitly denotes a scale degree: `3d` is degree three,
+while `3/1` is a scalar ratio. Unlike bare integers, these literals keep their
+degree meaning in arithmetic and under parameter coercion. A `ratio` parameter
+receives the degree's tuned frequency ratio, not its index. In the default
+12-TET context, `sqrt(2d)` therefore produces the ratio corresponding to `1d`
+(100 cents); `pitch(sqrt(2d))` converts it back to a pitch displacement.
+Zero and signed degrees use the existing indexing and equave wrapping rules:
+`0d`, `-1d`, and `+3d` are valid. Pitch modifiers retain their usual meaning,
+as in `^1d`. The suffix is lowercase and must end the numeric token, just like
+`e` and `r`. Degrees are integers; `1.5d` remains a sequence of degree 1, a rest,
+and degree 5 rather than a fractional degree. Use spaces
+around division (`3/1 / 2d`) to distinguish it from ratio and pitch-lift syntax.
+
 `let name = expression` evaluates the initializer once. `fn name(parameters) {
 ... ret expression }` creates a lexical closure. A function body contains zero
 or more local `let` or `fn` declarations followed by exactly one `ret`, whose

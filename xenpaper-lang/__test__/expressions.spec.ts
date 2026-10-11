@@ -25,6 +25,92 @@ function evaluate(source: string) {
 }
 
 describe('arithmetic expression evaluation', () => {
+  it('coerces tuned pitches for ratio-taking built-ins', () => {
+    expect(evaluate('pitch(2d)').value.equals(evaluate('2d').value)).toBe(true)
+    expect(evaluate('pitch((2d))').value.equals(evaluate('2d').value)).toBe(true)
+    expect(evaluate('pitch(^2d)').value.equals(evaluate('^2d').value)).toBe(true)
+    expect(evaluate('pitch(200c)').value.equals(Value.cents(200))).toBe(true)
+    expect(evaluate('pitch(2)').value.equals(Value.cents(1200))).toBe(true)
+
+    for (const source of ['pitch([1d 2d])', 'pitch(sort([2d 1d]))']) {
+      const pitches = evaluate(source)
+      if (pitches.kind !== 'container') throw new Error('Expected a container.')
+      expect(pitches.values.map((item) => item.value.valueOf())).toEqual([100, 200])
+    }
+
+    const nested = evaluate('pitch([[1d] [2d]])')
+    if (nested.kind !== 'container') throw new Error('Expected a container.')
+    expect(
+      nested.values.map((item) => {
+        if (item.kind !== 'container') throw new Error('Expected a nested container.')
+        return item.values[0]!.value.valueOf()
+      }),
+    ).toEqual([100, 200])
+  })
+
+  it('resolves explicit degrees as pitches before ratio coercion', () => {
+    expect(evaluate('3d').kind).toBe('pitchOffset')
+    expect(evaluate('3d').value.equals(Value.cents(300))).toBe(true)
+    expect(evaluate('3/1').value.equals(3)).toBe(true)
+    expect(evaluate('sqrt(2d)').kind).toBe('scalar')
+    expect(evaluate('sqrt(2d)').value.equals(evaluate('ratio(1d)').value)).toBe(true)
+    expect(evaluate('pitch(sqrt(2d))').value.equals(evaluate('1d').value)).toBe(true)
+    expect(evaluate('sqrt(2)').value.equals(new Value(2).pow(new Fraction(1, 2)))).toBe(true)
+    expect(evaluate('2d * 3/1').value.equals(Value.cents(600))).toBe(true)
+    expect(evaluate('^1d').value.equals(evaluate('^1').value)).toBe(true)
+    expect(evaluate('-1d').value.equals(Value.cents(-100))).toBe(true)
+    expect(evaluate('13d').value.equals(Value.cents(1300))).toBe(true)
+  })
+
+  it('coerces explicit degrees through nested containers and function defaults', () => {
+    const declaration = parse(
+      'fn select(values: container<container<ratio>>, fallback: ratio = 2d) { ret values[0][0] al fallback }',
+    ).body[0]
+    if (declaration.type !== 'FunctionDeclaration') throw new Error('Expected a function.')
+    const declared = evaluateDeclaration(declaration)
+    expect(declared.diagnostics).toEqual([])
+    for (const [source, expected] of [
+      ['select([[2d]])', Value.ratio(Value.cents(200))],
+      ['select([[2]])', new Value(2)],
+      ['select([[niente]])', Value.ratio(Value.cents(200))],
+    ] as const) {
+      const evaluated = evaluateExpression(
+        expression(source),
+        DEFAULT_PITCH_CONTEXT,
+        declared.environment,
+      )
+      expect(evaluated.diagnostics).toEqual([])
+      expect('value' in evaluated && evaluated.value.value.equals(expected)).toBe(true)
+    }
+  })
+
+  it.each(['integer', 'boolean'])('does not reinterpret an explicit degree as %s', (coercion) => {
+    const declaration = parse(`fn accept(value: ${coercion}) { ret value }`).body[0]
+    if (declaration.type !== 'FunctionDeclaration') throw new Error('Expected a function.')
+    const declared = evaluateDeclaration(declaration)
+    const bare = evaluateExpression(
+      expression('accept(1)'),
+      DEFAULT_PITCH_CONTEXT,
+      declared.environment,
+    )
+    expect(bare.diagnostics).toEqual([])
+    const explicit = evaluateExpression(
+      expression('accept(1d)'),
+      DEFAULT_PITCH_CONTEXT,
+      declared.environment,
+    )
+    expect('value' in explicit).toBe(false)
+    expect(explicit.diagnostics).toMatchObject([
+      { message: `value: Value cannot be coerced to ${coercion}.` },
+    ])
+  })
+
+  it('does not reinterpret an explicit degree as a built-in integer argument', () => {
+    const evaluated = evaluateExpression(expression('kCombinations([1/1, 3/1], 1d)'))
+    expect('value' in evaluated).toBe(false)
+    expect(evaluated.diagnostics).toMatchObject([{ message: expect.stringContaining('integer') }])
+  })
+
   it('retains Diamond-MOS interval spelling when subtracting MOS pitches', () => {
     const declaration = parse('MOS{5L2s}').body[0]
     if (declaration.type !== 'PitchContextChange') throw new Error('Expected a MOS declaration.')

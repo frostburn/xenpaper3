@@ -315,6 +315,7 @@ PrimaryExpression
   / !(DeclarationKeyword !IdentifierContinue) !DrumSampleLiteral pitch:PitchLiteral { return pitch; }
   / EqualDivisionLiteral
   / QuantityLiteral
+  / ExplicitScaleDegreeLiteral
   / RatioLiteral
   / RealLiteral
   / DecimalLiteral
@@ -997,8 +998,18 @@ MosAccidental
 // Bare signed integers are scale degrees unless the following characters
 // clearly continue the token as scalar arithmetic. This is a forward syntactic
 // predicate only: `-1 -2` stays two degrees, while `2 * M2` is arithmetic.
-// Explicit ratios (`2/1`, `-1/1`) remain the escape hatch for ambiguous integer
-// arithmetic.
+// Explicit ratios (`2/1`, `-1/1`) and degrees (`2d`, `-1d`) disambiguate
+// arithmetic without depending on the surrounding expression or coercion.
+ExplicitScaleDegreeLiteral
+  = sign:Sign? degree:UnsignedInteger "d" !IdentifierContinue {
+      return node('DegreeLiteral', {
+        modifiers: [],
+        degree: sign === '-' ? sign + degree : degree,
+        explicit: true,
+        raw: text(),
+      });
+    }
+
 ScaleDegreeLiteral
   = sign:Sign? degree:UnsignedInteger
     !NumericLiteralSuffix !IdentifierContinue !BinaryTailStart {

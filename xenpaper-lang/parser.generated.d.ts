@@ -229,6 +229,8 @@ export interface DegreeLiteral extends Node {
   type: 'DegreeLiteral'
   modifiers: PitchModifier[]
   degree: string
+  /** The `d` suffix fixes the meaning as a degree even under scalar coercion. */
+  explicit?: boolean
   raw: string
 }
 
