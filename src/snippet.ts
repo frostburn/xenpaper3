@@ -73,12 +73,12 @@ export const decodeSnippet = (hash: string): Snippet => {
 
 /** Compile one clip and lift its tempo timeline into the shared playback model. */
 export const compileSnippet = (snippet: Snippet) => {
-  const initialization = compileLaneSourceInitialization(snippet.lane.source)
+  const initialization = compileLaneSourceInitialization(snippet.lane.source, {}, undefined, true)
   const options = {
     initialization,
     directiveExtensions: ENVELOPE_EXTENSIONS,
     allowTempoDirective: true,
-    tempo: 120,
+    tempo: initialization.context?.tempo?.valueOf() ?? 120,
     timeSignature: { numerator: 4, denominator: 4 },
   }
   const program = parse(snippet.source, { grammarSource: 'xenpaper:clip-source' })
@@ -92,6 +92,7 @@ export const compileSnippet = (snippet: Snippet) => {
   const timeline = scoreTimelineContexts(evaluated.shape, base.visitorContext)
   const project = createDefaultProject()
   project.globalTrack.source = ''
+  project.globalTrack.tempoChanges[0]!.bpm = options.tempo
   const changes = new Map([[0, project.globalTrack.tempoChanges[0]!]])
   timeline.changes.forEach(({ start, context }, index) => {
     if (context.tempo)

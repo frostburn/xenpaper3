@@ -6,6 +6,7 @@ import type { DawProject, PitchedInstrumentLane } from '../daw/project'
 import { deferred } from './deferred'
 import basics from '../tutorial/basics.json'
 import { compileSnippet } from '../snippet'
+import { createPlaybackPlan } from '../daw/playback-plan'
 import { interactiveTutorialPages } from '../tutorial/interactive'
 
 const audio = vi.hoisted(() => ({
@@ -47,6 +48,10 @@ describe('interactive tutorial snippets', () => {
         },
       })
       expect(result.score.duration.valueOf()).toBeGreaterThan(0)
+      expect(result.project.globalTrack.tempoChanges[0]!.bpm).toBe(240)
+      expect(demo.props.instrument).toMatchObject({ type: 'patch', patchPreset: 'default' })
+      const plan = createPlaybackPlan(result.project, 0, { allowClipTempoDirective: true })
+      expect(plan.tempoMap.beatToSeconds(1)).toBe(0.25)
     }
   })
 

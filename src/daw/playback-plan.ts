@@ -186,7 +186,7 @@ const assertPlaybackStart = (fromBeat: number): void => {
 }
 
 export interface PlaybackPlanOptions {
-  /** Snippets have one clip whose tempo directives control the whole timeline. */
+  /** Snippets allow tempo directives in their hidden lane config and single clip. */
   readonly allowClipTempoDirective?: boolean
 }
 
@@ -265,6 +265,7 @@ export const createPlaybackPlan = (
                       lane.source,
                       globalInitialization,
                       project.globalTrack.timeSignatureChanges[0],
+                      options.allowClipTempoDirective,
                     ),
                     tempoMap,
                     fromBeat,

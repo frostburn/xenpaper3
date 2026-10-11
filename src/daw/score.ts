@@ -396,7 +396,9 @@ export const compileLaneSourceInitialization = (
   source: string,
   parent: SourceInitialization = {},
   timeSignature?: { readonly numerator: number; readonly denominator: number },
-): SourceInitialization => compileSourceInitialization(source, parent, true, timeSignature, false)
+  allowTempoDirective = false,
+): SourceInitialization =>
+  compileSourceInitialization(source, parent, true, timeSignature, allowTempoDirective)
 
 /** Convert the exact language score at the sound/preview boundary. */
 const realizeClipNotes = (
@@ -558,6 +560,7 @@ export const parseLaneNotes = (
     lane.source,
     globalInitialization,
     timeSignature,
+    allowTempoDirective,
   )
   const notes = lane.clips.flatMap((clip) =>
     realizeClipNotes(

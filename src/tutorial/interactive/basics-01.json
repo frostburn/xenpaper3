@@ -11,7 +11,7 @@
         "oscillatorType": "triangle"
       },
       "gain": 0.5,
-      "laneSource": "@adsr(10ms, 100ms, 70%, 100ms)",
+      "laneSource": "@tempo(240bpm) @adsr(10ms, 100ms, 70%, 100ms)",
       "simplified": true,
       "rows": 3,
       "editorLabel": "Notes source"
@@ -29,7 +29,7 @@
         "oscillatorType": "triangle"
       },
       "gain": 0.5,
-      "laneSource": "@adsr(10ms, 100ms, 70%, 100ms)",
+      "laneSource": "@tempo(240bpm) @adsr(10ms, 100ms, 70%, 100ms)",
       "simplified": true,
       "rows": 3,
       "editorLabel": "Rests and duration source"
@@ -47,7 +47,7 @@
         "oscillatorType": "triangle"
       },
       "gain": 0.5,
-      "laneSource": "@adsr(10ms, 100ms, 70%, 100ms)",
+      "laneSource": "@tempo(240bpm) @adsr(10ms, 100ms, 70%, 100ms)",
       "simplified": true,
       "rows": 3,
       "editorLabel": "Bar lines and ties source"
@@ -65,7 +65,7 @@
         "oscillatorType": "triangle"
       },
       "gain": 0.5,
-      "laneSource": "@adsr(10ms, 100ms, 70%, 100ms)",
+      "laneSource": "@tempo(240bpm) @adsr(10ms, 100ms, 70%, 100ms)",
       "simplified": true,
       "rows": 3,
       "editorLabel": "Pitch notation source"
@@ -83,7 +83,7 @@
         "oscillatorType": "triangle"
       },
       "gain": 0.5,
-      "laneSource": "@adsr(10ms, 100ms, 70%, 100ms)",
+      "laneSource": "@tempo(240bpm) @adsr(10ms, 100ms, 70%, 100ms)",
       "simplified": true,
       "rows": 3,
       "editorLabel": "Octave shifts source"
@@ -97,12 +97,11 @@
       "source": "(3,7)=[5,8]=(0,3,7)==.[1/1,6/5,3/2]==.",
       "instrument": {
         "type": "patch",
-        "patchPreset": "unison",
-        "oscillatorType": "sawtooth",
-        "numberOfVoices": 5
+        "patchPreset": "default",
+        "oscillatorType": "sawtooth"
       },
       "gain": 0.35,
-      "laneSource": "@adsr(100ms, 200ms, 70%, 300ms) @spread(12c)",
+      "laneSource": "@tempo(240bpm) @adsr(100ms, 200ms, 70%, 300ms)",
       "simplified": true,
       "rows": 3,
       "editorLabel": "Chords source"
@@ -120,7 +119,7 @@
         "oscillatorType": "triangle"
       },
       "gain": 0.5,
-      "laneSource": "@adsr(10ms, 100ms, 70%, 100ms)",
+      "laneSource": "@tempo(240bpm) @adsr(10ms, 100ms, 70%, 100ms)",
       "simplified": true,
       "rows": 3,
       "editorLabel": "Negative degrees source"
@@ -134,12 +133,11 @@
       "source": "10:12:15===",
       "instrument": {
         "type": "patch",
-        "patchPreset": "unison",
-        "oscillatorType": "sawtooth",
-        "numberOfVoices": 5
+        "patchPreset": "default",
+        "oscillatorType": "sawtooth"
       },
       "gain": 0.35,
-      "laneSource": "@adsr(100ms, 200ms, 70%, 300ms) @spread(12c)",
+      "laneSource": "@tempo(240bpm) @adsr(100ms, 200ms, 70%, 300ms)",
       "simplified": true,
       "rows": 3,
       "editorLabel": "Enumerated chords source"
@@ -153,12 +151,11 @@
       "source": "# a 7th chord\n[0,4,7,10]==..\n\n# a harmonic 7th chord\n4:5:6:7==..",
       "instrument": {
         "type": "patch",
-        "patchPreset": "unison",
-        "oscillatorType": "sawtooth",
-        "numberOfVoices": 5
+        "patchPreset": "default",
+        "oscillatorType": "sawtooth"
       },
       "gain": 0.35,
-      "laneSource": "@adsr(100ms, 200ms, 70%, 300ms) @spread(12c)",
+      "laneSource": "@tempo(240bpm) @adsr(100ms, 200ms, 70%, 300ms)",
       "simplified": true,
       "rows": 5,
       "editorLabel": "Comments source"
@@ -172,12 +169,11 @@
       "source": "[0,4,7]=== {31edo}[0,10,18]===",
       "instrument": {
         "type": "patch",
-        "patchPreset": "unison",
-        "oscillatorType": "sawtooth",
-        "numberOfVoices": 5
+        "patchPreset": "default",
+        "oscillatorType": "sawtooth"
       },
       "gain": 0.35,
-      "laneSource": "@adsr(100ms, 200ms, 70%, 300ms) @spread(12c)",
+      "laneSource": "@tempo(240bpm) @adsr(100ms, 200ms, 70%, 300ms)",
       "simplified": true,
       "rows": 3,
       "editorLabel": "Changing scales source"
