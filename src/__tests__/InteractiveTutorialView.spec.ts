@@ -8,8 +8,8 @@ import { deferred } from './deferred'
 const audio = vi.hoisted(() => ({
   resume: vi.fn<() => Promise<void>>(),
   play: vi.fn<(project: DawProject) => Promise<void>>(),
-  stop: vi.fn(),
-  dispose: vi.fn(),
+  stop: vi.fn<() => void>(),
+  dispose: vi.fn<() => void>(),
 }))
 vi.mock('../daw/audio-engine', () => ({
   DawAudioEngine: class extends EventTarget {

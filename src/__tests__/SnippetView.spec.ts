@@ -8,8 +8,8 @@ import { deferred } from './deferred'
 const audio = vi.hoisted(() => ({
   resume: vi.fn<() => Promise<void>>(),
   play: vi.fn<(...args: unknown[]) => Promise<void>>(),
-  stop: vi.fn(),
-  dispose: vi.fn(),
+  stop: vi.fn<() => void>(),
+  dispose: vi.fn<() => void>(),
 }))
 vi.mock('../daw/audio-engine', () => ({
   DawAudioEngine: class extends EventTarget {
@@ -61,7 +61,7 @@ describe('snippet view', () => {
     const restored = decodeSnippet(router.currentRoute.value.hash)
     expect(restored.lane.gain).toBe(0.4)
     expect(restored.lane.instrument).toMatchObject({ oscillatorType: 'triangle' })
-    const clipboard = vi.fn().mockResolvedValue(undefined)
+    const clipboard = vi.fn<(text: string) => Promise<void>>().mockResolvedValue(undefined)
     vi.stubGlobal('navigator', { clipboard: { writeText: clipboard } })
     await wrapper.get('[aria-label="Share format"]').setValue('wiki')
     await wrapper.get('.share button').trigger('click')
