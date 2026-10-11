@@ -159,7 +159,7 @@ onBeforeUnmount(() => {
       </section>
     </div>
     <section v-if="!simplified" class="preview" aria-label="Snippet piano roll">
-      <PianoRoll :score="compiled.result?.score" />
+      <PianoRoll :score="compiled.result?.score" theme="dark" />
     </section>
   </div>
 </template>
