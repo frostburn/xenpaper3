@@ -39,6 +39,7 @@ export function evaluateBuiltinArgument(
 ): ExpressionEvaluationResult {
   if (
     node.type === 'DegreeLiteral' &&
+    !node.explicit &&
     (coercionName(coercion) === 'ratio' ||
       coercionName(coercion) === 'integer' ||
       coercionName(coercion) === 'boolean')

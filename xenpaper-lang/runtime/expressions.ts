@@ -309,6 +309,7 @@ export function prepareFunctionCall(
       return containerItems(argument, mapping, environment, coercion)
     if (
       argument.type === 'DegreeLiteral' &&
+      !argument.explicit &&
       (coercion?.name === 'ratio' || coercion?.name === 'integer' || coercion?.name === 'boolean')
     )
       return evaluateLiteral({
