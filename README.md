@@ -60,9 +60,11 @@ MediaWiki external link, or Discord angle-bracket link. Sampled instruments
 include their manifest in the URL; their audio files still load from the
 configured sample URLs.
 
-The `/tutorial` stub contains three mini-snippets using the same
+The `/tutorial` page contains six mini-snippets using the same
 `SnippetEditor` component as `/snippet`. Parent templates configure the
-instrument and hidden `laneSource` prop. Bind `source`, `instrument`, and
+instrument and hidden `laneSource` prop. The melody, chord, and interval examples
+are followed by rests and duration, scales, and tuplets drawn directly from
+the existing Basics tutorial material. Bind `source`, `instrument`, and
 `gain` with `v-model`; `simplified` shows only Play, Stop, Gain, and the
 controls appropriate to that instrument, alongside the editable score.
 

@@ -2,6 +2,29 @@
 import { ref } from 'vue'
 import type { InstrumentSource } from '../daw/project'
 import SnippetEditor from '../components/SnippetEditor.vue'
+import basics from '../tutorial/basics.json'
+
+// Reuse the score and explanation from the existing Basics tutorial.
+const additionalExamples = [
+  { id: 'rests', section: 'Notes, rests, and duration', demo: 1 },
+  { id: 'scales', section: 'Scales', demo: 0 },
+  { id: 'timing', section: 'Timing', demo: 0 },
+].map(({ id, section, demo }) => {
+  const example = basics.find((entry) => entry.title === section)!.demos[demo]!
+  return {
+    id,
+    title: section,
+    description: example.description,
+    source: example.tune!,
+    instrument: {
+      type: 'patch',
+      patchPreset: 'default',
+      oscillatorType: 'triangle',
+    } as InstrumentSource,
+    gain: 0.5,
+  }
+})
+const examples = ref(additionalExamples)
 
 const melody = ref('0 2 4 5 7')
 const chord = ref('[0,4,7]===')
@@ -64,6 +87,23 @@ const intervalsGain = ref(0.5)
         v-model:instrument="intervalsInstrument"
         v-model:gain="intervalsGain"
         lane-source="@adsr(10ms, 100ms, 70%, 100ms)"
+      />
+    </section>
+    <section
+      v-for="example in examples"
+      :key="example.id"
+      :aria-labelledby="`${example.id}-heading`"
+    >
+      <h2 :id="`${example.id}-heading`">{{ example.title }}</h2>
+      <p>{{ example.description }}</p>
+      <SnippetEditor
+        simplified
+        :rows="3"
+        :editor-label="`${example.title} source`"
+        v-model:source="example.source"
+        v-model:instrument="example.instrument"
+        v-model:gain="example.gain"
+        lane-source="{12edo} @adsr(10ms, 100ms, 70%, 100ms)"
       />
     </section>
   </div>
