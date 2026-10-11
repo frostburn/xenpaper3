@@ -3,7 +3,7 @@ import { computed, ref, toRaw, watch } from 'vue'
 import type { Fraction } from 'xen-dev-utils/fraction'
 import type { BeatTimedScore } from '../../xenpaper-lang'
 
-const props = defineProps<{ score?: BeatTimedScore }>()
+const props = defineProps<{ score?: BeatTimedScore; theme?: 'light' | 'dark' }>()
 export interface PianoRollElementInfo {
   index: number
   label: string
@@ -213,7 +213,7 @@ const selectionBox = computed(() => {
 </script>
 
 <template>
-  <section class="piano-roll" aria-label="Piano roll visualiser">
+  <section class="piano-roll" :class="{ dark: theme === 'dark' }" aria-label="Piano roll visualiser">
     <h2>Piano roll</h2>
     <div class="scroll">
       <div class="canvas" :style="{ width: `${width}px` }">
@@ -311,14 +311,32 @@ const selectionBox = computed(() => {
 
 <style scoped>
 .piano-roll {
+  --roll-background: var(--xenpaper-gray-50);
+  --roll-border: var(--xenpaper-slate-450);
+  --roll-grid: var(--xenpaper-slate-100);
+  --roll-note: var(--xenpaper-purple);
+  --roll-hover: var(--xenpaper-lavender);
+  --roll-text: var(--xenpaper-gray-600);
+  --roll-label-background: var(--xenpaper-white);
+  --roll-label-text: var(--xenpaper-purple);
   width: 100%;
   margin-top: 1rem;
 }
+.piano-roll.dark {
+  --roll-background: var(--xenpaper-slate-925);
+  --roll-border: var(--xenpaper-slate-500);
+  --roll-grid: var(--xenpaper-slate-850);
+  --roll-note: var(--xenpaper-lavender);
+  --roll-hover: var(--xenpaper-cyan);
+  --roll-text: var(--xenpaper-slate-100);
+  --roll-label-background: var(--xenpaper-slate-850);
+  --roll-label-text: var(--xenpaper-slate-100);
+}
 .scroll {
   overflow-x: auto;
-  border: 1px solid var(--xenpaper-slate-450);
+  border: 1px solid var(--roll-border);
   border-radius: 0.35rem;
-  background: var(--xenpaper-gray-50);
+  background: var(--roll-background);
 }
 .canvas {
   position: relative;
@@ -343,25 +361,25 @@ svg {
   overflow: visible;
 }
 .ruler-background {
-  fill: var(--xenpaper-gray-50);
-  stroke: var(--xenpaper-slate-450);
+  fill: var(--roll-background);
+  stroke: var(--roll-border);
   stroke-width: 1;
 }
 .pitch-line {
-  stroke: var(--xenpaper-slate-100);
+  stroke: var(--roll-grid);
   stroke-width: 1;
 }
 .beat-line {
-  stroke: var(--xenpaper-slate-450);
+  stroke: var(--roll-border);
   stroke-dasharray: 3 3;
 }
 .note {
-  fill: var(--xenpaper-purple);
-  stroke: var(--xenpaper-purple);
+  fill: var(--roll-note);
+  stroke: var(--roll-note);
   rx: 2px;
 }
 .note.inspected {
-  fill: var(--xenpaper-lavender);
+  fill: var(--roll-hover);
 }
 .note.selected {
   fill: var(--xenpaper-pink);
@@ -383,7 +401,7 @@ svg {
   stroke-dasharray: 4 2;
 }
 text {
-  fill: var(--xenpaper-gray-600);
+  fill: var(--roll-text);
   font: 11px sans-serif;
 }
 .beat-label {
@@ -391,7 +409,7 @@ text {
   font-weight: 600;
 }
 .cents-label rect {
-  fill: var(--xenpaper-white);
+  fill: var(--roll-label-background);
   stroke: var(--xenpaper-pink);
   stroke-width: 1.5;
 }
@@ -400,7 +418,7 @@ text {
   stroke-width: 1.5;
 }
 .cents-label text {
-  fill: var(--xenpaper-purple);
+  fill: var(--roll-label-text);
   font-weight: 700;
   text-anchor: middle;
 }
