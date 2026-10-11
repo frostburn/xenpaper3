@@ -1,0 +1,182 @@
+[
+  {
+    "id": "basics-11",
+    "title": "Other equaves",
+    "description": "Equal division equave size can be changed by replacing the “o” with a number or fraction.",
+    "props": {
+      "source": "{13ed3}0 1 2 3 4",
+      "instrument": {
+        "type": "patch",
+        "patchPreset": "default",
+        "oscillatorType": "triangle"
+      },
+      "gain": 0.5,
+      "laneSource": "@adsr(10ms, 100ms, 70%, 100ms)",
+      "simplified": true,
+      "rows": 3,
+      "editorLabel": "Other equaves source"
+    }
+  },
+  {
+    "id": "basics-12",
+    "title": "Interval scales",
+    "description": "A scale can also be built from individual pitch intervals. The listed entries become degrees 1 onward; degree 0 remains the root.",
+    "props": {
+      "source": "{9/8 5/4 4/3 3/2 5/3 15/8 2/1}\n0 1 2 3 4 5 6 7=",
+      "instrument": {
+        "type": "patch",
+        "patchPreset": "default",
+        "oscillatorType": "triangle"
+      },
+      "gain": 0.5,
+      "laneSource": "@adsr(10ms, 100ms, 70%, 100ms)",
+      "simplified": true,
+      "rows": 3,
+      "editorLabel": "Interval scales source"
+    }
+  },
+  {
+    "id": "basics-13",
+    "title": "Scale degree wrapping",
+    "description": "The final listed pitch is also the equave. Degree indexing wraps through that equave, so the pattern continues beyond the entries shown.",
+    "props": {
+      "source": "{5/4 4/3 3/2}\n0 1 2 3 4 5 6 7 8=",
+      "instrument": {
+        "type": "patch",
+        "patchPreset": "default",
+        "oscillatorType": "triangle"
+      },
+      "gain": 0.5,
+      "laneSource": "@adsr(10ms, 100ms, 70%, 100ms)",
+      "simplified": true,
+      "rows": 3,
+      "editorLabel": "Scale degree wrapping source"
+    }
+  },
+  {
+    "id": "basics-14",
+    "title": "Enumerated scales",
+    "description": "An enumerated chord can define a scale compactly. Its first member becomes degree 0, and its final enumeral determines the equave.",
+    "props": {
+      "source": "{12:14:16:18:21:24}\n0 1 2 3 4 5 6 7=",
+      "instrument": {
+        "type": "patch",
+        "patchPreset": "default",
+        "oscillatorType": "triangle"
+      },
+      "gain": 0.5,
+      "laneSource": "@adsr(10ms, 100ms, 70%, 100ms)",
+      "simplified": true,
+      "rows": 3,
+      "editorLabel": "Enumerated scales source"
+    }
+  },
+  {
+    "id": "basics-15",
+    "title": "Harmonic segments",
+    "description": "Harmonic segments can be specified using two colons :: to enumerate a range.",
+    "props": {
+      "source": "{4::8}\n0 1 2 3 4==",
+      "instrument": {
+        "type": "patch",
+        "patchPreset": "default",
+        "oscillatorType": "triangle"
+      },
+      "gain": 0.5,
+      "laneSource": "@adsr(10ms, 100ms, 70%, 100ms)",
+      "simplified": true,
+      "rows": 3,
+      "editorLabel": "Harmonic segments source"
+    }
+  },
+  {
+    "id": "basics-16",
+    "title": "Retroverted scales",
+    "description": "Enumerations can be retroverted by prefixing them with a slash.",
+    "props": {
+      "source": "{/6::3}\n0 1 2 3==",
+      "instrument": {
+        "type": "patch",
+        "patchPreset": "default",
+        "oscillatorType": "triangle"
+      },
+      "gain": 0.5,
+      "laneSource": "@adsr(10ms, 100ms, 70%, 100ms)",
+      "simplified": true,
+      "rows": 3,
+      "editorLabel": "Retroverted scales source"
+    }
+  },
+  {
+    "id": "basics-17",
+    "title": "Scale subsets",
+    "description": "Scales can reference the scale degrees at the moment they are encountered, which is useful for creating a subset of a scale.",
+    "props": {
+      "source": "{19edo}{3 6 8 11 14 17 19}\n0 1 2 3 4 5 6 7=",
+      "instrument": {
+        "type": "patch",
+        "patchPreset": "default",
+        "oscillatorType": "triangle"
+      },
+      "gain": 0.5,
+      "laneSource": "@adsr(10ms, 100ms, 70%, 100ms)",
+      "simplified": true,
+      "rows": 3,
+      "editorLabel": "Scale subsets source"
+    }
+  },
+  {
+    "id": "basics-18",
+    "title": "Root frequency",
+    "description": "All pitch values other than cycles per second are relative to a root note.",
+    "props": {
+      "source": "0 2 4={root=432Hz}0 2 4=",
+      "instrument": {
+        "type": "patch",
+        "patchPreset": "default",
+        "oscillatorType": "triangle"
+      },
+      "gain": 0.5,
+      "laneSource": "@adsr(10ms, 100ms, 70%, 100ms)",
+      "simplified": true,
+      "rows": 3,
+      "editorLabel": "Root frequency source"
+    }
+  },
+  {
+    "id": "basics-19",
+    "title": "Chained roots",
+    "description": "As each root pitch change is relative to the current root, multiple roots can be chained.",
+    "props": {
+      "source": "4 0= {root = 2} 4 0= {root = 2} 4 0=",
+      "instrument": {
+        "type": "patch",
+        "patchPreset": "default",
+        "oscillatorType": "triangle"
+      },
+      "gain": 0.5,
+      "laneSource": "@adsr(10ms, 100ms, 70%, 100ms)",
+      "simplified": true,
+      "rows": 3,
+      "editorLabel": "Chained roots source"
+    }
+  },
+  {
+    "id": "basics-20",
+    "title": "Root octaves",
+    "description": "Root changes can also switch octaves for a time.",
+    "props": {
+      "source": "4 0={root = '0}4 0={root = `0}4 0=",
+      "instrument": {
+        "type": "patch",
+        "patchPreset": "default",
+        "oscillatorType": "triangle"
+      },
+      "gain": 0.5,
+      "laneSource": "@adsr(10ms, 100ms, 70%, 100ms)",
+      "simplified": true,
+      "rows": 3,
+      "editorLabel": "Root octaves source"
+    }
+  }
+]

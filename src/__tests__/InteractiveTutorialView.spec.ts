@@ -6,6 +6,7 @@ import type { DawProject, PitchedInstrumentLane } from '../daw/project'
 import { deferred } from './deferred'
 import basics from '../tutorial/basics.json'
 import { compileSnippet } from '../snippet'
+import { interactiveTutorialPages } from '../tutorial/interactive'
 
 const audio = vi.hoisted(() => ({
   resume: vi.fn<() => Promise<void>>(),
@@ -27,120 +28,130 @@ afterEach(() => {
 })
 
 describe('interactive tutorial snippets', () => {
-  it('uses six shared editors with only transport, gain, and sound-specific controls', () => {
-    const wrapper = mount(InteractiveTutorialView)
-    const editors = wrapper.findAllComponents(SnippetEditor)
-    expect(editors).toHaveLength(6)
-    expect(wrapper.findAll('textarea')).toHaveLength(6)
-    expect(wrapper.findAll('button').map((button) => button.text())).toEqual([
-      'Play',
-      'Stop',
-      'Play',
-      'Stop',
-      'Play',
-      'Stop',
-      'Play',
-      'Stop',
-      'Play',
-      'Stop',
-      'Play',
-      'Stop',
-    ])
-    expect(wrapper.findAll('input[type="range"]')).toHaveLength(6)
-    expect(wrapper.findAll('input[type="radio"]')).toHaveLength(0)
-    expect(wrapper.find('input[type="file"]').exists()).toBe(false)
-    expect(wrapper.find('[aria-label="Instrument lane source"]').exists()).toBe(false)
-    expect(wrapper.find('[aria-label="Share snippet"]').exists()).toBe(false)
-    expect(wrapper.find('.transport output').exists()).toBe(false)
-    expect(wrapper.text()).not.toContain('SW Patch')
-    expect(editors[1]!.find('[aria-label="Unison voices"]').exists()).toBe(true)
-    wrapper.unmount()
-  })
-
-  it('plays each parent-configured sound with its hidden defaults and keeps edits independent', async () => {
-    audio.resume.mockResolvedValue(undefined)
-    audio.play.mockResolvedValue(undefined)
-    const wrapper = mount(InteractiveTutorialView)
-    const editors = wrapper.findAllComponents(SnippetEditor)
-    await editors[0]!.get('[aria-label="Waveform"]').setValue('square')
-    await editors[0]!.get('[aria-label="Instrument gain"]').setValue('0.25')
-    await editors[0]!.get('[aria-label="Play"]').trigger('click')
-    await flushPromises()
-    const melody = audio.play.mock.calls[0]![0].instrumentLanes[0]! as PitchedInstrumentLane
-    expect(melody.instrument).toMatchObject({ patchPreset: 'default', oscillatorType: 'square' })
-    expect(melody.gain).toBe(0.25)
-    expect(melody.source).toContain('@adsr(10ms')
-    expect(melody.clips[0]!.source).toBe('0 2 4 5 7')
-    await editors[1]!.get('[aria-label="Play"]').trigger('click')
-    await flushPromises()
-    const chord = audio.play.mock.calls[1]![0].instrumentLanes[0]! as PitchedInstrumentLane
-    expect(chord.instrument).toMatchObject({
-      patchPreset: 'unison',
-      numberOfVoices: 5,
-      oscillatorType: 'sawtooth',
-    })
-    expect(chord.gain).toBe(0.35)
-    expect(chord.source).toContain('@spread(12c)')
-    await editors[2]!.get('[aria-label="Play"]').trigger('click')
-    await flushPromises()
-    expect(
-      (audio.play.mock.calls[2]![0].instrumentLanes[0]! as PitchedInstrumentLane).instrument,
-    ).toMatchObject({ oscillatorType: 'sine' })
-    for (let index = 3; index < editors.length; index++) {
-      const editor = editors[index]!
-      await editor.get('[aria-label="Play"]').trigger('click')
-      await flushPromises()
-      const lane = audio.play.mock.calls[index]![0].instrumentLanes[0]! as PitchedInstrumentLane
-      expect(lane.clips[0]!.source).toBe(editor.props('source'))
-      expect(lane.instrument).toMatchObject({ oscillatorType: 'triangle' })
-      expect(lane.gain).toBe(0.5)
-    }
-    expect(wrapper.findAll('[role="alert"]')).toHaveLength(0)
-    const originalSources = editors.map((editor) => editor.props('source'))
-    await editors[3]!.get('textarea').setValue('0== . 7')
-    await vi.waitFor(() => expect(editors[3]!.props('source')).toBe('0== . 7'))
-    await editors[3]!.get('[aria-label="Waveform"]').setValue('sine')
-    await editors[3]!.get('[aria-label="Instrument gain"]').setValue('0.2')
-    for (const index of [0, 1, 2, 4, 5]) {
-      expect(editors[index]!.props('source')).toBe(originalSources[index])
-    }
-    expect(editors[4]!.props('instrument')).toMatchObject({ oscillatorType: 'triangle' })
-    expect(editors[4]!.props('gain')).toBe(0.5)
-    await editors[3]!.get('[aria-label="Play"]').trigger('click')
-    await flushPromises()
-    const edited = audio.play.mock.calls[6]![0].instrumentLanes[0]! as PitchedInstrumentLane
-    expect(edited.clips[0]!.source).toBe('0== . 7')
-    expect(edited.instrument).toMatchObject({ oscillatorType: 'sine' })
-    expect(edited.gain).toBe(0.2)
-    wrapper.unmount()
-    expect(audio.dispose).toHaveBeenCalledTimes(6)
-  })
-
-  it('reuses Basics material and compiles all six snippets', () => {
-    const wrapper = mount(InteractiveTutorialView)
-    const editors = wrapper.findAllComponents(SnippetEditor)
-    const selections = [
-      ['Notes, rests, and duration', 1],
-      ['Scales', 0],
-      ['Timing', 0],
-    ] as const
-    selections.forEach(([title, demo], index) => {
-      const example = basics.find((section) => section.title === title)!.demos[demo]!
-      expect(editors[index + 3]!.props('source')).toBe(example.tune)
-      expect(wrapper.text()).toContain(example.description)
-    })
-    for (const editor of editors) {
+  it('contains the first 20 Basics demos in order, split into two pages of ten', () => {
+    expect(interactiveTutorialPages.map((page) => page.length)).toEqual([10, 10])
+    const demos = interactiveTutorialPages.flat()
+    expect(new Set(demos.map((demo) => demo.id)).size).toBe(20)
+    const material = basics
+      .flatMap((section) => section.demos)
+      .filter((demo) => demo.tune)
+      .slice(0, 20)
+    expect(demos.map((demo) => demo.props.source)).toEqual(material.map((demo) => demo.tune))
+    for (const demo of demos) {
       const result = compileSnippet({
-        source: editor.props('source'),
+        source: demo.props.source,
         lane: {
-          source: editor.props('laneSource') ?? '',
-          instrument: editor.props('instrument'),
-          gain: editor.props('gain'),
+          source: demo.props.laneSource,
+          instrument: demo.props.instrument,
+          gain: demo.props.gain,
         },
       })
       expect(result.score.duration.valueOf()).toBeGreaterThan(0)
-      expect(editor.get('[aria-label="Play"]').attributes('disabled')).toBeUndefined()
     }
+  })
+
+  it('renders JSON content and editor props on each page with bounded navigation', async () => {
+    const wrapper = mount(InteractiveTutorialView)
+    const previous = () => wrapper.get('.pagination button:first-child')
+    const next = () => wrapper.get('.pagination button:last-child')
+    expect(previous().attributes('disabled')).toBeDefined()
+    expect(next().attributes('disabled')).toBeUndefined()
+    for (let page = 0; page < 2; page++) {
+      const editors = wrapper.findAllComponents(SnippetEditor)
+      expect(editors).toHaveLength(10)
+      expect(wrapper.findAll('textarea')).toHaveLength(10)
+      expect(wrapper.get('[role="status"]').text()).toBe(`Page ${page + 1} of 2`)
+      interactiveTutorialPages[page]!.forEach((demo, index) => {
+        expect(wrapper.get(`#${demo.id}-heading`).text()).toBe(demo.title)
+        expect(editors[index]!.props()).toEqual(demo.props)
+        expect(editors[index]!.get('[aria-label="Play"]').attributes('disabled')).toBeUndefined()
+      })
+      for (const demo of interactiveTutorialPages[page]!.filter((demo) => demo.description)) {
+        expect(wrapper.text()).toContain(demo.description)
+      }
+      for (const demo of interactiveTutorialPages[page]!.filter((demo) => demo.html)) {
+        expect(wrapper.get(`#${demo.id}-heading`).element.parentElement!.innerHTML).toContain(
+          demo.html,
+        )
+      }
+      expect(wrapper.findAll('[role="alert"]')).toHaveLength(0)
+      expect(wrapper.find('input[type="radio"]').exists()).toBe(false)
+      expect(wrapper.find('[aria-label="Instrument lane source"]').exists()).toBe(false)
+      expect(wrapper.find('[aria-label="Share snippet"]').exists()).toBe(false)
+      if (page === 0) await next().trigger('click')
+    }
+    expect(next().attributes('disabled')).toBeDefined()
+    expect(previous().attributes('disabled')).toBeUndefined()
+    await previous().trigger('click')
+    expect(wrapper.get('[role="status"]').text()).toBe('Page 1 of 2')
+    wrapper.unmount()
+  })
+
+  it('plays every JSON-configured demo and disposes playback on page changes', async () => {
+    audio.resume.mockResolvedValue(undefined)
+    audio.play.mockResolvedValue(undefined)
+    const wrapper = mount(InteractiveTutorialView)
+    for (let page = 0; page < 2; page++) {
+      expect(audio.dispose).toHaveBeenCalledTimes(page * 10)
+      const editors = wrapper.findAllComponents(SnippetEditor)
+      for (let index = 0; index < editors.length; index++) {
+        await editors[index]!.get('[aria-label="Play"]').trigger('click')
+        await flushPromises()
+        const lane = audio.play.mock.calls[page * 10 + index]![0]
+          .instrumentLanes[0]! as PitchedInstrumentLane
+        const props = interactiveTutorialPages[page]![index]!.props
+        expect(lane.clips[0]!.source).toBe(props.source)
+        expect(lane.instrument).toEqual(props.instrument)
+        expect(lane.gain).toBe(props.gain)
+        expect(lane.source).toBe(props.laneSource)
+      }
+      if (page === 0) {
+        await wrapper.get('.pagination button:last-child').trigger('click')
+      }
+    }
+    wrapper.unmount()
+    expect(audio.dispose).toHaveBeenCalledTimes(20)
+  })
+
+  it('retains pending source, instrument, and gain edits across pages without changing other demos or JSON defaults', async () => {
+    const wrapper = mount(InteractiveTutorialView)
+    const first = wrapper.findAllComponents(SnippetEditor)[0]!
+    await first.get('[aria-label="Waveform"]').setValue('square')
+    await first.get('[aria-label="Instrument gain"]').setValue('0.25')
+    await first.get('textarea').setValue('0== . 7')
+    // Navigating immediately must flush the source editor debounce on unmount.
+    await wrapper.get('.pagination button:last-child').trigger('click')
+    const secondPage = wrapper.findAllComponents(SnippetEditor)
+    expect(secondPage[0]!.props()).toEqual(interactiveTutorialPages[1]![0]!.props)
+    await secondPage[0]!.get('[aria-label="Waveform"]').setValue('sine')
+    await wrapper.get('.pagination button:first-child').trigger('click')
+    const firstPage = wrapper.findAllComponents(SnippetEditor)
+    expect(firstPage[0]!.props('source')).toBe('0== . 7')
+    expect(firstPage[0]!.props('instrument')).toMatchObject({ oscillatorType: 'square' })
+    expect(firstPage[0]!.props('gain')).toBe(0.25)
+    expect(firstPage[1]!.props()).toEqual(interactiveTutorialPages[0]![1]!.props)
+    await wrapper.get('.pagination button:last-child').trigger('click')
+    expect(wrapper.findAllComponents(SnippetEditor)[0]!.props('instrument')).toMatchObject({
+      oscillatorType: 'sine',
+    })
+    wrapper.unmount()
+    const fresh = mount(InteractiveTutorialView)
+    expect(fresh.findAllComponents(SnippetEditor)[0]!.props()).toEqual(
+      interactiveTutorialPages[0]![0]!.props,
+    )
+    fresh.unmount()
+  })
+
+  it('cancels pending audio initialization when navigating away', async () => {
+    const resumed = deferred()
+    audio.resume.mockReturnValueOnce(resumed.promise)
+    const wrapper = mount(InteractiveTutorialView)
+    await wrapper.findAllComponents(SnippetEditor)[0]!.get('[aria-label="Play"]').trigger('click')
+    await wrapper.get('.pagination button:last-child').trigger('click')
+    resumed.resolve()
+    await flushPromises()
+    expect(audio.play).not.toHaveBeenCalled()
+    expect(audio.dispose).toHaveBeenCalledTimes(1)
     wrapper.unmount()
   })
 

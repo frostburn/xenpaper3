@@ -1,0 +1,186 @@
+[
+  {
+    "id": "basics-01",
+    "title": "Notes",
+    "description": "Typing a number creates a note. Notes can be separated by spaces or new lines.",
+    "props": {
+      "source": "0 4 7\n11 12",
+      "instrument": {
+        "type": "patch",
+        "patchPreset": "default",
+        "oscillatorType": "triangle"
+      },
+      "gain": 0.5,
+      "laneSource": "@adsr(10ms, 100ms, 70%, 100ms)",
+      "simplified": true,
+      "rows": 3,
+      "editorLabel": "Notes source"
+    }
+  },
+  {
+    "id": "basics-02",
+    "title": "Rests and duration",
+    "description": "Append equal signs to extend a note, and use dots for rests. Pitches and rests may be adjacent, although spaces often improve readability.",
+    "props": {
+      "source": "0.2.3...3=2=0==.",
+      "instrument": {
+        "type": "patch",
+        "patchPreset": "default",
+        "oscillatorType": "triangle"
+      },
+      "gain": 0.5,
+      "laneSource": "@adsr(10ms, 100ms, 70%, 100ms)",
+      "simplified": true,
+      "rows": 3,
+      "editorLabel": "Rests and duration source"
+    }
+  },
+  {
+    "id": "basics-03",
+    "title": "Bar lines and ties",
+    "html": "<p>Bar lines help organize the score without changing the timing. A leading <code>=</code> continues (ties) the preceding note across a bar line.</p>",
+    "props": {
+      "source": "0 8 7=|0 8 7=|=5 4== ||",
+      "instrument": {
+        "type": "patch",
+        "patchPreset": "default",
+        "oscillatorType": "triangle"
+      },
+      "gain": 0.5,
+      "laneSource": "@adsr(10ms, 100ms, 70%, 100ms)",
+      "simplified": true,
+      "rows": 3,
+      "editorLabel": "Bar lines and ties source"
+    }
+  },
+  {
+    "id": "basics-04",
+    "title": "Pitch notation",
+    "description": "Notes can be written as scale degrees, ratios, cents, diatonic pitches, steps of equal temperaments, cycles per second and more.",
+    "props": {
+      "source": "0 7 1/1 3/2 0c 702c C G\n0\\19 11\\19 262Hz 393Hz",
+      "instrument": {
+        "type": "patch",
+        "patchPreset": "default",
+        "oscillatorType": "triangle"
+      },
+      "gain": 0.5,
+      "laneSource": "@adsr(10ms, 100ms, 70%, 100ms)",
+      "simplified": true,
+      "rows": 3,
+      "editorLabel": "Pitch notation source"
+    }
+  },
+  {
+    "id": "basics-05",
+    "title": "Octave shifts",
+    "description": "Notes can be shifted up or down octaves. Primes (apostrophes) shift up and graves (backticks) shift down.",
+    "props": {
+      "source": "0=3='0='3=\"0='\"0=`0=``0=",
+      "instrument": {
+        "type": "patch",
+        "patchPreset": "default",
+        "oscillatorType": "triangle"
+      },
+      "gain": 0.5,
+      "laneSource": "@adsr(10ms, 100ms, 70%, 100ms)",
+      "simplified": true,
+      "rows": 3,
+      "editorLabel": "Octave shifts source"
+    }
+  },
+  {
+    "id": "basics-06",
+    "title": "Chords",
+    "html": "<p>Play simultaneous pitches by putting a comma-separated expression in parentheses or square brackets. Square brackets without commas create tuplets instead (see <strong>Timing</strong>).</p>",
+    "props": {
+      "source": "(3,7)=[5,8]=(0,3,7)==.[1/1,6/5,3/2]==.",
+      "instrument": {
+        "type": "patch",
+        "patchPreset": "unison",
+        "oscillatorType": "sawtooth",
+        "numberOfVoices": 5
+      },
+      "gain": 0.35,
+      "laneSource": "@adsr(100ms, 200ms, 70%, 300ms) @spread(12c)",
+      "simplified": true,
+      "rows": 3,
+      "editorLabel": "Chords source"
+    }
+  },
+  {
+    "id": "basics-07",
+    "title": "Negative degrees",
+    "description": "Negative degrees are supported.",
+    "props": {
+      "source": "0 -1 1 0=",
+      "instrument": {
+        "type": "patch",
+        "patchPreset": "default",
+        "oscillatorType": "triangle"
+      },
+      "gain": 0.5,
+      "laneSource": "@adsr(10ms, 100ms, 70%, 100ms)",
+      "simplified": true,
+      "rows": 3,
+      "editorLabel": "Negative degrees source"
+    }
+  },
+  {
+    "id": "basics-08",
+    "title": "Enumerated chords",
+    "description": "Chords can also be played by enumerating a colon-separated chord.",
+    "props": {
+      "source": "10:12:15===",
+      "instrument": {
+        "type": "patch",
+        "patchPreset": "unison",
+        "oscillatorType": "sawtooth",
+        "numberOfVoices": 5
+      },
+      "gain": 0.35,
+      "laneSource": "@adsr(100ms, 200ms, 70%, 300ms) @spread(12c)",
+      "simplified": true,
+      "rows": 3,
+      "editorLabel": "Enumerated chords source"
+    }
+  },
+  {
+    "id": "basics-09",
+    "title": "Comments",
+    "html": "<p>A <code>#</code> starts a comment that continues to the end of the line.</p>",
+    "props": {
+      "source": "# a 7th chord\n[0,4,7,10]==..\n\n# a harmonic 7th chord\n4:5:6:7==..",
+      "instrument": {
+        "type": "patch",
+        "patchPreset": "unison",
+        "oscillatorType": "sawtooth",
+        "numberOfVoices": 5
+      },
+      "gain": 0.35,
+      "laneSource": "@adsr(100ms, 200ms, 70%, 300ms) @spread(12c)",
+      "simplified": true,
+      "rows": 5,
+      "editorLabel": "Comments source"
+    }
+  },
+  {
+    "id": "basics-10",
+    "title": "Changing scales",
+    "description": "Change the scale at any point with braces. The default is 12 equal divisions of the octave (12edo); a scale change affects the notes that follow it.",
+    "props": {
+      "source": "[0,4,7]=== {31edo}[0,10,18]===",
+      "instrument": {
+        "type": "patch",
+        "patchPreset": "unison",
+        "oscillatorType": "sawtooth",
+        "numberOfVoices": 5
+      },
+      "gain": 0.35,
+      "laneSource": "@adsr(100ms, 200ms, 70%, 300ms) @spread(12c)",
+      "simplified": true,
+      "rows": 3,
+      "editorLabel": "Changing scales source"
+    }
+  }
+]
