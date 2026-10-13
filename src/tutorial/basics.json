@@ -24,7 +24,7 @@
       },
       {
         "tune": "(3,7)=[5,8]=(0,3,7)==.[1/1,6/5,3/2]==.",
-        "html": "<p>Play simultaneous pitches by putting a comma-separated expression in parentheses or square brackets. Square brackets without commas create tuplets instead (see <strong>Timing</strong>).</p>"
+        "html": "<p>Play simultaneous pitches by putting a comma-separated expression in parentheses or square brackets. Square brackets without commas create tuplets instead. (Timing will be described in detail later.)</p>"
       },
       {
         "description": "Negative degrees are supported.",
@@ -146,7 +146,7 @@
     "demos": [
       {
         "tune": "# Square little tune\n|: 0 2 4 5 |¹ 7 5 4 2 :|² 7 11 12= |\n12 11 9 7 | 5 4 2 -1 | 0=== ||",
-        "html": "<p>Everything between <code>|:</code> and <code>:|</code> is repeated twice by default. Alternate endings use <code>@^1</code> and <code>@^2</code>, or the equivalent superscript numerals attached to bar lines as below.</p>"
+        "html": "<p>Everything between <code>|:</code> and <code>:|</code> is repeated twice by default. Alternate endings use <code>@^1</code> and <code>@^2</code>, or the equivalent superscript numerals attached to bar lines in this example.</p>"
       },
       {
         "description": "To add more repeats use @x followed by a number attached to the opening |:.",
@@ -229,7 +229,7 @@
       },
       {
         "description": "More complex grooves can be set by using more than two notes.",
-        "tune": "@groove([0==0=0]==)\n0 1 2   5 4 3 |\n2 1 -1 -5 7 . |\n5 4 5   . . . |\n4 3 4   . . . |\n@4 3  2 1 0 -1\n  -3 -4== -5==|\n0===== ...... ||"
+        "tune": "@groove([0==0=0]==)\n0 1 2   5 4 3 |\n2 1 -1 -5 7 . |\n5 4 5   . . . |\n4 3 4   . . . |\n@2 3  2 1 0 -1\n  -3= -4= -5==|\n0===== ...... ||"
       },
       {
         "description": "Groove patterns can include accent dynamics. Accent values stay in effect until the next accent and multiply each note velocity.",

@@ -15,8 +15,8 @@
         "html": "<p>Settings are inherited by nested expressions, but changes made inside a parenthesized group, square-bracket tuplet, or parallel branch stay inside that construction. After the construction ends, the outer scale, root, subdivision, dynamic, articulation, groove, and other settings resume.</p><p>In this example, the group inherits <code>@p</code> and 12edo, temporarily switches to <code>@f</code> and 19edo, and then discards those changes. The final degree 7 is quiet and uses 12edo again.</p>"
       },
       {
-        "tune": "@2 @p\n0 [@3 @f 2 4 6 @2 5 3] 7 9",
-        "html": "<p>Tuplets create the same kind of boundary. Inside the brackets, <code>@3</code> controls the first four notes before <code>@2</code> changes the final pair. After the slot, the outer <code>@2</code> and <code>@p</code> settings resume.</p>"
+        "tune": "@1 @p\n0 4 7 12 |\n[@3 @f 12 11 9 7 @2 5 4]=== |\n2 7 0= ||",
+        "html": "<p>Tuplets create the same kind of boundary. A quiet C-major arpeggio leads into a louder descending phrase held across four beats. Inside the brackets, <code>@3</code> makes the first four notes shorter than the final pair under <code>@2</code>. After the tuplet, the outer <code>@1</code> and <code>@p</code> settings resume for the D–G–C ending.</p>"
       },
       {
         "description": "Each parallel branch also receives its own copy of the outer settings. A change in one branch affects neither its siblings nor the music following the parallel section.",

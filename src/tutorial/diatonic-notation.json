@@ -66,7 +66,7 @@
         "html": "<p>Key signatures can be set with <code>{key = G}</code> or modal names like <code>{key = D Dorian}</code>. Plain nominals receive the signature accidentals, while an explicit natural sign ♮ or underscore _ restores the unaltered nominal.</p>"
       },
       {
-        "description": "Custom key signatures allow you to attach ups, lifts, accidentals and inflections (see below) to plain nominals. A natural sign restores the original nominal.",
+        "description": "Custom key signatures allow you to attach ups, lifts, accidentals and inflections to plain nominals. Inflections will be described in detail later. A natural sign restores the original nominal.",
         "tune": "# 5-limit Phrygian\n{sig = Bbv5 Cv5 Fv5 Gv5}\n`A `B C D E F G A= B_ A="
       },
       {

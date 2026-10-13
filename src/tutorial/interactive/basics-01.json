@@ -92,7 +92,7 @@
   {
     "id": "basics-06",
     "title": "Chords",
-    "html": "<p>Play simultaneous pitches by putting a comma-separated expression in parentheses or square brackets. Square brackets without commas create tuplets instead (see <strong>Timing</strong>).</p>",
+    "html": "<p>Play simultaneous pitches by putting a comma-separated expression in parentheses or square brackets. Square brackets without commas create tuplets instead. (Timing will be described in detail later.)</p>",
     "props": {
       "source": "(3,7)=[5,8]=(0,3,7)==.[1/1,6/5,3/2]==.",
       "instrument": {

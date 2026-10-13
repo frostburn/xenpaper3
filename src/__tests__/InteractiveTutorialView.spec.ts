@@ -6,6 +6,7 @@ import type { DawProject, PitchedInstrumentLane } from '../daw/project'
 import { createMemoryHistory, createRouter } from 'vue-router'
 import { deferred } from './deferred'
 import basics from '../tutorial/basics.json'
+import tempos from '../tutorial/interactive/tempos.json'
 import { tutorialChapters } from '../tutorial'
 import { compileSnippet, SNIPPET_PLAYBACK_OPTIONS } from '../snippet'
 import { createPlaybackPlan } from '../daw/playback-plan'
@@ -103,10 +104,11 @@ describe('interactive tutorial snippets', () => {
         },
       })
       expect(result.score.duration.valueOf()).toBeGreaterThan(0)
-      expect(result.project.globalTrack.tempoChanges[0]!.bpm).toBe(240)
+      const expectedTempo = (tempos as Record<string, number>)[demo.id] ?? 240
+      expect(result.project.globalTrack.tempoChanges[0]!.bpm).toBe(expectedTempo)
       expect(result.diagnostics).toEqual([])
       const plan = createPlaybackPlan(result.project, 0, SNIPPET_PLAYBACK_OPTIONS)
-      expect(plan.tempoMap.beatToSeconds(1)).toBe(0.25)
+      expect(plan.tempoMap.beatToSeconds(1)).toBe(60 / expectedTempo)
       expect(plan.lanes[0]?.notes.length).toBeGreaterThan(0)
     }
   })

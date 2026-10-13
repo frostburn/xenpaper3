@@ -2,6 +2,7 @@ import basics01 from './basics-01.json'
 import basics02 from './basics-02.json'
 import titles from './titles.json'
 import additionalFeatures from './additional-features.json'
+import tempos from './tempos.json'
 import type { InstrumentSource } from '../../daw/project'
 import { tutorialChapters } from '..'
 
@@ -38,6 +39,7 @@ const chapterTitles = [
   titles['diamond-mos'],
 ]
 let pageIndex = 0
+const tempoOverrides: Record<string, number> = tempos
 
 type TutorialFeature = Pick<InteractiveTutorialDemo, 'id' | 'title' | 'description' | 'html'> & {
   source?: string
@@ -47,6 +49,7 @@ type TutorialFeature = Pick<InteractiveTutorialDemo, 'id' | 'title' | 'descripti
 
 function createDemo(feature: TutorialFeature): InteractiveTutorialDemo {
   const { id, title, description, html, source } = feature
+  const tempo = tempoOverrides[id] ?? 240
   return {
     id,
     title,
@@ -61,7 +64,7 @@ function createDemo(feature: TutorialFeature): InteractiveTutorialDemo {
             oscillatorType: 'semisine',
           },
           gain: 0.35,
-          laneSource: feature.laneSource ?? '@tempo(240bpm) @adsr(10ms, 100ms, 70%, 100ms)',
+          laneSource: feature.laneSource ?? `@tempo(${tempo}bpm) @adsr(10ms, 100ms, 70%, 100ms)`,
           simplified: true,
           rows: Math.max(3, Math.min(12, source.split('\n').length)),
           editorLabel: `${title} source`,

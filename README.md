@@ -70,7 +70,8 @@ remain readable explanations. The appended lessons in
 `src/tutorial/interactive/additional-features.json` cover explicit degrees,
 measure rests, hold-to-end, functions, containers, generated scales, tempo,
 envelopes, unison, and signal ramps. Appending them preserves existing permalinks.
-Playable examples use hidden 240 BPM defaults, with explicit tempo changes where
+Playable examples use hidden 240 BPM defaults, with selected examples set to
+120 BPM in `src/tutorial/interactive/tempos.json` and explicit tempo changes where
 demonstrated. Snippets have no implicit time signature, including during playback
 and note highlighting. Write `@time(...)` in the clip or lane source to enable
 measure rests and barline validation; the DAW still inherits its project meter.
