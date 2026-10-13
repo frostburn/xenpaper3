@@ -10,6 +10,7 @@ import {
 import XenpaperSourceEditor from './daw/XenpaperSourceEditor.vue'
 import InstrumentSettings from './daw/InstrumentSettings.vue'
 import PianoRoll from './PianoRoll.vue'
+import { parseLaneNotes } from '../daw/score'
 
 const props = withDefaults(
   defineProps<{
@@ -47,6 +48,25 @@ const audioError = ref('')
 const playing = ref(false)
 const pending = ref(false)
 const playhead = ref(0)
+const playbackNotes = computed(() => {
+  const project = compiled.value.result?.project
+  return project
+    ? parseLaneNotes(
+        project.instrumentLanes[0]!,
+        {},
+        project.globalTrack.timeSignatureChanges[0],
+        undefined,
+        true,
+      )
+    : []
+})
+const playingRanges = computed(() =>
+  playing.value
+    ? playbackNotes.value
+        .filter(({ beat, duration }) => beat <= playhead.value && playhead.value < beat + duration)
+        .flatMap(({ sourceRanges }) => sourceRanges)
+    : [],
+)
 let engine: DawAudioEngine | undefined
 let timer: ReturnType<typeof setInterval> | undefined
 let playRequest = 0
@@ -83,6 +103,7 @@ const play = async () => {
     if (request !== playRequest) return
     await engine.play(result.project, 0, { allowClipTempoDirective: true })
     if (request !== playRequest) return
+    playhead.value = engine.positionBeats
     playing.value = true
     timer = setInterval(() => {
       playhead.value = engine?.positionBeats ?? 0
@@ -118,7 +139,13 @@ onBeforeUnmount(() => {
         <button type="button" aria-label="Stop" @click="stop">Stop</button>
         <output v-if="!simplified">Beat {{ playhead.toFixed(2) }}</output>
       </div>
-      <span v-if="pending" role="status">Preparing audio…</span>
+      <span
+        class="preparing"
+        :class="{ pending }"
+        :role="pending ? 'status' : undefined"
+        :aria-hidden="!pending"
+        >Preparing audio…</span
+      >
       <span v-if="!simplified && compiled.result" class="duration"
         >{{ compiled.result.score.duration.toFraction() }} beats</span
       >
@@ -132,6 +159,7 @@ onBeforeUnmount(() => {
           :source="source"
           :rows="rows"
           :diagnostics="compiled.result?.diagnostics"
+          :playing-ranges="playingRanges"
           @update:source="emit('update:source', $event)"
         />
         <p v-if="compiled.error" role="alert" class="error">{{ compiled.error }}</p>
@@ -181,6 +209,22 @@ onBeforeUnmount(() => {
 .toolbar {
   border-block: 1px solid var(--xenpaper-slate-500);
   padding: 0.75rem 0;
+}
+.preparing {
+  opacity: 0;
+  transition: opacity 100ms ease-out;
+}
+.preparing.pending {
+  opacity: 1;
+  transition: opacity 200ms ease-in 150ms;
+}
+@media (prefers-reduced-motion: reduce) {
+  .preparing.pending {
+    transition: opacity 0s 150ms;
+  }
+  .preparing {
+    transition: none;
+  }
 }
 .duration {
   margin-left: auto;

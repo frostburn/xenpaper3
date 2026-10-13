@@ -1,17 +1,26 @@
 <script setup lang="ts">
 import { computed, nextTick, ref } from 'vue'
 import SnippetEditor from '../components/SnippetEditor.vue'
+import { useRoute, useRouter } from 'vue-router'
 import { interactiveTutorialPages } from '../tutorial/interactive'
 
 // Each mounted tutorial owns its editable state, including pages that are hidden.
 const pages = ref(structuredClone(interactiveTutorialPages))
-const currentPage = ref(0)
+const route = useRoute()
+const router = useRouter()
+const currentPage = computed(() => {
+  const page =
+    typeof route.query.page === 'string' && /^\d+$/.test(route.query.page)
+      ? Number(route.query.page) - 1
+      : 0
+  return page >= 0 && page < pages.value.length ? page : 0
+})
 const demos = computed(() => pages.value[currentPage.value]!)
 const heading = ref<HTMLHeadingElement>()
 
 async function changePage(page: number) {
   if (page < 0 || page >= pages.value.length) return
-  currentPage.value = page
+  await router.push({ query: { ...route.query, page: String(page + 1) } })
   await nextTick()
   heading.value?.focus()
   heading.value?.scrollIntoView?.({ block: 'start' })
@@ -36,7 +45,11 @@ async function changePage(page: number) {
       <button type="button" :disabled="currentPage === 0" @click="changePage(currentPage - 1)">
         Previous
       </button>
-      <span role="status">Page {{ currentPage + 1 }} of {{ pages.length }}</span>
+      <RouterLink
+        :to="{ query: { ...route.query, page: String(currentPage + 1) } }"
+        aria-label="Permalink to this tutorial page"
+        >Page {{ currentPage + 1 }} of {{ pages.length }}</RouterLink
+      >
       <button
         type="button"
         :disabled="currentPage === pages.length - 1"

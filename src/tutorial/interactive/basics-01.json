@@ -98,7 +98,7 @@
       "instrument": {
         "type": "patch",
         "patchPreset": "default",
-        "oscillatorType": "sawtooth"
+        "oscillatorType": "semisine"
       },
       "gain": 0.35,
       "laneSource": "@tempo(240bpm) @adsr(100ms, 200ms, 70%, 300ms)",
@@ -134,7 +134,7 @@
       "instrument": {
         "type": "patch",
         "patchPreset": "default",
-        "oscillatorType": "sawtooth"
+        "oscillatorType": "semisine"
       },
       "gain": 0.35,
       "laneSource": "@tempo(240bpm) @adsr(100ms, 200ms, 70%, 300ms)",
@@ -152,7 +152,7 @@
       "instrument": {
         "type": "patch",
         "patchPreset": "default",
-        "oscillatorType": "sawtooth"
+        "oscillatorType": "semisine"
       },
       "gain": 0.35,
       "laneSource": "@tempo(240bpm) @adsr(100ms, 200ms, 70%, 300ms)",
@@ -170,7 +170,7 @@
       "instrument": {
         "type": "patch",
         "patchPreset": "default",
-        "oscillatorType": "sawtooth"
+        "oscillatorType": "semisine"
       },
       "gain": 0.35,
       "laneSource": "@tempo(240bpm) @adsr(100ms, 200ms, 70%, 300ms)",
