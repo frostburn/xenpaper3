@@ -60,11 +60,14 @@ MediaWiki external link, or Discord angle-bracket link. Sampled instruments
 include their manifest in the URL; their audio files still load from the
 configured sample URLs.
 
-The `/tutorial` stub contains three mini-snippets using the same
-`SnippetEditor` component as `/snippet`. Parent templates configure the
-instrument and hidden `laneSource` prop. Bind `source`, `instrument`, and
-`gain` with `v-model`; `simplified` shows only Play, Stop, Gain, and the
-controls appropriate to that instrument, alongside the editable score.
+The `/tutorial` page presents the first 20 demos from the existing Basics
+material in order, with 10 demos per page. Content and every `SnippetEditor`
+prop live in `src/tutorial/interactive/basics-01.json` and `basics-02.json`.
+Tutorial pages have permalinks such as `/tutorial?page=2`; browser history restores
+the selected page. Vue renders the active page and binds `source`, `instrument`, and `gain` with
+`v-model`. Page changes stop playback and retain edits for the current visit.
+The `simplified` prop shows Play, Stop, Gain, and instrument-specific controls
+alongside the editable score.
 
 ## Playback architecture
 

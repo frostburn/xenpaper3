@@ -1,71 +1,63 @@
 <script setup lang="ts">
-import { ref } from 'vue'
-import type { InstrumentSource } from '../daw/project'
+import { computed, nextTick, ref } from 'vue'
 import SnippetEditor from '../components/SnippetEditor.vue'
+import { useRoute, useRouter } from 'vue-router'
+import { interactiveTutorialPages } from '../tutorial/interactive'
 
-const melody = ref('0 2 4 5 7')
-const chord = ref('[0,4,7]===')
-const intervals = ref('1/1 5/4 3/2 2/1')
-const melodyInstrument = ref<InstrumentSource>({
-  type: 'patch',
-  patchPreset: 'default',
-  oscillatorType: 'triangle',
+// Each mounted tutorial owns its editable state, including pages that are hidden.
+const pages = ref(structuredClone(interactiveTutorialPages))
+const route = useRoute()
+const router = useRouter()
+const currentPage = computed(() => {
+  const page =
+    typeof route.query.page === 'string' && /^\d+$/.test(route.query.page)
+      ? Number(route.query.page) - 1
+      : 0
+  return page >= 0 && page < pages.value.length ? page : 0
 })
-const chordInstrument = ref<InstrumentSource>({
-  type: 'patch',
-  patchPreset: 'unison',
-  oscillatorType: 'sawtooth',
-  numberOfVoices: 5,
-})
-const intervalsInstrument = ref<InstrumentSource>({
-  type: 'patch',
-  patchPreset: 'default',
-  oscillatorType: 'sine',
-})
-const melodyGain = ref(0.5)
-const chordGain = ref(0.35)
-const intervalsGain = ref(0.5)
+const demos = computed(() => pages.value[currentPage.value]!)
+const heading = ref<HTMLHeadingElement>()
+
+async function changePage(page: number) {
+  if (page < 0 || page >= pages.value.length) return
+  await router.push({ query: { ...route.query, page: String(page + 1) } })
+  await nextTick()
+  heading.value?.focus()
+  heading.value?.scrollIntoView?.({ block: 'start' })
+}
 </script>
 
 <template>
   <div class="tutorial">
-    <h1>Interactive tutorial</h1>
-    <section aria-labelledby="melody-heading">
-      <h2 id="melody-heading">Melody</h2>
+    <h1 ref="heading" tabindex="-1">Interactive tutorial</h1>
+    <section v-for="demo in demos" :key="demo.id" :aria-labelledby="`${demo.id}-heading`">
+      <h2 :id="`${demo.id}-heading`">{{ demo.title }}</h2>
+      <p v-if="demo.description">{{ demo.description }}</p>
+      <div v-if="demo.html" v-html="demo.html" />
       <SnippetEditor
-        simplified
-        :rows="3"
-        editor-label="Melody source"
-        v-model:source="melody"
-        v-model:instrument="melodyInstrument"
-        v-model:gain="melodyGain"
-        lane-source="{12edo} @adsr(10ms, 100ms, 70%, 100ms)"
+        v-bind="demo.props"
+        v-model:source="demo.props.source"
+        v-model:instrument="demo.props.instrument"
+        v-model:gain="demo.props.gain"
       />
     </section>
-    <section aria-labelledby="chord-heading">
-      <h2 id="chord-heading">Chord</h2>
-      <SnippetEditor
-        simplified
-        :rows="3"
-        editor-label="Chord source"
-        v-model:source="chord"
-        v-model:instrument="chordInstrument"
-        v-model:gain="chordGain"
-        lane-source="{12edo} @adsr(100ms, 200ms, 70%, 300ms) @spread(12c)"
-      />
-    </section>
-    <section aria-labelledby="intervals-heading">
-      <h2 id="intervals-heading">Intervals</h2>
-      <SnippetEditor
-        simplified
-        :rows="3"
-        editor-label="Intervals source"
-        v-model:source="intervals"
-        v-model:instrument="intervalsInstrument"
-        v-model:gain="intervalsGain"
-        lane-source="@adsr(10ms, 100ms, 70%, 100ms)"
-      />
-    </section>
+    <nav class="pagination" aria-label="Tutorial pagination">
+      <button type="button" :disabled="currentPage === 0" @click="changePage(currentPage - 1)">
+        Previous
+      </button>
+      <RouterLink
+        :to="{ query: { ...route.query, page: String(currentPage + 1) } }"
+        aria-label="Permalink to this tutorial page"
+        >Page {{ currentPage + 1 }} of {{ pages.length }}</RouterLink
+      >
+      <button
+        type="button"
+        :disabled="currentPage === pages.length - 1"
+        @click="changePage(currentPage + 1)"
+      >
+        Next
+      </button>
+    </nav>
   </div>
 </template>
 
@@ -88,6 +80,25 @@ h2 {
   margin-bottom: 1.5rem;
   padding-bottom: 1.5rem;
   border-bottom: 1px solid var(--xenpaper-slate-500);
+}
+.pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+.pagination button {
+  border: 1px solid var(--xenpaper-slate-500);
+  border-radius: 0.3rem;
+  padding: 0.5rem 0.75rem;
+  color: inherit;
+  background: var(--xenpaper-slate-850);
+  font: inherit;
+  cursor: pointer;
+}
+.pagination button:disabled {
+  opacity: 0.5;
+  cursor: default;
 }
 @media (max-width: 760px) {
   .tutorial {

@@ -12,7 +12,7 @@ import TheFooter from './components/TheFooter.vue'
         <RouterLink to="/snippet">Create a shareable Xenpaper snippet</RouterLink>
 
         <h2>Learn</h2>
-        <RouterLink to="/tutorial">Interactive tutorial (stub)</RouterLink>
+        <RouterLink to="/tutorial">Interactive tutorial</RouterLink>
 
         <h2>Remix</h2>
         <RouterLink :to="{ path: '/daw', query: { demo: 'minuet' } }">
