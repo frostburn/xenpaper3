@@ -6,9 +6,23 @@ import type { DawProject, PitchedInstrumentLane } from '../daw/project'
 import { createMemoryHistory, createRouter } from 'vue-router'
 import { deferred } from './deferred'
 import basics from '../tutorial/basics.json'
+import { tutorialChapters } from '../tutorial'
 import { compileSnippet } from '../snippet'
 import { createPlaybackPlan } from '../daw/playback-plan'
-import { interactiveTutorialPages } from '../tutorial/interactive'
+import {
+  interactiveTutorialChapters,
+  interactiveTutorialPages,
+  type InteractiveTutorialDemo,
+} from '../tutorial/interactive'
+
+const playablePages = interactiveTutorialPages.map((page) =>
+  page.filter(
+    (
+      demo,
+    ): demo is InteractiveTutorialDemo & { props: NonNullable<InteractiveTutorialDemo['props']> } =>
+      demo.props !== undefined,
+  ),
+)
 
 const audio = vi.hoisted(() => ({
   positionBeats: 1,
@@ -41,20 +55,45 @@ async function openTutorial(url = '/tutorial') {
   })
   await router.push(url)
   await router.isReady()
-  return mount(InteractiveTutorialView, { global: { plugins: [router] } })
+  return mount(InteractiveTutorialView, { attachTo: document.body, global: { plugins: [router] } })
 }
 
 describe('interactive tutorial snippets', () => {
-  it('contains the first 20 Basics demos in order, split into two pages of ten', () => {
-    expect(interactiveTutorialPages.map((page) => page.length)).toEqual([10, 10])
+  it('covers every chapter, including explanations without tunes, while preserving the first two pages', () => {
+    expect(interactiveTutorialChapters.map((chapter) => chapter.title)).toEqual(
+      tutorialChapters.map((chapter) => chapter.title),
+    )
+    expect(interactiveTutorialPages.slice(0, 2).map((page) => page.length)).toEqual([10, 10])
     const demos = interactiveTutorialPages.flat()
-    expect(new Set(demos.map((demo) => demo.id)).size).toBe(20)
+    expect(new Set(demos.map((demo) => demo.id)).size).toBe(demos.length)
+    for (const [index, chapter] of tutorialChapters.entries()) {
+      const entries = interactiveTutorialChapters[index]!.pages.flatMap((page) => page.demos)
+      const material = chapter.sections.flatMap((section) => section.demos)
+      expect(entries).toHaveLength(material.length)
+      expect(entries.map((demo) => demo.props?.source)).toEqual(material.map((demo) => demo.tune))
+      expect(entries.every((demo) => demo.title?.length > 0)).toBe(true)
+      // The original first demo removes sidebar-only "Click to load" instructions.
+      const newEntries = entries.slice(index === 0 ? 20 : 0)
+      const newMaterial = material.slice(index === 0 ? 20 : 0)
+      expect(newEntries.map((demo) => demo.description)).toEqual(
+        newMaterial.map((demo) => demo.description),
+      )
+      expect(newEntries.map((demo) => demo.html)).toEqual(newMaterial.map((demo) => demo.html))
+    }
+    expect(interactiveTutorialPages.every((page) => page.length > 0 && page.length <= 10)).toBe(
+      true,
+    )
     const material = basics
       .flatMap((section) => section.demos)
       .filter((demo) => demo.tune)
       .slice(0, 20)
-    expect(demos.map((demo) => demo.props.source)).toEqual(material.map((demo) => demo.tune))
-    for (const demo of demos) {
+    expect(demos.slice(0, 20).map((demo) => demo.props!.source)).toEqual(
+      material.map((demo) => demo.tune),
+    )
+  })
+
+  it('compiles every playable example with the tutorial defaults and builds its playback plan', () => {
+    for (const demo of playablePages.flat()) {
       const result = compileSnippet({
         source: demo.props.source,
         lane: {
@@ -68,6 +107,7 @@ describe('interactive tutorial snippets', () => {
       expect(demo.props.instrument).toMatchObject({ type: 'patch', patchPreset: 'default' })
       const plan = createPlaybackPlan(result.project, 0, { allowClipTempoDirective: true })
       expect(plan.tempoMap.beatToSeconds(1)).toBe(0.25)
+      expect(plan.lanes[0]?.notes.length).toBeGreaterThan(0)
     }
   })
 
@@ -77,15 +117,17 @@ describe('interactive tutorial snippets', () => {
     const next = () => wrapper.get('.pagination button:last-child')
     expect(previous().attributes('disabled')).toBeDefined()
     expect(next().attributes('disabled')).toBeUndefined()
-    for (let page = 0; page < 2; page++) {
+    for (let page = 0; page < interactiveTutorialPages.length; page++) {
       const editors = wrapper.findAllComponents(SnippetEditor)
-      expect(editors).toHaveLength(10)
-      expect(wrapper.findAll('textarea')).toHaveLength(10)
+      expect(editors).toHaveLength(playablePages[page]!.length)
+      expect(wrapper.findAll('textarea')).toHaveLength(playablePages[page]!.length)
       expect(wrapper.get('[aria-label="Permalink to this tutorial page"]').text()).toBe(
-        `Page ${page + 1} of 2`,
+        `Page ${page + 1} of ${interactiveTutorialPages.length}`,
       )
-      interactiveTutorialPages[page]!.forEach((demo, index) => {
+      interactiveTutorialPages[page]!.forEach((demo) => {
         expect(wrapper.get(`#${demo.id}-heading`).text()).toBe(demo.title)
+      })
+      playablePages[page]!.forEach((demo, index) => {
         expect(editors[index]!.props()).toEqual(demo.props)
         expect(editors[index]!.get('[aria-label="Play"]').attributes('disabled')).toBeUndefined()
       })
@@ -93,48 +135,56 @@ describe('interactive tutorial snippets', () => {
         expect(wrapper.text()).toContain(demo.description)
       }
       for (const demo of interactiveTutorialPages[page]!.filter((demo) => demo.html)) {
-        expect(wrapper.get(`#${demo.id}-heading`).element.parentElement!.innerHTML).toContain(
-          demo.html,
-        )
+        const expected = document.createElement('div')
+        expected.innerHTML = demo.html!
+        expect(
+          wrapper.get(`section[aria-labelledby="${demo.id}-heading"] .html-description`).element
+            .innerHTML,
+        ).toBe(expected.innerHTML)
       }
       expect(wrapper.findAll('[role="alert"]')).toHaveLength(0)
       expect(wrapper.find('input[type="radio"]').exists()).toBe(false)
       expect(wrapper.find('[aria-label="Instrument lane source"]').exists()).toBe(false)
       expect(wrapper.find('[aria-label="Share snippet"]').exists()).toBe(false)
-      if (page === 0) await next().trigger('click').then(flushPromises)
+      if (page < interactiveTutorialPages.length - 1)
+        await next().trigger('click').then(flushPromises)
     }
     expect(next().attributes('disabled')).toBeDefined()
     expect(previous().attributes('disabled')).toBeUndefined()
     await previous().trigger('click').then(flushPromises)
-    expect(wrapper.get('[aria-label="Permalink to this tutorial page"]').text()).toBe('Page 1 of 2')
+    expect(wrapper.get('[aria-label="Permalink to this tutorial page"]').text()).toBe(
+      `Page ${interactiveTutorialPages.length - 1} of ${interactiveTutorialPages.length}`,
+    )
     wrapper.unmount()
-  })
+  }, 30000)
 
   it('plays every JSON-configured demo and disposes playback on page changes', async () => {
     audio.resume.mockResolvedValue(undefined)
     audio.play.mockResolvedValue(undefined)
     const wrapper = await openTutorial()
-    for (let page = 0; page < 2; page++) {
-      expect(audio.dispose).toHaveBeenCalledTimes(page * 10)
+    let played = 0
+    for (let page = 0; page < interactiveTutorialPages.length; page++) {
+      expect(audio.dispose).toHaveBeenCalledTimes(played)
       const editors = wrapper.findAllComponents(SnippetEditor)
       for (let index = 0; index < editors.length; index++) {
         await editors[index]!.get('[aria-label="Play"]').trigger('click')
         await flushPromises()
-        const lane = audio.play.mock.calls[page * 10 + index]![0]
+        const lane = audio.play.mock.calls[played + index]![0]
           .instrumentLanes[0]! as PitchedInstrumentLane
-        const props = interactiveTutorialPages[page]![index]!.props
+        const props = playablePages[page]![index]!.props
         expect(lane.clips[0]!.source).toBe(props.source)
         expect(lane.instrument).toEqual(props.instrument)
         expect(lane.gain).toBe(props.gain)
         expect(lane.source).toBe(props.laneSource)
       }
-      if (page === 0) {
+      played += editors.length
+      if (page < interactiveTutorialPages.length - 1) {
         await wrapper.get('.pagination button:last-child').trigger('click').then(flushPromises)
       }
     }
     wrapper.unmount()
-    expect(audio.dispose).toHaveBeenCalledTimes(20)
-  })
+    expect(audio.dispose).toHaveBeenCalledTimes(playablePages.flat().length)
+  }, 30000)
 
   it('retains pending source, instrument, and gain edits across pages without changing other demos or JSON defaults', async () => {
     const wrapper = await openTutorial()
@@ -167,16 +217,77 @@ describe('interactive tutorial snippets', () => {
 
   it('opens permalinks and follows browser history with a safe fallback for invalid pages', async () => {
     const wrapper = await openTutorial('/tutorial?page=2')
-    expect(wrapper.get('h2').text()).toBe('Other equaves')
+    const firstTitle = () => wrapper.get('.tutorial > section h2').text()
+    expect(firstTitle()).toBe('Other equaves')
     expect(wrapper.get('[aria-label="Permalink to this tutorial page"]').attributes('href')).toBe(
       '/tutorial?page=2',
     )
     await wrapper.get('.pagination button:first-child').trigger('click').then(flushPromises)
     expect(wrapper.vm.$route.query.page).toBe('1')
     wrapper.vm.$router.back()
-    await vi.waitFor(() => expect(wrapper.get('h2').text()).toBe('Other equaves'))
+    await vi.waitFor(() => expect(firstTitle()).toBe('Other equaves'))
     await wrapper.vm.$router.push('/tutorial?page=999')
-    expect(wrapper.get('h2').text()).toBe('Notes')
+    expect(firstTitle()).toBe('Notes')
+    wrapper.unmount()
+  })
+
+  it('links every entry in the contents and jumps between chapters while retaining edits', async () => {
+    const wrapper = await openTutorial('/tutorial?setting=kept')
+    const contents = wrapper.get('details').element as HTMLDetailsElement
+    const links = wrapper.findAll('.contents a')
+    expect(links).toHaveLength(
+      interactiveTutorialPages.length + interactiveTutorialPages.flat().length,
+    )
+    expect(wrapper.get('.contents [aria-current="page"]').text()).toContain('Page 1:')
+    await wrapper.findAllComponents(SnippetEditor)[0]!.get('textarea').setValue('0== . 7')
+    const lastPage = interactiveTutorialPages.length
+    const lastDemo =
+      interactiveTutorialPages[lastPage - 1]![interactiveTutorialPages[lastPage - 1]!.length - 1]!
+    contents.open = true
+    expect(wrapper.get(`.contents a[href$="#${lastDemo.id}-heading"]`).attributes('href')).toBe(
+      `/tutorial?setting=kept&page=${lastPage}#${lastDemo.id}-heading`,
+    )
+    await wrapper
+      .get(`.contents a[href$="#${lastDemo.id}-heading"]`)
+      .trigger('click')
+      .then(flushPromises)
+    expect(contents.open).toBe(false)
+    expect(wrapper.vm.$route.query).toEqual({ setting: 'kept', page: String(lastPage) })
+    expect(document.activeElement).toBe(wrapper.get(`#${lastDemo.id}-heading`).element)
+    expect(wrapper.get('.contents [aria-current="location"]').text()).toBe(lastDemo.title)
+    expect(wrapper.get('.chapter-heading').text()).toContain('Diamond-mos notation')
+    expect(wrapper.findAllComponents(SnippetEditor).pop()!.props('source')).toBe(
+      lastDemo.props!.source,
+    )
+    await wrapper
+      .get('.contents a[href$="#basics-01-heading"]')
+      .trigger('click')
+      .then(flushPromises)
+    expect(wrapper.findAllComponents(SnippetEditor)[0]!.props('source')).toBe('0== . 7')
+    expect(document.activeElement).toBe(wrapper.get('#basics-01-heading').element)
+    contents.open = true
+    await wrapper
+      .get('.contents a[href$="#basics-01-heading"]')
+      .trigger('click')
+      .then(flushPromises)
+    expect(contents.open).toBe(false)
+    expect(document.activeElement).toBe(wrapper.get('#basics-01-heading').element)
+    wrapper.unmount()
+  })
+
+  it('opens example permalinks directly and safely handles unknown anchors and invalid page queries', async () => {
+    const wrapper = await openTutorial('/tutorial?page=3#basics-22-heading')
+    await flushPromises()
+    expect(document.activeElement).toBe(wrapper.get('#basics-22-heading').element)
+    expect(wrapper.get('#basics-22-heading').text()).toBe('Tuplets')
+    await wrapper.vm.$router.push('/tutorial?page=6#unknown-heading')
+    await flushPromises()
+    expect(document.activeElement).toBe(wrapper.get('h1').element)
+    expect(wrapper.get('.chapter-heading').text()).toContain('Advanced score construction')
+    for (const query of ['0', '-1', '1.5', 'abc', '1&page=2']) {
+      await wrapper.vm.$router.push(`/tutorial?page=${query}`)
+      expect(wrapper.get('.tutorial > section h2').text()).toBe('Notes')
+    }
     wrapper.unmount()
   })
 

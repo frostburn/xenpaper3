@@ -60,11 +60,15 @@ MediaWiki external link, or Discord angle-bracket link. Sampled instruments
 include their manifest in the URL; their audio files still load from the
 configured sample URLs.
 
-The `/tutorial` page presents the first 20 demos from the existing Basics
-material in order, with 10 demos per page. Content and every `SnippetEditor`
-prop live in `src/tutorial/interactive/basics-01.json` and `basics-02.json`.
-Tutorial pages have permalinks such as `/tutorial?page=2`; browser history restores
-the selected page. Vue renders the active page and binds `source`, `instrument`, and `gain` with
+The `/tutorial` page covers all four tutorial chapters, with up to 10 entries per
+page and a table of contents linking to each page and example. The original first
+20 Basics demos retain their configuration in `src/tutorial/interactive/basics-01.json`
+and `basics-02.json`. Later pages reuse the chapter JSON in `src/tutorial/`, with
+example titles in `src/tutorial/interactive/titles.json`; entries without tunes
+remain readable explanations. Playable examples use hidden 240 BPM defaults.
+Tutorial pages have permalinks such as `/tutorial?page=2`; example links also
+include an anchor, such as `/tutorial?page=3#basics-22-heading`. Browser history
+restores the selected page. Vue renders the active page and binds `source`, `instrument`, and `gain` with
 `v-model`. Page changes stop playback and retain edits for the current visit.
 The `simplified` prop shows Play, Stop, Gain, and instrument-specific controls
 alongside the editable score.
