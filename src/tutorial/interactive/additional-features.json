@@ -3,171 +3,471 @@
     "id": "features-explicit-degrees",
     "title": "Explicit scale degrees",
     "html": "<p>The lowercase suffix <code>d</code> keeps an integer a scale degree even inside arithmetic and function calls. By contrast, <code>3/1</code> is a ratio. Here <code>sqrt(2d)</code> halves the tuned interval of degree 2, giving degree 1 in 12edo. Try changing the scale to 19edo.</p>",
-    "source": "{12edo}\n0d 1d sqrt(2d) 2d 3d\n-1d 0d ^1d"
+    "props": {
+      "source": "{12edo}\n0d 1d sqrt(2d) 2d 3d\n-1d 0d ^1d",
+      "instrument": {
+        "type": "patch",
+        "patchPreset": "default",
+        "oscillatorType": "semisine"
+      },
+      "gain": 0.35,
+      "laneSource": "@tempo(240bpm) @adsr(10ms, 100ms, 70%, 100ms)",
+      "simplified": true,
+      "rows": 3,
+      "editorLabel": "Explicit scale degrees source"
+    }
   },
   {
     "id": "features-pitch-ratio",
     "title": "Pitch and ratio conversions",
     "html": "<p><code>pitch(...)</code> converts a ratio to an additive pitch interval; <code>ratio(...)</code> converts a pitch interval back to a ratio. Bare integers follow the parameter's meaning: <code>pitch(2)</code> is an octave, while <code>ratio(2)</code> uses scale degree 2. Use <code>d</code> or <code>/1</code> when you want to make that choice explicit.</p>",
-    "source": "pitch(2) 2/1\nratio(2) 2d\npitch(3/2) 702c\nratio(700c) 700c"
+    "props": {
+      "source": "pitch(2) 2/1\nratio(2) 2d\npitch(3/2) 702c\nratio(700c) 700c",
+      "instrument": {
+        "type": "patch",
+        "patchPreset": "default",
+        "oscillatorType": "semisine"
+      },
+      "gain": 0.35,
+      "laneSource": "@tempo(240bpm) @adsr(10ms, 100ms, 70%, 100ms)",
+      "simplified": true,
+      "rows": 4,
+      "editorLabel": "Pitch and ratio conversions source"
+    }
   },
   {
     "id": "features-bar-rests",
     "title": "Measure rests",
     "html": "<p>A semicolon outside a tuning block rests until the next measure boundary. At a boundary it rests for a whole measure. Snippets have no default time signature: write <code>@time(...)</code> to use measure rests or validate barlines. Without a meter, <code>;</code> warns and adds no duration. Change 3/4 to 5/4 to hear the pauses grow.</p>",
-    "source": "@time(3/4)\n0 ; | 4 ; | ; | 7 ; |\n@time(2/4)\n0 ; | 7 ; |"
+    "props": {
+      "source": "@time(3/4)\n0 ; | 4 ; | ; | 7 ; |\n@time(2/4)\n0 ; | 7 ; |",
+      "instrument": {
+        "type": "patch",
+        "patchPreset": "default",
+        "oscillatorType": "semisine"
+      },
+      "gain": 0.35,
+      "laneSource": "@tempo(240bpm) @adsr(10ms, 100ms, 70%, 100ms)",
+      "simplified": true,
+      "rows": 4,
+      "editorLabel": "Measure rests source"
+    }
   },
   {
     "id": "features-hold-to-end",
     "title": "Hold to the end of a group",
     "html": "<p>Append <code>!</code> to hold each attack until its enclosing construction ends. The starting times stay the same, so an arpeggio accumulates into a chord. Operators apply in order: compare <code>(0 4 7)!</code>, <code>(0 4 7)!=</code>, and <code>[0 4 7]!</code>.</p>",
-    "source": "(0 4 7) .\n(0 4 7)! .\n[0 4 7]!==="
+    "props": {
+      "source": "(0 4 7) .\n(0 4 7)! .\n[0 4 7]!===",
+      "instrument": {
+        "type": "patch",
+        "patchPreset": "default",
+        "oscillatorType": "semisine"
+      },
+      "gain": 0.35,
+      "laneSource": "@tempo(240bpm) @adsr(10ms, 100ms, 70%, 100ms)",
+      "simplified": true,
+      "rows": 3,
+      "editorLabel": "Hold to the end of a group source"
+    }
   },
   {
     "id": "features-chained-glissando",
     "title": "Chained glissando",
     "html": "<p>Successive <code>@gliss</code> directives join several slides into one held note. A leading <code>=</code> can continue it across a barline or newline. A rest ends the connection.</p>",
-    "source": "@gliss 0= @gliss(ease-in) 7= |\n= @gliss(ease-out) 4= 12== ."
+    "props": {
+      "source": "@gliss 0= @gliss(ease-in) 7= |\n= @gliss(ease-out) 4= 12== .",
+      "instrument": {
+        "type": "patch",
+        "patchPreset": "default",
+        "oscillatorType": "semisine"
+      },
+      "gain": 0.35,
+      "laneSource": "@tempo(240bpm) @adsr(10ms, 100ms, 70%, 100ms)",
+      "simplified": true,
+      "rows": 3,
+      "editorLabel": "Chained glissando source"
+    }
   },
   {
     "id": "features-declarations",
     "title": "Named values",
     "html": "<p><code>let</code> evaluates an expression once and gives it a name. Declarations consume no beats. Choose names that are not pitch spellings: <code>fifth</code> works, while <code>G</code> already means a note.</p>",
-    "source": "let fifth = 3/2\nlet third = 5/4\n1/1 third fifth\n[1/1, third, fifth]==="
+    "props": {
+      "source": "let fifth = 3/2\nlet third = 5/4\n1/1 third fifth\n[1/1, third, fifth]===",
+      "instrument": {
+        "type": "patch",
+        "patchPreset": "default",
+        "oscillatorType": "semisine"
+      },
+      "gain": 0.35,
+      "laneSource": "@tempo(240bpm) @adsr(10ms, 100ms, 70%, 100ms)",
+      "simplified": true,
+      "rows": 4,
+      "editorLabel": "Named values source"
+    }
   },
   {
     "id": "features-functions",
     "title": "Functions and defaults",
     "html": "<p>Define a function with <code>fn</code> and return its result with <code>ret</code>. Parameters can have trailing defaults. An unannotated pitch argument follows the caller's scale. Functions cannot call themselves recursively; use repeats for repetition.</p>",
-    "source": "fn transpose(note, interval = 3/2) { ret note + interval }\nC transpose(C)\nD transpose(D, 5/4)\n{19edo} 0 transpose(0)"
+    "props": {
+      "source": "fn transpose(note, interval = 3/2) { ret note + interval }\nC transpose(C)\nD transpose(D, 5/4)\n{19edo} 0 transpose(0)",
+      "instrument": {
+        "type": "patch",
+        "patchPreset": "default",
+        "oscillatorType": "semisine"
+      },
+      "gain": 0.35,
+      "laneSource": "@tempo(240bpm) @adsr(10ms, 100ms, 70%, 100ms)",
+      "simplified": true,
+      "rows": 4,
+      "editorLabel": "Functions and defaults source"
+    }
   },
   {
     "id": "features-musical-functions",
     "title": "Returning musical phrases",
     "description": "A function can return a whole musical fragment, including rhythm and directives. Each call inherits the current tuning and timing context. Change the phrase once to update both calls.",
-    "source": "fn phrase() { ret @2 0 2 4 7 4= 2 0== }\nphrase()\n{19edo} phrase()"
+    "props": {
+      "source": "fn phrase() { ret @2 0 2 4 7 4= 2 0== }\nphrase()\n{19edo} phrase()",
+      "instrument": {
+        "type": "patch",
+        "patchPreset": "default",
+        "oscillatorType": "semisine"
+      },
+      "gain": 0.35,
+      "laneSource": "@tempo(240bpm) @adsr(10ms, 100ms, 70%, 100ms)",
+      "simplified": true,
+      "rows": 3,
+      "editorLabel": "Returning musical phrases source"
+    }
   },
   {
     "id": "features-lexical-scope",
     "title": "Local bindings and closures",
     "description": "A function captures the named bindings visible when it is defined. Later declarations can shadow those names. Groups and parallel branches keep their own local declarations.",
-    "source": "let interval = 3/2\nfn remembered() { ret interval }\n(let interval = 5/4\n interval remembered())\ninterval remembered()"
+    "props": {
+      "source": "let interval = 3/2\nfn remembered() { ret interval }\n(let interval = 5/4\n interval remembered())\ninterval remembered()",
+      "instrument": {
+        "type": "patch",
+        "patchPreset": "default",
+        "oscillatorType": "semisine"
+      },
+      "gain": 0.35,
+      "laneSource": "@tempo(240bpm) @adsr(10ms, 100ms, 70%, 100ms)",
+      "simplified": true,
+      "rows": 5,
+      "editorLabel": "Local bindings and closures source"
+    }
   },
   {
     "id": "features-coercions",
     "title": "Parameter coercions",
     "html": "<p>Annotations specify how arguments are interpreted: <code>ratio</code>, <code>pitch</code>, <code>integer</code>, <code>boolean</code>, or <code>container</code>. Coercions can nest, as in <code>container&lt;ratio&gt;</code>. A bare integer in a ratio argument is a scalar; an explicit <code>d</code> degree supplies its tuned ratio.</p>",
-    "source": "fn half(value: ratio) { ret sqrt(value) }\nhalf(2) half(2d)\nfn first(values: container<ratio>) { ret values[0] }\nfirst([2 3 5]) first([2d 3d 5d])"
+    "props": {
+      "source": "fn half(value: ratio) { ret sqrt(value) }\nhalf(2) half(2d)\nfn first(values: container<ratio>) { ret values[0] }\nfirst([2 3 5]) first([2d 3d 5d])",
+      "instrument": {
+        "type": "patch",
+        "patchPreset": "default",
+        "oscillatorType": "semisine"
+      },
+      "gain": 0.35,
+      "laneSource": "@tempo(240bpm) @adsr(10ms, 100ms, 70%, 100ms)",
+      "simplified": true,
+      "rows": 4,
+      "editorLabel": "Parameter coercions source"
+    }
   },
   {
     "id": "features-indexing",
     "title": "Container indexing",
     "html": "<p>Square brackets can hold values for later use in expressions. Index from zero with <code>values[0]</code>; negative indices count from the end. Nested containers support repeated indexing. A bracketed score written directly in the music still follows the usual chord or tuplet rules.</p>",
-    "source": "let pitches = [1/1, 5/4, 3/2, 2/1]\npitches[0] pitches[1] pitches[-1] pitches[2]\nlet nested = [[1/1, 5/4], [3/2, 2/1]]\nnested[1][0]"
+    "props": {
+      "source": "let pitches = [1/1, 5/4, 3/2, 2/1]\npitches[0] pitches[1] pitches[-1] pitches[2]\nlet nested = [[1/1, 5/4], [3/2, 2/1]]\nnested[1][0]",
+      "instrument": {
+        "type": "patch",
+        "patchPreset": "default",
+        "oscillatorType": "semisine"
+      },
+      "gain": 0.35,
+      "laneSource": "@tempo(240bpm) @adsr(10ms, 100ms, 70%, 100ms)",
+      "simplified": true,
+      "rows": 4,
+      "editorLabel": "Container indexing source"
+    }
   },
   {
     "id": "features-optional-values",
     "title": "Optional values",
     "html": "<p><code>niente</code> represents a missing value. Use <code>al</code> to choose a fallback only when the left side is missing. It is useful for optional function parameters.</p>",
-    "source": "fn choose(note = niente) { ret note al 1/1 }\nchoose() choose(5/4) choose(3/2) choose(niente)"
+    "props": {
+      "source": "fn choose(note = niente) { ret note al 1/1 }\nchoose() choose(5/4) choose(3/2) choose(niente)",
+      "instrument": {
+        "type": "patch",
+        "patchPreset": "default",
+        "oscillatorType": "semisine"
+      },
+      "gain": 0.35,
+      "laneSource": "@tempo(240bpm) @adsr(10ms, 100ms, 70%, 100ms)",
+      "simplified": true,
+      "rows": 3,
+      "editorLabel": "Optional values source"
+    }
   },
   {
     "id": "features-conditionals",
     "title": "Conditional expressions",
     "html": "<p><code>value if condition else other</code> evaluates only the selected branch. Try changing the boolean argument to switch the chord's third.</p>",
-    "source": "fn triad(major: boolean) {\n  let third = 5/4 if major else 6/5\n  ret [1/1, third, 3/2]===\n}\ntriad(true) triad(false)"
+    "props": {
+      "source": "fn triad(major: boolean) {\n  let third = 5/4 if major else 6/5\n  ret [1/1, third, 3/2]===\n}\ntriad(true) triad(false)",
+      "instrument": {
+        "type": "patch",
+        "patchPreset": "default",
+        "oscillatorType": "semisine"
+      },
+      "gain": 0.35,
+      "laneSource": "@tempo(240bpm) @adsr(10ms, 100ms, 70%, 100ms)",
+      "simplified": true,
+      "rows": 5,
+      "editorLabel": "Conditional expressions source"
+    }
   },
   {
     "id": "features-constructed-scales",
     "title": "Scales from expressions",
     "html": "<p><code>{scale = expression}</code> builds a scale from a container or function result. Entries become degrees 1 onward; degree 0 remains the root, and the final entry sets the equave. Arithmetic can shift every member of the returned container.</p>",
-    "source": "fn intervals() { ret [2\\10 5\\10 8\\10] + 1\\10 }\n{scale = intervals()}\n0 1 2 3 4 5 6="
+    "props": {
+      "source": "fn intervals() { ret [2\\10 5\\10 8\\10] + 1\\10 }\n{scale = intervals()}\n0 1 2 3 4 5 6=",
+      "instrument": {
+        "type": "patch",
+        "patchPreset": "default",
+        "oscillatorType": "semisine"
+      },
+      "gain": 0.35,
+      "laneSource": "@tempo(240bpm) @adsr(10ms, 100ms, 70%, 100ms)",
+      "simplified": true,
+      "rows": 3,
+      "editorLabel": "Scales from expressions source"
+    }
   },
   {
     "id": "features-sorting",
     "title": "Sorting scale entries",
     "description": "sort() puts numeric container values in ascending order. Use it when a generated scale would otherwise put its degrees out of order.",
-    "source": "let intervals = [3/2, 9/8, 2/1, 5/4]\n{scale = sort(intervals)}\n0 1 2 3 4="
+    "props": {
+      "source": "let intervals = [3/2, 9/8, 2/1, 5/4]\n{scale = sort(intervals)}\n0 1 2 3 4=",
+      "instrument": {
+        "type": "patch",
+        "patchPreset": "default",
+        "oscillatorType": "semisine"
+      },
+      "gain": 0.35,
+      "laneSource": "@tempo(240bpm) @adsr(10ms, 100ms, 70%, 100ms)",
+      "simplified": true,
+      "rows": 3,
+      "editorLabel": "Sorting scale entries source"
+    }
   },
   {
     "id": "features-array-map",
     "title": "Mapping with lambdas",
     "html": "<p>A lambda such as <code>(value) =&gt; value + 100c</code> is an inline function. <code>arrayMap(callback, values)</code> applies it to each member of a container.</p>",
-    "source": "let steps = [200c, 500c, 800c]\n{scale = arrayMap((step) => step + 100c, steps)}\n0 1 2 3 4 5 6="
+    "props": {
+      "source": "let steps = [200c, 500c, 800c]\n{scale = arrayMap((step) => step + 100c, steps)}\n0 1 2 3 4 5 6=",
+      "instrument": {
+        "type": "patch",
+        "patchPreset": "default",
+        "oscillatorType": "semisine"
+      },
+      "gain": 0.35,
+      "laneSource": "@tempo(240bpm) @adsr(10ms, 100ms, 70%, 100ms)",
+      "simplified": true,
+      "rows": 3,
+      "editorLabel": "Mapping with lambdas source"
+    }
   },
   {
     "id": "features-array-reduce",
     "title": "Reducing a container",
     "html": "<p><code>arrayReduce(callback, values, initial)</code> combines a container into one result. The callback receives the accumulated result and the next element. Here three pure fifths combine into 27/8.</p>",
-    "source": "let stack = arrayReduce((total, interval) => total * interval, [3/2, 3/2, 3/2], 1/1)\n1/1 3/2 9/4 stack"
+    "props": {
+      "source": "let stack = arrayReduce((total, interval) => total * interval, [3/2, 3/2, 3/2], 1/1)\n1/1 3/2 9/4 stack",
+      "instrument": {
+        "type": "patch",
+        "patchPreset": "default",
+        "oscillatorType": "semisine"
+      },
+      "gain": 0.35,
+      "laneSource": "@tempo(240bpm) @adsr(10ms, 100ms, 70%, 100ms)",
+      "simplified": true,
+      "rows": 3,
+      "editorLabel": "Reducing a container source"
+    }
   },
   {
     "id": "features-products",
     "title": "Products and combinations",
     "html": "<p><code>prod(values)</code> multiplies interval ratios. <code>kCombinations(values, count)</code> lists all subsets of the requested size. Combining them produces the pairwise products 15, 21, and 35 from factors 3, 5, and 7.</p>",
-    "source": "let pairs = kCombinations([3/1, 5/1, 7/1], 2)\nlet products = arrayMap((pair) => prod(pair), pairs)\nproducts[0] / 15/1\nproducts[1] / 15/1\nproducts[2] / 15/1"
+    "props": {
+      "source": "let pairs = kCombinations([3/1, 5/1, 7/1], 2)\nlet products = arrayMap((pair) => prod(pair), pairs)\nproducts[0] / 15/1\nproducts[1] / 15/1\nproducts[2] / 15/1",
+      "instrument": {
+        "type": "patch",
+        "patchPreset": "default",
+        "oscillatorType": "semisine"
+      },
+      "gain": 0.35,
+      "laneSource": "@tempo(240bpm) @adsr(10ms, 100ms, 70%, 100ms)",
+      "simplified": true,
+      "rows": 5,
+      "editorLabel": "Products and combinations source"
+    }
   },
   {
     "id": "features-grounding",
     "title": "Grounding a scale",
     "html": "<p><code>ground(values)</code> shifts the first entry to unison and moves the others by the same interval. Here 3:5:7 becomes 1/1, 5/3, and 7/3.</p>",
-    "source": "let grounded = ground([3/1, 5/1, 7/1])\ngrounded[0] grounded[1] grounded[2]\n[1/1, 5/3, 7/3]==="
+    "props": {
+      "source": "let grounded = ground([3/1, 5/1, 7/1])\ngrounded[0] grounded[1] grounded[2]\n[1/1, 5/3, 7/3]===",
+      "instrument": {
+        "type": "patch",
+        "patchPreset": "default",
+        "oscillatorType": "semisine"
+      },
+      "gain": 0.35,
+      "laneSource": "@tempo(240bpm) @adsr(10ms, 100ms, 70%, 100ms)",
+      "simplified": true,
+      "rows": 3,
+      "editorLabel": "Grounding a scale source"
+    }
   },
   {
     "id": "features-equave-reduction",
     "title": "Equave reduction",
     "html": "<p><code>equaveReduce(values, equave)</code> moves ratios into one equave; the <code>rd</code> operator performs the reduction directly. If the second argument is omitted, the last container entry supplies the equave. Reducing 3/1, 5/1, and 7/1 by 2/1 gives 3/2, 5/4, and 7/4.</p>",
-    "source": "let reduced = equaveReduce([3/1, 5/1, 7/1], 2/1)\nreduced[0] reduced[1] reduced[2]\n3/1 rd 2/1"
+    "props": {
+      "source": "let reduced = equaveReduce([3/1, 5/1, 7/1], 2/1)\nreduced[0] reduced[1] reduced[2]\n3/1 rd 2/1",
+      "instrument": {
+        "type": "patch",
+        "patchPreset": "default",
+        "oscillatorType": "semisine"
+      },
+      "gain": 0.35,
+      "laneSource": "@tempo(240bpm) @adsr(10ms, 100ms, 70%, 100ms)",
+      "simplified": true,
+      "rows": 3,
+      "editorLabel": "Equave reduction source"
+    }
   },
   {
     "id": "features-cps",
     "title": "Combination product sets",
     "html": "<p><code>cps(factors, count)</code> combines products, grounding, equave reduction, and sorting into a scale helper. Optional arguments set the equave and whether to retain the products' original unity. Try replacing 7 with 11 or changing the combination size.</p>",
-    "source": "{scale = cps([1 3 5 7], 2)}\n0 1 2 3 4 5 6=\n{scale = cps([1 3 5 7], 2, 2/1, true)}\n0 1 2 3 4 5 6="
+    "props": {
+      "source": "{scale = cps([1 3 5 7], 2)}\n0 1 2 3 4 5 6=\n{scale = cps([1 3 5 7], 2, 2/1, true)}\n0 1 2 3 4 5 6=",
+      "instrument": {
+        "type": "patch",
+        "patchPreset": "default",
+        "oscillatorType": "semisine"
+      },
+      "gain": 0.35,
+      "laneSource": "@tempo(240bpm) @adsr(10ms, 100ms, 70%, 100ms)",
+      "simplified": true,
+      "rows": 4,
+      "editorLabel": "Combination product sets source"
+    }
   },
   {
     "id": "features-context-assignments",
     "title": "Combined tuning assignments",
     "html": "<p>Separate tuning assignments inside braces with semicolons. This lets you construct a scale and choose its mode in one block. A semicolon inside braces separates assignments; outside braces it is a measure rest.</p>",
-    "source": "{scale = cps([1 7 11 13], 2); mode = 4; root = 220Hz}\n0 1 2 3 4 5 6="
+    "props": {
+      "source": "{scale = cps([1 7 11 13], 2); mode = 4; root = 220Hz}\n0 1 2 3 4 5 6=",
+      "instrument": {
+        "type": "patch",
+        "patchPreset": "default",
+        "oscillatorType": "semisine"
+      },
+      "gain": 0.35,
+      "laneSource": "@tempo(240bpm) @adsr(10ms, 100ms, 70%, 100ms)",
+      "simplified": true,
+      "rows": 3,
+      "editorLabel": "Combined tuning assignments source"
+    }
   },
   {
     "id": "features-tempo",
     "title": "Tempo changes in snippets",
     "html": "<p><code>@tempo(...bpm)</code> changes playback speed without changing beat durations. Snippets support tempo changes inside the score; in the DAW, put tempo directives in the global source. Change 120bpm below and compare the two phrases.</p>",
-    "source": "0 2 4 7\n@tempo(120bpm) 0 2 4 7\n@tempo(240bpm) 0 2 4 7"
+    "props": {
+      "source": "0 2 4 7\n@tempo(120bpm) 0 2 4 7\n@tempo(240bpm) 0 2 4 7",
+      "instrument": {
+        "type": "patch",
+        "patchPreset": "default",
+        "oscillatorType": "semisine"
+      },
+      "gain": 0.35,
+      "laneSource": "@tempo(240bpm) @adsr(10ms, 100ms, 70%, 100ms)",
+      "simplified": true,
+      "rows": 3,
+      "editorLabel": "Tempo changes in snippets source"
+    }
   },
   {
     "id": "features-envelope",
     "title": "Note envelopes",
     "html": "<p><code>@adsr(attack, decay, sustain, release)</code> controls each note's loudness envelope. Times use <code>ms</code> or <code>s</code>, and sustain is a level such as <code>60%</code>. Try lengthening the attack or release.</p>",
-    "source": "@adsr(5ms, 60ms, 20%, 50ms)\n0 4 7 12 .\n@adsr(200ms, 100ms, 60%, 400ms)\n0== 4== 7== 12=="
+    "props": {
+      "source": "@adsr(5ms, 60ms, 20%, 50ms)\n0 4 7 12 .\n@adsr(200ms, 100ms, 60%, 400ms)\n0== 4== 7== 12==",
+      "instrument": {
+        "type": "patch",
+        "patchPreset": "default",
+        "oscillatorType": "semisine"
+      },
+      "gain": 0.35,
+      "laneSource": "@tempo(240bpm) @adsr(10ms, 100ms, 70%, 100ms)",
+      "simplified": true,
+      "rows": 4,
+      "editorLabel": "Note envelopes source"
+    }
   },
   {
     "id": "features-unison",
     "title": "Unison voices and spread",
     "html": "<p>The unison instrument layers detuned voices. This example uses five voices and <code>@spread(20c)</code> in its lane settings. Change the voice count or waveform below to compare the sound. In the DAW, set <code>@spread(...c)</code> in the instrument lane source; it does not control spread from a clip.</p>",
-    "source": "[0,4,7]=== . [0,3,7]===",
-    "instrument": {
-      "type": "patch",
-      "patchPreset": "unison",
-      "oscillatorType": "sawtooth",
-      "numberOfVoices": 5
-    },
-    "laneSource": "@tempo(240bpm) @adsr(10ms, 100ms, 70%, 100ms) @spread(20c)"
+    "props": {
+      "source": "[0,4,7]=== . [0,3,7]===",
+      "instrument": {
+        "type": "patch",
+        "patchPreset": "unison",
+        "oscillatorType": "sawtooth",
+        "numberOfVoices": 5
+      },
+      "gain": 0.35,
+      "laneSource": "@tempo(240bpm) @adsr(10ms, 100ms, 70%, 100ms) @spread(20c)",
+      "simplified": true,
+      "rows": 3,
+      "editorLabel": "Unison voices and spread source"
+    }
   },
   {
     "id": "features-signal-ramps",
     "title": "Continuous signal ramps",
     "html": "<p><code>@ramp</code> connects the next two occurrences of the same signal directive over the intervening beats. It supports the same easing curves as <code>@gliss</code>. This unison lane widens from 0c to 40c over eight beats, then narrows to 5c over four beats. Its lane source is:</p><pre>@ramp(ease-in-out) @spread(0c) ........\n@ramp @spread(40c) ....\n@spread(5c)</pre><p>Edit the held notes below to hear the same automation with a different chord.</p>",
-    "source": "[0,4,7]===============",
-    "instrument": {
-      "type": "patch",
-      "patchPreset": "unison",
-      "oscillatorType": "sawtooth",
-      "numberOfVoices": 5
-    },
-    "laneSource": "@tempo(240bpm) @adsr(10ms, 100ms, 70%, 100ms) @ramp(ease-in-out) @spread(0c) ........ @ramp @spread(40c) .... @spread(5c)"
+    "props": {
+      "source": "[0,4,7]===============",
+      "instrument": {
+        "type": "patch",
+        "patchPreset": "unison",
+        "oscillatorType": "sawtooth",
+        "numberOfVoices": 5
+      },
+      "gain": 0.35,
+      "laneSource": "@tempo(240bpm) @adsr(10ms, 100ms, 70%, 100ms) @ramp(ease-in-out) @spread(0c) ........ @ramp @spread(40c) .... @spread(5c)",
+      "simplified": true,
+      "rows": 3,
+      "editorLabel": "Continuous signal ramps source"
+    }
   },
   {
     "id": "features-effect-lanes",

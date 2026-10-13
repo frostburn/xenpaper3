@@ -5,9 +5,6 @@ import SnippetEditor from '../components/SnippetEditor.vue'
 import type { DawProject, PitchedInstrumentLane } from '../daw/project'
 import { createMemoryHistory, createRouter } from 'vue-router'
 import { deferred } from './deferred'
-import basics from '../tutorial/basics.json'
-import tempos from '../tutorial/interactive/tempos.json'
-import { tutorialChapters } from '../tutorial'
 import { compileSnippet, SNIPPET_PLAYBACK_OPTIONS } from '../snippet'
 import { createPlaybackPlan } from '../daw/playback-plan'
 import {
@@ -60,36 +57,25 @@ async function openTutorial(url = '/tutorial') {
 }
 
 describe('interactive tutorial snippets', () => {
-  it('covers every chapter, including explanations without tunes, while preserving the first two pages', () => {
-    expect(
-      interactiveTutorialChapters.slice(0, tutorialChapters.length).map((chapter) => chapter.title),
-    ).toEqual(tutorialChapters.map((chapter) => chapter.title))
+  it('keeps chapter order, stable IDs, and bounded pages for the dedicated interactive lessons', () => {
+    expect(interactiveTutorialChapters.map((chapter) => chapter.id)).toEqual([
+      'basics',
+      'advanced',
+      'diatonic',
+      'diamond-mos',
+      'features',
+    ])
     expect(interactiveTutorialPages.slice(0, 2).map((page) => page.length)).toEqual([10, 10])
     const demos = interactiveTutorialPages.flat()
     expect(new Set(demos.map((demo) => demo.id)).size).toBe(demos.length)
-    for (const [index, chapter] of tutorialChapters.entries()) {
-      const entries = interactiveTutorialChapters[index]!.pages.flatMap((page) => page.demos)
-      const material = chapter.sections.flatMap((section) => section.demos)
-      expect(entries).toHaveLength(material.length)
-      expect(entries.map((demo) => demo.props?.source)).toEqual(material.map((demo) => demo.tune))
-      expect(entries.every((demo) => demo.title?.length > 0)).toBe(true)
-      // The original first demo removes sidebar-only "Click to load" instructions.
-      const newEntries = entries.slice(index === 0 ? 20 : 0)
-      const newMaterial = material.slice(index === 0 ? 20 : 0)
-      expect(newEntries.map((demo) => demo.description)).toEqual(
-        newMaterial.map((demo) => demo.description),
-      )
-      expect(newEntries.map((demo) => demo.html)).toEqual(newMaterial.map((demo) => demo.html))
-    }
+    expect(demos.every((demo) => demo.title.length > 0)).toBe(true)
+    expect(demos.filter((demo) => demo.props)).toHaveLength(132)
+    expect(demos.filter((demo) => !demo.props)).toHaveLength(8)
+    expect(demos.slice(0, 20).map((demo) => demo.id)).toEqual(
+      Array.from({ length: 20 }, (_, index) => `basics-${String(index + 1).padStart(2, '0')}`),
+    )
     expect(interactiveTutorialPages.every((page) => page.length > 0 && page.length <= 10)).toBe(
       true,
-    )
-    const material = basics
-      .flatMap((section) => section.demos)
-      .filter((demo) => demo.tune)
-      .slice(0, 20)
-    expect(demos.slice(0, 20).map((demo) => demo.props!.source)).toEqual(
-      material.map((demo) => demo.tune),
     )
   })
 
@@ -104,7 +90,9 @@ describe('interactive tutorial snippets', () => {
         },
       })
       expect(result.score.duration.valueOf()).toBeGreaterThan(0)
-      const expectedTempo = (tempos as Record<string, number>)[demo.id] ?? 240
+      const tempoDirective = demo.props.laneSource.match(/@tempo\((\d+)bpm\)/)
+      expect(tempoDirective).not.toBeNull()
+      const expectedTempo = Number(tempoDirective![1])
       expect(result.project.globalTrack.tempoChanges[0]!.bpm).toBe(expectedTempo)
       expect(result.diagnostics).toEqual([])
       const plan = createPlaybackPlan(result.project, 0, SNIPPET_PLAYBACK_OPTIONS)

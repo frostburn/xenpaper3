@@ -62,17 +62,17 @@ configured sample URLs.
 
 The `/tutorial` page covers the four original tutorial chapters and a chapter of
 additional score features, with up to 10 entries per
-page and a table of contents linking to each page and example. The original first
-20 Basics demos retain their configuration in `src/tutorial/interactive/basics-01.json`
-and `basics-02.json`. Later pages reuse the chapter JSON in `src/tutorial/`, with
-example titles in `src/tutorial/interactive/titles.json`; entries without tunes
-remain readable explanations. The appended lessons in
-`src/tutorial/interactive/additional-features.json` cover explicit degrees,
-measure rests, hold-to-end, functions, containers, generated scales, tempo,
-envelopes, unison, and signal ramps. Appending them preserves existing permalinks.
-Playable examples use hidden 240 BPM defaults, with selected examples set to
-120 BPM in `src/tutorial/interactive/tempos.json` and explicit tempo changes where
-demonstrated. Snippets have no implicit time signature, including during playback
+page and a table of contents linking to each page and example. Each chapter has a dedicated JSON file in
+`src/tutorial/interactive/`, containing its example IDs, titles, explanations,
+and complete snippet props. Edit these files independently of the sidebar tutorial
+in `src/tutorial/`. Entries without snippet props remain readable explanations.
+The appended lessons in `src/tutorial/interactive/additional-features.json` cover
+explicit degrees, measure rests, hold-to-end, functions, containers, generated
+scales, tempo, envelopes, unison, and signal ramps. Keep chapter order and example
+IDs stable to preserve existing permalinks. Each playable example declares its
+hidden tempo directly in `props.laneSource` (120 or 240 BPM), alongside its envelope
+and any other lane settings; there are no separate title or tempo override tables.
+Snippets have no implicit time signature, including during playback
 and note highlighting. Write `@time(...)` in the clip or lane source to enable
 measure rests and barline validation; the DAW still inherits its project meter.
 Tutorial pages have permalinks such as `/tutorial?page=2`; example links also
