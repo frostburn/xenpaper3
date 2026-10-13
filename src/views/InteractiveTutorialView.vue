@@ -168,6 +168,9 @@ h2 {
 .tutorial > section h2 {
   scroll-margin-top: 1rem;
 }
+.html-description :deep(pre) {
+  overflow-x: auto;
+}
 .contents {
   margin-bottom: 1rem;
   border: 1px solid var(--xenpaper-slate-500);

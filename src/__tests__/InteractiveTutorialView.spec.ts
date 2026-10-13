@@ -7,7 +7,7 @@ import { createMemoryHistory, createRouter } from 'vue-router'
 import { deferred } from './deferred'
 import basics from '../tutorial/basics.json'
 import { tutorialChapters } from '../tutorial'
-import { compileSnippet } from '../snippet'
+import { compileSnippet, SNIPPET_PLAYBACK_OPTIONS } from '../snippet'
 import { createPlaybackPlan } from '../daw/playback-plan'
 import {
   interactiveTutorialChapters,
@@ -60,9 +60,9 @@ async function openTutorial(url = '/tutorial') {
 
 describe('interactive tutorial snippets', () => {
   it('covers every chapter, including explanations without tunes, while preserving the first two pages', () => {
-    expect(interactiveTutorialChapters.map((chapter) => chapter.title)).toEqual(
-      tutorialChapters.map((chapter) => chapter.title),
-    )
+    expect(
+      interactiveTutorialChapters.slice(0, tutorialChapters.length).map((chapter) => chapter.title),
+    ).toEqual(tutorialChapters.map((chapter) => chapter.title))
     expect(interactiveTutorialPages.slice(0, 2).map((page) => page.length)).toEqual([10, 10])
     const demos = interactiveTutorialPages.flat()
     expect(new Set(demos.map((demo) => demo.id)).size).toBe(demos.length)
@@ -104,8 +104,8 @@ describe('interactive tutorial snippets', () => {
       })
       expect(result.score.duration.valueOf()).toBeGreaterThan(0)
       expect(result.project.globalTrack.tempoChanges[0]!.bpm).toBe(240)
-      expect(demo.props.instrument).toMatchObject({ type: 'patch', patchPreset: 'default' })
-      const plan = createPlaybackPlan(result.project, 0, { allowClipTempoDirective: true })
+      expect(result.diagnostics).toEqual([])
+      const plan = createPlaybackPlan(result.project, 0, SNIPPET_PLAYBACK_OPTIONS)
       expect(plan.tempoMap.beatToSeconds(1)).toBe(0.25)
       expect(plan.lanes[0]?.notes.length).toBeGreaterThan(0)
     }
@@ -143,6 +143,7 @@ describe('interactive tutorial snippets', () => {
         ).toBe(expected.innerHTML)
       }
       expect(wrapper.findAll('[role="alert"]')).toHaveLength(0)
+      expect(wrapper.findAll('.syntax-warning')).toHaveLength(0)
       expect(wrapper.find('input[type="radio"]').exists()).toBe(false)
       expect(wrapper.find('[aria-label="Instrument lane source"]').exists()).toBe(false)
       expect(wrapper.find('[aria-label="Share snippet"]').exists()).toBe(false)
@@ -157,6 +158,32 @@ describe('interactive tutorial snippets', () => {
     )
     wrapper.unmount()
   }, 30000)
+
+  it('plays the documented unison spread ramps at the tutorial tempo', () => {
+    const demo = playablePages.flat().find(({ id }) => id === 'features-signal-ramps')!
+    const result = compileSnippet({
+      source: demo.props.source,
+      lane: {
+        source: demo.props.laneSource,
+        instrument: demo.props.instrument,
+        gain: demo.props.gain,
+      },
+    })
+    const lane = createPlaybackPlan(result.project, 0, SNIPPET_PLAYBACK_OPTIONS).lanes[0]!
+    expect(lane.kind).toBe('instrument')
+    if (lane.kind !== 'instrument') throw new Error('Expected a pitched instrument')
+    expect(lane.spread?.initialValue).toBe(0)
+    expect(
+      lane.spread?.curves.map(({ offset, duration, values }) => [
+        offset,
+        duration,
+        values[values.length - 1],
+      ]),
+    ).toEqual([
+      [0, 2, 40],
+      [2, 1, 5],
+    ])
+  })
 
   it('plays every JSON-configured demo and disposes playback on page changes', async () => {
     audio.resume.mockResolvedValue(undefined)
@@ -240,7 +267,10 @@ describe('interactive tutorial snippets', () => {
     )
     expect(wrapper.get('.contents [aria-current="page"]').text()).toContain('Page 1:')
     await wrapper.findAllComponents(SnippetEditor)[0]!.get('textarea').setValue('0== . 7')
-    const lastPage = interactiveTutorialPages.length
+    const mosPages = interactiveTutorialChapters.find(
+      (chapter) => chapter.id === 'diamond-mos',
+    )!.pages
+    const lastPage = mosPages[mosPages.length - 1]!.index + 1
     const lastDemo =
       interactiveTutorialPages[lastPage - 1]![interactiveTutorialPages[lastPage - 1]!.length - 1]!
     contents.open = true
@@ -329,6 +359,23 @@ describe('interactive tutorial snippets', () => {
     expect(wrapper.find('.source-playing').exists()).toBe(false)
     await wrapper.get('[aria-label="Stop"]').trigger('click')
     expect(wrapper.find('.source-playing').exists()).toBe(false)
+    wrapper.unmount()
+  })
+
+  it('highlights misplaced barlines only when the snippet explicitly supplies a meter', async () => {
+    const wrapper = mount(SnippetEditor, {
+      props: {
+        source: '0 4 7 | 12',
+        gain: 0.5,
+        instrument: { type: 'patch', patchPreset: 'default', oscillatorType: 'triangle' },
+        simplified: true,
+      },
+    })
+    expect(wrapper.findAll('.syntax-warning')).toHaveLength(0)
+    await wrapper.setProps({ source: '@time(4/4) 0 4 7 | 12' })
+    expect(wrapper.get('.syntax-warning').text()).toBe('|')
+    await wrapper.setProps({ source: '0 4 7 | 12' })
+    expect(wrapper.findAll('.syntax-warning')).toHaveLength(0)
     wrapper.unmount()
   })
 

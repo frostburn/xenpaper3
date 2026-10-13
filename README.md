@@ -60,12 +60,20 @@ MediaWiki external link, or Discord angle-bracket link. Sampled instruments
 include their manifest in the URL; their audio files still load from the
 configured sample URLs.
 
-The `/tutorial` page covers all four tutorial chapters, with up to 10 entries per
+The `/tutorial` page covers the four original tutorial chapters and a chapter of
+additional score features, with up to 10 entries per
 page and a table of contents linking to each page and example. The original first
 20 Basics demos retain their configuration in `src/tutorial/interactive/basics-01.json`
 and `basics-02.json`. Later pages reuse the chapter JSON in `src/tutorial/`, with
 example titles in `src/tutorial/interactive/titles.json`; entries without tunes
-remain readable explanations. Playable examples use hidden 240 BPM defaults.
+remain readable explanations. The appended lessons in
+`src/tutorial/interactive/additional-features.json` cover explicit degrees,
+measure rests, hold-to-end, functions, containers, generated scales, tempo,
+envelopes, unison, and signal ramps. Appending them preserves existing permalinks.
+Playable examples use hidden 240 BPM defaults, with explicit tempo changes where
+demonstrated. Snippets have no implicit time signature, including during playback
+and note highlighting. Write `@time(...)` in the clip or lane source to enable
+measure rests and barline validation; the DAW still inherits its project meter.
 Tutorial pages have permalinks such as `/tutorial?page=2`; example links also
 include an anchor, such as `/tutorial?page=3#basics-22-heading`. Browser history
 restores the selected page. Vue renders the active page and binds `source`, `instrument`, and `gain` with
