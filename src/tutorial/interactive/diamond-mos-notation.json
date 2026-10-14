@@ -1,0 +1,324 @@
+[
+  {
+    "id": "diamond-mos-01",
+    "title": "Generating MOS scales",
+    "description": "Many equal temperaments lack an interval near a just 3/2, but still contain many useful scales constructed by stacking one generating interval.",
+    "props": {
+      "source": "# Stacking 8\\11 produces the \"Nerevarine\" mode\n{11edo}{2 4 5 7 8 10 11}\n0 1 2 3 4 5 6 7=\n\n# The same mode of the \"Smitonic\" scale\nMOS{4L 3s}\nJ K L M N O P j=",
+      "instrument": {
+        "type": "patch",
+        "patchPreset": "default",
+        "oscillatorType": "semisine"
+      },
+      "gain": 0.35,
+      "laneSource": "@tempo(240bpm) @adsr(10ms, 100ms, 70%, 100ms)",
+      "simplified": true,
+      "rows": 7,
+      "editorLabel": "Generating MOS scales source"
+    }
+  },
+  {
+    "id": "diamond-mos-02",
+    "title": "MOS nominals and roots",
+    "description": "Moment of symmetry scales consist of large (L) and small (s) steps mixed as evenly as possible. They use nominals from J onwards and J is always aligned with the root frequency.",
+    "props": {
+      "source": "# \"Dylathian\" mode of \"Oneirotonic\"\nMOS{5L3s}\nJ K L M N O P Q j=\n{root = 333Hz}\nJ K L M N O P Q j=",
+      "instrument": {
+        "type": "patch",
+        "patchPreset": "default",
+        "oscillatorType": "semisine"
+      },
+      "gain": 0.35,
+      "laneSource": "@tempo(240bpm) @adsr(10ms, 100ms, 70%, 100ms)",
+      "simplified": true,
+      "rows": 5,
+      "editorLabel": "MOS nominals and roots source"
+    }
+  },
+  {
+    "id": "diamond-mos-03",
+    "title": "Modes and UDP notation",
+    "description": "Modes are selected by specifying an explicit pattern or by using UDP notation.",
+    "props": {
+      "source": "# \"Lorkhanic\" of \"Smitonic\"\nMOS{LsLsLLs}\nJ K L M N O P j=\n\n# \"Kagrenacan\" of \"Smitonic\"\n# Measuring from the root J...\n# two scale degrees are bright (i.e. wide),\n# while four degrees are dark (i.e. narrow)\nMOS{4L 3s 2|4}\nJ K L M N O P j=",
+      "instrument": {
+        "type": "patch",
+        "patchPreset": "default",
+        "oscillatorType": "semisine"
+      },
+      "gain": 0.35,
+      "laneSource": "@tempo(240bpm) @adsr(10ms, 100ms, 70%, 100ms)",
+      "simplified": true,
+      "rows": 10,
+      "editorLabel": "Modes and UDP notation source"
+    }
+  },
+  {
+    "id": "diamond-mos-04",
+    "title": "Scale hardness",
+    "description": "The ratio between the sizes of L and s steps is called hardness. It defaults to 2:1 i.e. \"basic\" hardness. You can either provide the scale pattern in terms of small integers or by specifying L:s after the fact.",
+    "props": {
+      "source": "# \"Anti-Kadathian\" of hard \"Checkertonic\"\nMOS{31131131}\nJ K L M N O P Q j=\n\n# \"Anti-locrian\" of soft \"Anti-diatonic\"\nMOS{2L 5s 3:2}\nJ K L M N O P j=",
+      "instrument": {
+        "type": "patch",
+        "patchPreset": "default",
+        "oscillatorType": "semisine"
+      },
+      "gain": 0.35,
+      "laneSource": "@tempo(240bpm) @adsr(10ms, 100ms, 70%, 100ms)",
+      "simplified": true,
+      "rows": 7,
+      "editorLabel": "Scale hardness source"
+    }
+  },
+  {
+    "id": "diamond-mos-05",
+    "title": "Complex step ratios",
+    "description": "More complex step ratios require commas between the steps.",
+    "props": {
+      "source": "# \"Salmon\" of ultrahard \"Pine\"\nMOS{43, 43, 10, 43, 43, 43, 43, 43}\nJ K L M N O P Q j=",
+      "instrument": {
+        "type": "patch",
+        "patchPreset": "default",
+        "oscillatorType": "semisine"
+      },
+      "gain": 0.35,
+      "laneSource": "@tempo(240bpm) @adsr(10ms, 100ms, 70%, 100ms)",
+      "simplified": true,
+      "rows": 3,
+      "editorLabel": "Complex step ratios source"
+    }
+  },
+  {
+    "id": "diamond-mos-06",
+    "title": "Multi-period scales",
+    "description": "MOS scales that have multiple identical periods per octave have less modes available.",
+    "props": {
+      "source": "# ssLssL\nMOS{2L 4s 0|4(2)}\nJ K L M N O j=\n\n# sLssLs\nMOS{2L 4s 2|2(2)}\nJ K L M N O j=\n\n# LssLss (period is optional)\nMOS{2L 4s 4|0}\nJ K L M N O j=",
+      "instrument": {
+        "type": "patch",
+        "patchPreset": "default",
+        "oscillatorType": "semisine"
+      },
+      "gain": 0.35,
+      "laneSource": "@tempo(240bpm) @adsr(10ms, 100ms, 70%, 100ms)",
+      "simplified": true,
+      "rows": 11,
+      "editorLabel": "Multi-period scales source"
+    }
+  },
+  {
+    "id": "diamond-mos-07",
+    "title": "MOS accidentals",
+    "description": "Ampersand & (read \"am\") raises by one chroma (L - s), while at-sign @ (read \"at\") lowers by one chroma.",
+    "props": {
+      "source": "MOS{2L 5s}\nJ J& K L M N@ N O P j=",
+      "instrument": {
+        "type": "patch",
+        "patchPreset": "default",
+        "oscillatorType": "semisine"
+      },
+      "gain": 0.35,
+      "laneSource": "@tempo(240bpm) @adsr(10ms, 100ms, 70%, 100ms)",
+      "simplified": true,
+      "rows": 3,
+      "editorLabel": "MOS accidentals source"
+    }
+  },
+  {
+    "id": "diamond-mos-08",
+    "title": "MOS half-accidentals",
+    "props": {
+      "source": "MOS{2L 5s 3:1}\nJ Je J& K L M N@ Na N O P j=",
+      "instrument": {
+        "type": "patch",
+        "patchPreset": "default",
+        "oscillatorType": "semisine"
+      },
+      "gain": 0.35,
+      "laneSource": "@tempo(240bpm) @adsr(10ms, 100ms, 70%, 100ms)",
+      "simplified": true,
+      "rows": 3,
+      "editorLabel": "MOS half-accidentals source"
+    }
+  },
+  {
+    "id": "diamond-mos-09",
+    "title": "MOS ups and downs",
+    "description": "Diamond-mos pitches get their own ups and downs from the underlying equal temperament.",
+    "props": {
+      "source": "# Minihard Trial implying 17edo\n# L = 7\\17\n# s = 3\\17\n# & = L-s = 4\\17\n# e = &/2 = 2\\17\n# ^ = 1\\17 (always one step)\n# / = 5\\17 (always five steps)\nMOS{2L 1s 7:3}\nJ ^J Je ^Je J& /J vK K",
+      "instrument": {
+        "type": "patch",
+        "patchPreset": "default",
+        "oscillatorType": "semisine"
+      },
+      "gain": 0.35,
+      "laneSource": "@tempo(240bpm) @adsr(10ms, 100ms, 70%, 100ms)",
+      "simplified": true,
+      "rows": 9,
+      "editorLabel": "MOS ups and downs source"
+    }
+  },
+  {
+    "id": "diamond-mos-10",
+    "title": "Unreduced hardness",
+    "description": "Hardness declarations are not reduced. 8:4 implies basic hardness but finer octave division.",
+    "props": {
+      "source": "# 12edo Lydian but ups are 1\\48\nMOS{5L 2s 8:4}\nJ ^J Je vJ& J&",
+      "instrument": {
+        "type": "patch",
+        "patchPreset": "default",
+        "oscillatorType": "semisine"
+      },
+      "gain": 0.35,
+      "laneSource": "@tempo(240bpm) @adsr(10ms, 100ms, 70%, 100ms)",
+      "simplified": true,
+      "rows": 3,
+      "editorLabel": "Unreduced hardness source"
+    }
+  },
+  {
+    "id": "diamond-mos-11",
+    "title": "Custom MOS ups and lifts",
+    "description": "MOS ups and lifts are customizable. Integers are interpreted as steps of the host edo.",
+    "props": {
+      "source": "MOS{7L 1s 43:10 3|4; ^=4; /=12}\n[J, vL, /N, O, ^Q, j, k]===",
+      "instrument": {
+        "type": "patch",
+        "patchPreset": "default",
+        "oscillatorType": "semisine"
+      },
+      "gain": 0.35,
+      "laneSource": "@tempo(240bpm) @adsr(10ms, 100ms, 70%, 100ms)",
+      "simplified": true,
+      "rows": 3,
+      "editorLabel": "Custom MOS ups and lifts source"
+    }
+  },
+  {
+    "id": "diamond-mos-12",
+    "title": "Other MOS equaves",
+    "description": "MOS equave is set by enclosing it in angle brackets.",
+    "props": {
+      "source": "# \"Cassiopeian\" of \"Lambda (Bohlen-Pierce)\"\nMOS{4L5s<3> 5|3}\nJ K L M N O P Q R j=",
+      "instrument": {
+        "type": "patch",
+        "patchPreset": "default",
+        "oscillatorType": "semisine"
+      },
+      "gain": 0.35,
+      "laneSource": "@tempo(240bpm) @adsr(10ms, 100ms, 70%, 100ms)",
+      "simplified": true,
+      "rows": 3,
+      "editorLabel": "Other MOS equaves source"
+    }
+  },
+  {
+    "id": "diamond-mos-13",
+    "title": "Fifth equaves",
+    "props": {
+      "source": "# 9edf is acceptable for Carlos Alpha\n# \"Dionian\" of hard \"Saturnian\"\nMOS{2L3s<3/2> 2|2 3:1}\nJ K L M N j=",
+      "instrument": {
+        "type": "patch",
+        "patchPreset": "default",
+        "oscillatorType": "semisine"
+      },
+      "gain": 0.35,
+      "laneSource": "@tempo(240bpm) @adsr(10ms, 100ms, 70%, 100ms)",
+      "simplified": true,
+      "rows": 4,
+      "editorLabel": "Fifth equaves source"
+    }
+  },
+  {
+    "id": "diamond-mos-14",
+    "title": "Modulating a MOS scale",
+    "description": "You can move the same MOS mode to a different key...",
+    "props": {
+      "source": "# \"Erev\" of \"Machinoid\"\nMOS{5L 1s}\nJ K L M N O j=\n\n# Same scale but 4\\11 higher\n# J becomes J& and K becomes K&\nMOS{key = L}\nL M N O j k l=",
+      "instrument": {
+        "type": "patch",
+        "patchPreset": "default",
+        "oscillatorType": "semisine"
+      },
+      "gain": 0.35,
+      "laneSource": "@tempo(240bpm) @adsr(10ms, 100ms, 70%, 100ms)",
+      "simplified": true,
+      "rows": 8,
+      "editorLabel": "Modulating a MOS scale source"
+    }
+  },
+  {
+    "id": "diamond-mos-15",
+    "title": "Changing MOS modes",
+    "description": "...or specify a new UDP mode altogether.",
+    "props": {
+      "source": "# \"Medicinal\" of \"Manual\"\nMOS{4L 1s 3|1}\nJ K L M N j=\n\n# Switch to \"Indical\" mode on K\n# M becomes M@\nMOS{key = K 1|3}\nK L M N j k=",
+      "instrument": {
+        "type": "patch",
+        "patchPreset": "default",
+        "oscillatorType": "semisine"
+      },
+      "gain": 0.35,
+      "laneSource": "@tempo(240bpm) @adsr(10ms, 100ms, 70%, 100ms)",
+      "simplified": true,
+      "rows": 8,
+      "editorLabel": "Changing MOS modes source"
+    }
+  },
+  {
+    "id": "diamond-mos-16",
+    "title": "Custom MOS key signatures",
+    "description": "Custom key signatures are supported. A natural sign restores the unaltered nominal.",
+    "props": {
+      "source": "MOS{5L 7s 15:13 6|5}\nMOS{sig = ^^^K ^M& vN@ ^^\\P ^^^R vvvS ^^^T vvvU}\nJ K L M N O P Q R S T U j U_ j=",
+      "instrument": {
+        "type": "patch",
+        "patchPreset": "default",
+        "oscillatorType": "semisine"
+      },
+      "gain": 0.35,
+      "laneSource": "@tempo(240bpm) @adsr(10ms, 100ms, 70%, 100ms)",
+      "simplified": true,
+      "rows": 3,
+      "editorLabel": "Custom MOS key signatures source"
+    }
+  },
+  {
+    "id": "diamond-mos-17",
+    "title": "Large MOS scales",
+    "description": "When the system runs out of nominals it starts over but prefixes everything with a J.",
+    "props": {
+      "source": "@8\nMOS{14L5s}\nJ=== K L M N O P Q R S T\nU V W X Y Z JJ JK j===",
+      "instrument": {
+        "type": "patch",
+        "patchPreset": "default",
+        "oscillatorType": "semisine"
+      },
+      "gain": 0.35,
+      "laneSource": "@tempo(120bpm) @adsr(10ms, 100ms, 70%, 100ms)",
+      "simplified": true,
+      "rows": 4,
+      "editorLabel": "Large MOS scales source"
+    }
+  },
+  {
+    "id": "diamond-mos-18",
+    "title": "Just intonation MOS scales",
+    "description": "MOS scales tuned to just intonation have irrational hardness so you have to define the size of a step directly.",
+    "props": {
+      "source": "# Size of the small step is inferred from the pattern and equave\nMOS{5L 1s; L = 8/7}\nJ K L M N O j",
+      "instrument": {
+        "type": "patch",
+        "patchPreset": "default",
+        "oscillatorType": "semisine"
+      },
+      "gain": 0.35,
+      "laneSource": "@tempo(240bpm) @adsr(10ms, 100ms, 70%, 100ms)",
+      "simplified": true,
+      "rows": 3,
+      "editorLabel": "Just intonation MOS scales source"
+    }
+  }
+]

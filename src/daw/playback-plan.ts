@@ -188,6 +188,8 @@ const assertPlaybackStart = (fromBeat: number): void => {
 export interface PlaybackPlanOptions {
   /** Snippets allow tempo directives in their hidden lane config and single clip. */
   readonly allowClipTempoDirective?: boolean
+  /** Standalone snippets have no meter until their source explicitly declares one. */
+  readonly inheritProjectTimeSignature?: boolean
 }
 
 /**
@@ -203,16 +205,19 @@ export const createPlaybackPlan = (
 ): PlaybackPlan => {
   assertPlaybackStart(fromBeat)
   const tempoMap = TempoMap.fromProject(project)
+  const timeSignature =
+    options.inheritProjectTimeSignature === false
+      ? undefined
+      : project.globalTrack.timeSignatureChanges[0]
   const globalInitialization = compileSourceInitialization(
     project.globalTrack.source,
     {},
     true,
-    project.globalTrack.timeSignatureChanges[0],
+    timeSignature,
   )
-  const timeSignatureChanges = globalTimeSignatureChanges(
-    project.globalTrack.source,
-    project.globalTrack.timeSignatureChanges[0]!,
-  )
+  const timeSignatureChanges = timeSignature
+    ? globalTimeSignatureChanges(project.globalTrack.source, timeSignature)
+    : undefined
   let endBeat = fromBeat
   const lanes: PlaybackLane[] = []
 
@@ -221,7 +226,7 @@ export const createPlaybackPlan = (
     for (const note of parseLaneNotes(
       lane,
       globalInitialization,
-      project.globalTrack.timeSignatureChanges[0],
+      timeSignature,
       timeSignatureChanges,
       options.allowClipTempoDirective,
     )) {
@@ -264,7 +269,7 @@ export const createPlaybackPlan = (
                     compileLaneSourceInitialization(
                       lane.source,
                       globalInitialization,
-                      project.globalTrack.timeSignatureChanges[0],
+                      timeSignature,
                       options.allowClipTempoDirective,
                     ),
                     tempoMap,

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
-import { compileSnippet } from '../snippet'
+import { compileSnippet, SNIPPET_PLAYBACK_OPTIONS } from '../snippet'
 import { DawAudioEngine } from '../daw/audio-engine'
 import {
   createDefaultProject,
@@ -50,15 +50,7 @@ const pending = ref(false)
 const playhead = ref(0)
 const playbackNotes = computed(() => {
   const project = compiled.value.result?.project
-  return project
-    ? parseLaneNotes(
-        project.instrumentLanes[0]!,
-        {},
-        project.globalTrack.timeSignatureChanges[0],
-        undefined,
-        true,
-      )
-    : []
+  return project ? parseLaneNotes(project.instrumentLanes[0]!, {}, undefined, undefined, true) : []
 })
 const playingRanges = computed(() =>
   playing.value
@@ -101,7 +93,7 @@ const play = async () => {
     engine.addEventListener('ended', stop)
     if (engine.context.state === 'suspended') await engine.context.resume()
     if (request !== playRequest) return
-    await engine.play(result.project, 0, { allowClipTempoDirective: true })
+    await engine.play(result.project, 0, SNIPPET_PLAYBACK_OPTIONS)
     if (request !== playRequest) return
     playhead.value = engine.positionBeats
     playing.value = true
