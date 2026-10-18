@@ -10,6 +10,8 @@ export type InteractiveTutorialDemo = {
   title: string
   description?: string
   html?: string
+  // Warning codes intentionally demonstrated by this lesson.
+  expectedWarnings?: string[]
   props?: {
     source: string
     instrument: InstrumentSource

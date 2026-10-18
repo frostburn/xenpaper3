@@ -234,24 +234,6 @@
     }
   },
   {
-    "id": "features-constructed-scales",
-    "title": "Scales from expressions",
-    "html": "<p><code>{scale = expression}</code> builds a scale from a container or function result. Entries become degrees 1 onward; degree 0 remains the root, and the final entry sets the equave. Arithmetic can shift every member of the returned container.</p>",
-    "props": {
-      "source": "fn intervals() { ret [2\\10 5\\10 8\\10] + 1\\10 }\n{scale = intervals()}\n0 1 2 3 4 5 6=",
-      "instrument": {
-        "type": "patch",
-        "patchPreset": "default",
-        "oscillatorType": "semisine"
-      },
-      "gain": 0.35,
-      "laneSource": "@tempo(240bpm) @adsr(10ms, 100ms, 70%, 100ms)",
-      "simplified": true,
-      "rows": 3,
-      "editorLabel": "Scales from expressions source"
-    }
-  },
-  {
     "id": "features-sorting",
     "title": "Sorting scale entries",
     "description": "sort() puts numeric container values in ascending order. Use it when a generated scale would otherwise put its degrees out of order.",
@@ -357,42 +339,6 @@
       "simplified": true,
       "rows": 3,
       "editorLabel": "Equave reduction source"
-    }
-  },
-  {
-    "id": "features-cps",
-    "title": "Combination product sets",
-    "html": "<p><code>cps(factors, count)</code> combines products, grounding, equave reduction, and sorting into a scale helper. Optional arguments set the equave and whether to retain the products' original unity. Try replacing 7 with 11 or changing the combination size.</p>",
-    "props": {
-      "source": "{scale = cps([1 3 5 7], 2)}\n0 1 2 3 4 5 6=\n{scale = cps([1 3 5 7], 2, 2/1, true)}\n0 1 2 3 4 5 6=",
-      "instrument": {
-        "type": "patch",
-        "patchPreset": "default",
-        "oscillatorType": "semisine"
-      },
-      "gain": 0.35,
-      "laneSource": "@tempo(240bpm) @adsr(10ms, 100ms, 70%, 100ms)",
-      "simplified": true,
-      "rows": 4,
-      "editorLabel": "Combination product sets source"
-    }
-  },
-  {
-    "id": "features-context-assignments",
-    "title": "Combined tuning assignments",
-    "html": "<p>Separate tuning assignments inside braces with semicolons. This lets you construct a scale and choose its mode in one block. A semicolon inside braces separates assignments; outside braces it is a measure rest.</p>",
-    "props": {
-      "source": "{scale = cps([1 7 11 13], 2); mode = 4; root = 220Hz}\n0 1 2 3 4 5 6=",
-      "instrument": {
-        "type": "patch",
-        "patchPreset": "default",
-        "oscillatorType": "semisine"
-      },
-      "gain": 0.35,
-      "laneSource": "@tempo(240bpm) @adsr(10ms, 100ms, 70%, 100ms)",
-      "simplified": true,
-      "rows": 3,
-      "editorLabel": "Combined tuning assignments source"
     }
   },
   {

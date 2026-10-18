@@ -69,7 +69,7 @@ describe('interactive tutorial snippets', () => {
     const demos = interactiveTutorialPages.flat()
     expect(new Set(demos.map((demo) => demo.id)).size).toBe(demos.length)
     expect(demos.every((demo) => demo.title.length > 0)).toBe(true)
-    expect(demos.filter((demo) => demo.props)).toHaveLength(132)
+    expect(demos.filter((demo) => demo.props)).toHaveLength(133)
     expect(demos.filter((demo) => !demo.props)).toHaveLength(8)
     expect(demos.slice(0, 20).map((demo) => demo.id)).toEqual(
       Array.from({ length: 20 }, (_, index) => `basics-${String(index + 1).padStart(2, '0')}`),
@@ -77,6 +77,19 @@ describe('interactive tutorial snippets', () => {
     expect(interactiveTutorialPages.every((page) => page.length > 0 && page.length <= 10)).toBe(
       true,
     )
+  })
+
+  it('introduces scale assignments and CPS in Basics before timing and advanced expressions', () => {
+    const basics = interactiveTutorialChapters[0]!.pages.flatMap((page) => page.demos)
+    const ids = basics.map((demo) => demo.id)
+    expect(ids.slice(ids.indexOf('basics-21') + 1, ids.indexOf('basics-22'))).toEqual([
+      'features-constructed-scales',
+      'features-cps',
+      'features-context-assignments',
+    ])
+    expect(
+      basics.find((demo) => demo.id === 'features-constructed-scales')!.props!.source,
+    ).not.toContain('fn ')
   })
 
   it('compiles every playable example with the tutorial defaults and builds its playback plan', () => {
@@ -94,7 +107,9 @@ describe('interactive tutorial snippets', () => {
       expect(tempoDirective).not.toBeNull()
       const expectedTempo = Number(tempoDirective![1])
       expect(result.project.globalTrack.tempoChanges[0]!.bpm).toBe(expectedTempo)
-      expect(result.diagnostics).toEqual([])
+      expect(result.diagnostics.map(({ code, severity }) => ({ code, severity }))).toEqual(
+        (demo.expectedWarnings ?? []).map((code) => ({ code, severity: 'warning' })),
+      )
       const plan = createPlaybackPlan(result.project, 0, SNIPPET_PLAYBACK_OPTIONS)
       expect(plan.tempoMap.beatToSeconds(1)).toBe(60 / expectedTempo)
       expect(plan.lanes[0]?.notes.length).toBeGreaterThan(0)
@@ -133,7 +148,12 @@ describe('interactive tutorial snippets', () => {
         ).toBe(expected.innerHTML)
       }
       expect(wrapper.findAll('[role="alert"]')).toHaveLength(0)
-      expect(wrapper.findAll('.syntax-warning')).toHaveLength(0)
+      expect(wrapper.findAll('.syntax-warning')).toHaveLength(
+        interactiveTutorialPages[page]!.reduce(
+          (count, demo) => count + (demo.expectedWarnings?.length ?? 0),
+          0,
+        ),
+      )
       expect(wrapper.find('input[type="radio"]').exists()).toBe(false)
       expect(wrapper.find('[aria-label="Instrument lane source"]').exists()).toBe(false)
       expect(wrapper.find('[aria-label="Share snippet"]').exists()).toBe(false)
@@ -296,11 +316,15 @@ describe('interactive tutorial snippets', () => {
   })
 
   it('opens example permalinks directly and safely handles unknown anchors and invalid page queries', async () => {
-    const wrapper = await openTutorial('/tutorial?page=3#basics-22-heading')
+    const tupletPage =
+      interactiveTutorialPages.findIndex((page) => page.some((demo) => demo.id === 'basics-22')) + 1
+    const wrapper = await openTutorial(`/tutorial?page=${tupletPage}#basics-22-heading`)
     await flushPromises()
     expect(document.activeElement).toBe(wrapper.get('#basics-22-heading').element)
     expect(wrapper.get('#basics-22-heading').text()).toBe('Tuplets')
-    await wrapper.vm.$router.push('/tutorial?page=6#unknown-heading')
+    const advancedPage =
+      interactiveTutorialChapters.find((chapter) => chapter.id === 'advanced')!.pages[0]!.index + 1
+    await wrapper.vm.$router.push(`/tutorial?page=${advancedPage}#unknown-heading`)
     await flushPromises()
     expect(document.activeElement).toBe(wrapper.get('h1').element)
     expect(wrapper.get('.chapter-heading').text()).toContain('Advanced score construction')
