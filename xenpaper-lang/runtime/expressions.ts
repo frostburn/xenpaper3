@@ -754,7 +754,14 @@ export function evaluateExpression(
     if (node.type === 'Identifier') {
       for (let scope: LexicalEnvironment | undefined = environment; scope; scope = scope.parent) {
         const value = scope.variables.get(node.name)
-        if (value) return { value, diagnostics: [] }
+        if (value)
+          return {
+            value: {
+              ...value,
+              origins: [...value.origins, { location: node.location, role: 'literal' }],
+            },
+            diagnostics: [],
+          }
       }
     }
     if (node.type === 'Identifier' && node.name === 'niente')
