@@ -79,17 +79,16 @@ describe('interactive tutorial snippets', () => {
     )
   })
 
-  it('introduces scale assignments and CPS in Basics before timing and advanced expressions', () => {
-    const basics = interactiveTutorialChapters[0]!.pages.flatMap((page) => page.demos)
-    const ids = basics.map((demo) => demo.id)
-    expect(ids.slice(ids.indexOf('basics-21') + 1, ids.indexOf('basics-22'))).toEqual([
+  it('introduces scale assignments and CPS at the start of Advanced score construction', () => {
+    const advanced = interactiveTutorialChapters
+      .find((chapter) => chapter.id === 'advanced')!
+      .pages.flatMap((page) => page.demos)
+    expect(advanced.slice(0, 3).map((demo) => demo.id)).toEqual([
       'features-constructed-scales',
       'features-cps',
       'features-context-assignments',
     ])
-    expect(
-      basics.find((demo) => demo.id === 'features-constructed-scales')!.props!.source,
-    ).not.toContain('fn ')
+    expect(advanced[0]!.props!.source).not.toContain('fn ')
   })
 
   it('compiles every playable example with the tutorial defaults and builds its playback plan', () => {

@@ -66,8 +66,8 @@ page and a table of contents linking to each page and example. Each chapter has 
 `src/tutorial/interactive/`, containing its example IDs, titles, explanations,
 and complete snippet props. Edit these files independently of the sidebar tutorial
 in `src/tutorial/`. Entries without snippet props remain readable explanations.
-Basics introduces scale assignments, combination product sets, and combined tuning
-assignments before timing. The lessons in
+Advanced score construction starts with scale assignments, combination product
+sets, and combined tuning assignments. The lessons in
 `src/tutorial/interactive/additional-features.json` cover explicit degrees, measure
 rests, hold-to-end, functions, containers, scale helpers, tempo, envelopes, unison,
 and signal ramps. Keep chapter order and example
