@@ -213,7 +213,11 @@ const selectionBox = computed(() => {
 </script>
 
 <template>
-  <section class="piano-roll" :class="{ dark: theme === 'dark' }" aria-label="Piano roll visualiser">
+  <section
+    class="piano-roll"
+    :class="{ dark: theme === 'dark' }"
+    aria-label="Piano roll visualiser"
+  >
     <h2>Piano roll</h2>
     <div class="scroll">
       <div class="canvas" :style="{ width: `${width}px` }">
