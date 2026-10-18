@@ -66,7 +66,7 @@
   {
     "id": "advanced-06",
     "title": "Groups, tuplets, and parallel expressions",
-    "description": "Parentheses group an expression without rescaling its duration. Square brackets without a top-level comma normalize the entire contents into one rhythmic slot, producing a tuplet. A top-level comma creates parallel branches; the construction lasts as long as its longest branch, and shorter branches are padded with silence.",
+    "description": "Parentheses group an expression without rescaling its duration. Square brackets normalize the entire contents into one rhythmic slot, producing a tuplet. A comma creates parallel branches deliniated by double barlines; the construction lasts as long as its longest branch, and shorter branches are padded with silence.",
     "props": {
       "source": "# Three ordinary beats\n(0 2 4)\n# Three notes fitted into one beat\n[0 2 4]\n# Two simultaneous branches lasting four beats\n|| 0 2 4, [7, 11]=== ||\n# Three ordinary beats after the parallel section\n0 2 4",
       "instrument": {

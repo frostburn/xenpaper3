@@ -256,7 +256,7 @@
     "title": "Harmonic segments",
     "description": "Harmonic segments can be specified using two colons :: to enumerate a range.",
     "props": {
-      "source": "{4::8}\n0 1 2 3 4==",
+      "source": "{4::8}  # {5/4, 6/4, 7/4, 8/4}\n0 1 2 3 4==",
       "instrument": {
         "type": "patch",
         "patchPreset": "default",
@@ -274,7 +274,7 @@
     "title": "Retroverted scales",
     "description": "Enumerations can be retroverted by prefixing them with a slash.",
     "props": {
-      "source": "{/6::3}\n0 1 2 3==",
+      "source": "{/6::3}  # {6/5, 6/4, 6/3}\n0 1 2 3==",
       "instrument": {
         "type": "patch",
         "patchPreset": "default",
@@ -400,7 +400,7 @@
     "title": "Holding tuplets",
     "description": "Holding a tuplet stretches it as a whole.",
     "props": {
-      "source": "[0 2 7] [0 2 7]===",
+      "source": "[0 2 7] [0 2 7]== [0 2 7]===",
       "instrument": {
         "type": "patch",
         "patchPreset": "default",
@@ -450,9 +450,27 @@
     }
   },
   {
+    "id": "basics-25-b",
+    "title": "Barline checks",
+    "description": "Incorrectly placed barlines are highlighted. This helps you keep time while writing music.",
+    "props": {
+      "source": "@time(3/4) C D E F | G A |\n@time(2/4) B c= |",
+      "instrument": {
+        "type": "patch",
+        "patchPreset": "default",
+        "oscillatorType": "semisine"
+      },
+      "gain": 0.35,
+      "laneSource": "@tempo(240bpm) @adsr(10ms, 100ms, 70%, 100ms)",
+      "simplified": true,
+      "rows": 3,
+      "editorLabel": "Time signatures source"
+    }
+  },
+  {
     "id": "basics-26",
     "title": "Shifting chord roots",
-    "description": "Enumerated chords can be shifted using arithmetic. The first enumeral defines where 1/1 falls.",
+    "description": "Enumerated chords can be shifted using arithmetic. The first enumeral defines where 1/1 falls. Use smaller numbers to place notes below the root.",
     "props": {
       "source": "4/3 * 4:5:6==\n3/2 * 4:5:3==\n5/4 * /6:5:4==",
       "instrument": {
@@ -488,9 +506,9 @@
   {
     "id": "basics-28",
     "title": "Equal temperament equaves",
-    "description": "Use angle brackets to change the equave of steps of equal temperaments.",
+    "description": "Use angle brackets to change the equave of steps of equal temperaments. (It defaults to 2.)",
     "props": {
-      "source": "5\\13<3> 5\\13<3/2>",
+      "source": "5\\13 5\\13<2> 5\\13<3> 5\\13<3/2>",
       "instrument": {
         "type": "patch",
         "patchPreset": "default",

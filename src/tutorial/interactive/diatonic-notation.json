@@ -38,7 +38,7 @@
   {
     "id": "diatonic-03",
     "title": "Staff clefs",
-    "description": "The notation view supports treble and bass clef changes. Clef directives affect notation only, not pitch or playback.",
+    "description": "The upcoming notation view supports treble and bass clef changes. Clef directives affect notation only, not pitch or playback.",
     "props": {
       "source": "@clef(treble) C D E F\n@clef(bass) `C `D `E `F",
       "instrument": {
@@ -153,7 +153,7 @@
     "title": "Tempering ratios and chords",
     "description": "Use tilde ~ to temper ratios and enumerated chords.",
     "props": {
-      "source": "{53edo} @p\n# Overtones are locked together\n5::15==\n.\n# Tempered shimmering\n~5::15==\n.\n\n@mf\n# Tempered chord\n~[4/3, 7/3, 9/3, 11/3]==\n.\n\n# Tempered ratios\n~1/1 ~13/10 ~3/2",
+      "source": "{53edo} @pp\n# Overtones are locked together\n5::15===\n.\n# Tempered shimmering\n~5::15===\n.\n\n@mf\n# Tempered chord\n~[4/3, 7/3, 9/3, 11/3]==\n.\n\n# Tempered ratios\n~1/1 ~13/10 ~3/2",
       "instrument": {
         "type": "patch",
         "patchPreset": "default",
