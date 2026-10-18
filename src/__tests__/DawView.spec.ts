@@ -238,6 +238,33 @@ describe('DAW project model', () => {
     ])
   })
 
+  it.each([
+    ['[C D]', 'scale[0]'],
+    ['[[C D] [E F]]', 'scale[0][0]'],
+    ['[C D]', 'arrayReduce((first, next) => first, scale)'],
+  ])('retains named container references when extracting from %s with %s', (value, use) => {
+    const source = `let scale = ${value}\n${use}\n${use}`
+    const notes = parseClipNotes(source)
+    const firstUse = source.indexOf('scale', source.indexOf('\n'))
+    const secondUse = source.lastIndexOf('scale')
+    const valueRange = { start: source.indexOf('C'), end: source.indexOf('C') + 1 }
+
+    expect(notes).toHaveLength(2)
+    for (const [index, reference] of [firstUse, secondUse].entries()) {
+      expect(notes[index]!.sourceRanges).toContainEqual(valueRange)
+      expect(notes[index]!.sourceRanges).toContainEqual({ start: reference, end: reference + 5 })
+      const otherReference = index === 0 ? secondUse : firstUse
+      expect(notes[index]!.sourceRanges).not.toContainEqual({
+        start: otherReference,
+        end: otherReference + 5,
+      })
+    }
+    const wrapper = mount(XenpaperSourceHighlight, {
+      props: { source, playingRanges: notes[0]!.sourceRanges },
+    })
+    expect(wrapper.findAll('[data-playing="true"]').map((token) => token.text())).toContain('scale')
+  })
+
   it('highlights clip-local names for inherited values', () => {
     const initialization = compileSourceInitialization('let tone = C')
     const source = 'tone'

@@ -708,6 +708,18 @@ function containerItems(
   )
 }
 
+/** Keep a reference visible when container operations extract a nested element. */
+function annotateReference(value: EvaluatedLiteral, origin: SourceOrigin): EvaluatedLiteral {
+  const origins = [...value.origins, origin]
+  if (value.kind === 'container')
+    return {
+      ...value,
+      origins,
+      values: value.values.map((item) => annotateReference(item, origin)),
+    }
+  return { ...value, origins }
+}
+
 /** Evaluate the arithmetic subset of the parser AST without throwing for source errors. */
 export function evaluateExpression(
   node: Expression,
@@ -756,10 +768,7 @@ export function evaluateExpression(
         const value = scope.variables.get(node.name)
         if (value)
           return {
-            value: {
-              ...value,
-              origins: [...value.origins, { location: node.location, role: 'literal' }],
-            },
+            value: annotateReference(value, { location: node.location, role: 'literal' }),
             diagnostics: [],
           }
       }
