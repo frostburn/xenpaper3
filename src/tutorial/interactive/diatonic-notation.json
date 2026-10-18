@@ -1,0 +1,717 @@
+[
+  {
+    "id": "diatonic-01",
+    "title": "Pythagorean and tempered scales",
+    "description": "By default, Xenpaper 3 associates degree 0 and middle C with 12edo middle C below A4 = 440 Hz (about 261.626 Hz). Diatonic intervals themselves follow a pure 3/2 chain of fifths until a temperament is selected.",
+    "props": {
+      "source": "# Ascending Pythagorean Major scale\nC= D E F G A B c=\n# Descending Pythagorean Major\n243/128 27/16 3/2 4/3 81/64 9/8 1/1=\n..\n# Ascending 12-TET Major\n0= 2 4 5 7 9 11 12==\n.",
+      "instrument": {
+        "type": "patch",
+        "patchPreset": "default",
+        "oscillatorType": "semisine"
+      },
+      "gain": 0.35,
+      "laneSource": "@tempo(240bpm) @adsr(10ms, 100ms, 70%, 100ms)",
+      "simplified": true,
+      "rows": 8,
+      "editorLabel": "Pythagorean and tempered scales source"
+    }
+  },
+  {
+    "id": "diatonic-02",
+    "title": "Nominals and octaves",
+    "description": "Lower-case nominals are always an octave above upper-case nominals. Primes and graves always refer to octaves.",
+    "props": {
+      "source": "# Minor pentatonic\n`A `B D E G A B d e g a b 'd 'e 'g 'a=",
+      "instrument": {
+        "type": "patch",
+        "patchPreset": "default",
+        "oscillatorType": "semisine"
+      },
+      "gain": 0.35,
+      "laneSource": "@tempo(240bpm) @adsr(10ms, 100ms, 70%, 100ms)",
+      "simplified": true,
+      "rows": 3,
+      "editorLabel": "Nominals and octaves source"
+    }
+  },
+  {
+    "id": "diatonic-03",
+    "title": "Staff clefs",
+    "description": "The upcoming notation view supports treble and bass clef changes. Clef directives affect notation only, not pitch or playback.",
+    "props": {
+      "source": "@clef(treble) C D E F\n@clef(bass) `C `D `E `F",
+      "instrument": {
+        "type": "patch",
+        "patchPreset": "default",
+        "oscillatorType": "semisine"
+      },
+      "gain": 0.35,
+      "laneSource": "@tempo(240bpm) @adsr(10ms, 100ms, 70%, 100ms)",
+      "simplified": true,
+      "rows": 3,
+      "editorLabel": "Staff clefs source"
+    }
+  },
+  {
+    "id": "diatonic-04",
+    "title": "Relative intervals",
+    "description": "Relative pitch offsets are supported too.",
+    "props": {
+      "source": "@3\nC  P1 1/1       # Perfect unison\nC# A1 2187/2048 # Augmented unison\nDb m2 256/243   # Minor second\nD  M2 9/8       # Major second\nEb m3 32/27     # Minor third\nE  M3 81/64     # Major third\nF  P4 4/3       # Perfect fourth\nGb d5 1024/729  # Diminished fifth\nG  P5 3/2       # Perfect fifth\nAb m6 128/81    # Minor sixth\nA  M6 27/16     # Major sixth\nBb m7 16/9      # Minor seventh\nB  M7 243/128   # Major seventh\nc  P8 2/1       # Perfect octave",
+      "instrument": {
+        "type": "patch",
+        "patchPreset": "default",
+        "oscillatorType": "semisine"
+      },
+      "gain": 0.35,
+      "laneSource": "@tempo(240bpm) @adsr(10ms, 100ms, 70%, 100ms)",
+      "simplified": true,
+      "rows": 12,
+      "editorLabel": "Relative intervals source"
+    }
+  },
+  {
+    "id": "diatonic-05",
+    "title": "Pure sharps and flats",
+    "description": "Note how C# and Db are not the same pitch when tuned pure."
+  },
+  {
+    "id": "diatonic-06",
+    "title": "Root association",
+    "description": "You can change which nominal aligns with the root frequency.",
+    "props": {
+      "source": "# Keep the default 262 Hz root, but call it F\n{root as F}\nF A C 0",
+      "instrument": {
+        "type": "patch",
+        "patchPreset": "default",
+        "oscillatorType": "semisine"
+      },
+      "gain": 0.35,
+      "laneSource": "@tempo(240bpm) @adsr(10ms, 100ms, 70%, 100ms)",
+      "simplified": true,
+      "rows": 3,
+      "editorLabel": "Root association source"
+    }
+  },
+  {
+    "id": "diatonic-07",
+    "title": "Tempering diatonic pitches",
+    "description": "Tuning using an equal temperament like {31edo} automatically affects diatonic notation: C stays with the root, P5 becomes whatever is the closest approximation to 3/2 and the circle of fifths continues from there defining G, D, A, E etc. with increasing drift from Pythagorean intonation.",
+    "props": {
+      "source": "{31edo}\n# ii-V-I\n[D, F, A, C]==. [D, F, G, B]==. [C, E, G, c]==.",
+      "instrument": {
+        "type": "patch",
+        "patchPreset": "default",
+        "oscillatorType": "semisine"
+      },
+      "gain": 0.35,
+      "laneSource": "@tempo(240bpm) @adsr(10ms, 100ms, 70%, 100ms)",
+      "simplified": true,
+      "rows": 3,
+      "editorLabel": "Tempering diatonic pitches source"
+    }
+  },
+  {
+    "id": "diatonic-08",
+    "title": "Reversed accidentals",
+    "description": "If the fifth is tuned very flat the process unfortunately swaps the directions of sharp and flat.",
+    "props": {
+      "source": "{23edo}\n# Anti-minor sounds majorish\n[`A, C,  E]==.\n# Anti-major has a narrow third\n[`A, C#, E]==.",
+      "instrument": {
+        "type": "patch",
+        "patchPreset": "default",
+        "oscillatorType": "semisine"
+      },
+      "gain": 0.35,
+      "laneSource": "@tempo(240bpm) @adsr(10ms, 100ms, 70%, 100ms)",
+      "simplified": true,
+      "rows": 5,
+      "editorLabel": "Reversed accidentals source"
+    }
+  },
+  {
+    "id": "diatonic-09",
+    "title": "Ups and downs",
+    "description": "It is recommended to use Ups and Downs i.e. the caret ^ and v when sharps and flats can be confusing.",
+    "props": {
+      "source": "{16edo}\n# Anti-minor\n[C, E,  G]==.\n# Anti-major using a sensible inflection\n[C, vE, G]==.",
+      "instrument": {
+        "type": "patch",
+        "patchPreset": "default",
+        "oscillatorType": "semisine"
+      },
+      "gain": 0.35,
+      "laneSource": "@tempo(240bpm) @adsr(10ms, 100ms, 70%, 100ms)",
+      "simplified": true,
+      "rows": 5,
+      "editorLabel": "Ups and downs source"
+    }
+  },
+  {
+    "id": "diatonic-10",
+    "title": "Tempering ratios and chords",
+    "description": "Use tilde ~ to temper ratios and enumerated chords.",
+    "props": {
+      "source": "{53edo} @pp\n# Overtones are locked together\n5::15===\n.\n# Tempered shimmering\n~5::15===\n.\n\n@mf\n# Tempered chord\n~[4/3, 7/3, 9/3, 11/3]==\n.\n\n# Tempered ratios\n~1/1 ~13/10 ~3/2",
+      "instrument": {
+        "type": "patch",
+        "patchPreset": "default",
+        "oscillatorType": "semisine"
+      },
+      "gain": 0.35,
+      "laneSource": "@tempo(240bpm) @adsr(10ms, 100ms, 70%, 100ms)",
+      "simplified": true,
+      "rows": 12,
+      "editorLabel": "Tempering ratios and chords source"
+    }
+  },
+  {
+    "id": "diatonic-11",
+    "title": "Key signatures",
+    "html": "<p>Key signatures can be set with <code>{key = G}</code> or modal names like <code>{key = D Dorian}</code>. Plain nominals receive the signature accidentals, while an explicit natural sign ♮ or underscore _ restores the unaltered nominal.</p>",
+    "props": {
+      "source": "# G major sharpens F\n{key = G}\nG= A B c d e f g=\n# Flat seventh to tonic\nf_= g=",
+      "instrument": {
+        "type": "patch",
+        "patchPreset": "default",
+        "oscillatorType": "semisine"
+      },
+      "gain": 0.35,
+      "laneSource": "@tempo(240bpm) @adsr(10ms, 100ms, 70%, 100ms)",
+      "simplified": true,
+      "rows": 5,
+      "editorLabel": "Key signatures source"
+    }
+  },
+  {
+    "id": "diatonic-12",
+    "title": "Custom key signatures",
+    "description": "Custom key signatures allow you to attach ups, lifts, accidentals and inflections to plain nominals. Inflections will be described in detail later. A natural sign restores the original nominal.",
+    "props": {
+      "source": "# 5-limit Phrygian\n{sig = Bbv5 Cv5 Fv5 Gv5}\n`A `B C D E F G A= B_ A=",
+      "instrument": {
+        "type": "patch",
+        "patchPreset": "default",
+        "oscillatorType": "semisine"
+      },
+      "gain": 0.35,
+      "laneSource": "@tempo(240bpm) @adsr(10ms, 100ms, 70%, 100ms)",
+      "simplified": true,
+      "rows": 3,
+      "editorLabel": "Custom key signatures source"
+    }
+  },
+  {
+    "id": "diatonic-13",
+    "title": "Pythagorean accidentals",
+    "description": "Use the pythagorean accidentals p/q (a.k.a. po and qu from Color notation) to jump between named pitches.",
+    "props": {
+      "source": "{`A as root}\n# B becomes 10/9 while\n# c takes the place of 9/8.\n{sig = B^5 Cbp}\n`A `B C D E F G A=",
+      "instrument": {
+        "type": "patch",
+        "patchPreset": "default",
+        "oscillatorType": "semisine"
+      },
+      "gain": 0.35,
+      "laneSource": "@tempo(240bpm) @adsr(10ms, 100ms, 70%, 100ms)",
+      "simplified": true,
+      "rows": 5,
+      "editorLabel": "Pythagorean accidentals source"
+    }
+  },
+  {
+    "id": "diatonic-14",
+    "title": "FJS inflections",
+    "html": "<p>The Functional Just System lets you spell just intonation by tweaking the Pythagorean spine with small inflections. For example, the Pythagorean major third 81/64 becomes 5/4 by dividing by the syntonic comma 81/80. In FJS, <code>^5</code> indicates that prime 5 occurs in the target interval’s numerator; the symbol describes the prime spelling, not necessarily the direction of the pitch adjustment.</p>",
+    "props": {
+      "source": "1/1 5/4 4/3 3/2 9/5  2/1 ..\nC   E^5 F   G   Bbv5 c   ..",
+      "instrument": {
+        "type": "patch",
+        "patchPreset": "default",
+        "oscillatorType": "semisine"
+      },
+      "gain": 0.35,
+      "laneSource": "@tempo(240bpm) @adsr(10ms, 100ms, 70%, 100ms)",
+      "simplified": true,
+      "rows": 3,
+      "editorLabel": "FJS inflections source"
+    }
+  },
+  {
+    "id": "diatonic-15",
+    "title": "HEJI inflections",
+    "html": "<p>HEJI instead chooses the arrow by the inflection’s pitch direction and appends the flavor <code>h</code> to the prime. Consequently, the same 5-limit pitches use the opposite arrow from their FJS spellings.</p>",
+    "props": {
+      "source": "1/1 5/4  4/3 3/2 9/5   2/1 ..\nC   Ev5h F   G   Bb^5h c   ..",
+      "instrument": {
+        "type": "patch",
+        "patchPreset": "default",
+        "oscillatorType": "semisine"
+      },
+      "gain": 0.35,
+      "laneSource": "@tempo(240bpm) @adsr(10ms, 100ms, 70%, 100ms)",
+      "simplified": true,
+      "rows": 3,
+      "editorLabel": "HEJI inflections source"
+    }
+  },
+  {
+    "id": "diatonic-16",
+    "title": "Inflection flavors",
+    "description": "There's a plethora of different inflection commas used for different purposes. Xenpaper inherits from SonicWeave but syntax-wise only ^ and v are allowed. E.g. 48/35 has to be spelled P4v5v7.",
+    "props": {
+      "source": "{8::16}\n0  1  2     3      4  5      6     7     8 ..\n# FJS\nC D E^5  F^11   G  Ab^13   Bb^7   B^5    c ..\n# HEJI\nC D Ev5h F^11h  G  Av13h   Bbv7h  Bv5h   c ..\n# Neutral FJS\nC D Ed^5n F‡^11n G  Ad^13n Bd^7n  Bd^5n  c ..",
+      "instrument": {
+        "type": "patch",
+        "patchPreset": "default",
+        "oscillatorType": "semisine"
+      },
+      "gain": 0.35,
+      "laneSource": "@tempo(240bpm) @adsr(10ms, 100ms, 70%, 100ms)",
+      "simplified": true,
+      "rows": 8,
+      "editorLabel": "Inflection flavors source"
+    }
+  },
+  {
+    "id": "diatonic-17",
+    "title": "Tempering inflections",
+    "description": "Inflections respond to tempering.",
+    "props": {
+      "source": "# Harmonic seventh in JI\n[G B^5 d f^7]== .\n\n# Harmonic seventh in 19-TET\n{19edo}\n[G B^5 d f^7]== .\n# i.e.\n[11 17 22 26]== .",
+      "instrument": {
+        "type": "patch",
+        "patchPreset": "default",
+        "oscillatorType": "semisine"
+      },
+      "gain": 0.35,
+      "laneSource": "@tempo(240bpm) @adsr(10ms, 100ms, 70%, 100ms)",
+      "simplified": true,
+      "rows": 8,
+      "editorLabel": "Tempering inflections source"
+    }
+  },
+  {
+    "id": "diatonic-18",
+    "title": "Comma flavor reference",
+    "html": "<a href=\"https://github.com/xenharmonic-devs/sonic-weave/blob/main/documentation/commas.md\" target=\"_blank\" rel=\"noreferrer\">List of comma flavors</a>"
+  },
+  {
+    "id": "diatonic-19",
+    "title": "Half-intervals",
+    "html": "<p>Every even equal temperament of the octave contains the semioctave √2 (i.e. 1\\2 or 600c) while every odd edo (besides 1edo) has a good approximation to either the neutral third √3/√2 or the semifourth 2/√3.</p>"
+  },
+  {
+    "id": "diatonic-20",
+    "title": "Neutral chords",
+    "description": "Neutral chords fall exactly between minor and major.",
+    "props": {
+      "source": "[1/1, 32/27,     3/2]==.  # Pythagorean minor\n[1/1, 6/5,       3/2]==.  # 5-limit minor\n[1/1, 11/9,      3/2]==.  # 11-limit neutral\n[1/1, sqrt(3/2), 3/2]==.  # true neutral\n[1/1, 5/4,       3/2]==.  # 5-limit major\n[1/1, 81/64,     3/2]==.  # Pythagorean major",
+      "instrument": {
+        "type": "patch",
+        "patchPreset": "default",
+        "oscillatorType": "semisine"
+      },
+      "gain": 0.35,
+      "laneSource": "@tempo(240bpm) @adsr(10ms, 100ms, 70%, 100ms)",
+      "simplified": true,
+      "rows": 6,
+      "editorLabel": "Neutral chords source"
+    }
+  },
+  {
+    "id": "diatonic-21",
+    "title": "Semiquartal chords",
+    "description": "Semiquartal chords can be fun to mess around with.",
+    "props": {
+      "source": "[1/1, 8/7,      4/3]==.  # inverted 6:7:8\n[1/1, 4/3**1/2, 4/3]==.  # true semiquartal\n[1/1, 7/6,      4/3]==.  # 6:7:8",
+      "instrument": {
+        "type": "patch",
+        "patchPreset": "default",
+        "oscillatorType": "semisine"
+      },
+      "gain": 0.35,
+      "laneSource": "@tempo(240bpm) @adsr(10ms, 100ms, 70%, 100ms)",
+      "simplified": true,
+      "rows": 3,
+      "editorLabel": "Semiquartal chords source"
+    }
+  },
+  {
+    "id": "diatonic-22",
+    "title": "Semioctave chords",
+    "html": "<p>Note that fractions in Xenpaper 3 are &quot;vertical&quot; and bind more strongly than exponentiation. (PEMDAS-like division is available as <code>div</code>).</p><p>The semi-octave is familiar from 12edo but can be used in other contexts as well.</p>",
+    "props": {
+      "source": "4:5:6:7==.                      # harmonic 7th\n[1/1, 5/4, 3/2, sqrt(25/8)]==.  # true √2 against the third",
+      "instrument": {
+        "type": "patch",
+        "patchPreset": "default",
+        "oscillatorType": "semisine"
+      },
+      "gain": 0.35,
+      "laneSource": "@tempo(240bpm) @adsr(10ms, 100ms, 70%, 100ms)",
+      "simplified": true,
+      "rows": 3,
+      "editorLabel": "Semioctave chords source"
+    }
+  },
+  {
+    "id": "diatonic-23",
+    "title": "Half-accidentals in 10edo",
+    "html": "<p>When the closest approximation to 3/2 spans an even number of edosteps it often makes sense to use half-sharps (𝄲, ‡ or t) and half-flats (𝄳 or d) to reach the neutral third <code>n3</code>.</p>",
+    "props": {
+      "source": "{10edo}\n# All 10 notes (and the octave)\nC Ct D Ed F F𝄲 G G‡ A B𝄳 c",
+      "instrument": {
+        "type": "patch",
+        "patchPreset": "default",
+        "oscillatorType": "semisine"
+      },
+      "gain": 0.35,
+      "laneSource": "@tempo(240bpm) @adsr(10ms, 100ms, 70%, 100ms)",
+      "simplified": true,
+      "rows": 3,
+      "editorLabel": "Half-accidentals in 10edo source"
+    }
+  },
+  {
+    "id": "diatonic-24",
+    "title": "Half-accidentals in 17edo",
+    "props": {
+      "source": "{17edo}\n# All 17 notes (and the octave)\nC Ct Dd D Dt Ed E F Ft Gd G Gt Ad A At Bd B c",
+      "instrument": {
+        "type": "patch",
+        "patchPreset": "default",
+        "oscillatorType": "semisine"
+      },
+      "gain": 0.35,
+      "laneSource": "@tempo(240bpm) @adsr(10ms, 100ms, 70%, 100ms)",
+      "simplified": true,
+      "rows": 3,
+      "editorLabel": "Half-accidentals in 17edo source"
+    }
+  },
+  {
+    "id": "diatonic-25",
+    "title": "Quartertone key signatures",
+    "description": "Key signatures support quartertones.",
+    "props": {
+      "source": "{key = C Locrian}\nC F B e a 'd 'g\n{key = Cd Locrian}\nC F B e a 'd 'g\n{key = Cb Locrian}\nC F B e a 'd 'g\n{key = Cdb Locrian}\nC F B e a 'd 'g",
+      "instrument": {
+        "type": "patch",
+        "patchPreset": "default",
+        "oscillatorType": "semisine"
+      },
+      "gain": 0.35,
+      "laneSource": "@tempo(240bpm) @adsr(10ms, 100ms, 70%, 100ms)",
+      "simplified": true,
+      "rows": 8,
+      "editorLabel": "Quartertone key signatures source"
+    }
+  },
+  {
+    "id": "diatonic-26",
+    "title": "Relative neutral intervals",
+    "description": "Relative neutral intervals fall exactly between minor and major, mid fourth falls between perfect and augmented, while mid fifth falls between diminished and perfect. Like other relative intervals, they follow the active temperament.",
+    "props": {
+      "source": "Ct  SA1   # Semi-augmented unison\nDdb sd2   # Semi-diminished second\nDd  n2    # Neutral second\nDt  SA2   # Semi-augmented second\nEd  n3    # Neutral third\nFd  sd4   # Semi-diminished fourth\nFt SA4 n4 # Semi-augmented i.e. mid fourth\nGd sd5 n5 # Semi-diminished i.e. mid fifth\nGt  SA5   # Semi-augmented fifth",
+      "instrument": {
+        "type": "patch",
+        "patchPreset": "default",
+        "oscillatorType": "semisine"
+      },
+      "gain": 0.35,
+      "laneSource": "@tempo(240bpm) @adsr(10ms, 100ms, 70%, 100ms)",
+      "simplified": true,
+      "rows": 9,
+      "editorLabel": "Relative neutral intervals source"
+    }
+  },
+  {
+    "id": "diatonic-27",
+    "title": "Interordinal nominals",
+    "description": "12edo hides scales that repeat twice every octave.",
+    "props": {
+      "source": "{12edo}\nC D E F Gam Del Eps Zet c\n..\nC Eta D Alp E F Gam G Del A Eps Zet c",
+      "instrument": {
+        "type": "patch",
+        "patchPreset": "default",
+        "oscillatorType": "semisine"
+      },
+      "gain": 0.35,
+      "laneSource": "@tempo(240bpm) @adsr(10ms, 100ms, 70%, 100ms)",
+      "simplified": true,
+      "rows": 4,
+      "editorLabel": "Interordinal nominals source"
+    }
+  },
+  {
+    "id": "diatonic-28",
+    "title": "Greek nominals in 22edo",
+    "description": "Unfortunately a semioctave above C falls exactly between F and G so we need a new nominal Gam (Gamma) for this purpose. (The fifthwards tritone F# may be tuned unpredictably and rarely matches the fourthwards tritone Gb.) Every interordinal nominal is related to a Latin nominal by a semioctave. Alp is a 1\\2 below A, Bet is a 1\\2 below B, Gam is a 1\\2 above C, etc. to stay within the C to c range.\n\nThe scales retain much of their character in 22edo. Highlight colors help to differentiate Greek script from Latin. On the staff Greek notes obtain a triangle note-head.",
+    "props": {
+      "source": "{22edo}\nC D E F Γ Δ Ε Ζ c\n..\nC Η D Α E F Γ G Δ A Ε Ζ c",
+      "instrument": {
+        "type": "patch",
+        "patchPreset": "default",
+        "oscillatorType": "semisine"
+      },
+      "gain": 0.35,
+      "laneSource": "@tempo(240bpm) @adsr(10ms, 100ms, 70%, 100ms)",
+      "simplified": true,
+      "rows": 4,
+      "editorLabel": "Greek nominals in 22edo source"
+    }
+  },
+  {
+    "id": "diatonic-29",
+    "title": "Semioctave key signatures",
+    "description": "Key signatures translate across semioctaves.",
+    "props": {
+      "source": "{key = F major}\nF Zet G eta A alp\n# Both B and Bet become flat\nB bet\n\nc gam d del e eps f Zet F=",
+      "instrument": {
+        "type": "patch",
+        "patchPreset": "default",
+        "oscillatorType": "semisine"
+      },
+      "gain": 0.35,
+      "laneSource": "@tempo(240bpm) @adsr(10ms, 100ms, 70%, 100ms)",
+      "simplified": true,
+      "rows": 6,
+      "editorLabel": "Semioctave key signatures source"
+    }
+  },
+  {
+    "id": "diatonic-30",
+    "title": "Relative semioctave intervals",
+    "html": "<p>Relative semi-octave intervals exist and are interordinal. E.g. <code>P8 / 2</code> is <code>P4½</code>. The ASCII for \"½\" is \"h\" in this context.</p>",
+    "props": {
+      "source": "Eta P1½\nAlp M2½\nBet M3½\nGam P4h\nDel M5h\nEps M6½\nZet P7½",
+      "instrument": {
+        "type": "patch",
+        "patchPreset": "default",
+        "oscillatorType": "semisine"
+      },
+      "gain": 0.35,
+      "laneSource": "@tempo(240bpm) @adsr(10ms, 100ms, 70%, 100ms)",
+      "simplified": true,
+      "rows": 7,
+      "editorLabel": "Relative semioctave intervals source"
+    }
+  },
+  {
+    "id": "diatonic-31",
+    "title": "Semiquartal scales in 19edo",
+    "description": "When the closest approximation to 4/3 spans an even number of edosteps you may combine half-accidentals with interordinals to reach the semifourth.",
+    "props": {
+      "source": "{19edo}\nC D Alpd Betd F G Deld Epsd Bb c",
+      "instrument": {
+        "type": "patch",
+        "patchPreset": "default",
+        "oscillatorType": "semisine"
+      },
+      "gain": 0.35,
+      "laneSource": "@tempo(240bpm) @adsr(10ms, 100ms, 70%, 100ms)",
+      "simplified": true,
+      "rows": 3,
+      "editorLabel": "Semiquartal scales in 19edo source"
+    }
+  },
+  {
+    "id": "diatonic-32",
+    "title": "Semiquartal scales in 53edo",
+    "props": {
+      "source": "{53edo}\n# Barbados[9]\nc d αd βd f g δd εd bb 'c",
+      "instrument": {
+        "type": "patch",
+        "patchPreset": "default",
+        "oscillatorType": "semisine"
+      },
+      "gain": 0.35,
+      "laneSource": "@tempo(240bpm) @adsr(10ms, 100ms, 70%, 100ms)",
+      "simplified": true,
+      "rows": 3,
+      "editorLabel": "Semiquartal scales in 53edo source"
+    }
+  },
+  {
+    "id": "diatonic-33",
+    "title": "Relative semiquartal intervals",
+    "description": "Relative semiquartal intervals are spelled as neutral qualities of interordinals.",
+    "props": {
+      "source": "n2½ P4 / 2\nn3½ M6 / 2\nn5½ m10 / 2\nn6½ P8 - P4 / 2",
+      "instrument": {
+        "type": "patch",
+        "patchPreset": "default",
+        "oscillatorType": "semisine"
+      },
+      "gain": 0.35,
+      "laneSource": "@tempo(240bpm) @adsr(10ms, 100ms, 70%, 100ms)",
+      "simplified": true,
+      "rows": 4,
+      "editorLabel": "Relative semiquartal intervals source"
+    }
+  },
+  {
+    "id": "diatonic-34",
+    "title": "Custom ups and downs",
+    "description": "The Ups-and-Downs inflection is customizable.",
+    "props": {
+      "source": "# Make ups septimal\n{^ = 64/63}\n# Down-minor is 6:7:9\n[`A vC E]== .\n# Up-major is 14:18:21\n[`A ^C# E]== .",
+      "instrument": {
+        "type": "patch",
+        "patchPreset": "default",
+        "oscillatorType": "semisine"
+      },
+      "gain": 0.35,
+      "laneSource": "@tempo(240bpm) @adsr(10ms, 100ms, 70%, 100ms)",
+      "simplified": true,
+      "rows": 6,
+      "editorLabel": "Custom ups and downs source"
+    }
+  },
+  {
+    "id": "diatonic-35",
+    "title": "Custom lifts and drops",
+    "description": "By default a tempered lift is worth 5 ups, but can be configured separately.",
+    "props": {
+      "source": "{311edo}\n# Make lifts septendecimal\n{/ = 4\\311}\n# ~9:12:16:17\n[C F Bb /cb]===",
+      "instrument": {
+        "type": "patch",
+        "patchPreset": "default",
+        "oscillatorType": "semisine"
+      },
+      "gain": 0.35,
+      "laneSource": "@tempo(240bpm) @adsr(10ms, 100ms, 70%, 100ms)",
+      "simplified": true,
+      "rows": 5,
+      "editorLabel": "Custom lifts and drops source"
+    }
+  },
+  {
+    "id": "diatonic-36",
+    "title": "Inflected scale degrees",
+    "description": "Ups and lifts attach to numeric scale degrees too.",
+    "props": {
+      "source": "{^ = 1\\24; / = 5\\25}\n0 ^0 1 v2 2 /0",
+      "instrument": {
+        "type": "patch",
+        "patchPreset": "default",
+        "oscillatorType": "semisine"
+      },
+      "gain": 0.35,
+      "laneSource": "@tempo(240bpm) @adsr(10ms, 100ms, 70%, 100ms)",
+      "simplified": true,
+      "rows": 3,
+      "editorLabel": "Inflected scale degrees source"
+    }
+  },
+  {
+    "id": "diatonic-37",
+    "title": "Recovering just intonation",
+    "description": "Automatic tempering can be undone by setting the scale to {Pythagorean} or {JI}.",
+    "props": {
+      "source": "{5edo}\nC D F G A c\n{Pythagorean}\nC D F G A c",
+      "instrument": {
+        "type": "patch",
+        "patchPreset": "default",
+        "oscillatorType": "semisine"
+      },
+      "gain": 0.35,
+      "laneSource": "@tempo(240bpm) @adsr(10ms, 100ms, 70%, 100ms)",
+      "simplified": true,
+      "rows": 4,
+      "editorLabel": "Recovering just intonation source"
+    }
+  },
+  {
+    "id": "diatonic-38",
+    "title": "Syntonic accidentals",
+    "description": "5-limit intervals are available using syntonic accidentals 𝄬, 𝄭, 𝄮, 𝄯, 𝄰 and 𝄱 which adjust pitch by 81/80.",
+    "props": {
+      "source": "# 4:5:6 on C\n[C, E𝄯, G]==",
+      "instrument": {
+        "type": "patch",
+        "patchPreset": "default",
+        "oscillatorType": "semisine"
+      },
+      "gain": 0.35,
+      "laneSource": "@tempo(240bpm) @adsr(10ms, 100ms, 70%, 100ms)",
+      "simplified": true,
+      "rows": 3,
+      "editorLabel": "Syntonic accidentals source"
+    }
+  },
+  {
+    "id": "diatonic-39",
+    "title": "Jubilismic lifts",
+    "description": "7-limit intervals use the jubilismic √(50/49) lift slash / and the drop backslash \\ to turn interordinals back into just intonation.",
+    "props": {
+      "source": "# 5:6:7 on C\n[C E𝄬 \\Gam]==",
+      "instrument": {
+        "type": "patch",
+        "patchPreset": "default",
+        "oscillatorType": "semisine"
+      },
+      "gain": 0.35,
+      "laneSource": "@tempo(240bpm) @adsr(10ms, 100ms, 70%, 100ms)",
+      "simplified": true,
+      "rows": 3,
+      "editorLabel": "Jubilismic lifts source"
+    }
+  },
+  {
+    "id": "diatonic-40",
+    "title": "Rastmic ups and downs",
+    "description": "11-limit intervals go through neutrals using the rastmic √(243/242) up caret ^ and the down v.",
+    "props": {
+      "source": "# 9:10:11 on C\n[C D𝄯 vEd]==",
+      "instrument": {
+        "type": "patch",
+        "patchPreset": "default",
+        "oscillatorType": "semisine"
+      },
+      "gain": 0.35,
+      "laneSource": "@tempo(240bpm) @adsr(10ms, 100ms, 70%, 100ms)",
+      "simplified": true,
+      "rows": 3,
+      "editorLabel": "Rastmic ups and downs source"
+    }
+  },
+  {
+    "id": "diatonic-41",
+    "title": "Wart notation",
+    "description": "Instead of \"edo\" you can use Wart Notation to select a different prime mapping.",
+    "props": {
+      "source": "{A = 440Hz}\n# This progression would drift with plain\n# {17edo} so we use the 17c val instead.\n{17c}\n|:@x10\n[`A Cv5 E]\n[Cv5 E Gv5]\n[`B Dv5 Gv5]\n[`Av5 Dv5 F#]\n{root = Av5} :|",
+      "instrument": {
+        "type": "patch",
+        "patchPreset": "default",
+        "oscillatorType": "semisine"
+      },
+      "gain": 0.35,
+      "laneSource": "@tempo(120bpm) @adsr(10ms, 100ms, 70%, 100ms)",
+      "simplified": true,
+      "rows": 10,
+      "editorLabel": "Wart notation source"
+    }
+  },
+  {
+    "id": "diatonic-42",
+    "title": "Custom prime mappings",
+    "description": "Custom prime mappings are supported.",
+    "props": {
+      "source": "# Generator climb in WE tuned tetracot\n{map = <1199.559c 1903.939c 2784.414c]}\n`A    E     F     |\n`B^5  E     D^5   |\nC#^25 D^5   F^5   |\nD#^125=     E^125 |\nE#^5^5^5^5= C^5   |\n[E, A]===         ||",
+      "instrument": {
+        "type": "patch",
+        "patchPreset": "default",
+        "oscillatorType": "semisine"
+      },
+      "gain": 0.35,
+      "laneSource": "@tempo(240bpm) @adsr(10ms, 100ms, 70%, 100ms)",
+      "simplified": true,
+      "rows": 8,
+      "editorLabel": "Custom prime mappings source"
+    }
+  }
+]

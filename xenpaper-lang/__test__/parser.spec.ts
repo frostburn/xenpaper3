@@ -41,7 +41,7 @@ describe('lexical declarations', () => {
   })
 
   it('uses numeric suffix boundaries without consuming decibel quantities', () => {
-    for (const source of ['3dog', '3d2']) expect(() => parse(source)).toThrow()
+    for (const source of ['3dog', '3d2']) expect(() => parse(source)).toThrow(/but "d" found\./)
     expect(parse('3dB').body[0]).toMatchObject({ type: 'QuantityLiteral', unit: 'dB' })
     // A dot still separates score items as a rest; it cannot form a fractional degree.
     expect(parse('1.5d').body[0]).toMatchObject({

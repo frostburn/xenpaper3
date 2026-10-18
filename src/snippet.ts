@@ -11,6 +11,13 @@ import {
   type PitchedInstrumentLane,
 } from './daw/project'
 import { compileLaneSourceInitialization, ENVELOPE_EXTENSIONS } from './daw/score'
+import type { PlaybackPlanOptions } from './daw/playback-plan'
+import { contextAt } from '../xenpaper-lang/runtime/initialization'
+
+export const SNIPPET_PLAYBACK_OPTIONS: PlaybackPlanOptions = {
+  allowClipTempoDirective: true,
+  inheritProjectTimeSignature: false,
+}
 
 export interface Snippet {
   source: string
@@ -20,7 +27,7 @@ export interface Snippet {
 export const createDefaultSnippet = (): Snippet => {
   const { source, gain, instrument } = createDefaultProject()
     .instrumentLanes[0]! as PitchedInstrumentLane
-  return { source: '@tempo(120bpm)\n@time(4/4)\n[0,4,7]===\n', lane: { source, gain, instrument } }
+  return { source: '@tempo(120bpm)\n[0,4,7]===\n', lane: { source, gain, instrument } }
 }
 
 /** A versioned UTF-8 base64url fragment: no brackets, whitespace, or chat markup. */
@@ -78,8 +85,7 @@ export const compileSnippet = (snippet: Snippet) => {
     initialization,
     directiveExtensions: ENVELOPE_EXTENSIONS,
     allowTempoDirective: true,
-    tempo: initialization.context?.tempo?.valueOf() ?? 120,
-    timeSignature: { numerator: 4, denominator: 4 },
+    tempo: contextAt(initialization, beat(0))?.tempo?.valueOf() ?? 120,
   }
   const program = parse(snippet.source, { grammarSource: 'xenpaper:clip-source' })
   const expanded = expandToBeatEvents(program, options)

@@ -111,7 +111,10 @@ describe('snippet view', () => {
     const { wrapper } = await open()
     await wrapper.get('[aria-label="Play"]').trigger('click')
     await flushPromises()
-    expect(audio.play.mock.calls[0]![2]).toEqual({ allowClipTempoDirective: true })
+    expect(audio.play.mock.calls[0]![2]).toEqual({
+      allowClipTempoDirective: true,
+      inheritProjectTimeSignature: false,
+    })
     expect(wrapper.get('[aria-label="Play"]').attributes('aria-pressed')).toBe('true')
     await wrapper.get('[aria-label="Play"]').trigger('click')
     await flushPromises()

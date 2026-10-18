@@ -1,0 +1,795 @@
+[
+  {
+    "id": "basics-01",
+    "title": "Notes",
+    "description": "Typing a number creates a note. Notes can be separated by spaces or new lines.",
+    "props": {
+      "source": "0 4 7\n11 12",
+      "instrument": {
+        "type": "patch",
+        "patchPreset": "default",
+        "oscillatorType": "triangle"
+      },
+      "gain": 0.5,
+      "laneSource": "@tempo(240bpm) @adsr(10ms, 100ms, 70%, 100ms)",
+      "simplified": true,
+      "rows": 3,
+      "editorLabel": "Notes source"
+    }
+  },
+  {
+    "id": "basics-02",
+    "title": "Rests and duration",
+    "description": "Append equal signs to extend a note, and use dots for rests. Pitches and rests may be adjacent, although spaces often improve readability.",
+    "props": {
+      "source": "0.2.3...3=2=0==.",
+      "instrument": {
+        "type": "patch",
+        "patchPreset": "default",
+        "oscillatorType": "triangle"
+      },
+      "gain": 0.5,
+      "laneSource": "@tempo(240bpm) @adsr(10ms, 100ms, 70%, 100ms)",
+      "simplified": true,
+      "rows": 3,
+      "editorLabel": "Rests and duration source"
+    }
+  },
+  {
+    "id": "basics-03",
+    "title": "Bar lines and ties",
+    "html": "<p>Bar lines help organize the score without changing the timing. A leading <code>=</code> continues (ties) the preceding note across a bar line.</p>",
+    "props": {
+      "source": "0 8 7=|0 8 7=|=5 4== ||",
+      "instrument": {
+        "type": "patch",
+        "patchPreset": "default",
+        "oscillatorType": "triangle"
+      },
+      "gain": 0.5,
+      "laneSource": "@tempo(240bpm) @adsr(10ms, 100ms, 70%, 100ms)",
+      "simplified": true,
+      "rows": 3,
+      "editorLabel": "Bar lines and ties source"
+    }
+  },
+  {
+    "id": "basics-04",
+    "title": "Pitch notation",
+    "description": "Notes can be written as scale degrees, ratios, cents, diatonic pitches, steps of equal temperaments, cycles per second and more.",
+    "props": {
+      "source": "0 7 1/1 3/2 0c 702c C G\n0\\19 11\\19 262Hz 393Hz",
+      "instrument": {
+        "type": "patch",
+        "patchPreset": "default",
+        "oscillatorType": "triangle"
+      },
+      "gain": 0.5,
+      "laneSource": "@tempo(240bpm) @adsr(10ms, 100ms, 70%, 100ms)",
+      "simplified": true,
+      "rows": 3,
+      "editorLabel": "Pitch notation source"
+    }
+  },
+  {
+    "id": "basics-05",
+    "title": "Octave shifts",
+    "description": "Notes can be shifted up or down octaves. Primes (apostrophes) shift up and graves (backticks) shift down.",
+    "props": {
+      "source": "0=3='0='3=\"0='\"0=`0=``0=",
+      "instrument": {
+        "type": "patch",
+        "patchPreset": "default",
+        "oscillatorType": "triangle"
+      },
+      "gain": 0.5,
+      "laneSource": "@tempo(240bpm) @adsr(10ms, 100ms, 70%, 100ms)",
+      "simplified": true,
+      "rows": 3,
+      "editorLabel": "Octave shifts source"
+    }
+  },
+  {
+    "id": "basics-06",
+    "title": "Chords",
+    "html": "<p>Play simultaneous pitches by putting a comma-separated expression in parentheses or square brackets. Square brackets without commas create tuplets instead. (Timing will be described in detail later.)</p>",
+    "props": {
+      "source": "(3,7)=[5,8]=(0,3,7)==.[1/1,6/5,3/2]==.",
+      "instrument": {
+        "type": "patch",
+        "patchPreset": "default",
+        "oscillatorType": "semisine"
+      },
+      "gain": 0.35,
+      "laneSource": "@tempo(240bpm) @adsr(100ms, 200ms, 70%, 300ms)",
+      "simplified": true,
+      "rows": 3,
+      "editorLabel": "Chords source"
+    }
+  },
+  {
+    "id": "basics-07",
+    "title": "Negative degrees",
+    "description": "Negative degrees are supported.",
+    "props": {
+      "source": "0 -1 1 0=",
+      "instrument": {
+        "type": "patch",
+        "patchPreset": "default",
+        "oscillatorType": "triangle"
+      },
+      "gain": 0.5,
+      "laneSource": "@tempo(240bpm) @adsr(10ms, 100ms, 70%, 100ms)",
+      "simplified": true,
+      "rows": 3,
+      "editorLabel": "Negative degrees source"
+    }
+  },
+  {
+    "id": "basics-08",
+    "title": "Enumerated chords",
+    "description": "Chords can also be played by enumerating a colon-separated chord.",
+    "props": {
+      "source": "10:12:15===",
+      "instrument": {
+        "type": "patch",
+        "patchPreset": "default",
+        "oscillatorType": "semisine"
+      },
+      "gain": 0.35,
+      "laneSource": "@tempo(240bpm) @adsr(100ms, 200ms, 70%, 300ms)",
+      "simplified": true,
+      "rows": 3,
+      "editorLabel": "Enumerated chords source"
+    }
+  },
+  {
+    "id": "basics-09",
+    "title": "Comments",
+    "html": "<p>A <code>#</code> starts a comment that continues to the end of the line.</p>",
+    "props": {
+      "source": "# a 7th chord\n[0,4,7,10]==..\n\n# a harmonic 7th chord\n4:5:6:7==..",
+      "instrument": {
+        "type": "patch",
+        "patchPreset": "default",
+        "oscillatorType": "semisine"
+      },
+      "gain": 0.35,
+      "laneSource": "@tempo(240bpm) @adsr(100ms, 200ms, 70%, 300ms)",
+      "simplified": true,
+      "rows": 5,
+      "editorLabel": "Comments source"
+    }
+  },
+  {
+    "id": "basics-10",
+    "title": "Changing scales",
+    "description": "Change the scale at any point with braces. The default is 12 equal divisions of the octave (12edo); a scale change affects the notes that follow it.",
+    "props": {
+      "source": "[0,4,7]=== {31edo}[0,10,18]===",
+      "instrument": {
+        "type": "patch",
+        "patchPreset": "default",
+        "oscillatorType": "semisine"
+      },
+      "gain": 0.35,
+      "laneSource": "@tempo(240bpm) @adsr(100ms, 200ms, 70%, 300ms)",
+      "simplified": true,
+      "rows": 3,
+      "editorLabel": "Changing scales source"
+    }
+  },
+  {
+    "id": "basics-11",
+    "title": "Other equaves",
+    "description": "Equal division equave size can be changed by replacing the “o” with a number or fraction.",
+    "props": {
+      "source": "{13ed3}0 1 2 3 4",
+      "instrument": {
+        "type": "patch",
+        "patchPreset": "default",
+        "oscillatorType": "triangle"
+      },
+      "gain": 0.5,
+      "laneSource": "@tempo(240bpm) @adsr(10ms, 100ms, 70%, 100ms)",
+      "simplified": true,
+      "rows": 3,
+      "editorLabel": "Other equaves source"
+    }
+  },
+  {
+    "id": "basics-12",
+    "title": "Interval scales",
+    "description": "A scale can also be built from individual pitch intervals. The listed entries become degrees 1 onward; degree 0 remains the root.",
+    "props": {
+      "source": "{9/8 5/4 4/3 3/2 5/3 15/8 2/1}\n0 1 2 3 4 5 6 7=",
+      "instrument": {
+        "type": "patch",
+        "patchPreset": "default",
+        "oscillatorType": "triangle"
+      },
+      "gain": 0.5,
+      "laneSource": "@tempo(240bpm) @adsr(10ms, 100ms, 70%, 100ms)",
+      "simplified": true,
+      "rows": 3,
+      "editorLabel": "Interval scales source"
+    }
+  },
+  {
+    "id": "basics-13",
+    "title": "Scale degree wrapping",
+    "description": "The final listed pitch is also the equave. Degree indexing wraps through that equave, so the pattern continues beyond the entries shown.",
+    "props": {
+      "source": "{5/4 4/3 3/2}\n0 1 2 3 4 5 6 7 8=",
+      "instrument": {
+        "type": "patch",
+        "patchPreset": "default",
+        "oscillatorType": "triangle"
+      },
+      "gain": 0.5,
+      "laneSource": "@tempo(240bpm) @adsr(10ms, 100ms, 70%, 100ms)",
+      "simplified": true,
+      "rows": 3,
+      "editorLabel": "Scale degree wrapping source"
+    }
+  },
+  {
+    "id": "basics-14",
+    "title": "Enumerated scales",
+    "description": "An enumerated chord can define a scale compactly. Its first member becomes degree 0, and its final enumeral determines the equave.",
+    "props": {
+      "source": "{12:14:16:18:21:24}\n0 1 2 3 4 5 6 7=",
+      "instrument": {
+        "type": "patch",
+        "patchPreset": "default",
+        "oscillatorType": "triangle"
+      },
+      "gain": 0.5,
+      "laneSource": "@tempo(240bpm) @adsr(10ms, 100ms, 70%, 100ms)",
+      "simplified": true,
+      "rows": 3,
+      "editorLabel": "Enumerated scales source"
+    }
+  },
+  {
+    "id": "basics-15",
+    "title": "Harmonic segments",
+    "description": "Harmonic segments can be specified using two colons :: to enumerate a range.",
+    "props": {
+      "source": "{4::8}  # {5/4, 6/4, 7/4, 8/4}\n0 1 2 3 4==",
+      "instrument": {
+        "type": "patch",
+        "patchPreset": "default",
+        "oscillatorType": "triangle"
+      },
+      "gain": 0.5,
+      "laneSource": "@tempo(240bpm) @adsr(10ms, 100ms, 70%, 100ms)",
+      "simplified": true,
+      "rows": 3,
+      "editorLabel": "Harmonic segments source"
+    }
+  },
+  {
+    "id": "basics-16",
+    "title": "Retroverted scales",
+    "description": "Enumerations can be retroverted by prefixing them with a slash.",
+    "props": {
+      "source": "{/6::3}  # {6/5, 6/4, 6/3}\n0 1 2 3==",
+      "instrument": {
+        "type": "patch",
+        "patchPreset": "default",
+        "oscillatorType": "triangle"
+      },
+      "gain": 0.5,
+      "laneSource": "@tempo(240bpm) @adsr(10ms, 100ms, 70%, 100ms)",
+      "simplified": true,
+      "rows": 3,
+      "editorLabel": "Retroverted scales source"
+    }
+  },
+  {
+    "id": "basics-17",
+    "title": "Scale subsets",
+    "description": "Scales can reference the scale degrees at the moment they are encountered, which is useful for creating a subset of a scale.",
+    "props": {
+      "source": "{19edo}{3 6 8 11 14 17 19}\n0 1 2 3 4 5 6 7=",
+      "instrument": {
+        "type": "patch",
+        "patchPreset": "default",
+        "oscillatorType": "triangle"
+      },
+      "gain": 0.5,
+      "laneSource": "@tempo(240bpm) @adsr(10ms, 100ms, 70%, 100ms)",
+      "simplified": true,
+      "rows": 3,
+      "editorLabel": "Scale subsets source"
+    }
+  },
+  {
+    "id": "basics-18",
+    "title": "Root frequency",
+    "description": "All pitch values other than cycles per second are relative to a root note.",
+    "props": {
+      "source": "0 2 4={root=432Hz}0 2 4=",
+      "instrument": {
+        "type": "patch",
+        "patchPreset": "default",
+        "oscillatorType": "triangle"
+      },
+      "gain": 0.5,
+      "laneSource": "@tempo(240bpm) @adsr(10ms, 100ms, 70%, 100ms)",
+      "simplified": true,
+      "rows": 3,
+      "editorLabel": "Root frequency source"
+    }
+  },
+  {
+    "id": "basics-19",
+    "title": "Chained roots",
+    "description": "As each root pitch change is relative to the current root, multiple roots can be chained.",
+    "props": {
+      "source": "4 0= {root = 2} 4 0= {root = 2} 4 0=",
+      "instrument": {
+        "type": "patch",
+        "patchPreset": "default",
+        "oscillatorType": "triangle"
+      },
+      "gain": 0.5,
+      "laneSource": "@tempo(240bpm) @adsr(10ms, 100ms, 70%, 100ms)",
+      "simplified": true,
+      "rows": 3,
+      "editorLabel": "Chained roots source"
+    }
+  },
+  {
+    "id": "basics-20",
+    "title": "Root octaves",
+    "description": "Root changes can also switch octaves for a time.",
+    "props": {
+      "source": "4 0={root = '0}4 0={root = `0}4 0=",
+      "instrument": {
+        "type": "patch",
+        "patchPreset": "default",
+        "oscillatorType": "triangle"
+      },
+      "gain": 0.5,
+      "laneSource": "@tempo(240bpm) @adsr(10ms, 100ms, 70%, 100ms)",
+      "simplified": true,
+      "rows": 3,
+      "editorLabel": "Root octaves source"
+    }
+  },
+  {
+    "id": "basics-21",
+    "title": "Stretching tuning",
+    "html": "<p>Multiply <code>tuning</code> by a positive dimensionless factor to stretch or compress the entire active pitch space while keeping its root fixed. The change scales degrees, the equave, prime mappings, accidentals, and MOS intervals together; here, <code>102%</code> makes 12edo slightly wider.</p>",
+    "props": {
+      "source": "{12edo} [0,4,7]===\n{tuning *= 102%} [0,4,7]===",
+      "instrument": {
+        "type": "patch",
+        "patchPreset": "default",
+        "oscillatorType": "semisine"
+      },
+      "gain": 0.35,
+      "laneSource": "@tempo(240bpm) @adsr(10ms, 100ms, 70%, 100ms)",
+      "simplified": true,
+      "rows": 3,
+      "editorLabel": "Stretching tuning source"
+    }
+  },
+  {
+    "id": "basics-22",
+    "title": "Tuplets",
+    "description": "Tuplets can be created by enclosing a sequence of notes inside square brackets.",
+    "props": {
+      "source": "0 2 7 [0 2 7] [0 2 3 5 7]",
+      "instrument": {
+        "type": "patch",
+        "patchPreset": "default",
+        "oscillatorType": "semisine"
+      },
+      "gain": 0.35,
+      "laneSource": "@tempo(120bpm) @adsr(10ms, 100ms, 70%, 100ms)",
+      "simplified": true,
+      "rows": 3,
+      "editorLabel": "Tuplets source"
+    }
+  },
+  {
+    "id": "basics-23",
+    "title": "Holding tuplets",
+    "description": "Holding a tuplet stretches it as a whole.",
+    "props": {
+      "source": "[0 2 7] [0 2 7]== [0 2 7]===",
+      "instrument": {
+        "type": "patch",
+        "patchPreset": "default",
+        "oscillatorType": "semisine"
+      },
+      "gain": 0.35,
+      "laneSource": "@tempo(120bpm) @adsr(10ms, 100ms, 70%, 100ms)",
+      "simplified": true,
+      "rows": 3,
+      "editorLabel": "Holding tuplets source"
+    }
+  },
+  {
+    "id": "basics-24",
+    "title": "Subdivisions",
+    "html": "<p>Set the number of subdivisions per beat with <code>@</code> followed by a positive number. For example, <code>@2</code> makes each plain note half a beat long; <code>@1/2</code> makes it two beats long.</p>",
+    "props": {
+      "source": "@2 0 2 3 7 @3 0 2 3 7 @4 0 2 3 7 @1/2 0 2 3 7",
+      "instrument": {
+        "type": "patch",
+        "patchPreset": "default",
+        "oscillatorType": "semisine"
+      },
+      "gain": 0.35,
+      "laneSource": "@tempo(120bpm) @adsr(10ms, 100ms, 70%, 100ms)",
+      "simplified": true,
+      "rows": 3,
+      "editorLabel": "Subdivisions source"
+    }
+  },
+  {
+    "id": "basics-25",
+    "title": "Time signatures",
+    "html": "<p>Use <code>@time(n/d)</code> to set the time signature for notation and barline checks. It starts a new measure cycle but does not change note durations; use subdivision directives to control rhythmic spacing.</p>",
+    "props": {
+      "source": "@time(3/4) C D E | F G A |\n@time(2/4) B c |",
+      "instrument": {
+        "type": "patch",
+        "patchPreset": "default",
+        "oscillatorType": "semisine"
+      },
+      "gain": 0.35,
+      "laneSource": "@tempo(240bpm) @adsr(10ms, 100ms, 70%, 100ms)",
+      "simplified": true,
+      "rows": 3,
+      "editorLabel": "Time signatures source"
+    }
+  },
+  {
+    "id": "basics-25-b",
+    "title": "Barline checks",
+    "description": "Incorrectly placed barlines are highlighted. This helps you keep time while writing music.",
+    "props": {
+      "source": "@time(3/4) C D E F | G A |\n@time(2/4) B c= |",
+      "instrument": {
+        "type": "patch",
+        "patchPreset": "default",
+        "oscillatorType": "semisine"
+      },
+      "gain": 0.35,
+      "laneSource": "@tempo(240bpm) @adsr(10ms, 100ms, 70%, 100ms)",
+      "simplified": true,
+      "rows": 3,
+      "editorLabel": "Barline checks source"
+    },
+    "expectedWarnings": ["XP_BARLINE_OFF_CYCLE", "XP_BARLINE_OFF_CYCLE"]
+  },
+  {
+    "id": "basics-26",
+    "title": "Shifting chord roots",
+    "description": "Enumerated chords can be shifted using arithmetic. The first enumeral defines where 1/1 falls. Use smaller numbers to place notes below the root.",
+    "props": {
+      "source": "4/3 * 4:5:6==\n3/2 * 4:5:3==\n5/4 * /6:5:4==",
+      "instrument": {
+        "type": "patch",
+        "patchPreset": "default",
+        "oscillatorType": "semisine"
+      },
+      "gain": 0.35,
+      "laneSource": "@tempo(240bpm) @adsr(10ms, 100ms, 70%, 100ms)",
+      "simplified": true,
+      "rows": 3,
+      "editorLabel": "Shifting chord roots source"
+    }
+  },
+  {
+    "id": "basics-27",
+    "title": "Adding pitch offsets",
+    "html": "<p>Note that asterisks <code>*</code> only mean pitch shifts when both operands are ratios. Using + to shift is more common.</p>",
+    "props": {
+      "source": "4/3   + ~4:5:6==  # Ratio + tempered ratios\n702c  + 4:5:3==   # Cents + ratios\n17\\53 + /6:5:4==  # Steps of equal temperaments + ratios",
+      "instrument": {
+        "type": "patch",
+        "patchPreset": "default",
+        "oscillatorType": "semisine"
+      },
+      "gain": 0.35,
+      "laneSource": "@tempo(240bpm) @adsr(10ms, 100ms, 70%, 100ms)",
+      "simplified": true,
+      "rows": 3,
+      "editorLabel": "Adding pitch offsets source"
+    }
+  },
+  {
+    "id": "basics-28",
+    "title": "Equal temperament equaves",
+    "description": "Use angle brackets to change the equave of steps of equal temperaments. (It defaults to 2.)",
+    "props": {
+      "source": "5\\13 5\\13<2> 5\\13<3> 5\\13<3/2>",
+      "instrument": {
+        "type": "patch",
+        "patchPreset": "default",
+        "oscillatorType": "semisine"
+      },
+      "gain": 0.35,
+      "laneSource": "@tempo(120bpm) @adsr(10ms, 100ms, 70%, 100ms)",
+      "simplified": true,
+      "rows": 3,
+      "editorLabel": "Equal temperament equaves source"
+    }
+  },
+  {
+    "id": "basics-29",
+    "title": "Repeats and alternate endings",
+    "html": "<p>Everything between <code>|:</code> and <code>:|</code> is repeated twice by default. Alternate endings use <code>@^1</code> and <code>@^2</code>, or the equivalent superscript numerals attached to bar lines in this example.</p>",
+    "props": {
+      "source": "# Square little tune\n|: 0 2 4 5 |¹ 7 5 4 2 :|² 7 11 12= |\n12 11 9 7 | 5 4 2 -1 | 0=== ||",
+      "instrument": {
+        "type": "patch",
+        "patchPreset": "default",
+        "oscillatorType": "semisine"
+      },
+      "gain": 0.35,
+      "laneSource": "@tempo(240bpm) @adsr(10ms, 100ms, 70%, 100ms)",
+      "simplified": true,
+      "rows": 3,
+      "editorLabel": "Repeats and alternate endings source"
+    }
+  },
+  {
+    "id": "basics-30",
+    "title": "Repeat counts",
+    "description": "To add more repeats use @x followed by a number attached to the opening |:.",
+    "props": {
+      "source": "|:@x6\n4:5:6\n4:5:3 * 5/4\n8:5:6 * 25/16\n{root = 125/128}\n:|",
+      "instrument": {
+        "type": "patch",
+        "patchPreset": "default",
+        "oscillatorType": "semisine"
+      },
+      "gain": 0.35,
+      "laneSource": "@tempo(120bpm) @adsr(10ms, 100ms, 70%, 100ms)",
+      "simplified": true,
+      "rows": 6,
+      "editorLabel": "Repeat counts source"
+    }
+  },
+  {
+    "id": "basics-31",
+    "title": "Multiline alternate endings",
+    "html": "<p>When alternate endings are present, the initial <code>|:</code> may be omitted. A later ending marker can begin on an aligned line after <code>:|</code>, making conventional multiline scores easier to write.</p>",
+    "props": {
+      "source": "0 2 |¹ 4 5 :|\n    |² 7 9 ||",
+      "instrument": {
+        "type": "patch",
+        "patchPreset": "default",
+        "oscillatorType": "semisine"
+      },
+      "gain": 0.35,
+      "laneSource": "@tempo(240bpm) @adsr(10ms, 100ms, 70%, 100ms)",
+      "simplified": true,
+      "rows": 3,
+      "editorLabel": "Multiline alternate endings source"
+    }
+  },
+  {
+    "id": "basics-32",
+    "title": "Linear glissando",
+    "description": "Use @gliss to slide legato into the next note and hold the target. Linear glissando is the default.",
+    "props": {
+      "source": "@gliss 0=== 7",
+      "instrument": {
+        "type": "patch",
+        "patchPreset": "default",
+        "oscillatorType": "semisine"
+      },
+      "gain": 0.35,
+      "laneSource": "@tempo(240bpm) @adsr(10ms, 100ms, 70%, 100ms)",
+      "simplified": true,
+      "rows": 3,
+      "editorLabel": "Linear glissando source"
+    }
+  },
+  {
+    "id": "basics-33",
+    "title": "Glissando easing",
+    "description": "Use ? on the target to make it zero-duration. Easing modes include linear, ease and ease-in/out/in-out.",
+    "props": {
+      "source": "@gliss(ease-in-out)11=== 12==\n..\n@gliss(ease-in)0=== 7?\n..\n@gliss(ease-out)9=== 5=",
+      "instrument": {
+        "type": "patch",
+        "patchPreset": "default",
+        "oscillatorType": "semisine"
+      },
+      "gain": 0.35,
+      "laneSource": "@tempo(240bpm) @adsr(10ms, 100ms, 70%, 100ms)",
+      "simplified": true,
+      "rows": 5,
+      "editorLabel": "Glissando easing source"
+    }
+  },
+  {
+    "id": "basics-34",
+    "title": "Chord glissando",
+    "description": "Chord glissandi pair voices by index, so each chord tone slides legato.",
+    "props": {
+      "source": "@gliss[0, 3, 7]==@gliss[0, 3, 7]\n@gliss[0, 3, 9]==@gliss[0, 3, 9]\n[2, 7, 10]===",
+      "instrument": {
+        "type": "patch",
+        "patchPreset": "default",
+        "oscillatorType": "semisine"
+      },
+      "gain": 0.35,
+      "laneSource": "@tempo(240bpm) @adsr(10ms, 100ms, 70%, 100ms)",
+      "simplified": true,
+      "rows": 3,
+      "editorLabel": "Chord glissando source"
+    }
+  },
+  {
+    "id": "basics-35",
+    "title": "Articulation",
+    "description": "Articulation setters change how long notes sound without changing the duration they occupy. Use percentages, named setters, or compact shorthands: @' @staccatissimo, @. @staccato, @: @portato, @- @tenuto, and @_ @legato.",
+    "props": {
+      "source": "@. 0 2 4 7 .\n@: 0 2 4 7 .\n@- 0 2 4 7 .\n@_ 0 2 4 7 .\n@art(75%) 0 2 4 7",
+      "instrument": {
+        "type": "patch",
+        "patchPreset": "default",
+        "oscillatorType": "semisine"
+      },
+      "gain": 0.35,
+      "laneSource": "@tempo(240bpm) @adsr(10ms, 100ms, 70%, 100ms)",
+      "simplified": true,
+      "rows": 5,
+      "editorLabel": "Articulation source"
+    }
+  },
+  {
+    "id": "basics-36",
+    "title": "Grace notes",
+    "description": "Use a grace setter before a note to make that note borrow a short duration from the following note. Repeat the ? marker to apply the same grace duration to multiple notes.",
+    "props": {
+      "source": "@8? 5 3= @16? 7 5=\n@8?? 7 10 8==\n@4? 10 12==",
+      "instrument": {
+        "type": "patch",
+        "patchPreset": "default",
+        "oscillatorType": "semisine"
+      },
+      "gain": 0.35,
+      "laneSource": "@tempo(120bpm) @adsr(10ms, 100ms, 70%, 100ms)",
+      "simplified": true,
+      "rows": 3,
+      "editorLabel": "Grace notes source"
+    }
+  },
+  {
+    "id": "basics-37",
+    "title": "Dynamics",
+    "html": "<p>Control synth velocity with directives such as <code>@f</code> and <code>@pp</code>, or specify it directly with <code>@velocity(...)</code>. Dynamic settings remain active until the next dynamic directive.</p>",
+    "props": {
+      "source": "@mf 0==   # 50% (default)\n@f 1==    # 65%\n@ff 2==   # 82%\n@fff 3==  # 100%\n\n@velocity(70%) 1==  # Fine-grained control\n\n@mp 0==    # 40%\n@p -1==    # 30%\n@pp -2==   # 20%\n@ppp -3==  # 10%",
+      "instrument": {
+        "type": "patch",
+        "patchPreset": "default",
+        "oscillatorType": "semisine"
+      },
+      "gain": 0.35,
+      "laneSource": "@tempo(240bpm) @adsr(10ms, 100ms, 70%, 100ms)",
+      "simplified": true,
+      "rows": 11,
+      "editorLabel": "Dynamics source"
+    }
+  },
+  {
+    "id": "basics-38",
+    "title": "Drones",
+    "html": "<p>Use <code>@drone(...)</code> to sustain a note or chord behind subsequent music. A new drone replaces the old one; empty parentheses stop it.</p>",
+    "props": {
+      "source": "@drone([0, 7]) 0 2 4 5\n@drone(5) 7 5 4 2\n@drone() 0===",
+      "instrument": {
+        "type": "patch",
+        "patchPreset": "default",
+        "oscillatorType": "semisine"
+      },
+      "gain": 0.35,
+      "laneSource": "@tempo(240bpm) @adsr(10ms, 100ms, 70%, 100ms)",
+      "simplified": true,
+      "rows": 3,
+      "editorLabel": "Drones source"
+    }
+  },
+  {
+    "id": "basics-39",
+    "title": "Parallel sections",
+    "html": "<p>Use the comma <code>,</code> to separate sections that you want to play in parallel and terminate the group with a double bar line.</p>",
+    "props": {
+      "source": "{root = '0} @4\n5 . 7  . 10 7 5 . 7  . 12 . 10 7 5  . |\n0 . 10 . 7  5 7 . 12 5 7  . 10 . 12 . |,\n\n@2\n[0,4,7]==    [5,9,12]==     [3,7,10]= |\n=   [2,7,12]==   [0,4,7,11,12]===     |,\n\n{root = `0}\n0= 0= | 5= 7= ||",
+      "instrument": {
+        "type": "patch",
+        "patchPreset": "default",
+        "oscillatorType": "semisine"
+      },
+      "gain": 0.35,
+      "laneSource": "@tempo(120bpm) @adsr(10ms, 100ms, 70%, 100ms)",
+      "simplified": true,
+      "rows": 10,
+      "editorLabel": "Parallel sections source"
+    }
+  },
+  {
+    "id": "basics-40",
+    "title": "Swing",
+    "description": "Set an uneven groove to play with a swung feel. Even divisions of the same span will be cyclically mapped to match it.",
+    "props": {
+      "source": "@2\n# Straight\n0 0 4 4 7 7 9 9 10 10 9 9 7 7 4 4 |\n# Triplet swing\n@groove([0=0]=)\n0 0 4 4 7 7 9 9 10 10 9 9 7 7 4 4 |\n# Quintuplet swing\n@groove([0==0=]=)\n0 0 4 4 7 7 9 9 10 10 9 9 7 7 4 4 |\n# Back to straight rhythm\n@groove\n0 0 4 4 7 7 9 9 '0===     . . . . ||",
+      "instrument": {
+        "type": "patch",
+        "patchPreset": "default",
+        "oscillatorType": "semisine"
+      },
+      "gain": 0.35,
+      "laneSource": "@tempo(120bpm) @adsr(10ms, 100ms, 70%, 100ms)",
+      "simplified": true,
+      "rows": 12,
+      "editorLabel": "Swing source"
+    }
+  },
+  {
+    "id": "basics-41",
+    "title": "Complex grooves",
+    "description": "More complex grooves can be set by using more than two notes.",
+    "props": {
+      "source": "@groove([0==0=0]==)\n0 1 2   5 4 3 |\n2 1 -1 -5 7 . |\n5 4 5   . . . |\n4 3 4   . . . |\n@2 3  2 1 0 -1\n  -3= -4= -5==|\n0===== ...... ||",
+      "instrument": {
+        "type": "patch",
+        "patchPreset": "default",
+        "oscillatorType": "semisine"
+      },
+      "gain": 0.35,
+      "laneSource": "@tempo(240bpm) @adsr(10ms, 100ms, 70%, 100ms)",
+      "simplified": true,
+      "rows": 8,
+      "editorLabel": "Complex grooves source"
+    }
+  },
+  {
+    "id": "basics-42",
+    "title": "Groove accents",
+    "description": "Groove patterns can include accent dynamics. Accent values stay in effect until the next accent and multiply each note velocity.",
+    "props": {
+      "source": "@4\n@groove(@ff 0 0 @pp 0 @ff 0 0 @pp 0 @ff 0 @pp 0)\n0  2  3 5   7  9 10 12\n0  2  3 5   7  9 10 12\n12 10 9 7   10 9 7  5\n9  7  5 3   7  5 3  2",
+      "instrument": {
+        "type": "patch",
+        "patchPreset": "default",
+        "oscillatorType": "semisine"
+      },
+      "gain": 0.35,
+      "laneSource": "@tempo(120bpm) @adsr(10ms, 100ms, 70%, 100ms)",
+      "simplified": true,
+      "rows": 6,
+      "editorLabel": "Groove accents source"
+    }
+  },
+  {
+    "id": "basics-43",
+    "title": "Groove articulation",
+    "description": "Groove patterns can also include articulation. Articulation values latch until the next articulation and shorten or lengthen each grooved note.",
+    "props": {
+      "source": "@groove([@: 0== @' 0=]=)\n0  6 8 2  3 9 10 4 |\n12 6 5 11 8 3 0=   ||",
+      "instrument": {
+        "type": "patch",
+        "patchPreset": "default",
+        "oscillatorType": "semisine"
+      },
+      "gain": 0.35,
+      "laneSource": "@tempo(240bpm) @adsr(10ms, 100ms, 70%, 100ms)",
+      "simplified": true,
+      "rows": 3,
+      "editorLabel": "Groove articulation source"
+    }
+  }
+]

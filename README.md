@@ -60,11 +60,29 @@ MediaWiki external link, or Discord angle-bracket link. Sampled instruments
 include their manifest in the URL; their audio files still load from the
 configured sample URLs.
 
-The `/tutorial` page presents the first 20 demos from the existing Basics
-material in order, with 10 demos per page. Content and every `SnippetEditor`
-prop live in `src/tutorial/interactive/basics-01.json` and `basics-02.json`.
-Tutorial pages have permalinks such as `/tutorial?page=2`; browser history restores
-the selected page. Vue renders the active page and binds `source`, `instrument`, and `gain` with
+The `/tutorial` page covers the four original tutorial chapters and a chapter of
+additional score features, with up to 10 entries per
+page and a table of contents linking to each page and example. Each chapter has a dedicated JSON file in
+`src/tutorial/interactive/`, containing its example IDs, titles, explanations,
+and complete snippet props. Edit these files independently of the sidebar tutorial
+in `src/tutorial/`. Entries without snippet props remain readable explanations.
+Advanced score construction starts with scale assignments, combination product
+sets, and combined tuning assignments. The lessons in
+`src/tutorial/interactive/additional-features.json` cover explicit degrees, measure
+rests, hold-to-end, functions, containers, scale helpers, tempo, envelopes, unison,
+and signal ramps. Keep chapter order and example
+IDs stable to preserve existing permalinks. Each playable example declares its
+hidden tempo directly in `props.laneSource` (120 or 240 BPM), alongside its envelope
+and any other lane settings; there are no separate title or tempo override tables.
+Lessons that deliberately demonstrate warnings list their diagnostic codes in
+`expectedWarnings`, so validation checks them while requiring other examples to
+compile without diagnostics.
+Snippets have no implicit time signature, including during playback
+and note highlighting. Write `@time(...)` in the clip or lane source to enable
+measure rests and barline validation; the DAW still inherits its project meter.
+Tutorial pages have permalinks such as `/tutorial?page=2`; example links also
+include an anchor, such as `/tutorial?page=3#basics-22-heading`. Browser history
+restores the selected page. Vue renders the active page and binds `source`, `instrument`, and `gain` with
 `v-model`. Page changes stop playback and retain edits for the current visit.
 The `simplified` prop shows Play, Stop, Gain, and instrument-specific controls
 alongside the editable score.
