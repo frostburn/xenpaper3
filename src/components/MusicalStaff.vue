@@ -259,12 +259,10 @@ const items = computed(() => {
       return offset
     } else if (shape.kind === 'parallel') {
       const startIndex = layout.length
-      const branchStates = shape.branches.map(
-        (): VisitState => ({
-          activeItems: [],
-          activeNotes: [],
-        }),
-      )
+      const branchStates = shape.branches.map((): VisitState => ({
+        activeItems: [],
+        activeNotes: [],
+      }))
       const branchEnds = shape.branches.map((branch, index) =>
         visit(branch, offset, branchStates[index]!, nextVoiceId++),
       )

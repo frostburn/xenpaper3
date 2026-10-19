@@ -64,8 +64,9 @@ describe('snippet view', () => {
     const clipboard = vi.fn<(text: string) => Promise<void>>().mockResolvedValue(undefined)
     vi.stubGlobal('navigator', { clipboard: { writeText: clipboard } })
     expect(wrapper.find('[aria-label="Share format"]').exists()).toBe(false)
-    const shareUrl = (wrapper.get('[aria-label="Shareable snippet link"]').element as HTMLInputElement)
-      .value
+    const shareUrl = (
+      wrapper.get('[aria-label="Shareable snippet link"]').element as HTMLInputElement
+    ).value
     expect(shareUrl).toMatch(/^http.*#v1\.[A-Za-z0-9_-]+$/)
     expect(new URL(shareUrl).hash).toBe(router.currentRoute.value.hash)
     await wrapper.get('.share button').trigger('click')
