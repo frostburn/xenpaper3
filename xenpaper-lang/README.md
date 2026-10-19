@@ -148,7 +148,20 @@ as in `^1d`. The suffix is lowercase and must end the numeric token, just like
 and degree 5 rather than a fractional degree. Use spaces
 around division (`3/1 / 2d`) to distinguish it from ratio and pitch-lift syntax.
 
-`let name = expression` evaluates the initializer once. `fn name(parameters) {
+`let name = expression` evaluates the initializer once using the same rules as
+score literals: `let second = 2` stores scale degree two. Use an explicit ratio
+for a scalar, such as `let octave = 2/1` or `let subdivision = 4/1`.
+The `d` suffix remains useful to force degree meaning in arithmetic (`2d * 3/1`). Containers can also be stored and played:
+
+```text
+let tuplet = [0 1 2]
+tuplet tuplet
+```
+
+Each use retains the container's sequence or parallel structure and slot timing.
+Its pitches are captured at declaration; playback uses the current timing context.
+
+`fn name(parameters) {
 ... ret expression }` creates a lexical closure. A function body contains zero
 or more local `let` or `fn` declarations followed by exactly one `ret`, whose
 expression is the call's result. Commas separate parameters and a trailing comma

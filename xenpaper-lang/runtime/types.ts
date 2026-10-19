@@ -239,6 +239,10 @@ export interface FrequencyPitchValue {
 /** A first-class collection used by scale-construction helpers. */
 export interface ContainerValue {
   readonly kind: 'container'
+  /** Preserve authored composition when a collection is played as a score. */
+  readonly composition?: 'sequence' | 'parallel'
+  readonly normalized?: boolean
+  readonly grouped?: boolean
   readonly values: readonly EvaluatedLiteral[]
   readonly value: Value
   readonly origins: readonly SourceOrigin[]

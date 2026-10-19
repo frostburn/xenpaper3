@@ -65,7 +65,7 @@ describe('global grid context', () => {
   })
 
   it('initializes a child from the complete set of declarations at beat zero', () => {
-    const global = initialize('let division = 2 fn phrase() { ret C D } . {5edo}')
+    const global = initialize('let division = 2/1 fn phrase() { ret C D } . {5edo}')
     const lane = initialize('@subdivision(division) fn local() { ret phrase() }', global)
     expect(notes('local()', lane).map(({ start }) => start.toFraction())).toEqual(['0', '1/2'])
   })

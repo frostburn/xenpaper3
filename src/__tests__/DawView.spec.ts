@@ -227,12 +227,21 @@ describe('DAW project model', () => {
     const secondUse = source.lastIndexOf('tone')
 
     expect(notes).toHaveLength(2)
-    expect(notes[0]!.sourceRanges).toEqual([valueRange, { start: firstUse, end: firstUse + 4 }])
-    expect(notes[1]!.sourceRanges).toEqual([valueRange, { start: secondUse, end: secondUse + 4 }])
+    expect(notes[0]!.sourceRanges).toEqual([
+      valueRange,
+      { start: 4, end: 8 },
+      { start: firstUse, end: firstUse + 4 },
+    ])
+    expect(notes[1]!.sourceRanges).toEqual([
+      valueRange,
+      { start: 4, end: 8 },
+      { start: secondUse, end: secondUse + 4 },
+    ])
     const wrapper = mount(XenpaperSourceHighlight, {
       props: { source, playingRanges: notes[0]!.sourceRanges },
     })
     expect(wrapper.findAll('[data-playing="true"]').map((token) => token.text())).toEqual([
+      'tone',
       'C',
       'tone',
     ])
@@ -272,6 +281,60 @@ describe('DAW project model', () => {
 
     expect(notes).toHaveLength(1)
     expect(notes[0]!.sourceRanges).toEqual([{ start: 0, end: source.length }])
+  })
+
+  it('recursively highlights variable names, references, and only their playing values', async () => {
+    const source = 'let sec = 2\nlet con = (1 sec 3)\ncon='
+    const notes = parseClipNotes(source)
+    expect(notes).toHaveLength(3)
+    const range = (text: string, offset = 0) => {
+      const start = source.indexOf(text, offset)
+      expect(start).toBeGreaterThanOrEqual(0)
+      return { start, end: start + text.length }
+    }
+    const declaration = range('con')
+    const reference = range('con', declaration.end)
+    const secDeclaration = range('sec')
+    const secReference = range('sec', secDeclaration.end)
+    const common = [declaration, reference]
+    const expected = [
+      [...common, range('1')],
+      [...common, secDeclaration, secReference, range('2')],
+      [...common, range('3')],
+    ]
+    const wrapper = mount(XenpaperSourceHighlight, {
+      props: { source, playingRanges: [] },
+    })
+    for (const [index, note] of notes.entries()) {
+      for (const value of expected[index]!) expect(note.sourceRanges).toContainEqual(value)
+      for (const value of [range('1'), range('2'), range('3'), secDeclaration, secReference]) {
+        if (!expected[index]!.some((r) => r.start === value.start))
+          expect(note.sourceRanges).not.toContainEqual(value)
+      }
+      await wrapper.setProps({ playingRanges: note.sourceRanges })
+      const activeText = wrapper.findAll('[data-playing="true"]').map((token) => token.text())
+      expect(activeText.filter((text) => text === 'con')).toHaveLength(2)
+      expect(activeText.filter((text) => text === 'sec')).toHaveLength(index === 1 ? 2 : 0)
+      expect(activeText.filter((text) => /^[123]$/.test(text))).toEqual([
+        String(index === 0 ? 1 : index === 1 ? 2 : 3),
+      ])
+    }
+  })
+
+  it('retains recursive origins through nested container aliases and indexing', () => {
+    const source =
+      'let note = 2\nlet inner = [1 note]\nlet outer = [inner 3]\nlet alias = outer\nalias[0]'
+    const notes = parseClipNotes(source)
+    expect(notes).toHaveLength(2)
+    const texts = notes.map((note) =>
+      note.sourceRanges.map(({ start, end }) => source.slice(start, end)),
+    )
+    for (const parts of texts) {
+      expect(parts).toEqual(expect.arrayContaining(['inner', 'outer', 'alias']))
+      expect(parts).not.toContain('3')
+    }
+    expect(texts[0]).not.toContain('note')
+    expect(texts[1]).toEqual(expect.arrayContaining(['note', '2']))
   })
 
   it('places a playback caret at the first note beat on each source line', () => {
@@ -762,7 +825,7 @@ describe('DAW project model', () => {
   })
 
   it('propagates initialization context through declarations and repeats', () => {
-    const declared = compileSourceInitialization('let subdivision = 4 @subdivision(subdivision)')
+    const declared = compileSourceInitialization('let subdivision = 4/1 @subdivision(subdivision)')
     expect(parseClipNotes('C D', Infinity, declared).map(({ beat }) => beat)).toEqual([0, 0.25])
 
     const repeated = compileSourceInitialization('|: @ff @. :|')
