@@ -2,6 +2,21 @@ import { describe, expect, it } from 'vitest'
 import { parse } from '../parser.js'
 
 describe('lexical declarations', () => {
+  it('allows names that extend a pitch-like prefix', () => {
+    expect(parse('let JJv5Gain = 3/2 JJv5Gain').body[0]).toMatchObject({
+      type: 'Sequence',
+      items: [
+        { type: 'VariableDeclaration', name: { name: 'JJv5Gain' } },
+        { type: 'Identifier', name: 'JJv5Gain' },
+      ],
+    })
+    expect(parse('JJv5_counter(3/2)').body[0]).toMatchObject({
+      type: 'CallExpression',
+      callee: 'JJv5_counter',
+    })
+    expect(() => parse('J^5sqrt(2)')).toThrow(/Expected/)
+  })
+
   it.each(['0', '2', '-2', '+2', '2d', '2/1', '2 * 3', '^2', '[0 1 2]'])(
     'parses the initializer %s with the score expression rules',
     (source) => {

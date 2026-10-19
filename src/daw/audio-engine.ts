@@ -71,11 +71,23 @@ export const parseProjectNotes = parseProjectPatchNotes
 const prepareSamples = async (context: BaseAudioContext, plan: PlaybackPlan) => {
   const sampledDrumkits = new Map<string, SampledDrumkit>()
   const sampledInstruments = new Map<string, SampledInstrument>()
+  let failed = false
+  const retain = <T extends SampledDrumkit | SampledInstrument>(
+    samples: Map<string, T>,
+    id: string,
+    sample: T,
+  ) => {
+    // Promise.all rejects before sibling loads settle. A late result still
+    // needs disposal after the caller has already handled the failure.
+    if (failed) sample.dispose()
+    else samples.set(id, sample)
+  }
   try {
     await Promise.all([
       ...plan.lanes.map(async (lane) => {
         if (lane.kind !== 'drum' || lane.drumkit.type !== 'samples') return
-        sampledDrumkits.set(
+        retain(
+          sampledDrumkits,
           lane.id,
           await loadSampledDrumkit(context, lane.drumkit.strudelJson, {
             baseUrl: lane.drumkit.url
@@ -87,7 +99,8 @@ const prepareSamples = async (context: BaseAudioContext, plan: PlaybackPlan) => 
       ...plan.lanes.map(async (lane) => {
         if (lane.kind !== 'instrument' || lane.instrument.type !== 'samples') return
         const source = lane.instrument
-        sampledInstruments.set(
+        retain(
+          sampledInstruments,
           lane.id,
           await loadSampledInstrument(context, source.doughJson, source.instrument, {
             baseUrl: source.url
@@ -98,8 +111,8 @@ const prepareSamples = async (context: BaseAudioContext, plan: PlaybackPlan) => 
       }),
     ])
   } catch (error) {
-    for (const drumkit of sampledDrumkits.values()) drumkit.dispose()
-    for (const instrument of sampledInstruments.values()) instrument.dispose()
+    failed = true
+    disposeSamples(sampledDrumkits, sampledInstruments)
     throw error
   }
   return { sampledDrumkits, sampledInstruments }

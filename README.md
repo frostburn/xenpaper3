@@ -95,6 +95,8 @@ The DAW playback path is intentionally split at the browser boundary:
 - `src/daw/timeline.ts` snapshots and pre-integrates tempo changes.
 - `src/daw/playback-plan.ts` turns mutable editor state into an immutable,
   browser-independent playback plan.
+- `src/daw/signal-automation.ts` samples pitch, effect, and spread ramps through
+  the same tempo map, preserving each ramp's endpoints and audible window.
 - `src/daw/web-audio-automation.ts` owns SW Patch detune conversion and Web Audio
   automation workarounds.
 - `src/daw/web-audio-playback.ts` owns disposable nodes, patches, transport events,
@@ -117,8 +119,8 @@ npm run lint
 npm run build
 ```
 
-`npm run lint` applies safe automatic fixes. `npm run format` formats `src/`
-with oxfmt.
+`npm run lint` applies safe automatic fixes. `npm run format` formats the app and
+language runtime sources with oxfmt.
 
 ## Language documentation
 
