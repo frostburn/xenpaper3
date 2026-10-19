@@ -55,8 +55,7 @@ by unpadded UTF-8 base64url JSON containing `[clipSource, laneSource, gain,
 instrument]`. Only letters, digits, hyphens, underscores, and the version dot
 appear in the encoded payload, so score punctuation cannot break chat links
 or MediaWiki markup. Opening a link restores all snippet settings without
-local storage or a project file. The sharing controls copy a plain URL,
-MediaWiki external link, or Discord angle-bracket link. Sampled instruments
+local storage or a project file. The sharing controls copy a plain URL. Sampled instruments
 include their manifest in the URL; their audio files still load from the
 configured sample URLs.
 
