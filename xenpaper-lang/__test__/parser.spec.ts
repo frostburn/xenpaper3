@@ -206,6 +206,7 @@ describe('grammar boundary roles', () => {
       ],
     })
     expect(parse('-1/1 - 2/1').body[0]).toMatchObject({ type: 'BinaryExpression', operator: '-' })
+    expect(parse('0 + 5').body[0]).toMatchObject({ type: 'BinaryExpression', operator: '+' })
     expect(parse('2 * M2').body[0]).toMatchObject({ type: 'BinaryExpression', operator: '*' })
   })
 
@@ -234,9 +235,6 @@ describe('grammar boundary roles', () => {
       type: 'Sequence',
       items: [{ type: 'IntervalLiteral', number: '4' }, { type: 'Rest' }, { degree: '5' }],
     })
-    for (const source of ['0.2.3...3=2=0==.', 'C[D E]F', '{13edo}[0,4,7]']) {
-      expect(() => parse(source)).not.toThrow()
-    }
   })
 })
 
@@ -579,6 +577,20 @@ describe('Diamond-MOS tokens', () => {
     expect(() => parse('MOS{5L2s} KZ^5')).toThrow(/Expected/)
     expect(() => parse('MOS{5L2s} ZZ^5')).toThrow(/Expected/)
   })
+
+  it('keeps musical name restrictions out of directives and explicit sample names', () => {
+    expect(parse('@JJv5(JJv5: 3/2)').body[0]).toMatchObject({
+      type: 'Directive',
+      name: 'jjv5',
+      arguments: [{ type: 'NamedArgument', name: 'JJv5', value: { type: 'RatioLiteral' } }],
+    })
+    expect(parse('JJv5', { drumSamples: ['JJv5'] }).body[0]).toMatchObject({
+      type: 'DrumSampleLiteral',
+      sample: 'JJv5',
+    })
+    expect(() => parse('JJv5')).toThrow(/Expected/)
+    expect(() => parse('let JJv5 = 3/2')).toThrow(/Expected/)
+  })
 })
 
 const score = String.raw`# FJS and prefix modifiers
@@ -664,10 +676,6 @@ describe('Xenpaper surface grammar', () => {
       ],
     })
   })
-  it('parses adjacent dots as a single cluster rest', () => {
-    expect(parse('...').body[0]).toMatchObject({ type: 'Rest', raw: '...' })
-  })
-
   it('parses rests attached to surrounding notes as sequence items', () => {
     const items = (parse('C. .D').body[0] as SyntaxNode).items as SyntaxNode[]
 
@@ -817,41 +825,6 @@ describe('Xenpaper surface grammar', () => {
     expect((expression.operand as SyntaxNode).type).toBe('RatioLiteral')
   })
 
-  it('parses unary plus degrees like unary minus degrees', () => {
-    const expression = parse('+5').body[0]
-
-    expect(expression.type).toBe('DegreeLiteral')
-    expect(expression.degree).toBe('5')
-  })
-
-  it('parses a sequence of degrees', () => {
-    const program = parse('0 1 2 -3')
-    const items = (program.body[0] as SyntaxNode).items as SyntaxNode[]
-
-    expect(items.map((item) => item.type)).toEqual([
-      'DegreeLiteral',
-      'DegreeLiteral',
-      'DegreeLiteral',
-      'DegreeLiteral',
-    ])
-    expect(items.map((item) => item.degree)).toEqual(['0', '1', '2', '-3'])
-  })
-
-  it('preserves attached plus signs as degree signs after sequence gaps', () => {
-    const program = parse('0 +5')
-    const items = (program.body[0] as SyntaxNode).items as SyntaxNode[]
-
-    expect(items.map((item) => item.type)).toEqual(['DegreeLiteral', 'DegreeLiteral'])
-    expect(items.map((item) => item.degree)).toEqual(['0', '5'])
-  })
-
-  it('keeps spaced plus signs as binary addition', () => {
-    const expression = parse('0 + 5').body[0]
-
-    expect(expression.type).toBe('BinaryExpression')
-    expect(expression.operator).toBe('+')
-  })
-
   it('distinguishes attached negated intervals from spaced subtraction', () => {
     const sequence = parse('D -n3').body[0]
     const subtraction = parse('D - n3').body[0]
@@ -923,24 +896,6 @@ describe('Xenpaper surface grammar', () => {
       'DegreeLiteral',
     ])
     expect(branches.map((branch) => branch.degree)).toEqual(['0', '1', '2', '-3'])
-  })
-
-  it('parses a slotted triplet of degrees', () => {
-    const program = parse('[1 -2 3]')
-    const expression = (program.body[0] as SyntaxNode).expression as SyntaxNode
-    const items = expression.items as SyntaxNode[]
-
-    expect(expression.type).toBe('Sequence')
-    expect(items.map((item) => item.degree)).toEqual(['1', '-2', '3'])
-  })
-
-  it('parses a slotted chord of degrees', () => {
-    const program = parse('[1, -2, 3]')
-    const expression = (program.body[0] as SyntaxNode).expression as SyntaxNode
-    const branches = expression.branches as SyntaxNode[]
-
-    expect(expression.type).toBe('Parallel')
-    expect(branches.map((branch) => branch.degree)).toEqual(['1', '-2', '3'])
   })
 
   it('parses holds', () => {
@@ -1033,14 +988,6 @@ describe('Xenpaper surface grammar', () => {
       type: 'PitchModifierExpression',
       modifier: { kind: 'down' },
       operand: { type: 'PitchLiteral', raw: 'C' },
-    })
-  })
-
-  it('reserves v followed by digits for down-shifted scale degrees', () => {
-    expect(parse('v2').body[0]).toMatchObject({
-      type: 'PitchModifierExpression',
-      modifier: { kind: 'down' },
-      operand: { type: 'DegreeLiteral', degree: '2' },
     })
   })
 

@@ -28,6 +28,7 @@ import type {
   LexicalEnvironment,
 } from './types'
 import { parseVal, valMapping } from './val'
+import { equaveShift, equaveShifts } from './pitch-modifiers'
 
 export const DEFAULT_MAPPING: PrimeMapping = {
   id: 'untempered',
@@ -1040,19 +1041,18 @@ const origin = (node: PitchLiteral | IntervalLiteral): readonly SourceOrigin[] =
   { location: node.location, role: 'literal' },
 ]
 
-function shifts(modifiers: readonly { kind: string }[]): number {
-  return modifiers.reduce(
-    (sum, modifier) =>
-      sum +
-      (modifier.kind === 'equaveUp'
-        ? 1
-        : modifier.kind === 'doubleEquaveUp'
-          ? 2
-          : modifier.kind === 'equaveDown'
-            ? -1
-            : 0),
-    0,
-  )
+function applyPitchOperatorModifiers(
+  value: Value,
+  modifiers: readonly { readonly kind: string }[],
+  context: PitchContext,
+): Value {
+  for (const { kind } of modifiers) {
+    if (kind === 'up') value = value.add(requirePitchOperator(context, 'up'))
+    else if (kind === 'down') value = value.sub(requirePitchOperator(context, 'up'))
+    else if (kind === 'lift') value = value.add(requirePitchOperator(context, 'lift'))
+    else if (kind === 'drop') value = value.sub(requirePitchOperator(context, 'lift'))
+  }
+  return value
 }
 
 /** Preserve the diatonic meaning of subtracting two naturally spelled pitches. */
@@ -1166,29 +1166,10 @@ export function transposePitchSpelling(
   if (base < 0) return undefined
   const octave =
     (pitch.nominal === pitch.nominal.toLowerCase() ? 1 : 0) +
-    (pitch.modifiers ?? []).reduce(
-      (sum, modifier) =>
-        sum +
-        (modifier === 'equaveUp'
-          ? 1
-          : modifier === 'doubleEquaveUp'
-            ? 2
-            : modifier === 'equaveDown'
-              ? -1
-              : 0),
-      0,
-    )
+    (pitch.modifiers ?? []).reduce((sum, modifier) => sum + equaveShift(modifier), 0)
   const number = Number(interval.number.valueOf())
   const intervalOctaves = (interval.modifiers ?? []).reduce(
-    (sum, modifier) =>
-      sum +
-      (modifier === 'equaveUp'
-        ? 7
-        : modifier === 'doubleEquaveUp'
-          ? 14
-          : modifier === 'equaveDown'
-            ? -7
-            : 0),
+    (sum, modifier) => sum + 7 * equaveShift(modifier),
     0,
   )
   let steps = Math.ceil(number - 1) + intervalOctaves
@@ -1242,7 +1223,8 @@ export function evaluatePitchLiteral(
     let rootOffset = context.mos.nominals.get(nominal)
     if (!rootOffset) throw new TypeError(`Undefined MOS nominal ${node.nominal.value}.`)
     const registers =
-      (node.nominal.value === node.nominal.value.toLowerCase() ? 1 : 0) + shifts(node.modifiers)
+      (node.nominal.value === node.nominal.value.toLowerCase() ? 1 : 0) +
+      equaveShifts(node.modifiers)
     const nominalRank = [...context.mos.nominals.keys()].indexOf(nominal)
     rootOffset = rootOffset.add(context.mos.equave.mul(new Value(registers)))
     const chroma = context.mos.large.sub(context.mos.small)
@@ -1257,15 +1239,7 @@ export function evaluatePitchLiteral(
     if (context.rootPitch.mos?.context === context.mos) {
       rootOffset = rootOffset.sub(context.rootPitch.rootOffset)
     }
-    for (const modifier of node.modifiers) {
-      if (modifier.kind === 'up') rootOffset = rootOffset.add(requirePitchOperator(context, 'up'))
-      else if (modifier.kind === 'down')
-        rootOffset = rootOffset.sub(requirePitchOperator(context, 'up'))
-      else if (modifier.kind === 'lift')
-        rootOffset = rootOffset.add(requirePitchOperator(context, 'lift'))
-      else if (modifier.kind === 'drop')
-        rootOffset = rootOffset.sub(requirePitchOperator(context, 'lift'))
-    }
+    rootOffset = applyPitchOperatorModifiers(rootOffset, node.modifiers, context)
     return {
       kind: 'absolutePitch',
       rootOffset,
@@ -1288,7 +1262,7 @@ export function evaluatePitchLiteral(
   if (!entries) throw new TypeError(`Undefined nominal ${node.nominal.value}.`)
   const result = formula(entries)
   const octave =
-    (node.nominal.value === node.nominal.value.toLowerCase() ? 1 : 0) + shifts(node.modifiers)
+    (node.nominal.value === node.nominal.value.toLowerCase() ? 1 : 0) + equaveShifts(node.modifiers)
   if (octave) result.set(2, (result.get(2) ?? new Fraction(0)).add(octave))
   let chromatic = 0
   for (const accidental of node.accidentals) {
@@ -1340,15 +1314,7 @@ export function evaluatePitchLiteral(
   let rootOffset = mapFormula(result, context.mapping)
   if (context.rootPitch.formula.size)
     rootOffset = rootOffset.sub(mapFormula(context.rootPitch.formula, context.mapping))
-  for (const modifier of node.modifiers) {
-    if (modifier.kind === 'up') rootOffset = rootOffset.add(requirePitchOperator(context, 'up'))
-    else if (modifier.kind === 'down')
-      rootOffset = rootOffset.sub(requirePitchOperator(context, 'up'))
-    else if (modifier.kind === 'lift')
-      rootOffset = rootOffset.add(requirePitchOperator(context, 'lift'))
-    else if (modifier.kind === 'drop')
-      rootOffset = rootOffset.sub(requirePitchOperator(context, 'lift'))
-  }
+  rootOffset = applyPitchOperatorModifiers(rootOffset, node.modifiers, context)
   return {
     kind: 'absolutePitch',
     rootOffset,
@@ -1420,7 +1386,7 @@ export function evaluateIntervalLiteral(
   if (number.mul(2).d !== 1)
     throw new TypeError('Interval number must be an integer or half-integer.')
   const zeroBased = number.sub(1)
-  const octaves = Math.floor(zeroBased.div(7).valueOf()) + shifts(node.modifiers)
+  const octaves = Math.floor(zeroBased.div(7).valueOf()) + equaveShifts(node.modifiers)
   const simple = zeroBased.mmod(7).add(1).valueOf()
   const interordinal = !Number.isInteger(simple)
   const perfect = [1, 4, 5, 1.5, 4.5, 7.5].includes(simple)
@@ -1449,12 +1415,7 @@ export function evaluateIntervalLiteral(
   applyFjsInflections(result, node.inflections)
   const spellingNumber = number.d === 1 ? BigInt(number.n) : number
   let value = mapFormula(result, context.mapping)
-  for (const modifier of node.modifiers) {
-    if (modifier.kind === 'up') value = value.add(requirePitchOperator(context, 'up'))
-    else if (modifier.kind === 'down') value = value.sub(requirePitchOperator(context, 'up'))
-    else if (modifier.kind === 'lift') value = value.add(requirePitchOperator(context, 'lift'))
-    else if (modifier.kind === 'drop') value = value.sub(requirePitchOperator(context, 'lift'))
-  }
+  value = applyPitchOperatorModifiers(value, node.modifiers, context)
   return {
     kind: 'pitchOffset',
     value,

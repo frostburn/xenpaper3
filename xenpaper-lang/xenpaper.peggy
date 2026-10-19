@@ -41,6 +41,19 @@
     }
   };
 
+  const implicitRepeat = (body, result, remainder) => {
+    const repeat = node('Repeat', {
+      count: null,
+      body: [body],
+      endings: result.endings,
+      terminal: result.terminal,
+      incompleteEndings: result.incomplete,
+    });
+    implicitRepeats.add(repeat);
+    if (remainder) prependImplicitRepeatScope(remainder, [repeat]);
+    return sequence(remainder ? [repeat, remainder] : [repeat]);
+  };
+
   const parallel = (branches, loc = location()) =>
     branches.length === 1 ? branches[0] : node('Parallel', { branches }, loc);
 
@@ -96,31 +109,9 @@ ParallelExpression
 // its lexical sequence. Keeping this behavior in the scoped productions lets
 // explicit repeat bodies continue to reserve their own `:|` delimiter.
 ScopedParallelExpression
-  = repeated:ParallelExpression Spacing ":|" !(Spacing ",")
+  = body:ParallelExpression result:RepeatEndings !(Spacing ",")
     remainder:(Spacing item:ScopedParallelExpression { return item; })? {
-      const repeat = node('Repeat', {
-        count: null,
-        body: [repeated],
-        endings: [],
-        terminal: ":|",
-        incompleteEndings: false,
-      });
-      implicitRepeats.add(repeat);
-      if (remainder) prependImplicitRepeatScope(remainder, [repeat]);
-      return sequence(remainder ? [repeat, remainder] : [repeat]);
-    }
-  / body:ParallelExpression result:RepeatEndings !(Spacing ",")
-    remainder:(Spacing item:ScopedParallelExpression { return item; })? {
-      const repeat = node('Repeat', {
-        count: null,
-        body: [body],
-        endings: result.endings,
-        terminal: result.terminal,
-        incompleteEndings: result.incomplete,
-      });
-      implicitRepeats.add(repeat);
-      if (remainder) prependImplicitRepeatScope(remainder, [repeat]);
-      return sequence(remainder ? [repeat, remainder] : [repeat]);
+      return implicitRepeat(body, result, remainder);
     }
   / first:ScopedSequenceExpression
     rest:(Spacing "," Spacing branch:ScopedSequenceExpression { return branch; })* {
@@ -128,30 +119,9 @@ ScopedParallelExpression
     }
 
 ScopedSequenceExpression
-  = repeated:SequenceExpression Spacing ":|" remainder:(Spacing item:ScopedSequenceExpression { return item; })? {
-      const repeat = node('Repeat', {
-        count: null,
-        body: [repeated],
-        endings: [],
-        terminal: ":|",
-        incompleteEndings: false,
-      });
-      implicitRepeats.add(repeat);
-      if (remainder) prependImplicitRepeatScope(remainder, [repeat]);
-      return sequence(remainder ? [repeat, remainder] : [repeat]);
-    }
-  / body:SequenceExpression result:RepeatEndings
+  = body:SequenceExpression result:RepeatEndings
     remainder:(Spacing item:ScopedSequenceExpression { return item; })? {
-      const repeat = node('Repeat', {
-        count: null,
-        body: [body],
-        endings: result.endings,
-        terminal: result.terminal,
-        incompleteEndings: result.incomplete,
-      });
-      implicitRepeats.add(repeat);
-      if (remainder) prependImplicitRepeatScope(remainder, [repeat]);
-      return sequence(remainder ? [repeat, remainder] : [repeat]);
+      return implicitRepeat(body, result, remainder);
     }
   / SequenceExpression
 
@@ -275,7 +245,6 @@ UnaryOperator
   / "-" { return "-"; }
   / "~" { return "~"; }
   / "√" { return "√"; }
-  / $("'" / '"' / "`" / "^" / "v" / "/" / "\\")
 
 PostfixExpression
   = expression:PrimaryExpression indexes:("[" Spacing index:AdditiveExpression Spacing "]" { return index; })* marks:AttachedPostfixMark* {
@@ -311,8 +280,8 @@ PrimaryExpression
   / MosIntervalLiteral
   / IntervalLiteral
   / TightCallExpression
-  / !(DeclarationKeyword !IdentifierContinue) !DrumSampleLiteral pitch:MosPitchLiteral { return pitch; }
-  / !(DeclarationKeyword !IdentifierContinue) !DrumSampleLiteral pitch:PitchLiteral { return pitch; }
+  / !DrumSampleLiteral pitch:MosPitchLiteral { return pitch; }
+  / !DrumSampleLiteral pitch:PitchLiteral { return pitch; }
   / EqualDivisionLiteral
   / QuantityLiteral
   / ExplicitScaleDegreeLiteral
@@ -759,16 +728,23 @@ ContextPreset
     }
 
 CallExpression
-  = !("v" Spacing "(") callee:Identifier Spacing "(" Spacing args:CallArgumentList? Spacing ")" {
-      return node('CallExpression', { callee, arguments: args ?? [] });
+  = callee:CallName Spacing args:CallArguments {
+      return node('CallExpression', { callee, arguments: args });
     }
 
 // Pitch-shaped function names need an attached opening parenthesis to win over
 // pitch literals without making failed call attempts consume comments as spacing.
 TightCallExpression
-  = !("v" "(") callee:Identifier "(" Spacing args:CallArgumentList? Spacing ")" {
-      return node('CallExpression', { callee, arguments: args ?? [] });
+  = callee:CallName args:CallArguments {
+      return node('CallExpression', { callee, arguments: args });
     }
+
+// `v(...)` lowers a grouped score; it is never a function call.
+CallName
+  = !("v" !IdentifierContinue) @MusicalIdentifier
+
+CallArguments
+  = "(" Spacing args:CallArgumentList? Spacing ")" { return args ?? []; }
 
 // Declarations are score items with no duration. Their bindings become visible
 // only to following items in the same lexical sequence. Nested groups and
@@ -821,18 +797,26 @@ ReturnStatement
 LocatedIdentifier
   // Musical spellings are never declaration names: score syntax always wins
   // over the lexical namespace rather than becoming context-dependent.
-  = !(MosPitchLiteral / PitchLiteral) name:Identifier { return node('Identifier', { name }); }
+  = !(MosPitchLiteral / PitchLiteral) name:MusicalIdentifier {
+      return node('Identifier', { name });
+    }
 
 CallArgumentList
-  = first:(ScaleDegreeLiteral / AdditiveExpression)
-    rest:(Spacing "," Spacing argument:(ScaleDegreeLiteral / AdditiveExpression) { return argument; })* {
+  = first:Expression
+    rest:(Spacing "," Spacing argument:Expression { return argument; })* {
       return [first, ...rest];
     }
 
 IdentifierExpression
-  = !("v" &DownPrefixOperandStart) name:Identifier {
+  = !("v" &DownPrefixOperandStart) name:MusicalIdentifier {
       return node('Identifier', { name });
     }
+
+// Reject unsupported FJS suffixes where a bare word could be mistaken for a
+// MOS pitch. Directive names, named argument keys, and explicit sample names
+// use Identifier directly and do not inherit musical expression restrictions.
+MusicalIdentifier
+  = !([J-Zj-z] [J-Zj-z]? FjsInflection) @Identifier
 
 IntervalLiteral
   = quality:IntervalQuality number:IntervalNumber
@@ -1216,10 +1200,7 @@ Sign
   = $("+" / "-")
 
 Identifier
-  // A Diamond-MOS nominal followed by an FJS suffix is an invalid pitch, not
-  // an identifier followed by an adjacent prefix-modified degree.
-  = !(DeclarationKeyword !IdentifierContinue)
-    !([J-Zj-z] [J-Zj-z]? FjsInflection) name:$([A-Za-z_] IdentifierContinue*) { return name; }
+  = !(DeclarationKeyword !IdentifierContinue) name:$([A-Za-z_] IdentifierContinue*) { return name; }
 
 DeclarationKeyword
   = "let" / "fn" / "ret"

@@ -1,4 +1,4 @@
-import { sum } from 'xen-dev-utils/core'
+import { ceilPow2, sum } from 'xen-dev-utils/core'
 import { centsToValue, valueToCents } from 'xen-dev-utils/conversion'
 import { AperiodicWave } from 'aperiodic-oscillator'
 
@@ -159,10 +159,6 @@ export function isSWOscillatorType(value: unknown): value is SWOscillatorType {
   if (isFatOscillatorType(value)) return isHarmonicSWOscillatorType(value.slice(3))
 
   return isHarmonicSWOscillatorType(value) || isAperiodicTimbre(value)
-}
-
-function ceilPow2(x: number) {
-  return 1 << (32 - Math.clz32(x - 1))
 }
 
 const createWave = (context: BaseAudioContext, real: number[], imag: number[]) =>
