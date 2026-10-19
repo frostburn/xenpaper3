@@ -9,7 +9,6 @@ const snippet = ref(createDefaultSnippet())
 const editor = ref<InstanceType<typeof SnippetEditor>>()
 const urlError = ref('')
 const copyStatus = ref('')
-const shareFormat = ref<'url' | 'wiki' | 'discord'>('url')
 const shareField = ref<HTMLInputElement>()
 watch(
   () => route.hash,
@@ -41,20 +40,9 @@ const shareUrl = computed(() => {
   const resolved = router.resolve({ path: '/snippet', hash: encoded.value })
   return new URL(resolved.href, window.location.href).href
 })
-const shareText = computed(() =>
-  shareFormat.value === 'wiki'
-    ? `[${shareUrl.value} Xenpaper snippet]`
-    : shareFormat.value === 'discord'
-      ? `<${shareUrl.value}>`
-      : shareUrl.value,
-)
-watch(shareFormat, () => {
-  copyStatus.value = ''
-})
-
 const copy = async () => {
   try {
-    await navigator.clipboard.writeText(shareText.value)
+    await navigator.clipboard.writeText(shareUrl.value)
     copyStatus.value = 'Copied!'
   } catch {
     shareField.value?.focus()
@@ -79,14 +67,9 @@ const copy = async () => {
     <section class="share" aria-label="Share snippet">
       <h2>Share snippet</h2>
       <div class="share-controls">
-        <select v-model="shareFormat" aria-label="Share format">
-          <option value="url">URL</option>
-          <option value="wiki">MediaWiki</option>
-          <option value="discord">Discord</option>
-        </select>
         <input
           ref="shareField"
-          :value="shareText"
+          :value="shareUrl"
           aria-label="Shareable snippet link"
           readonly
           @focus="shareField?.select()"
@@ -138,7 +121,6 @@ h2 {
   min-width: 8rem;
 }
 .share-controls button,
-.share-controls select,
 .share-controls input {
   min-height: 2rem;
   border: 1px solid var(--xenpaper-slate-500);
