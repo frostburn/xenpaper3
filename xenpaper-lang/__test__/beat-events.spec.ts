@@ -249,7 +249,7 @@ describe('beat event expansion', () => {
     ['one-shot state across iterations', '', 'C @velocity(1/4)', 'D'],
     [
       'sequential declarations',
-      'let division = 2',
+      'let division = 2/1',
       'let division = division + 1 @subdivision(division) C',
       'D',
     ],

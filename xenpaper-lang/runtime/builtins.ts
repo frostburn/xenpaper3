@@ -57,23 +57,36 @@ export function evaluateBuiltinArgument(
       raw: node.raw,
       location: node.location,
     })
-  if (node.type === 'Group')
-    return evaluateBuiltinArgument(node.expression, coercion, environment, evaluate)
+  if (node.type === 'Group') {
+    const evaluated = evaluateBuiltinArgument(node.expression, coercion, environment, evaluate)
+    if (!('value' in evaluated) || evaluated.value.kind !== 'container') return evaluated
+    return { ...evaluated, value: { ...evaluated.value, grouped: true } }
+  }
   if (node.type === 'NormalizeToSlot') {
     if (!node.expression)
       return {
-        value: { kind: 'container', values: [], value: new Value(0), origins: [] },
+        value: {
+          kind: 'container',
+          values: [],
+          normalized: true,
+          value: new Value(0),
+          origins: [],
+        },
         diagnostics: [],
       }
     const element = elementCoercion(coercion)
-    if (node.expression.type === 'Sequence' || node.expression.type === 'Parallel')
-      return evaluateBuiltinArgument(node.expression, element, environment, evaluate)
+    if (node.expression.type === 'Sequence' || node.expression.type === 'Parallel') {
+      const evaluated = evaluateBuiltinArgument(node.expression, element, environment, evaluate)
+      if (!('value' in evaluated) || evaluated.value.kind !== 'container') return evaluated
+      return { ...evaluated, value: { ...evaluated.value, normalized: true } }
+    }
     const item = evaluateBuiltinArgument(node.expression, element, environment, evaluate)
     if (!('value' in item)) return item
     return {
       value: {
         kind: 'container',
         values: [item.value],
+        normalized: true,
         value: new Value(0),
         origins: [{ location: node.location, role: 'literal' }],
       },
@@ -91,6 +104,7 @@ export function evaluateBuiltinArgument(
       value: {
         kind: 'container',
         values: results.map((item) => (item as { value: EvaluatedLiteral }).value),
+        composition: node.type === 'Parallel' ? 'parallel' : 'sequence',
         value: new Value(0),
         origins: [{ location: node.location, role: 'literal' }],
       },
@@ -267,6 +281,7 @@ class ArrayMapBuiltin extends Builtin {
       throw new TypeError('arrayMap() expects a one-parameter lambda.')
     const origins = this.origins(arguments_)
     return {
+      ...arguments_[1],
       kind: 'container',
       values: this.requireContainer(arguments_, 1).map((item) => {
         const environment = extendLexicalEnvironment(callback.environment, {
@@ -297,6 +312,7 @@ class SortBuiltin extends Builtin {
       { kind: 'scalar' | 'pitchOffset' }
     >[]
     return {
+      ...arguments_[0],
       kind: 'container',
       values: [...numeric].sort((a, b) => a.value.valueOf() - b.value.valueOf()),
       value: new Value(0),

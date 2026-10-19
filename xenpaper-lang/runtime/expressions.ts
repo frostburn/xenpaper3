@@ -103,7 +103,15 @@ export function evaluateDeclaration(
     if (!('value' in evaluated)) return { environment, diagnostics: evaluated.diagnostics }
     return {
       environment: extendLexicalEnvironment(environment, {
-        variables: new Map([[node.name.name, evaluated.value]]),
+        variables: new Map([
+          [
+            node.name.name,
+            annotateReference(evaluated.value, {
+              location: node.name.location,
+              role: 'structural',
+            }),
+          ],
+        ]),
       }),
       diagnostics: evaluated.diagnostics,
     }
@@ -627,6 +635,8 @@ function binary(
   if (operator === 'al') return left.kind === 'undefined' ? right : left
   if (left.kind === 'container' || right.kind === 'container') {
     if (left.kind === 'container' && right.kind === 'container') {
+      if (left.composition && right.composition && left.composition !== right.composition)
+        throw new TypeError('Container operands must have the same composition.')
       if (left.values.length !== right.values.length)
         throw new TypeError('Container operands must have the same length.')
       return {
@@ -816,7 +826,7 @@ export function evaluateExpression(
           },
         ],
       }
-    if (node.type === 'Group') return evaluateExpression(node.expression, mapping, environment)
+    if (node.type === 'Group') return containerItems(node, mapping, environment)
     if (node.type === 'NormalizeToSlot') return containerItems(node, mapping, environment)
     if (node.type === 'PitchModifierExpression') {
       const operand = evaluateExpression(node.operand, mapping, environment)

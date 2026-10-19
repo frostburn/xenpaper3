@@ -2,6 +2,15 @@ import { describe, expect, it } from 'vitest'
 import { parse } from '../parser.js'
 
 describe('lexical declarations', () => {
+  it.each(['0', '2', '-2', '+2', '2d', '2/1', '2 * 3', '^2', '[0 1 2]'])(
+    'parses the initializer %s with the score expression rules',
+    (source) => {
+      const declaration = parse(`let note = ${source}`).body[0]
+      if (declaration.type !== 'VariableDeclaration') throw new Error('Expected a variable.')
+      expect(declaration.value.type).toBe(parse(source).body[0].type)
+    },
+  )
+
   it('distinguishes explicit degrees from contextual degrees and ratios', () => {
     expect(parse('3d 3 3/1').body[0]).toMatchObject({
       type: 'Sequence',

@@ -16,6 +16,98 @@ function shape(source: string, pulse: Fraction | number = 1): ScoreShape {
 }
 
 describe('score-shape timing', () => {
+  it.each([
+    ['0', 0],
+    ['2', 200],
+    ['-2', -200],
+    ['+2', 200],
+    ['2d', 200],
+    ['2/1', 1200],
+    ['2 * 3', 1200 * Math.log2(6)],
+  ])('plays a variable initialized with %s like the same score literal', (value, cents) => {
+    const score = shape(`let note = ${value} note`) as SequenceShape
+    const notes = score.children.filter((child) => child.kind === 'attack')
+    expect(notes).toHaveLength(1)
+    expect(notes[0]!.pitch.value.valueOf()).toBeCloseTo(cents)
+  })
+
+  it('evaluates local degree variables in the active tuning', () => {
+    const score = shape('{24edo} fn phrase() { let note = 2 ret note } phrase()') as SequenceShape
+    const collect = (current: ScoreShape): number[] => {
+      if (current.kind === 'attack') return [current.pitch.value.valueOf()]
+      if (current.kind === 'sequence') return current.children.flatMap(collect)
+      if (current.kind === 'parallel') return current.branches.flatMap(collect)
+      return []
+    }
+    expect(collect(score)).toEqual([100])
+  })
+
+  it.each([
+    ['sort([2 1])', '[1 2]'],
+    ['sort((2,1))', '(1,2)'],
+    ['arrayMap((note) => note, [0 1])', '[0 1]'],
+    ['arrayMap((note) => note, (0,1))', '(0,1)'],
+    ['let notes = (0 1) notes==', '(0 1)=='],
+    ['let notes = (0,1) notes==', '(0,1)=='],
+    ['let notes = sort((1 0)) notes==', '(0 1)=='],
+    ['let notes = arrayMap((note) => note, (0 1)) notes==', '(0 1)=='],
+  ])('preserves musical structure in %s', (source, reference) => {
+    const snapshot = (score: ScoreShape): unknown => {
+      if (score.kind === 'attack')
+        return ['attack', score.duration.toFraction(), score.pitch.value.valueOf()]
+      if (score.kind === 'sequence') {
+        const children = score.children.filter((child) => child.duration.compare(0) > 0)
+        if (children.length === 1) return snapshot(children[0]!)
+        return ['sequence', score.duration.toFraction(), children.map(snapshot)]
+      }
+      if (score.kind === 'parallel')
+        return ['parallel', score.duration.toFraction(), score.branches.map(snapshot)]
+      return [score.kind, score.duration.toFraction()]
+    }
+    expect(snapshot(shape(source))).toEqual(snapshot(shape(reference)))
+  })
+
+  it('stores bare scale degrees separately from explicit scalar ratios', () => {
+    const score = shape('let second = 2 let octave = 2/1 second octave') as SequenceShape
+    const notes = score.children.filter((child) => child.kind === 'attack')
+    expect(notes.map((note) => note.pitch.value.valueOf())).toEqual([200, 1200])
+  })
+
+  it.each([
+    ['[0 1 2]', 1, [0, 100, 200]],
+    ['[0,1,2]', 1, [0, 100, 200]],
+    ['(0 1 2)', 3, [0, 100, 200]],
+    ['(0,1,2)', 1, [0, 100, 200]],
+    ['[[0 1] 2]', 1, [0, 100, 200]],
+    ['[]', 1, []],
+  ])('plays a container variable initialized with %s', (container, duration, cents) => {
+    const score = shape(`let tuplet = ${container} tuplet`)
+    const notes: Extract<ScoreShape, { kind: 'attack' }>[] = []
+    const collect = (current: ScoreShape) => {
+      if (current.kind === 'attack') notes.push(current)
+      else if (current.kind === 'sequence') current.children.forEach(collect)
+      else if (current.kind === 'parallel') current.branches.forEach(collect)
+    }
+    collect(score)
+    expect(score.duration.equals(duration)).toBe(true)
+    expect(notes.map((note) => note.pitch.value.valueOf())).toEqual(cents)
+    if (container === '[0 1 2]')
+      expect(notes.every((note) => note.duration.equals(new Fraction(1, 3)))).toBe(true)
+  })
+
+  it('captures container pitches once and reuses them under the current timing', () => {
+    const score = shape('let tuplet = [0 1 2] {24edo} @2 tuplet tuplet[1]')
+    const notes: Extract<ScoreShape, { kind: 'attack' }>[] = []
+    const collect = (current: ScoreShape) => {
+      if (current.kind === 'attack') notes.push(current)
+      else if (current.kind === 'sequence') current.children.forEach(collect)
+      else if (current.kind === 'parallel') current.branches.forEach(collect)
+    }
+    collect(score)
+    expect(notes.map((note) => note.pitch.value.valueOf())).toEqual([0, 100, 200, 100])
+    expect(notes.slice(0, 3).every((note) => note.duration.equals(new Fraction(1, 6)))).toBe(true)
+  })
+
   it('plays explicit degrees and their square roots in the active tuning', () => {
     const score = shape('1d sqrt(2d) {24edo} 1d sqrt(2d)') as SequenceShape
     const attacks = score.children.filter((child) => child.kind === 'attack')

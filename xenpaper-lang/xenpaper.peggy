@@ -189,7 +189,7 @@ SequenceItem
       return node('PostfixExpression', { expression, marks });
     }
 
-// A bare integer in score and pitch-context positions denotes a scale degree,
+// A bare integer in score, variable initializer, and pitch-context positions denotes a scale degree,
 // while every other value uses the regular arithmetic expression grammar.
 Expression
   = ScaleDegreeLiteral
@@ -775,7 +775,7 @@ TightCallExpression
 // parallel branches receive child scopes. Shadowing is permitted; recursion is
 // deliberately rejected by the evaluator.
 VariableDeclaration
-  = "let" !IdentifierContinue RequiredSpacing name:LocatedIdentifier Spacing "=" Spacing value:AdditiveExpression {
+  = "let" !IdentifierContinue RequiredSpacing name:LocatedIdentifier Spacing "=" Spacing value:Expression {
       return node('VariableDeclaration', { name, value });
     }
 

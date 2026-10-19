@@ -3,10 +3,11 @@ import type { Expression, Node } from '../parser.generated.js'
 import type { Diagnostic } from '../diagnostics'
 import { Value } from '../value'
 import { evaluateDeclaration, evaluateExpression, prepareFunctionCall } from './expressions'
+import type { ExpressionEvaluationResult } from './expressions'
 import { DYNAMIC_VELOCITIES, resolveDirective } from './directives'
 import { Visitor, type VisitorEvaluation } from './visitor'
 import { contextAt } from './initialization'
-import { extendLexicalEnvironment } from './types'
+import { EMPTY_LEXICAL_ENVIRONMENT, extendLexicalEnvironment } from './types'
 import {
   DEFAULT_PITCH_CONTEXT,
   applyPitchContextChange,
@@ -16,6 +17,7 @@ import {
 } from './pitches'
 import type {
   AttackShape,
+  EvaluatedLiteral,
   AttackAppearance,
   AnnotationShape,
   BarlineShape,
@@ -1021,7 +1023,7 @@ function contextShape(
 function playablePitch(
   node: Expression,
   context: PitchContext,
-  environment?: LexicalEnvironment,
+  evaluated: ExpressionEvaluationResult,
 ):
   | {
       readonly pitch: AttackShape['pitch']
@@ -1029,7 +1031,6 @@ function playablePitch(
       readonly diagnostics: readonly Diagnostic[]
     }
   | { readonly diagnostics: readonly Diagnostic[] } {
-  const evaluated = evaluateExpression(node, context, environment)
   if (!('value' in evaluated)) return evaluated
   if (evaluated.value.kind === 'pitchOffset') {
     return {
@@ -2144,7 +2145,12 @@ export function evaluateScoreSemantics(
       const elimination = current.marks.find((mark) => mark.type === 'TailElimination')
       let evaluated = visitor.visit(current.expression)
       if (!('shape' in evaluated)) return evaluated
-      const distributesHolds = current.expression.type === 'Group'
+      let distributesHolds = current.expression.type === 'Group'
+      if (continuations.length && !distributesHolds) {
+        const stored = evaluateExpression(current.expression, context, environment)
+        if ('value' in stored)
+          distributesHolds = stored.value.kind === 'container' && !!stored.value.grouped
+      }
       if (
         continuations.length &&
         (evaluated.shape.kind === 'sequence' || evaluated.shape.kind === 'parallel') &&
@@ -2228,7 +2234,41 @@ export function evaluateScoreSemantics(
         return { shape: contextAnnotation(current), diagnostics: [] }
       }
     }
-    const evaluated = playablePitch(current, context, environment)
+    const value = evaluateExpression(current, context, environment)
+    if ('value' in value && value.value.kind === 'container') {
+      const variables = new Map<string, EvaluatedLiteral>()
+      const fragment = (item: EvaluatedLiteral): Expression => {
+        if (item.kind !== 'container') {
+          const name = `$container${variables.size}`
+          variables.set(name, item)
+          return { type: 'Identifier', name, location: current.location }
+        }
+        const children = item.values.map(fragment)
+        const expression: Expression =
+          item.composition === 'parallel'
+            ? { type: 'Parallel', branches: children, location: current.location }
+            : { type: 'Sequence', items: children, location: current.location }
+        const composed: Expression = item.grouped
+          ? { type: 'Group', expression, location: current.location }
+          : expression
+        return item.normalized
+          ? {
+              type: 'NormalizeToSlot',
+              expression: children.length ? composed : null,
+              location: current.location,
+            }
+          : composed
+      }
+      const expression = fragment(value.value)
+      const result = changeVisitor(visitor, (context) => ({
+        ...context,
+        lexicalEnvironment: extendLexicalEnvironment(environment ?? EMPTY_LEXICAL_ENVIRONMENT, {
+          variables,
+        }),
+      })).visit(expression)
+      return { ...result, diagnostics: [...value.diagnostics, ...result.diagnostics] }
+    }
+    const evaluated = playablePitch(current, context, value)
     if (!('pitch' in evaluated)) return evaluated
     const broadcastContext = current as Expression & {
       readonly broadcastArticulation?: Fraction
