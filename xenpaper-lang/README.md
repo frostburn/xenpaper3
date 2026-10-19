@@ -249,6 +249,11 @@ syntax tree returned to TypeScript callers.
 
 ## Directive extensions
 
+Musical name restrictions apply to expression references, calls, and declarations.
+Directive names, named argument keys, and explicitly enumerated drum samples use
+plain identifiers; for example, `JJv5` can name a sample or directive argument even
+though it is rejected as an unsupported FJS-inflected MOS pitch in a score.
+
 Xenpaper parses named directive arguments without assigning synthesizer or real-time
 meaning to them. Second-party runtimes can supply `DirectiveExtension` objects through
 `ScoreShapeOptions.directiveExtensions`. An extension owns its initial and prevailing

@@ -307,10 +307,10 @@ describe('DAW project model', () => {
     })
     for (const [index, note] of notes.entries()) {
       for (const value of expected[index]!) expect(note.sourceRanges).toContainEqual(value)
-      for (const value of [range('1'), range('2'), range('3'), secDeclaration, secReference]) {
-        if (!expected[index]!.some((r) => r.start === value.start))
-          expect(note.sourceRanges).not.toContainEqual(value)
-      }
+      const excluded = [range('1'), range('2'), range('3'), secDeclaration, secReference].filter(
+        (value) => !expected[index]!.some((r) => r.start === value.start),
+      )
+      for (const value of excluded) expect(note.sourceRanges).not.toContainEqual(value)
       await wrapper.setProps({ playingRanges: note.sourceRanges })
       const activeText = wrapper.findAll('[data-playing="true"]').map((token) => token.text())
       expect(activeText.filter((text) => text === 'con')).toHaveLength(2)

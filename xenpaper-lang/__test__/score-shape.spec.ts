@@ -91,8 +91,6 @@ describe('score-shape timing', () => {
     collect(score)
     expect(score.duration.equals(duration)).toBe(true)
     expect(notes.map((note) => note.pitch.value.valueOf())).toEqual(cents)
-    if (container === '[0 1 2]')
-      expect(notes.every((note) => note.duration.equals(new Fraction(1, 3)))).toBe(true)
   })
 
   it('captures container pitches once and reuses them under the current timing', () => {

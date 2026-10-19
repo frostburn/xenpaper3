@@ -4,6 +4,7 @@ import type { Diagnostic } from '../diagnostics'
 import { Value } from '../value'
 import { evaluateBuiltinArgument, evaluateBuiltinCall, requireInteger } from './builtins'
 import { evaluateLiteral, type NumericLiteralNode } from './literals'
+import { equaveShift as modifierEquaveShift, equaveShifts } from './pitch-modifiers'
 import type {
   EvaluatedLiteral,
   LexicalEnvironment,
@@ -34,19 +35,6 @@ const MOS_HALF_ALTERATIONS: Readonly<Record<string, number>> = {
   a: -1,
   _: 0,
   '♮': 0,
-}
-
-const EQUAVE_SHIFT_BY_MODIFIER: Readonly<Record<string, number>> = {
-  equaveUp: 1,
-  doubleEquaveUp: 2,
-  equaveDown: -1,
-}
-
-function equaveShifts(modifiers: readonly { readonly kind: string }[]): number {
-  return modifiers.reduce(
-    (sum, modifier) => sum + (EQUAVE_SHIFT_BY_MODIFIER[modifier.kind] ?? 0),
-    0,
-  )
 }
 
 export type ExpressionEvaluationResult =
@@ -449,8 +437,7 @@ function addOrSubtract(
     if (mos && offset.spelling?.raw.endsWith('ms')) {
       const mosContext = mos.context
       const registerSteps = (offset.spelling.modifiers ?? []).reduce(
-        (sum, modifier) =>
-          sum + (EQUAVE_SHIFT_BY_MODIFIER[modifier] ?? 0) * mosContext.nominals.size,
+        (sum, modifier) => sum + modifierEquaveShift(modifier) * mosContext.nominals.size,
         0,
       )
       let steps = Number(offset.spelling.number.valueOf()) + registerSteps
@@ -839,7 +826,7 @@ export function evaluateExpression(
         throw new TypeError('Pitch modifiers require a numeric operand.')
       const context = 'rootPitch' in mapping ? mapping : createPitchContext(mapping)
       const modifier = node.modifier.kind
-      const equaveShift = EQUAVE_SHIFT_BY_MODIFIER[modifier] ?? 0
+      const equaveShift = modifierEquaveShift(modifier)
       // A MOS equave governs MOS pitches and scale-relative values. Latin and
       // Greek pitches retain their notational octave even while a MOS is active.
       let scalarDisplacement: Value
