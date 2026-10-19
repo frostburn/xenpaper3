@@ -189,6 +189,35 @@ describe('DAW playback preparation', () => {
     expect(WebAudioPlaybackSession).not.toHaveBeenCalled()
   })
 
+  it('disposes samples that finish loading after another lane fails', async () => {
+    const project = drumProject()
+    const drums = project.instrumentLanes[0]!
+    if (drums.kind !== 'drum') throw new Error('Expected drum lane')
+    drums.drumkit = { type: 'samples', url: '', strudelJson: { bd: ['kick.wav'] } }
+    const piano = createDefaultProject().instrumentLanes[0]!
+    if (piano.kind !== 'instrument') throw new Error('Expected instrument lane')
+    piano.instrument = {
+      type: 'samples',
+      url: '',
+      instrument: 'piano',
+      doughJson: { piano: { C4: 'piano.wav' } },
+    }
+    piano.clips = [{ id: 'note', start: beat(0), length: beat(1), source: 'C' }]
+    project.instrumentLanes.push(piano)
+    const pending = deferred()
+    const kit = { dispose: vi.fn<() => void>() } as unknown as swSeq.SampledDrumkit
+    const loading = pending.promise.then(() => kit)
+    vi.spyOn(swSeq, 'loadSampledDrumkit').mockReturnValue(loading)
+    vi.spyOn(swSeq, 'loadSampledInstrument').mockRejectedValue(new Error('sample failed'))
+    const engine = new DawAudioEngine({} as AudioContext)
+    await expect(engine.play(project)).rejects.toThrow('sample failed')
+    pending.resolve()
+    await loading
+    expect(kit.dispose).toHaveBeenCalledOnce()
+    expect(WebAudioPlaybackSession).not.toHaveBeenCalled()
+    engine.dispose()
+  })
+
   it('cancels a pending play when stopped during worklet registration', async () => {
     const registration = deferred()
     vi.spyOn(swPatch, 'registerMathWorklets').mockReturnValue(registration.promise)

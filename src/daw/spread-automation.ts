@@ -1,15 +1,13 @@
-import { easeGlissando } from './easing'
-import type { PitchAutomationPlan } from './playback-plan'
 import {
-  DEFAULT_SPREAD,
-  type ScheduledLaneNote,
-  type SourceInitialization,
-  type SpreadSettings,
-} from './score'
+  compileSignalCurves,
+  signalRampValue,
+  type SignalAutomationPlan,
+} from './signal-automation'
+import { DEFAULT_SPREAD, type SourceInitialization, type SpreadSettings } from './score'
 import type { TempoMap } from './timeline'
 import { applyPitchAutomation, type AudioParamAutomationTarget } from './web-audio-automation'
 
-export interface SpreadAutomationPlan extends PitchAutomationPlan {
+export interface SpreadAutomationPlan extends SignalAutomationPlan {
   readonly changes: readonly { readonly when: number; readonly value: number }[]
 }
 
@@ -18,12 +16,6 @@ export function compileSpreadAutomation(
   initialization: SourceInitialization,
   tempoMap: TempoMap,
   fromBeat: number,
-  compileCurves: (
-    note: ScheduledLaneNote,
-    tempoMap: TempoMap,
-    fromBeat: number,
-    toBeat: number,
-  ) => PitchAutomationPlan,
 ): SpreadAutomationPlan {
   const settings = (state: unknown) => (state as SpreadSettings | undefined) ?? DEFAULT_SPREAD
   const events = [
@@ -44,36 +36,19 @@ export function compileSpreadAutomation(
   }
   const preceding = events.filter(({ beat }) => beat <= fromBeat)
   let initialValue = preceding[preceding.length - 1]!.value
-  for (const ramp of ramps) {
-    const progress = (fromBeat - Number(ramp.start)) / Number(ramp.duration)
-    if (progress < 0 || progress >= 1) continue
-    const from = settings(ramp.from).value
-    initialValue = from + (settings(ramp.to).value - from) * easeGlissando(ramp.curve, progress)
-  }
-  const curves = ramps.flatMap((ramp) => {
-    const from = settings(ramp.from).value
-    const note: ScheduledLaneNote = {
-      beat: 0,
-      duration: Number(ramp.start.add(ramp.duration)),
-      cents: from,
-      velocity: 0,
-      envelope: { attack: 0, decay: 0, sustain: 0, release: 0 },
-      sourceRanges: [],
-      glissando: [
-        {
-          start: Number(ramp.start),
-          duration: Number(ramp.duration),
-          from,
-          to: settings(ramp.to).value,
-          easing: ramp.curve,
-        },
-      ],
-    }
-    return compileCurves(note, tempoMap, fromBeat, note.duration).curves
-  })
+  const segments = ramps.map((ramp) => ({
+    start: Number(ramp.start),
+    duration: Number(ramp.duration),
+    from: settings(ramp.from).value,
+    to: settings(ramp.to).value,
+    easing: ramp.curve,
+  }))
+  for (const segment of segments)
+    if (fromBeat >= segment.start && fromBeat < segment.start + segment.duration)
+      initialValue = signalRampValue(segment, fromBeat)
   return Object.freeze({
     initialValue,
-    curves: Object.freeze(curves),
+    curves: compileSignalCurves(segments, tempoMap, fromBeat),
     changes: Object.freeze(
       events
         .filter(({ beat }) => beat > fromBeat)

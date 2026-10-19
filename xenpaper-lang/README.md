@@ -253,6 +253,8 @@ Musical name restrictions apply to expression references, calls, and declaration
 Directive names, named argument keys, and explicitly enumerated drum samples use
 plain identifiers; for example, `JJv5` can name a sample or directive argument even
 though it is rejected as an unsupported FJS-inflected MOS pitch in a score.
+Longer names such as `JJv5Gain` remain identifiers: a musical prefix alone does
+not reserve the rest of a name.
 
 Xenpaper parses named directive arguments without assigning synthesizer or real-time
 meaning to them. Second-party runtimes can supply `DirectiveExtension` objects through

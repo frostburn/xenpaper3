@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { reactive } from 'vue'
 import { createPlaybackPlan } from '../daw/playback-plan'
 import { beat, createDefaultProject } from '../daw/project'
 import {
@@ -9,6 +10,7 @@ import {
   parseProjectScoreNotes,
 } from '../daw/score'
 import { globalTempoChanges, TempoMap } from '../daw/timeline'
+import { compileSignalCurves } from '../daw/signal-automation'
 import {
   applyPitchAutomation,
   glissandoCurveDuration,
@@ -16,6 +18,88 @@ import {
 } from '../daw/web-audio-automation'
 
 describe('DAW playback planning', () => {
+  it('clips adjacent signal ramps independently across tempo changes', () => {
+    const curves = compileSignalCurves(
+      [
+        { start: 0, duration: 1, from: 0, to: 40, easing: 'linear' },
+        { start: 1, duration: 1, from: 80, to: 100, easing: 'linear' },
+      ],
+      new TempoMap([
+        { id: 'initial', beat: beat(0), bpm: 90 },
+        { id: 'faster', beat: beat(1), bpm: 120 },
+      ]),
+      0.5,
+      1.5,
+    )
+    expect(curves).toHaveLength(2)
+    expect(curves[0]!.values[0]).toBe(20)
+    expect(curves[0]!.values[curves[0]!.values.length - 1]).toBe(40)
+    expect(curves[1]!.values[0]).toBe(80)
+    expect(curves[1]!.values[curves[1]!.values.length - 1]).toBe(90)
+    expect(curves[1]!.offset).toBeCloseTo(1 / 3)
+    expect(curves[1]!.duration).toBeCloseTo(0.25)
+  })
+
+  it('snapshots instrument settings while leaving the editor mutable', () => {
+    const project = reactive(createDefaultProject())
+    const lane = project.instrumentLanes[0]!
+    if (lane.kind !== 'instrument' || lane.instrument.type !== 'patch')
+      throw new Error('Expected a patch instrument')
+    lane.clips = [{ id: 'note', start: beat(0), length: beat(1), source: 'C' }]
+    const oscillatorType = lane.instrument.oscillatorType
+    const plan = createPlaybackPlan(project)
+    lane.instrument.oscillatorType = 'square'
+    const planned = plan.lanes[0]!
+    if (planned.kind !== 'instrument' || planned.instrument.type !== 'patch')
+      throw new Error('Expected a patch instrument')
+    expect(planned.instrument.oscillatorType).toBe(oscillatorType)
+    expect(Object.isFrozen(planned.instrument)).toBe(true)
+  })
+
+  it('snapshots nested sample maps from reactive editor state', () => {
+    const project = reactive(createDefaultProject())
+    const piano = { C4: 'piano.wav' }
+    const drums = ['kick.wav', 'kick-2.wav']
+    const lane = project.instrumentLanes[0]!
+    if (lane.kind !== 'instrument') throw new Error('Expected an instrument')
+    lane.instrument = {
+      type: 'samples',
+      url: 'https://example.com/piano.json',
+      instrument: 'piano',
+      doughJson: { piano },
+    }
+    lane.clips = [{ id: 'note', start: beat(0), length: beat(1), source: 'C' }]
+    project.instrumentLanes.push({
+      id: 'drums',
+      kind: 'drum',
+      name: 'Drums',
+      gain: 1,
+      source: '',
+      drumkit: {
+        type: 'samples',
+        url: 'https://example.com/drums.json',
+        strudelJson: { bd: drums },
+      },
+      clips: [{ id: 'hit', start: beat(0), length: beat(1), source: 'bd' }],
+    })
+    const plan = createPlaybackPlan(project)
+    piano.C4 = 'edited.wav'
+    drums[0] = 'edited.wav'
+    const instrument = plan.lanes[0]!
+    const kit = plan.lanes[1]!
+    if (
+      instrument.kind !== 'instrument' ||
+      instrument.instrument.type !== 'samples' ||
+      kit.kind !== 'drum' ||
+      kit.drumkit.type !== 'samples'
+    )
+      throw new Error('Expected sampled lanes')
+    expect(instrument.instrument.doughJson.piano).toEqual({ C4: 'piano.wav' })
+    expect(kit.drumkit.strudelJson.bd).toEqual(['kick.wav', 'kick-2.wav'])
+    expect(Object.isFrozen(instrument.instrument.doughJson.piano)).toBe(true)
+    expect(Object.isFrozen(kit.drumkit.strudelJson.bd)).toBe(true)
+  })
+
   it('compiles ping-pong delay directives into effect config signals', () => {
     expect(
       compileEffectSettings('@delay(375ms) @feedback(62%) @wet(40%) @separation(75%)'),

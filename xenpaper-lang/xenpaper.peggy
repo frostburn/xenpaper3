@@ -812,11 +812,16 @@ IdentifierExpression
       return node('Identifier', { name });
     }
 
-// Reject unsupported FJS suffixes where a bare word could be mistaken for a
-// MOS pitch. Directive names, named argument keys, and explicit sample names
+// Reject complete unsupported FJS-inflected MOS tokens, not prefixes of longer
+// names. Directive names, named argument keys, and explicit sample names
 // use Identifier directly and do not inherit musical expression restrictions.
+// Only the ASCII `v` inflection can continue an identifier; punctuation and
+// superscript/subscript inflections must still reject the musical spelling.
 MusicalIdentifier
-  = !([J-Zj-z] [J-Zj-z]? FjsInflection) @Identifier
+  = !([J-Zj-z] [J-Zj-z]? (
+      &"v" FjsInflection !IdentifierContinue
+      / !"v" FjsInflection
+    )) @Identifier
 
 IntervalLiteral
   = quality:IntervalQuality number:IntervalNumber

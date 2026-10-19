@@ -1,5 +1,4 @@
 import { compileSpreadAutomation, type SpreadAutomationPlan } from './spread-automation'
-import { easeGlissando } from './easing'
 import type { DawProject, DrumkitSource, InstrumentSource } from './project'
 import {
   compileEffectSettings,
@@ -12,28 +11,36 @@ import {
   type ScheduledLaneNote,
 } from './score'
 import { globalTimeSignatureChanges, TempoMap } from './timeline'
+import {
+  compileSignalCurves,
+  signalRampValue,
+  type SignalAutomationPlan,
+  type SignalCurvePlan,
+} from './signal-automation'
 
-const GLISSANDO_SAMPLES_PER_SECOND = 120
+// Instrument sources contain JSON data. Read through entries so Vue proxies
+// are copied as values, and freeze nested manifests as well as their settings.
+const snapshotSource = <T extends InstrumentSource | DrumkitSource>(source: T): T => {
+  const copy = (value: unknown): unknown => {
+    if (Array.isArray(value)) return Object.freeze(value.map(copy))
+    if (value && typeof value === 'object')
+      return Object.freeze(
+        Object.fromEntries(Object.entries(value).map(([key, child]) => [key, copy(child)])),
+      )
+    return value
+  }
+  return copy(source) as T
+}
 
 export interface NotePlaybackWindow {
   readonly startBeat: number
   readonly endBeat: number
 }
 
-export interface PitchCurvePlan {
-  /** Seconds after this note becomes audible. */
-  readonly offset: number
-  /** Nominal musical duration; the Web Audio adapter may shorten the endpoint slightly. */
-  readonly duration: number
-  readonly startValue: number
-  readonly values: readonly number[]
-}
+export type PitchCurvePlan = SignalCurvePlan
 
-export interface PitchAutomationPlan {
-  /** Authored, C-relative pitch held at the playback start. */
-  readonly initialValue: number
-  readonly curves: readonly PitchCurvePlan[]
-}
+/** Signal values are authored, C-relative cents for note pitch automation. */
+export type PitchAutomationPlan = SignalAutomationPlan
 
 export interface PlaybackNote {
   readonly startBeat: number
@@ -61,7 +68,7 @@ export interface PlaybackEffectLane {
   readonly patchPreset: 'ping-pong-delay'
   readonly gain: number
   readonly config: ReturnType<typeof compileEffectSettings>
-  readonly automation?: Readonly<Record<keyof EffectSettings, PitchAutomationPlan>>
+  readonly automation?: Readonly<Record<keyof EffectSettings, SignalAutomationPlan>>
   readonly configChanges: readonly {
     readonly when: number
     readonly config: ReturnType<typeof compileEffectSettings>
@@ -107,17 +114,10 @@ export const glissandoPitchAtBeat = (note: ScheduledLaneNote, projectBeat: numbe
       value = segment.to
       continue
     }
-    const progress = (projectBeat - start) / segment.duration
-    return segment.from + (segment.to - segment.from) * easeGlissando(segment.easing, progress)
+    return signalRampValue({ ...segment, start }, projectBeat)
   }
   return value
 }
-
-const glissandoPitchAtSeconds = (
-  note: ScheduledLaneNote,
-  tempoMap: TempoMap,
-  seconds: number,
-): number => glissandoPitchAtBeat(note, tempoMap.secondsToBeat(seconds))
 
 /** Compatibility helper for sampling a beat-defined glide uniformly in audio time. */
 export const glissandoPitchAtElapsedTime = (
@@ -128,10 +128,9 @@ export const glissandoPitchAtElapsedTime = (
   elapsedRatio: number,
 ): number => {
   const tempoMap = TempoMap.fromProject(project)
-  return glissandoPitchAtSeconds(
+  return glissandoPitchAtBeat(
     note,
-    tempoMap,
-    tempoMap.beatToSeconds(startBeat) + durationSeconds * elapsedRatio,
+    tempoMap.secondsToBeat(tempoMap.beatToSeconds(startBeat) + durationSeconds * elapsedRatio),
   )
 }
 
@@ -140,45 +139,16 @@ const compilePitchAutomation = (
   tempoMap: TempoMap,
   playbackStartBeat: number,
   playbackEndBeat: number,
-): PitchAutomationPlan => {
-  const curves: PitchCurvePlan[] = []
-  const noteStartSeconds = tempoMap.beatToSeconds(playbackStartBeat)
-  for (const segment of note.glissando ?? []) {
-    if (segment.duration <= 0) continue
-    const segmentStartBeat = note.beat + segment.start
-    const segmentEndBeat = Math.min(segmentStartBeat + segment.duration, playbackEndBeat)
-    if (segmentEndBeat <= playbackStartBeat) continue
-
-    const audibleStartBeat = Math.max(segmentStartBeat, playbackStartBeat)
-    if (segmentEndBeat <= audibleStartBeat) continue
-    const audibleStartSeconds = tempoMap.beatToSeconds(audibleStartBeat)
-    const duration = tempoMap.beatToSeconds(segmentEndBeat) - audibleStartSeconds
-    if (duration <= 0) continue
-
-    const sampleCount = Math.max(2, Math.ceil(duration * GLISSANDO_SAMPLES_PER_SECOND))
-    const values = Object.freeze(
-      Array.from({ length: sampleCount }, (_, index) =>
-        glissandoPitchAtSeconds(
-          note,
-          tempoMap,
-          audibleStartSeconds + (duration * index) / (sampleCount - 1),
-        ),
-      ),
-    )
-    curves.push(
-      Object.freeze({
-        offset: audibleStartSeconds - noteStartSeconds,
-        duration,
-        startValue: values[0]!,
-        values,
-      }),
-    )
-  }
-  return Object.freeze({
+): PitchAutomationPlan =>
+  Object.freeze({
     initialValue: glissandoPitchAtBeat(note, playbackStartBeat),
-    curves: Object.freeze(curves),
+    curves: compileSignalCurves(
+      (note.glissando ?? []).map((segment) => ({ ...segment, start: note.beat + segment.start })),
+      tempoMap,
+      playbackStartBeat,
+      playbackEndBeat,
+    ),
   })
-}
 
 const assertPlaybackStart = (fromBeat: number): void => {
   if (!Number.isFinite(fromBeat) || fromBeat < 0)
@@ -258,11 +228,11 @@ export const createPlaybackPlan = (
     }
     lanes.push(
       lane.kind === 'drum'
-        ? Object.freeze({ ...common, kind: 'drum', drumkit: lane.drumkit })
+        ? Object.freeze({ ...common, kind: 'drum', drumkit: snapshotSource(lane.drumkit) })
         : Object.freeze({
             ...common,
             kind: 'instrument',
-            instrument: lane.instrument,
+            instrument: snapshotSource(lane.instrument),
             ...(lane.instrument.type === 'patch' && lane.instrument.patchPreset === 'unison'
               ? {
                   spread: compileSpreadAutomation(
@@ -274,7 +244,6 @@ export const createPlaybackPlan = (
                     ),
                     tempoMap,
                     fromBeat,
-                    compilePitchAutomation,
                   ),
                 }
               : {}),
@@ -297,52 +266,33 @@ export const createPlaybackPlan = (
         )
         const { changes: timeline, ramps } = effectTimeline
         const properties = ['delayTime', 'feedback', 'wet', 'separation'] as const
-        const settingsAt = (atBeat: number): EffectSettings => {
-          const preceding = timeline.filter(({ beat }) => beat <= atBeat)
-          const prevailing = preceding[preceding.length - 1]!.settings
-          const settings = { ...prevailing }
-          for (const ramp of ramps) {
-            if (atBeat < ramp.start || atBeat >= ramp.start + ramp.duration) continue
-            for (const property of properties)
-              if (ramp.from[property] !== ramp.to[property])
-                settings[property] =
-                  ramp.from[property] +
-                  (ramp.to[property] - ramp.from[property]) *
-                    easeGlissando(ramp.easing, (atBeat - ramp.start) / ramp.duration)
-          }
-          return settings
-        }
-        const initial = settingsAt(fromBeat)
-        const automation = Object.fromEntries(
-          properties.map((property) => {
-            const curves = ramps.flatMap((ramp) => {
-              if (ramp.from[property] === ramp.to[property]) return []
-              const note: ScheduledLaneNote = {
-                beat: 0,
-                duration: ramp.start + ramp.duration,
-                cents: ramp.from[property],
-                velocity: 0,
-                envelope: { attack: 0, decay: 0, sustain: 0, release: 0 },
-                sourceRanges: [],
-                glissando: [
-                  {
-                    start: ramp.start,
-                    duration: ramp.duration,
-                    from: ramp.from[property],
-                    to: ramp.to[property],
-                    easing: ramp.easing,
-                  },
-                ],
-              }
-              return compilePitchAutomation(note, tempoMap, fromBeat, ramp.start + ramp.duration)
-                .curves
-            })
-            return [
-              property,
-              Object.freeze({ initialValue: initial[property], curves: Object.freeze(curves) }),
-            ]
-          }),
-        ) as unknown as Readonly<Record<keyof EffectSettings, PitchAutomationPlan>>
+        const preceding = timeline.filter(({ beat }) => beat <= fromBeat)
+        const initial = { ...preceding[preceding.length - 1]!.settings }
+        const automation = Object.freeze(
+          Object.fromEntries(
+            properties.map((property) => {
+              const segments = ramps
+                .filter((ramp) => ramp.from[property] !== ramp.to[property])
+                .map((ramp) => ({
+                  start: ramp.start,
+                  duration: ramp.duration,
+                  from: ramp.from[property],
+                  to: ramp.to[property],
+                  easing: ramp.easing,
+                }))
+              for (const segment of segments)
+                if (fromBeat >= segment.start && fromBeat < segment.start + segment.duration)
+                  initial[property] = signalRampValue(segment, fromBeat)
+              return [
+                property,
+                Object.freeze({
+                  initialValue: initial[property],
+                  curves: compileSignalCurves(segments, tempoMap, fromBeat),
+                }),
+              ]
+            }),
+          ),
+        ) as Readonly<Record<keyof EffectSettings, SignalAutomationPlan>>
         return Object.freeze({
           id: effect.id,
           name: effect.name,
