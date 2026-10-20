@@ -180,5 +180,41 @@
     "id": "advanced-10",
     "title": "Syntax philosophy",
     "description": "Xenpaper 3 tries to be consistent by enclosing context assignments that affect tuning in curly brackets while everything else uses @style directives."
+  },
+  {
+    "id": "advanced-chord-ties",
+    "title": "Ties across chords",
+    "html": "<p><code>-></code> sustains matching pitches from the left operand through their matching notes on the right, removing the repeated attacks. The first progression reattacks C; the second sustains C while the other chord tones change. Parentheses make each chord an operand. Try changing the right-hand C to D.</p>",
+    "props": {
+      "source": "{12edo}\n(C, E, G) (C, F, A)\n(C, E, G) -> (C, F, A)",
+      "instrument": {
+        "type": "patch",
+        "patchPreset": "default",
+        "oscillatorType": "semisine"
+      },
+      "gain": 0.35,
+      "laneSource": "@tempo(100bpm) @adsr(10ms, 100ms, 70%, 100ms)",
+      "simplified": true,
+      "rows": 3,
+      "editorLabel": "Ties across chords source"
+    }
+  },
+  {
+    "id": "advanced-tuplet-ties",
+    "title": "Ties between tuplets",
+    "html": "<p>Ties match notes anywhere in both operands, including earlier tuplet notes. In the second phrase, C and E sustain into their matches in the next tuplet; D and F keep their original timing. C lasts from the start of the first tuplet through the first note of the second. Try replacing the second tuplet with <code>[F C E]</code> to hear C sustain farther.</p>",
+    "props": {
+      "source": "{12edo}\n[C D E] [C F E]\n[C D E] -> [C F E]",
+      "instrument": {
+        "type": "patch",
+        "patchPreset": "default",
+        "oscillatorType": "semisine"
+      },
+      "gain": 0.35,
+      "laneSource": "@tempo(90bpm) @adsr(10ms, 100ms, 70%, 100ms)",
+      "simplified": true,
+      "rows": 3,
+      "editorLabel": "Ties between tuplets source"
+    }
   }
 ]

@@ -260,21 +260,23 @@ export function flattenScoreSemantics(
       const firstEvent = events.length
       let cursor = start
       for (const child of current.children) cursor = visitor.visit(child, { start: cursor })
-      if (current.normalized) {
+      if (current.normalized || current.continuationTarget === 'all') {
         state.active = events
           .slice(firstEvent)
           .filter((event): event is MutableNoteEvent => event.kind === 'note')
-        state.activeStart = copy(start)
-        state.activeSpan = copy(current.duration)
+        state.activeStart = current.normalized ? copy(start) : undefined
+        state.activeSpan = current.normalized ? copy(current.duration) : undefined
       }
       return start.add(current.duration)
     } else {
       const firstEvent = events.length
-      const states = current.branches.map((): FlatteningState => ({
-        active: [],
-        groove: state.groove,
-        grooveOverride: state.grooveOverride,
-      }))
+      const states = current.branches.map(
+        (): FlatteningState => ({
+          active: [],
+          groove: state.groove,
+          grooveOverride: state.grooveOverride,
+        }),
+      )
       current.branches.forEach((branch, index) => visitor.visit(branch, { state: states[index]! }))
       const end = start.add(current.duration)
       for (const branchState of states) {

@@ -7,6 +7,7 @@ import type { ExpressionEvaluationResult } from './expressions'
 import { DYNAMIC_VELOCITIES, resolveDirective } from './directives'
 import { Visitor, type VisitorEvaluation } from './visitor'
 import { contextAt } from './initialization'
+import { tieScoreShapes } from './ties'
 import { EMPTY_LEXICAL_ENVIRONMENT, extendLexicalEnvironment } from './types'
 import {
   DEFAULT_PITCH_CONTEXT,
@@ -126,6 +127,9 @@ function mapScoreConstruction(
       return item
     }
     return mapLeaf(item)
+  }
+  if (node.type === 'BinaryExpression' && node.operator === '->') {
+    return { ...node, left: mapItem(node.left), right: mapItem(node.right) }
   }
   if (node.type === 'Sequence') {
     return {
@@ -334,7 +338,7 @@ function broadcastScalarOperation(
     if (operand) return { ...node, operand }
     return mapScoreConstruction(node.operand, (item) => ({ ...node, operand: item }))
   }
-  if (node.type !== 'BinaryExpression') return undefined
+  if (node.type !== 'BinaryExpression' || node.operator === '->') return undefined
   const left = broadcastScalarOperation(node.left, context, environment)
   if (left) return { ...node, left }
   const right = broadcastScalarOperation(node.right, context, environment)
@@ -1257,6 +1261,30 @@ export function evaluateScoreSemantics(
       directiveState: currentDirectiveState,
       environment,
     } = visitor.scope
+    if (current.type === 'BinaryExpression' && current.operator === '->') {
+      // Directives and declarations establish prevailing state as sequence items.
+      const operand = (expression: Expression): Expression => ({
+        type: 'Sequence',
+        items: [expression],
+        location: expression.location,
+      })
+      const left = visitor.visit(operand(current.left))
+      if (!hasShape(left)) return left
+      const next = at(
+        visitorAfter(left, visitor),
+        visitor.scope.offset.add(left.shape.duration.mul(visitor.scope.timeScale)),
+      )
+      const right = next.visit(operand(current.right))
+      const diagnostics = [...left.diagnostics, ...right.diagnostics]
+      if (!hasShape(right)) return { diagnostics }
+      return withVisitor(
+        {
+          shape: tieScoreShapes(left.shape, right.shape, [origin(current, 'operator')]),
+          diagnostics,
+        },
+        visitorAfter(right, next),
+      )
+    }
     if (current.type === 'DrumSampleLiteral') {
       return visitor.visit({
         type: 'DegreeLiteral',
