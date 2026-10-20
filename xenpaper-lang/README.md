@@ -107,6 +107,30 @@ an integer. `sort(container)`, `arrayMap(callback, container)`, and
 `arrayReduce(callback, container, initial?)` likewise require containers in
 their container positions and diagnose missing or extra arguments.
 
+## Note ties
+
+The binary `->` operator sequences two operands and ties matching notes:
+
+```text
+(C, E, G) -> (C, F, A)
+[C D E] -> [C F E]
+```
+
+Every left-hand note is eligible, including earlier notes inside a tuplet.
+Matching uses the evaluated sounding pitch, and searches the entire right
+operand. Each matching left note keeps its attack and takes the latest end
+of its matching right notes. All matched right attacks are deleted. Unmatched
+notes, operand durations, and other attack positions stay intact. For example,
+the second line sustains C from pulse 0 to 4/3 and E from 2/3 to 2, while D
+and F retain their original subdivisions. Repeated matches on the right extend
+the source to the latest matching endpoint.
+
+Arithmetic and postfix marks bind tighter than `->`; sequencing and parallel
+composition bind more loosely. Parenthesize multi-note or chord operands.
+Chains associate to the left: `C -> C -> C` is one attack lasting three pulses.
+`C= -> C=` is one attack lasting four pulses. Tuplets are normalized before
+their note ends are tied, so tying does not stretch their other subdivisions.
+
 ## Local declarations and functions
 
 Declarations are zero-duration score items:

@@ -153,17 +153,23 @@ SequenceExpression
     }
 
 SequenceItem
-  = expression:(EnumeratedChordArithmetic / Expression)
+  = Expression
+
+// Ties compose complete score operands, below arithmetic and postfix marks but
+// above sequencing and parallel composition. Chains associate to the left.
+Expression
+  = first:TieOperand rest:(Spacing "->" Spacing right:TieOperand {
+      return { operator: "->", right };
+    })* {
+      return foldBinary(first, rest);
+    }
+
+TieOperand
+  = expression:(EnumeratedChordArithmetic / ScaleDegreeLiteral / AdditiveExpression)
     marks:AttachedPostfixMark* {
       if (!marks.length) return expression;
       return node('PostfixExpression', { expression, marks });
     }
-
-// A bare integer in score, variable initializer, and pitch-context positions denotes a scale degree,
-// while every other value uses the regular arithmetic expression grammar.
-Expression
-  = ScaleDegreeLiteral
-  / AdditiveExpression
 
 EnumeratedChordArithmetic
   = first:EnumeratedChord
@@ -1013,8 +1019,8 @@ NumericLiteralSuffix
   = "/" / "\\" / UnitSuffix / "." [0-9]+ ("e" / "r" / UnitSuffix)
 
 BinaryTailStart
-  = ("+" / "-") ![0-9]
-  / RequiredSpacing ("+" / "-") RequiredSpacing
+  = ("+" / "-" !">") ![0-9]
+  / RequiredSpacing ("+" / "-" !">") RequiredSpacing
   / Spacing MultiplicativeOperator
   / RequiredSpacing "/" RequiredSpacing
   / "**"
