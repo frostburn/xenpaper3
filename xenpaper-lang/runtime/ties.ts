@@ -52,10 +52,10 @@ function timedAttacks(shape: ScoreShape) {
         visit(child, offset, state)
         offset = offset.add(child.duration)
       }
-      if (current.normalized) {
+      if (current.normalized || current.continuationTarget === 'all') {
         state.active = notes.slice(first)
-        state.start = start
-        state.span = current.duration
+        state.start = current.normalized ? start : undefined
+        state.span = current.normalized ? current.duration : undefined
       }
     } else if (current.kind === 'parallel') {
       const first = notes.length
@@ -163,16 +163,10 @@ export function tieScoreShapes(
   }
   const duration = left.duration.add(right.duration)
   return {
-    kind: 'parallel',
+    kind: 'sequence',
     duration,
-    branches: [
-      {
-        kind: 'sequence',
-        duration,
-        children: [restore(left, source), restore(right, target)],
-        origins,
-      },
-    ],
+    children: [restore(left, source), restore(right, target)],
+    continuationTarget: 'all',
     origins,
   }
 }

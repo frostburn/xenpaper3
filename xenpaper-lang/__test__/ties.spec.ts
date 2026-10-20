@@ -213,6 +213,34 @@ describe('binary ties', () => {
     expect(result.duration.toFraction()).toBe('3')
   })
 
+  it.each([
+    ['C -> @drone(D) E', 'C @drone(D) E'],
+    ['@drone(D) -> C E', '@drone(D) C E'],
+    ['C -> @groove([C= C]) @2 D E', 'C @groove([C= C]) @2 D E'],
+    ['@groove([C= C]) -> C @2 D E', '@groove([C= C]) C @2 D E'],
+  ])('preserves sequential directive state and explicit group scopes: %s', (actual, expected) => {
+    const notes = (source: string) =>
+      score(source)
+        .events.filter((event) => event.kind === 'note')
+        .map((note) => [
+          note.pitch.value.toString(),
+          note.start.toFraction(),
+          note.duration.toFraction(),
+        ])
+    expect(notes(actual)).toEqual(notes(expected))
+  })
+
+  it('keeps drone changes inside explicitly grouped operands', () => {
+    expect(timing('C -> (@drone(D) C) E')).toEqual({
+      duration: '3',
+      notes: [
+        ['0', '2'],
+        ['1', '1'],
+        ['2', '1'],
+      ],
+    })
+  })
+
   it('works in function returns, stored operands, and repeats', () => {
     expect(timing('fn sustain() { ret C -> C } sustain()')).toEqual({
       duration: '2',

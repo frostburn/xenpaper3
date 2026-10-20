@@ -1262,13 +1262,19 @@ export function evaluateScoreSemantics(
       environment,
     } = visitor.scope
     if (current.type === 'BinaryExpression' && current.operator === '->') {
-      const left = visitor.visit(current.left)
+      // Directives and declarations establish prevailing state as sequence items.
+      const operand = (expression: Expression): Expression => ({
+        type: 'Sequence',
+        items: [expression],
+        location: expression.location,
+      })
+      const left = visitor.visit(operand(current.left))
       if (!hasShape(left)) return left
       const next = at(
         visitorAfter(left, visitor),
         visitor.scope.offset.add(left.shape.duration.mul(visitor.scope.timeScale)),
       )
-      const right = next.visit(current.right)
+      const right = next.visit(operand(current.right))
       const diagnostics = [...left.diagnostics, ...right.diagnostics]
       if (!hasShape(right)) return { diagnostics }
       return withVisitor(
