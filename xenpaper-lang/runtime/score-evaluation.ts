@@ -1262,21 +1262,36 @@ export function evaluateScoreSemantics(
       environment,
     } = visitor.scope
     if (current.type === 'BinaryExpression' && current.operator === '->') {
-      // Directives and declarations establish prevailing state as sequence items.
-      const operand = (expression: Expression): Expression => ({
-        type: 'Sequence',
-        items: [expression],
-        location: expression.location,
+      const directiveOnly = (expression: Expression): boolean =>
+        expression.type === 'Directive' ||
+        (expression.type === 'Group' && directiveOnly(expression.expression))
+      const invalidOperand = (
+        expression: Expression,
+        diagnostics: readonly Diagnostic[] = [],
+      ): ScoreShapeEvaluationResult => ({
+        diagnostics: [
+          ...diagnostics,
+          {
+            code: 'XP_TIE_OPERAND',
+            severity: 'error',
+            message: 'A tie operand must contain at least one note.',
+            locations: [expression.location],
+          },
+        ],
       })
-      const left = visitor.visit(operand(current.left))
+      if (directiveOnly(current.left)) return invalidOperand(current.left)
+      const left = visitor.visit(current.left)
       if (!hasShape(left)) return left
+      if (!attacks(left.shape).length) return invalidOperand(current.left, left.diagnostics)
+      if (directiveOnly(current.right)) return invalidOperand(current.right, left.diagnostics)
       const next = at(
         visitorAfter(left, visitor),
         visitor.scope.offset.add(left.shape.duration.mul(visitor.scope.timeScale)),
       )
-      const right = next.visit(operand(current.right))
+      const right = next.visit(current.right)
       const diagnostics = [...left.diagnostics, ...right.diagnostics]
       if (!hasShape(right)) return { diagnostics }
+      if (!attacks(right.shape).length) return invalidOperand(current.right, diagnostics)
       return withVisitor(
         {
           shape: tieScoreShapes(left.shape, right.shape, [origin(current, 'operator')]),

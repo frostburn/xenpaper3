@@ -116,6 +116,10 @@ The binary `->` operator sequences two operands and ties matching notes:
 [C D E] -> [C F E]
 ```
 
+Both operands must contain notes. A directive, rest, or empty group cannot
+serve as an operand on its own. Directives can appear inside a musical operand,
+such as `C -> (@p C)`, with their usual group scope.
+
 Every left-hand note is eligible, including earlier notes inside a tuplet.
 Matching uses the evaluated sounding pitch, and searches the entire right
 operand. Each matching left note keeps its attack and takes the latest end

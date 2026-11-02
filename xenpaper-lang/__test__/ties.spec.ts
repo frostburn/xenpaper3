@@ -164,8 +164,6 @@ describe('binary ties', () => {
         ['1', '1'],
       ],
     ],
-    ['C -> .', '2', [['0', '1']]],
-    ['. -> C', '2', [['1', '1']]],
   ])(
     'retains rhythm through holds, normalization, and composition: %s',
     (source, duration, notes) => {
@@ -214,11 +212,11 @@ describe('binary ties', () => {
   })
 
   it.each([
-    ['C -> @drone(D) E', 'C @drone(D) E'],
-    ['@drone(D) -> C E', '@drone(D) C E'],
-    ['C -> @groove([C= C]) @2 D E', 'C @groove([C= C]) @2 D E'],
-    ['@groove([C= C]) -> C @2 D E', '@groove([C= C]) C @2 D E'],
-  ])('preserves sequential directive state and explicit group scopes: %s', (actual, expected) => {
+    ['@drone(D) C -> C E', '@drone(D) C= E'],
+    ['@groove([C= C]) C -> C @2 D E', '@groove([C= C]) C= @2 D E'],
+    ['C -> (@groove([C= C]) C) @2 D E', 'C= @2 D E'],
+    ['(@groove([C= C]) C) -> C @2 D E', 'C= @2 D E'],
+  ])('preserves prevailing directives and musical operand scopes: %s', (actual, expected) => {
     const notes = (source: string) =>
       score(source)
         .events.filter((event) => event.kind === 'note')
@@ -228,6 +226,31 @@ describe('binary ties', () => {
           note.duration.toFraction(),
         ])
     expect(notes(actual)).toEqual(notes(expected))
+  })
+
+  it.each([
+    '@groove([C= C]) -> C @2 D E',
+    'C -> @groove([C= C]) @2 D E',
+    '@drone(D) -> C E',
+    'C -> @drone(D) E',
+    '(@groove([C= C])) -> C',
+    'C -> (@drone(D))',
+    '. -> C',
+    'C -> .',
+    '[] -> C',
+    'C -> []',
+    '({12edo}) -> C',
+    'C -> ({12edo})',
+  ])('rejects a tie operand without notes: %s', (source) => {
+    const result = expandToBeatEvents(parse(source))
+    expect(result).not.toHaveProperty('score')
+    expect(result.diagnostics).toEqual([
+      expect.objectContaining({
+        code: 'XP_TIE_OPERAND',
+        severity: 'error',
+        message: 'A tie operand must contain at least one note.',
+      }),
+    ])
   })
 
   it('keeps drone changes inside explicitly grouped operands', () => {
