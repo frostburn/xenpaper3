@@ -7,7 +7,7 @@ import type { ExpressionEvaluationResult } from './expressions'
 import { DYNAMIC_VELOCITIES, resolveDirective } from './directives'
 import { Visitor, type VisitorEvaluation } from './visitor'
 import { contextAt } from './initialization'
-import { tieScoreShapes } from './ties'
+import { materializeScoreContinuations, tieScoreShapes } from './ties'
 import { EMPTY_LEXICAL_ENVIRONMENT, extendLexicalEnvironment } from './types'
 import {
   DEFAULT_PITCH_CONTEXT,
@@ -860,25 +860,6 @@ function holdAttacks(
   if (!attackCount) return undefined
   if (!extension.n) return held
   return sequence([held, generatedRest(extension)], shape.origins)
-}
-
-/** Materialize the timing of postfix continuations before a later `!` mark. */
-function materializeTrailingContinuations(shape: ScoreShape): ScoreShape {
-  if (shape.kind !== 'sequence') return shape
-  let end = shape.children.length
-  while (end && shape.children[end - 1]!.kind === 'continue') end--
-  if (end === shape.children.length || !end) return shape
-  const children = shape.children.slice(0, end)
-  const body = children.length === 1 ? children[0]! : sequence(children, shape.origins)
-  if (!body.duration.n || !attacks(body).length) return shape
-  const continuationDuration = shape.children
-    .slice(end)
-    .reduce((duration, child) => duration.add(child.duration), new Fraction(0))
-  // A normalized slot stretches as a unit. Ordinary groups retain their onsets;
-  // the following hold will sustain their attacks through the continuation span.
-  return body.kind === 'sequence' && body.normalized
-    ? scaleShape(body, body.duration.add(continuationDuration).div(body.duration))
-    : sequence([body, generatedRest(continuationDuration)], shape.origins)
 }
 
 function contextAnnotation(
@@ -2171,7 +2152,7 @@ export function evaluateScoreSemantics(
         if (!('shape' in evaluated)) return evaluated
         const continuations = heldFrom.filter((mark) => mark.type === 'DetachedContinue')
         const extension = currentPulse.mul(continuations.length)
-        const base = materializeTrailingContinuations(evaluated.shape)
+        const base = materializeScoreContinuations(evaluated.shape)
         const held = holdAttacks(
           base,
           base.duration.add(extension),

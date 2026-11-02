@@ -68,6 +68,82 @@ function timedAttacks(shape: ScoreShape) {
   return { notes, continued }
 }
 
+function restore(
+  shape: ScoreShape,
+  timing: ReturnType<typeof timedAttacks>,
+  removed: ReadonlySet<AttackShape> = new Set(),
+): ScoreShape {
+  const notes = new Map(timing.notes.map((note) => [note.attack, note]))
+  const visit = (current: ScoreShape, start: Fraction): ScoreShape => {
+    if (current.kind === 'attack') {
+      if (removed.has(current))
+        return {
+          kind: 'rest',
+          duration: current.duration,
+          generated: true,
+          origins: current.origins,
+        }
+      const note = notes.get(current)!
+      if (
+        note.start.equals(start) &&
+        note.duration.equals(current.duration) &&
+        note.origins === current.origins
+      )
+        return current
+      const attack: AttackShape = {
+        ...current,
+        duration: note.duration,
+        origins: note.origins,
+        automation: note.automation,
+      }
+      const delay = note.start.sub(start)
+      const branch: ScoreShape = delay.n
+        ? {
+            kind: 'sequence',
+            duration: delay.add(attack.duration),
+            children: [
+              { kind: 'rest', duration: delay, generated: true, origins: current.origins },
+              attack,
+            ],
+            origins: current.origins,
+          }
+        : attack
+      // Keep the attack's rhythmic slot even when its sounding end changes.
+      return {
+        kind: 'parallel',
+        duration: current.duration,
+        branches: [branch],
+        origins: current.origins,
+      }
+    }
+    if (current.kind === 'continue' && timing.continued.has(current))
+      return {
+        kind: 'rest',
+        duration: current.duration,
+        generated: true,
+        origins: current.origins,
+      }
+    if (current.kind === 'sequence') {
+      let offset = start
+      const children = current.children.map((child) => {
+        const result = visit(child, offset)
+        offset = offset.add(child.duration)
+        return result
+      })
+      return { ...current, children }
+    }
+    if (current.kind === 'parallel')
+      return { ...current, branches: current.branches.map((branch) => visit(branch, start)) }
+    return current
+  }
+  return visit(shape, new Fraction(0))
+}
+
+/** Resolve continuations to explicit attack timings without changing rhythmic slots. */
+export function materializeScoreContinuations(shape: ScoreShape): ScoreShape {
+  return restore(shape, timedAttacks(shape))
+}
+
 /**
  * Sequence two operands, replacing each matching left endpoint with the latest
  * matching right endpoint. Matched right attacks disappear; their slots remain.
@@ -95,77 +171,11 @@ export function tieScoreShapes(
     note.origins = [...note.origins, ...origins, ...matches.flatMap((match) => match.origins)]
   }
 
-  const restore = (shape: ScoreShape, timing: ReturnType<typeof timedAttacks>): ScoreShape => {
-    const notes = new Map(timing.notes.map((note) => [note.attack, note]))
-    const visit = (current: ScoreShape, start: Fraction): ScoreShape => {
-      if (current.kind === 'attack') {
-        if (removed.has(current))
-          return {
-            kind: 'rest',
-            duration: current.duration,
-            generated: true,
-            origins: current.origins,
-          }
-        const note = notes.get(current)!
-        if (
-          note.start.equals(start) &&
-          note.duration.equals(current.duration) &&
-          note.origins === current.origins
-        )
-          return current
-        const attack: AttackShape = {
-          ...current,
-          duration: note.duration,
-          origins: note.origins,
-          automation: note.automation,
-        }
-        const delay = note.start.sub(start)
-        const branch: ScoreShape = delay.n
-          ? {
-              kind: 'sequence',
-              duration: delay.add(attack.duration),
-              children: [
-                { kind: 'rest', duration: delay, generated: true, origins: current.origins },
-                attack,
-              ],
-              origins: current.origins,
-            }
-          : attack
-        // Keep the attack's rhythmic slot even when its sounding end changes.
-        return {
-          kind: 'parallel',
-          duration: current.duration,
-          branches: [branch],
-          origins: current.origins,
-        }
-      }
-      if (current.kind === 'continue' && timing.continued.has(current))
-        return {
-          kind: 'rest',
-          duration: current.duration,
-          generated: true,
-          origins: current.origins,
-        }
-      if (current.kind === 'sequence') {
-        let offset = start
-        const children = current.children.map((child) => {
-          const result = visit(child, offset)
-          offset = offset.add(child.duration)
-          return result
-        })
-        return { ...current, children }
-      }
-      if (current.kind === 'parallel')
-        return { ...current, branches: current.branches.map((branch) => visit(branch, start)) }
-      return current
-    }
-    return visit(shape, new Fraction(0))
-  }
   const duration = left.duration.add(right.duration)
   return {
     kind: 'sequence',
     duration,
-    children: [restore(left, source), restore(right, target)],
+    children: [restore(left, source, removed), restore(right, target, removed)],
     continuationTarget: 'all',
     origins,
   }
