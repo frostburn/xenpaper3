@@ -69,7 +69,7 @@ describe('interactive tutorial snippets', () => {
     const demos = interactiveTutorialPages.flat()
     expect(new Set(demos.map((demo) => demo.id)).size).toBe(demos.length)
     expect(demos.every((demo) => demo.title.length > 0)).toBe(true)
-    expect(demos.filter((demo) => demo.props)).toHaveLength(135)
+    expect(demos.filter((demo) => demo.props)).toHaveLength(136)
     expect(demos.filter((demo) => !demo.props)).toHaveLength(8)
     expect(demos.slice(0, 20).map((demo) => demo.id)).toEqual(
       Array.from({ length: 20 }, (_, index) => `basics-${String(index + 1).padStart(2, '0')}`),
@@ -113,6 +113,42 @@ describe('interactive tutorial snippets', () => {
       expect(plan.tempoMap.beatToSeconds(1)).toBe(60 / expectedTempo)
       expect(plan.lanes[0]?.notes.length).toBeGreaterThan(0)
     }
+  })
+
+  it('sustains common tones through the four-bar progression without repeated attacks', () => {
+    const demo = playablePages
+      .flat()
+      .find((demo) => demo.id === 'basics-four-bar-tied-progression')!
+    const result = compileSnippet({
+      source: demo.props.source,
+      lane: {
+        source: demo.props.laneSource,
+        instrument: demo.props.instrument,
+        gain: demo.props.gain,
+      },
+    })
+    expect(result.diagnostics).toEqual([])
+    expect(result.score.duration.toFraction()).toBe('16')
+    expect(
+      result.score.events
+        .filter((event) => event.kind === 'marker' && event.marker === 'barline')
+        .map((event) => event.start.toFraction()),
+    ).toEqual(['4', '8', '12', '16'])
+    expect(
+      result.score.events
+        .filter((event) => event.kind === 'note')
+        .map((note) => [note.label, note.start.toFraction(), note.duration.toFraction()]),
+    ).toEqual([
+      ['C', '0', '16'],
+      ['E', '0', '12'],
+      ['G', '0', '8'],
+      ['B', '0', '4'],
+      ['A', '4', '12'],
+      ['F', '8', '8'],
+      ['D', '12', '4'],
+    ])
+    const plan = createPlaybackPlan(result.project, 0, SNIPPET_PLAYBACK_OPTIONS)
+    expect(plan.lanes[0]!.notes).toHaveLength(7)
   })
 
   it('renders JSON content and editor props on each page with bounded navigation', async () => {
