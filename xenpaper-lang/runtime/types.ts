@@ -603,6 +603,8 @@ export type BarlineStyle =
 export interface SequenceShape extends ShapeBase {
   readonly kind: 'sequence'
   readonly children: readonly ScoreShape[]
+  /** Ties keep every surviving attack available to following continuations. */
+  readonly continuationTarget?: 'all'
   /** Whether the sequence was explicitly normalized into a single rhythmic slot. */
   readonly normalized?: boolean
   /** Number of notes explicitly normalized into a non-binary rhythmic slot. */

@@ -469,6 +469,60 @@
     "expectedWarnings": ["XP_BARLINE_OFF_CYCLE", "XP_BARLINE_OFF_CYCLE"]
   },
   {
+    "id": "advanced-chord-ties",
+    "title": "Ties across chords",
+    "html": "<p><code>-></code> sustains matching pitches from the left operand through their matching notes on the right, removing the repeated attacks. The first progression reattacks C; the second sustains C while the other chord tones change. Parentheses make each chord an operand. Try changing the right-hand C to D.</p>",
+    "props": {
+      "source": "{12edo}\n(C, E, G) (C, F, A)\n(C, E, G) -> (C, F, A)",
+      "instrument": {
+        "type": "patch",
+        "patchPreset": "default",
+        "oscillatorType": "semisine"
+      },
+      "gain": 0.35,
+      "laneSource": "@tempo(100bpm) @adsr(10ms, 100ms, 70%, 100ms)",
+      "simplified": true,
+      "rows": 3,
+      "editorLabel": "Ties across chords source"
+    }
+  },
+  {
+    "id": "advanced-tuplet-ties",
+    "title": "Ties between tuplets",
+    "html": "<p>Ties match notes anywhere in both operands, including earlier tuplet notes. In the second phrase, C and E sustain into their matches in the next tuplet; D and F keep their original timing. C lasts from the start of the first tuplet through the first note of the second. Try replacing the second tuplet with <code>[F C E]</code> to hear C sustain farther.</p>",
+    "props": {
+      "source": "{12edo}\n[C D E] [C F E]\n[C D E] -> [C F E]",
+      "instrument": {
+        "type": "patch",
+        "patchPreset": "default",
+        "oscillatorType": "semisine"
+      },
+      "gain": 0.35,
+      "laneSource": "@tempo(90bpm) @adsr(10ms, 100ms, 70%, 100ms)",
+      "simplified": true,
+      "rows": 3,
+      "editorLabel": "Ties between tuplets source"
+    }
+  },
+  {
+    "id": "basics-four-bar-tied-progression",
+    "title": "Four-bar progression with common tones",
+    "html": "<p>Play Cmaj7, Am7, Fmaj7, and Dm7, one chord per 4/4 bar. The arrows sustain common tones: C sounds once across all four bars while the other shared pitches continue into the next chord. Each <code>===</code> holds a chord for four beats. Bar lines can appear before <code>-></code> to keep the measures clear. Remove the arrows to hear every chord tone attack again.</p>",
+    "props": {
+      "source": "{12edo} @time(4/4)\n[C, E, G, B]=== | ->\n[C, E, G, A]=== | ->\n[C, E, F, A]=== | ->\n[C, D, F, A]=== ||",
+      "instrument": {
+        "type": "patch",
+        "patchPreset": "default",
+        "oscillatorType": "semisine"
+      },
+      "gain": 0.35,
+      "laneSource": "@tempo(100bpm) @adsr(10ms, 100ms, 70%, 100ms)",
+      "simplified": true,
+      "rows": 5,
+      "editorLabel": "Four-bar progression with common tones source"
+    }
+  },
+  {
     "id": "basics-26",
     "title": "Shifting chord roots",
     "description": "Enumerated chords can be shifted using arithmetic. The first enumeral defines where 1/1 falls. Use smaller numbers to place notes below the root.",

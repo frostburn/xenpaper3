@@ -436,6 +436,18 @@ export function constructStaffNotationShape(shape: ScoreShape): StaffNotationSha
         duration: shape.duration,
       }
     case 'sequence':
+      if (shape.continuationTarget === 'all' && !shape.normalized)
+        return {
+          kind: 'parallel',
+          duration: shape.duration,
+          branches: [
+            {
+              kind: 'sequence',
+              duration: shape.duration,
+              children: shape.children.map(constructStaffNotationShape),
+            },
+          ],
+        }
       return {
         kind: 'sequence',
         duration: shape.duration,

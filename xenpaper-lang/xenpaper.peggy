@@ -153,17 +153,41 @@ SequenceExpression
     }
 
 SequenceItem
-  = expression:(EnumeratedChordArithmetic / Expression)
+  = Expression
+
+// Ties compose complete score operands, below arithmetic and postfix marks but
+// above sequencing and parallel composition. Chains associate to the left.
+Expression
+  = first:TieOperand rest:(Spacing
+      before:(barline:Barline Spacing { return barline; })*
+      "->" Spacing
+      after:(barline:Barline Spacing { return barline; })*
+      right:TieOperand {
+      return { barlines: [...before, ...after], right };
+    })* {
+      let result = first;
+      for (const part of rest) {
+        // Bar checks belong at the join, without becoming either tie operand.
+        const left = part.barlines.length
+          ? sequence([result, ...part.barlines], {
+              ...result.location,
+              end: part.barlines[part.barlines.length - 1].location.end,
+            })
+          : result;
+        result = binary("->", left, part.right, {
+          ...left.location,
+          end: part.right.location.end,
+        });
+      }
+      return result;
+    }
+
+TieOperand
+  = expression:(EnumeratedChordArithmetic / ScaleDegreeLiteral / AdditiveExpression)
     marks:AttachedPostfixMark* {
       if (!marks.length) return expression;
       return node('PostfixExpression', { expression, marks });
     }
-
-// A bare integer in score, variable initializer, and pitch-context positions denotes a scale degree,
-// while every other value uses the regular arithmetic expression grammar.
-Expression
-  = ScaleDegreeLiteral
-  / AdditiveExpression
 
 EnumeratedChordArithmetic
   = first:EnumeratedChord
@@ -1013,8 +1037,8 @@ NumericLiteralSuffix
   = "/" / "\\" / UnitSuffix / "." [0-9]+ ("e" / "r" / UnitSuffix)
 
 BinaryTailStart
-  = ("+" / "-") ![0-9]
-  / RequiredSpacing ("+" / "-") RequiredSpacing
+  = ("+" / "-" !">") ![0-9]
+  / RequiredSpacing ("+" / "-" !">") RequiredSpacing
   / Spacing MultiplicativeOperator
   / RequiredSpacing "/" RequiredSpacing
   / "**"

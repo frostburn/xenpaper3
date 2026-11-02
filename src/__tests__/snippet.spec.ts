@@ -9,6 +9,28 @@ import {
 import { createPlaybackPlan } from '../daw/playback-plan'
 
 describe('shareable snippets', () => {
+  it.each(['@groove([C= C]) -> C @2 D E', 'C -> @drone(D) E', '(@groove([C= C])) -> C', 'C -> .'])(
+    'rejects note-free tie operands through snippet compilation: %s',
+    (source) => {
+      const snippet = createDefaultSnippet()
+      snippet.source = source
+      expect(() => compileSnippet(snippet)).toThrow('A tie operand must contain at least one note.')
+    },
+  )
+
+  it.each([
+    ['C -> C', 1],
+    ['[C D E] -> [C F E]', 4],
+  ])('compiles musical tie operands through snippet playback: %s', (source, attacks) => {
+    const snippet = createDefaultSnippet()
+    snippet.source = source
+    const result = compileSnippet(snippet)
+    expect(result.diagnostics).toEqual([])
+    expect(result.score.duration.valueOf()).toBe(2)
+    const plan = createPlaybackPlan(result.project, 0, SNIPPET_PLAYBACK_OPTIONS)
+    expect(plan.lanes[0]!.notes).toHaveLength(attacks)
+  })
+
   it('starts without an explicit or inherited time signature', () => {
     const snippet = createDefaultSnippet()
     expect(snippet.source).not.toContain('@time')
