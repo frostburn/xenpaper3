@@ -133,7 +133,6 @@ describe('beat event expansion', () => {
   it.each([
     ['(0 5 7)!', ['0', '1', '2'], ['3', '2', '1'], '3'],
     ['[0 5 7]!', ['0', '1/3', '2/3'], ['1', '2/3', '1/3'], '1'],
-    ['(0 5 7)=', ['0', '1', '2'], ['2', '2', '2'], '4'],
     ['(0 5 7)!=', ['0', '1', '2'], ['4', '3', '2'], '4'],
     ['[0 5 7]!=', ['0', '1/3', '2/3'], ['2', '5/3', '4/3'], '2'],
     ['[0 5 7]=!=', ['0', '2/3', '4/3'], ['3', '7/3', '5/3'], '3'],
@@ -144,6 +143,40 @@ describe('beat event expansion', () => {
     expect(notes.map((note) => note.start.toFraction())).toEqual(starts)
     expect(notes.map((note) => note.duration.toFraction())).toEqual(durations)
     expect(result.duration.toFraction()).toBe(totalDuration)
+  })
+
+  it.each([
+    ['(1 2 3)==', ['0', '1', '2'], ['1', '1', '3'], '5'],
+    ['(1 2 3) ==', ['0', '1', '2'], ['1', '1', '3'], '5'],
+    ['((1 2) 3)==', ['0', '1', '2'], ['1', '1', '3'], '5'],
+    ['(1 2 3)== 4', ['0', '1', '2', '5'], ['1', '1', '3', '1'], '6'],
+    ['let phrase = (1 2 3) phrase==', ['0', '1', '2'], ['1', '1', '3'], '5'],
+    ['fn phrase() { ret (1 2 3) } phrase()==', ['0', '1', '2'], ['1', '1', '3'], '5'],
+    ['[1 2 3]==', ['0', '1', '2'], ['1', '1', '1'], '3'],
+    ['([1 2 3])==', ['0', '1', '2'], ['1', '1', '1'], '3'],
+    ['let phrase = [1 2 3] phrase==', ['0', '1', '2'], ['1', '1', '1'], '3'],
+    ['(1, 2, 3)==', ['0', '0', '0'], ['3', '3', '3'], '3'],
+    ['(1, 2 3)=', ['0', '0', '2'], ['2', '2', '2'], '3'],
+    ['(1 2 3)==!', ['0', '1', '2'], ['5', '4', '3'], '5'],
+    ['(1 2 3)!=', ['0', '1', '2'], ['4', '3', '2'], '4'],
+    ['(1 2 3)=!=', ['0', '1', '2'], ['5', '4', '3'], '5'],
+  ])('retains continuation timing for %s', (source, starts, durations, totalDuration) => {
+    const result = score(source)
+    const notes = result.events.filter((event) => event.kind === 'note')
+
+    expect(notes.map((note) => note.start.toFraction())).toEqual(starts)
+    expect(notes.map((note) => note.duration.toFraction())).toEqual(durations)
+    expect(result.duration.toFraction()).toBe(totalDuration)
+  })
+
+  it('does not continue a note across a rest at the end of a group', () => {
+    const result = expandToBeatEvents(parse('(1 2 .)=='))
+
+    expect(result.diagnostics).toMatchObject([
+      { code: 'XP_CONTINUE_WITHOUT_ATTACK' },
+      { code: 'XP_CONTINUE_WITHOUT_ATTACK' },
+    ])
+    expect('score' in result).toBe(false)
   })
 
   it('preserves non-attack shapes while holding a container', () => {

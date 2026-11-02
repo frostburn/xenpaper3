@@ -419,5 +419,77 @@
     "id": "features-effect-lanes",
     "title": "Delay effect lanes",
     "html": "<p>In the <a href=\"/daw\">DAW</a>, add a ping-pong delay effect lane and route an instrument to it in the mixer. Its source supports <code>@delay(250ms)</code>, <code>@feedback(55%)</code>, <code>@wet(35%)</code>, and <code>@separation(100%)</code>. Separation controls the stereo width. These directives belong to the effect lane, not a note snippet.</p><p>All four parameters support <code>@ramp</code>. For example, this effect source raises the wet level over eight beats:</p><pre>@delay(250ms) @feedback(55%) @separation(100%)\n@ramp(ease-in) @wet(10%) ........ @wet(60%)</pre>"
+  },
+  {
+    "id": "features-group-continuations",
+    "title": "Continuing the end of a phrase",
+    "html": "<p>After an ordinary sequence, <code>=</code> continues its final note without another attack. Parentheses keep that rule: <code>(1 2 3)==</code> and <code>1 2 3==</code> both last five beats, with note lengths 1, 1, and 3. Stored phrases and function results behave the same way. Compare the three phrases below.</p>",
+    "props": {
+      "source": "(1 2 3)== .\n1 2 3== .\nlet phrase = (1 2 3)\nphrase== .",
+      "instrument": {
+        "type": "patch",
+        "patchPreset": "default",
+        "oscillatorType": "semisine"
+      },
+      "gain": 0.35,
+      "laneSource": "@tempo(120bpm) @adsr(10ms, 100ms, 70%, 100ms)",
+      "simplified": true,
+      "rows": 4,
+      "editorLabel": "Continuing the end of a phrase source"
+    }
+  },
+  {
+    "id": "features-continuations-in-tuplets",
+    "title": "Continuations inside and outside tuplets",
+    "html": "<p>Square brackets make one rhythmic slot. Appending <code>==</code> stretches the entire tuplet to three slots, including the gaps between its attacks. Putting <code>==</code> on its last note inside the brackets instead gives that note three shares of the original single slot. Parentheses around a tuplet preserve the tuplet rule.</p>",
+    "props": {
+      "source": "[0 4 7]== .\n[0 4 7==] .\n([0 4 7])== .",
+      "instrument": {
+        "type": "patch",
+        "patchPreset": "default",
+        "oscillatorType": "semisine"
+      },
+      "gain": 0.35,
+      "laneSource": "@tempo(120bpm) @adsr(10ms, 100ms, 70%, 100ms)",
+      "simplified": true,
+      "rows": 3,
+      "editorLabel": "Continuations inside and outside tuplets source"
+    }
+  },
+  {
+    "id": "features-parallel-continuations",
+    "title": "Continuations in parallel voices",
+    "html": "<p>A continuation after a chord extends all its notes. After an uneven parallel expression it stretches every collected note, including earlier attacks, and can move later attacks or make notes sound past the construction's end. Put continuations inside individual branches to control their endings: in <code>(0=, 4 7=)</code>, only 0 and the final 7 are extended. Compare that with a continuation outside <code>(0, 4 7)</code>.</p>",
+    "props": {
+      "source": "# A three-beat chord\n(0, 4, 7)== .\n# Continue each voice explicitly\n(0=, 4 7=) .\n# Stretch every collected note\n(0, 4 7)= .",
+      "instrument": {
+        "type": "patch",
+        "patchPreset": "default",
+        "oscillatorType": "semisine"
+      },
+      "gain": 0.35,
+      "laneSource": "@tempo(120bpm) @adsr(10ms, 100ms, 70%, 100ms)",
+      "simplified": true,
+      "rows": 6,
+      "editorLabel": "Continuations in parallel voices source"
+    }
+  },
+  {
+    "id": "features-continuation-hold-order",
+    "title": "Rests and the order of holds",
+    "html": "<p>A rest clears the preceding note: <code>(0 4 .)=</code> is an error because there is nothing to continue. Use <code>!</code> when earlier attacks should also sustain. In the examples below, <code>==</code> first extends the final note, then <code>!</code> holds every attack to the resulting end. With <code>!=</code>, every attack instead holds to the group's end plus one slot. A tuplet stretched before <code>!</code> keeps its stretched attack times. To connect specific matching pitches in a following phrase, use <code>-&gt;</code>.</p>",
+    "props": {
+      "source": "(0 4 7)== .\n(0 4 7)==! .\n(0 4 7)!= .\n[0 4 7]=!= .",
+      "instrument": {
+        "type": "patch",
+        "patchPreset": "default",
+        "oscillatorType": "semisine"
+      },
+      "gain": 0.35,
+      "laneSource": "@tempo(120bpm) @adsr(10ms, 100ms, 70%, 100ms)",
+      "simplified": true,
+      "rows": 4,
+      "editorLabel": "Rests and the order of holds source"
+    }
   }
 ]

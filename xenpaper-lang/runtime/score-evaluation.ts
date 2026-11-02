@@ -824,7 +824,6 @@ function holdAttacks(
   shape: ScoreShape,
   duration: Fraction,
   extension: Fraction,
-  holdUntilEnd: boolean,
   markOrigins: readonly SourceOrigin[],
 ): ScoreShape | undefined {
   let attackCount = 0
@@ -833,7 +832,7 @@ function holdAttacks(
       attackCount++
       const held: AttackShape = {
         ...current,
-        duration: holdUntilEnd ? duration.sub(start) : current.duration.add(extension),
+        duration: duration.sub(start),
         origins: [...current.origins, ...markOrigins],
       }
       return {
@@ -869,12 +868,17 @@ function materializeTrailingContinuations(shape: ScoreShape): ScoreShape {
   let end = shape.children.length
   while (end && shape.children[end - 1]!.kind === 'continue') end--
   if (end === shape.children.length || !end) return shape
-  const body = sequence(shape.children.slice(0, end), shape.origins)
+  const children = shape.children.slice(0, end)
+  const body = children.length === 1 ? children[0]! : sequence(children, shape.origins)
   if (!body.duration.n || !attacks(body).length) return shape
   const continuationDuration = shape.children
     .slice(end)
     .reduce((duration, child) => duration.add(child.duration), new Fraction(0))
-  return scaleShape(body, body.duration.add(continuationDuration).div(body.duration))
+  // A normalized slot stretches as a unit. Ordinary groups retain their onsets;
+  // the following hold will sustain their attacks through the continuation span.
+  return body.kind === 'sequence' && body.normalized
+    ? scaleShape(body, body.duration.add(continuationDuration).div(body.duration))
+    : sequence([body, generatedRest(continuationDuration)], shape.origins)
 }
 
 function contextAnnotation(
@@ -2172,7 +2176,6 @@ export function evaluateScoreSemantics(
           base,
           base.duration.add(extension),
           extension,
-          true,
           current.marks.map((mark) => origin(mark, 'duration')),
         )
         if (held)
@@ -2188,16 +2191,21 @@ export function evaluateScoreSemantics(
       const elimination = current.marks.find((mark) => mark.type === 'TailElimination')
       let evaluated = visitor.visit(current.expression)
       if (!('shape' in evaluated)) return evaluated
-      let distributesHolds = current.expression.type === 'Group'
-      if (continuations.length && !distributesHolds) {
-        const stored = evaluateExpression(current.expression, context, environment)
-        if ('value' in stored)
-          distributesHolds = stored.value.kind === 'container' && !!stored.value.grouped
-      }
+      // Only constructions continued as a unit need their timed contexts moved.
+      // Ordinary sequences keep their attack positions and continue the last note.
+      let continued = evaluated.shape
+      while (
+        continued.kind === 'sequence' &&
+        !continued.normalized &&
+        !continued.continuationTarget &&
+        continued.children.length === 1
+      )
+        continued = continued.children[0]!
       if (
         continuations.length &&
-        (evaluated.shape.kind === 'sequence' || evaluated.shape.kind === 'parallel') &&
-        !distributesHolds &&
+        (continued.kind === 'parallel' ||
+          (continued.kind === 'sequence' &&
+            (continued.normalized || continued.continuationTarget === 'all'))) &&
         !visitor.scope.layout
       ) {
         const duration = evaluated.shape.duration.sub(currentPulse.mul(elimination?.count ?? 0))
@@ -2226,24 +2234,6 @@ export function evaluateScoreSemantics(
             ],
           }
         base = trimShape(base, base.duration.sub(removed))
-      }
-      if (distributesHolds) {
-        const extension = currentPulse.mul(continuations.length)
-        const duration = base.duration.add(extension)
-        const held = holdAttacks(
-          base,
-          duration,
-          extension,
-          false,
-          current.marks
-            .filter((mark) => mark.type === 'DetachedContinue')
-            .map((mark) => origin(mark, 'duration')),
-        )
-        if (held)
-          return withVisitor(
-            { shape: held, diagnostics: evaluated.diagnostics },
-            visitorAfter(evaluated, visitor),
-          )
       }
       if (!continuations.length)
         return withVisitor(
