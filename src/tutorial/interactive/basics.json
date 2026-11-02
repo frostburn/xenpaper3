@@ -507,9 +507,9 @@
   {
     "id": "basics-four-bar-tied-progression",
     "title": "Four-bar progression with common tones",
-    "html": "<p>Play Cmaj7, Am7, Fmaj7, and Dm7, one chord per 4/4 bar. The arrows sustain common tones: C sounds once across all four bars while the other shared pitches continue into the next chord. Each <code>===</code> holds a chord for four beats; parentheses include its bar line in the tie operand. Remove the arrows to hear every chord tone attack again.</p>",
+    "html": "<p>Play Cmaj7, Am7, Fmaj7, and Dm7, one chord per 4/4 bar. The arrows sustain common tones: C sounds once across all four bars while the other shared pitches continue into the next chord. Each <code>===</code> holds a chord for four beats. Bar lines can appear before <code>-></code> to keep the measures clear. Remove the arrows to hear every chord tone attack again.</p>",
     "props": {
-      "source": "{12edo} @time(4/4)\n([C, E, G, B]=== |) ->\n([C, E, G, A]=== |) ->\n([C, E, F, A]=== |) ->\n([C, D, F, A]=== |)",
+      "source": "{12edo} @time(4/4)\n[C, E, G, B]=== | ->\n[C, E, G, A]=== | ->\n[C, E, F, A]=== | ->\n[C, D, F, A]=== ||",
       "instrument": {
         "type": "patch",
         "patchPreset": "default",

@@ -60,6 +60,57 @@ describe('binary ties', () => {
     expect(parse('~3/2').body[0]).toMatchObject({ operator: '~' })
   })
 
+  it.each(['C|->C', 'C | -> C', 'C -> | C', 'C | # across the bar\n -> C'])(
+    'ties across a barline without making it an operand: %s',
+    (source) => {
+      expect(parse(source).body[0]).toMatchObject({
+        type: 'BinaryExpression',
+        operator: '->',
+        left: { type: 'Sequence', items: [{ type: 'PitchLiteral' }, { type: 'Barline' }] },
+        right: { type: 'PitchLiteral' },
+      })
+      const result = score(source)
+      expect(result.duration.toFraction()).toBe('2')
+      expect(result.events.filter((event) => event.kind === 'note')).toMatchObject([
+        { start: new Fraction(0), duration: new Fraction(2) },
+      ])
+      expect(result.events.filter((event) => event.kind === 'marker')).toMatchObject([
+        { marker: 'barline', start: new Fraction(1) },
+      ])
+    },
+  )
+
+  it('preserves metered barlines and a final double barline across a tie', () => {
+    const result = score('@time(4/4) C=== | -> C=== ||')
+    expect(result.duration.toFraction()).toBe('8')
+    expect(result.events.filter((event) => event.kind === 'note')).toMatchObject([
+      { start: new Fraction(0), duration: new Fraction(8) },
+    ])
+    expect(
+      result.events
+        .filter((event) => event.kind === 'marker' && event.marker === 'barline')
+        .map((event) => event.start.toFraction()),
+    ).toEqual(['4', '8'])
+  })
+
+  it('keeps barline ties inside their repeat', () => {
+    expect(timing('|: C | -> C :|')).toEqual({
+      duration: '4',
+      notes: [
+        ['0', '2'],
+        ['2', '2'],
+      ],
+    })
+  })
+
+  it('still checks the meter of a barline crossed by a tie', () => {
+    const result = expandToBeatEvents(parse('@time(4/4) C | -> C'))
+    expect(result.diagnostics).toMatchObject([
+      { code: 'XP_BARLINE_OFF_CYCLE', severity: 'warning' },
+    ])
+    expect(result).toHaveProperty('score')
+  })
+
   it('ties matching chord tones while retaining unmatched notes', () => {
     expect(timing('(C, E, G) -> (C, F, A)')).toEqual({
       duration: '2',

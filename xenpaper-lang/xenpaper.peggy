@@ -158,10 +158,20 @@ SequenceItem
 // Ties compose complete score operands, below arithmetic and postfix marks but
 // above sequencing and parallel composition. Chains associate to the left.
 Expression
-  = first:TieOperand rest:(Spacing "->" Spacing right:TieOperand {
-      return { operator: "->", right };
+  = first:TieOperand rest:(Spacing
+      before:(barline:Barline Spacing { return barline; })*
+      "->" Spacing
+      after:(barline:Barline Spacing { return barline; })*
+      right:TieOperand {
+      return { barlines: [...before, ...after], right };
     })* {
-      return foldBinary(first, rest);
+      let result = first;
+      for (const part of rest) {
+        // Bar checks belong at the join, without becoming either tie operand.
+        const left = part.barlines.length ? sequence([result, ...part.barlines]) : result;
+        result = binary("->", left, part.right);
+      }
+      return result;
     }
 
 TieOperand

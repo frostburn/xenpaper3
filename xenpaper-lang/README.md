@@ -120,6 +120,10 @@ Both operands must contain notes. A directive, rest, or empty group cannot
 serve as an operand on its own. Directives can appear inside a musical operand,
 such as `C -> (@p C)`, with their usual group scope.
 
+Barlines may appear on either side of the operator: `C=== | -> C===` and
+`C=== -> | C===` both sustain one C across the bar. The barline remains at
+the join for notation and meter checks.
+
 Every left-hand note is eligible, including earlier notes inside a tuplet.
 Matching uses the evaluated sounding pitch, and searches the entire right
 operand. Each matching left note keeps its attack and takes the latest end
