@@ -168,8 +168,16 @@ Expression
       let result = first;
       for (const part of rest) {
         // Bar checks belong at the join, without becoming either tie operand.
-        const left = part.barlines.length ? sequence([result, ...part.barlines]) : result;
-        result = binary("->", left, part.right);
+        const left = part.barlines.length
+          ? sequence([result, ...part.barlines], {
+              ...result.location,
+              end: part.barlines[part.barlines.length - 1].location.end,
+            })
+          : result;
+        result = binary("->", left, part.right, {
+          ...left.location,
+          end: part.right.location.end,
+        });
       }
       return result;
     }

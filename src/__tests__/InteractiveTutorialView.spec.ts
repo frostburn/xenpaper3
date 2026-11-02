@@ -411,6 +411,40 @@ describe('interactive tutorial snippets', () => {
     wrapper.unmount()
   })
 
+  it('keeps chained tie barlines and chord slots correctly colored when snippet source changes', async () => {
+    const demo = playablePages
+      .flat()
+      .find((demo) => demo.id === 'basics-four-bar-tied-progression')!
+    const wrapper = mount(SnippetEditor, { props: demo.props })
+    const highlighted = () => wrapper.get('.xenpaper-source-highlight')
+    expect(
+      highlighted()
+        .findAll('.syntax-punctuation')
+        .filter((span) => span.text().includes('|'))
+        .map((span) => span.text()),
+    ).toEqual(['|', '|', '|', '||'])
+    expect(
+      highlighted()
+        .findAll('.syntax-operator')
+        .map((span) => span.text()),
+    ).toEqual(['===', '->', '===', '->', '===', '->', '==='])
+    expect(highlighted().findAll('.syntax-pitch-latin')).toHaveLength(16)
+    expect(highlighted().find('.syntax-warning').exists()).toBe(false)
+
+    await wrapper.setProps({ source: 'C -> C -> C -> C' })
+    expect(
+      highlighted()
+        .findAll('.syntax-pitch-latin')
+        .map((span) => span.text()),
+    ).toEqual(['C', 'C', 'C', 'C'])
+    expect(
+      highlighted()
+        .findAll('.syntax-operator')
+        .map((span) => span.text()),
+    ).toEqual(['->', '->', '->'])
+    wrapper.unmount()
+  })
+
   it('highlights misplaced barlines only when the snippet explicitly supplies a meter', async () => {
     const wrapper = mount(SnippetEditor, {
       props: {

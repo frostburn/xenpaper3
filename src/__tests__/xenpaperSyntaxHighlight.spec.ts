@@ -1,8 +1,63 @@
 import { describe, expect, it } from 'vitest'
 import { highlightXenpaper } from '../xenpaperSyntaxHighlight'
 import { parse } from '../../xenpaper-lang'
+import basics from '../tutorial/interactive/basics.json'
 
 describe('highlightXenpaper', () => {
+  it('keeps later pitches and barlines visible in the four-bar tie progression', () => {
+    const source = basics.find((demo) => demo.id === 'basics-four-bar-tied-progression')!.props
+      .source
+    const tokens = highlightXenpaper(parse(source))
+    expect(tokens.map(({ text }) => text).join('')).toBe(source)
+    expect(tokens.filter(({ kind }) => kind === 'pitch-latin').map(({ text }) => text)).toEqual([
+      'C',
+      'E',
+      'G',
+      'B',
+      'C',
+      'E',
+      'G',
+      'A',
+      'C',
+      'E',
+      'F',
+      'A',
+      'C',
+      'D',
+      'F',
+      'A',
+    ])
+    expect(
+      tokens
+        .filter(({ kind, text }) => kind === 'punctuation' && text.includes('|'))
+        .map(({ text }) => text),
+    ).toEqual(['|', '|', '|', '||'])
+    expect(tokens.filter(({ kind }) => kind === 'operator').map(({ text }) => text)).toEqual([
+      '===',
+      '->',
+      '===',
+      '->',
+      '===',
+      '->',
+      '===',
+    ])
+  })
+
+  it('does not let earlier binary ties mask later operands in a chain', () => {
+    const tokens = highlightXenpaper(parse('C -> C -> C -> C'))
+    expect(tokens.filter(({ kind }) => kind === 'pitch-latin').map(({ text }) => text)).toEqual([
+      'C',
+      'C',
+      'C',
+      'C',
+    ])
+    expect(tokens.filter(({ kind }) => kind === 'operator').map(({ text }) => text)).toEqual([
+      '->',
+      '->',
+      '->',
+    ])
+  })
+
   it('highlights every configured drum sample consistently', () => {
     const tokens = highlightXenpaper(parse('[bd,hh hh]', { drumSamples: ['bd', 'hh'] }))
 
