@@ -642,30 +642,30 @@ ContextStatementList
     }
 
 ContextAssignmentStart
-  = ("sig"i / "key"i / "root"i) !IdentifierContinue Spacing "="
-  / "tuning"i !IdentifierContinue Spacing "*="
-  / "'" Spacing "="
-  / ContextAssignmentTarget Spacing "="
+  = ("sig"i / "key"i / "root"i) !IdentifierContinue Spacing "<-"
+  / "tuning"i !IdentifierContinue Spacing "*<-"
+  / "'" Spacing "<-"
+  / ContextAssignmentTarget Spacing "<-"
   / 'root'i !IdentifierContinue Spacing 'as'i !IdentifierContinue
   / ContextAssignmentTarget Spacing 'as'i !IdentifierContinue Spacing 'root'i !IdentifierContinue
 
 ContextStatement
-  = name:$('tuning'i) !IdentifierContinue Spacing '*=' Spacing value:AdditiveExpression {
+  = name:$('tuning'i) !IdentifierContinue Spacing '*<-' Spacing value:AdditiveExpression {
       return node('TuningStretch', { factor: value, raw: text() });
     }
-  / "scale"i !IdentifierContinue Spacing "=" Spacing value:ContextScaleParallelExpression {
+  / "scale"i !IdentifierContinue Spacing "<-" Spacing value:ContextScaleParallelExpression {
       return node('ContextDegreeMapping', { values: [value] });
     }
-  / operator:$("'") Spacing "=" Spacing value:ContextValue {
+  / operator:$("'") Spacing "<-" Spacing value:ContextValue {
       return node('ContextAssignment', {
         target: node('ContextOperatorTarget', { operator }),
         value,
       });
     }
-  / kind:$("sig"i) !IdentifierContinue Spacing "=" Spacing pitches:SignaturePitchList {
+  / kind:$("sig"i) !IdentifierContinue Spacing "<-" Spacing pitches:SignaturePitchList {
       return node('SignatureDeclaration', { kind: kind.toLowerCase(), pitches });
     }
-  / kind:$("key"i) !IdentifierContinue Spacing "=" Spacing pitch:SignaturePitchLiteral
+  / kind:$("key"i) !IdentifierContinue Spacing "<-" Spacing pitch:SignaturePitchLiteral
     mode:(RequiredSpacing value:KeyModeName { return value; })? {
       return node('SignatureDeclaration', {
         kind: kind.toLowerCase(),
@@ -673,14 +673,14 @@ ContextStatement
         mode: mode ?? null,
       });
     }
-  / name:$('root'i) !IdentifierContinue Spacing "=" Spacing
+  / name:$('root'i) !IdentifierContinue Spacing "<-" Spacing
     value:Expression {
       return node('ContextAssignment', {
         target: node('ContextNameTarget', { name: name.toLowerCase() }),
         value,
       });
     }
-  / target:ContextAssignmentTarget Spacing "=" Spacing
+  / target:ContextAssignmentTarget Spacing "<-" Spacing
     !('root'i !IdentifierContinue) value:ContextValue {
       return node('ContextAssignment', { target, value });
     }
@@ -775,7 +775,7 @@ CallArguments
 // parallel branches receive child scopes. Shadowing is permitted; recursion is
 // deliberately rejected by the evaluator.
 VariableDeclaration
-  = "let" !IdentifierContinue RequiredSpacing name:LocatedIdentifier Spacing "=" Spacing value:Expression {
+  = "let" !IdentifierContinue RequiredSpacing name:LocatedIdentifier Spacing "<-" Spacing value:Expression {
       return node('VariableDeclaration', { name, value });
     }
 
@@ -788,7 +788,7 @@ FunctionDeclaration
 FunctionParameter
   = name:LocatedIdentifier
     coercion:(Spacing ":" Spacing annotation:CoercionAnnotation { return annotation; })?
-    defaultValue:(Spacing "=" Spacing value:AdditiveExpression { return value; })? {
+    defaultValue:(Spacing "<-" Spacing value:AdditiveExpression { return value; })? {
       return node('FunctionParameter', {
         name,
         coercion: coercion ?? null,
@@ -890,14 +890,14 @@ MosElementList
     }
 
 MosElement
-  = kind:$("sig"i) !IdentifierContinue Spacing "=" Spacing pitches:MosSignaturePitchList {
+  = kind:$("sig"i) !IdentifierContinue Spacing "<-" Spacing pitches:MosSignaturePitchList {
       return node('SignatureDeclaration', { kind: kind.toLowerCase(), pitches, udp: null });
     }
-  / kind:$("key"i) !IdentifierContinue Spacing "=" Spacing pitch:MosSignaturePitchLiteral
+  / kind:$("key"i) !IdentifierContinue Spacing "<-" Spacing pitch:MosSignaturePitchLiteral
     udp:(RequiredSpacing value:MosUdpValue { return value; })? {
       return node('SignatureDeclaration', { kind: kind.toLowerCase(), pitches: [pitch], udp: udp ?? null });
     }
-  / target:$("'" / "^" / "/" / "L" / "s") Spacing "=" Spacing value:MosSetterValue {
+  / target:$("'" / "^" / "/" / "L" / "s") Spacing "<-" Spacing value:MosSetterValue {
       return node('MosStepAssignment', { target, value });
     }
   / large:UnsignedInteger "L" Spacing small:UnsignedInteger "s" {

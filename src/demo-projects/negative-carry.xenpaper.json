@@ -5,7 +5,7 @@
   "xenpaperVersion": "3.0.0-beta.16",
   "title": "Negative Carry",
   "globalTrack": {
-    "source": "{scale = cps([1 7 11 13], 2)}\n{mode = 1}",
+    "source": "{scale <- cps([1 7 11 13], 2)}\n{mode <- 1}",
     "tempoChanges": [
       {
         "id": "tempo-1",
@@ -109,7 +109,7 @@
       "id": "instrument-2",
       "name": "Bass",
       "gain": 0.92,
-      "source": "# Defaults inherited by every clip in this lane\n@adsr(10ms, 200ms, 10%, 30ms)\n{root = ``0}\n",
+      "source": "# Defaults inherited by every clip in this lane\n@adsr(10ms, 200ms, 10%, 30ms)\n{root <- ``0}\n",
       "clips": [
         {
           "id": "clip-1",
@@ -233,7 +233,7 @@
       "id": "instrument-3",
       "name": "Glide Triangle",
       "gain": 0.9,
-      "source": "# Defaults inherited by every clip in this lane\n@adsr(100ms, 200ms, 70%, 300ms)\n{root = '0}",
+      "source": "# Defaults inherited by every clip in this lane\n@adsr(100ms, 200ms, 70%, 300ms)\n{root <- '0}",
       "clips": [
         {
           "id": "clip-1",

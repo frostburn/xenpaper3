@@ -64,7 +64,7 @@ describe('arithmetic expression evaluation', () => {
 
   it('coerces explicit degrees through nested containers and function defaults', () => {
     const declaration = parse(
-      'fn select(values: container<container<ratio>>, fallback: ratio = 2d) { ret values[0][0] al fallback }',
+      'fn select(values: container<container<ratio>>, fallback: ratio <- 2d) { ret values[0][0] al fallback }',
     ).body[0]
     if (declaration.type !== 'FunctionDeclaration') throw new Error('Expected a function.')
     const declared = evaluateDeclaration(declaration)
@@ -389,7 +389,7 @@ describe('arithmetic expression evaluation', () => {
 
   it('coerces annotated parameters and evaluates declared defaults', () => {
     const declaration = parse(
-      'fn power(value: ratio, exponent: integer = 2/1) { ret value ** exponent }',
+      'fn power(value: ratio, exponent: integer <- 2/1) { ret value ** exponent }',
     ).body[0]
     if (declaration.type !== 'FunctionDeclaration') throw new Error('Expected a function.')
     const declared = evaluateDeclaration(declaration)
@@ -416,7 +416,7 @@ describe('arithmetic expression evaluation', () => {
     expect('value' in integer && integer.value.kind === 'scalar').toBe(true)
     expect('value' in integer && integer.value.value.equals(49)).toBe(true)
 
-    const invalidOrder = parse('fn invalid(optional = 1/1, required) { ret required }').body[0]
+    const invalidOrder = parse('fn invalid(optional <- 1/1, required) { ret required }').body[0]
     if (invalidOrder.type !== 'FunctionDeclaration') throw new Error('Expected a function.')
     expect(evaluateDeclaration(invalidOrder).diagnostics).toMatchObject([
       { code: 'XP_REQUIRED_PARAMETER_AFTER_DEFAULT' },
@@ -770,7 +770,7 @@ describe('arithmetic expression evaluation', () => {
   )
 
   it('reassociates a Diamond-MOS pitch with the root', () => {
-    const declaration = parse('MOS{5L2s 5|1; L=9/8}').body[0]
+    const declaration = parse('MOS{5L2s 5|1; L<-9/8}').body[0]
     if (declaration.type !== 'PitchContextChange') throw new Error('Expected a MOS declaration.')
     const mosContext = applyPitchContextChange(declaration, DEFAULT_PITCH_CONTEXT)
     expect(mosContext.up).toBe(DEFAULT_PITCH_CONTEXT.up)
@@ -794,8 +794,8 @@ describe('arithmetic expression evaluation', () => {
   })
 
   it('uses a pitch frequency assignment as a root frequency and spelling shorthand', () => {
-    const shorthand = parse('{A = 440Hz}').body[0]
-    const expanded = parse('{root = 440Hz; A as root}').body[0]
+    const shorthand = parse('{A <- 440Hz}').body[0]
+    const expanded = parse('{root <- 440Hz; A as root}').body[0]
     if (shorthand.type !== 'PitchContextChange' || expanded.type !== 'PitchContextChange')
       throw new Error('Expected context changes.')
 
@@ -811,7 +811,7 @@ describe('arithmetic expression evaluation', () => {
   })
 
   it('moves the root frequency when assigning a pitch to root', () => {
-    const change = parse('{root = D}').body[0]
+    const change = parse('{root <- D}').body[0]
     if (change.type !== 'PitchContextChange') throw new Error('Expected a context change.')
     const context = applyPitchContextChange(change, DEFAULT_PITCH_CONTEXT)
     const c = evaluateExpression(expression('C'), context)
@@ -833,7 +833,7 @@ describe('arithmetic expression evaluation', () => {
   })
 
   it('moves the root frequency when assigning an absolute-pitch expression to root', () => {
-    const change = parse('{root = C# + M3}').body[0]
+    const change = parse('{root <- C# + M3}').body[0]
     if (change.type !== 'PitchContextChange') throw new Error('Expected a context change.')
     const target = evaluateExpression(expression('C# + M3'), DEFAULT_PITCH_CONTEXT)
     if (!('value' in target) || target.value.kind !== 'absolutePitch')
@@ -850,7 +850,7 @@ describe('arithmetic expression evaluation', () => {
   })
 
   it('normalizes a root frequency ratio against the current frequency', () => {
-    const change = parse('{root = 8/9}').body[0]
+    const change = parse('{root <- 8/9}').body[0]
     if (change.type !== 'PitchContextChange') throw new Error('Expected a context change.')
 
     const context = applyPitchContextChange(change, DEFAULT_PITCH_CONTEXT)

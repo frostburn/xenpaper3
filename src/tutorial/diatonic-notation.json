@@ -62,16 +62,16 @@
     "title": "Key signatures",
     "demos": [
       {
-        "tune": "# G major sharpens F\n{key = G}\nG= A B c d e f g=\n# Flat seventh to tonic\nf_= g=",
-        "html": "<p>Key signatures can be set with <code>{key = G}</code> or modal names like <code>{key = D Dorian}</code>. Plain nominals receive the signature accidentals, while an explicit natural sign ♮ or underscore _ restores the unaltered nominal.</p>"
+        "tune": "# G major sharpens F\n{key <- G}\nG= A B c d e f g=\n# Flat seventh to tonic\nf_= g=",
+        "html": "<p>Key signatures can be set with <code>{key &lt;- G}</code> or modal names like <code>{key &lt;- D Dorian}</code>. Plain nominals receive the signature accidentals, while an explicit natural sign ♮ or underscore _ restores the unaltered nominal.</p>"
       },
       {
         "description": "Custom key signatures allow you to attach ups, lifts, accidentals and inflections to plain nominals. Inflections will be described in detail later. A natural sign restores the original nominal.",
-        "tune": "# 5-limit Phrygian\n{sig = Bbv5 Cv5 Fv5 Gv5}\n`A `B C D E F G A= B_ A="
+        "tune": "# 5-limit Phrygian\n{sig <- Bbv5 Cv5 Fv5 Gv5}\n`A `B C D E F G A= B_ A="
       },
       {
         "description": "Use the pythagorean accidentals p/q (a.k.a. po and qu from Color notation) to jump between named pitches.",
-        "tune": "{`A as root}\n# B becomes 10/9 while\n# c takes the place of 9/8.\n{sig = B^5 Cbp}\n`A `B C D E F G A="
+        "tune": "{`A as root}\n# B becomes 10/9 while\n# c takes the place of 9/8.\n{sig <- B^5 Cbp}\n`A `B C D E F G A="
       }
     ]
   },
@@ -131,7 +131,7 @@
       },
       {
         "description": "Key signatures support quartertones.",
-        "tune": "{key = C Locrian}\nC F B e a 'd 'g\n{key = Cd Locrian}\nC F B e a 'd 'g\n{key = Cb Locrian}\nC F B e a 'd 'g\n{key = Cdb Locrian}\nC F B e a 'd 'g"
+        "tune": "{key <- C Locrian}\nC F B e a 'd 'g\n{key <- Cd Locrian}\nC F B e a 'd 'g\n{key <- Cb Locrian}\nC F B e a 'd 'g\n{key <- Cdb Locrian}\nC F B e a 'd 'g"
       },
       {
         "description": "Relative neutral intervals fall exactly between minor and major, mid fourth falls between perfect and augmented, while mid fifth falls between diminished and perfect. Like other relative intervals, they follow the active temperament.",
@@ -152,7 +152,7 @@
       },
       {
         "description": "Key signatures translate across semioctaves.",
-        "tune": "{key = F major}\nF Zet G eta A alp\n# Both B and Bet become flat\nB bet\n\nc gam d del e eps f Zet F="
+        "tune": "{key <- F major}\nF Zet G eta A alp\n# Both B and Bet become flat\nB bet\n\nc gam d del e eps f Zet F="
       },
       {
         "html": "<p>Relative semi-octave intervals exist and are interordinal. E.g. <code>P8 / 2</code> is <code>P4½</code>. The ASCII for \"½\" is \"h\" in this context.</p>",
@@ -181,15 +181,15 @@
     "demos": [
       {
         "description": "The Ups-and-Downs inflection is customizable.",
-        "tune": "# Make ups septimal\n{^ = 64/63}\n# Down-minor is 6:7:9\n[`A vC E]== .\n# Up-major is 14:18:21\n[`A ^C# E]== ."
+        "tune": "# Make ups septimal\n{^ <- 64/63}\n# Down-minor is 6:7:9\n[`A vC E]== .\n# Up-major is 14:18:21\n[`A ^C# E]== ."
       },
       {
         "description": "By default a tempered lift is worth 5 ups, but can be configured separately.",
-        "tune": "{311edo}\n# Make lifts septendecimal\n{/ = 4\\311}\n# ~9:12:16:17\n[C F Bb /cb]==="
+        "tune": "{311edo}\n# Make lifts septendecimal\n{/ <- 4\\311}\n# ~9:12:16:17\n[C F Bb /cb]==="
       },
       {
         "description": "Ups and lifts attach to numeric scale degrees too.",
-        "tune": "{^ = 1\\24; / = 5\\25}\n0 ^0 1 v2 2 /0"
+        "tune": "{^ <- 1\\24; / <- 5\\25}\n0 ^0 1 v2 2 /0"
       }
     ]
   },
@@ -219,11 +219,11 @@
     "demos": [
       {
         "description": "Instead of \"edo\" you can use Wart Notation to select a different prime mapping.",
-        "tune": "{A = 440Hz}\n# This progression would drift with plain\n# {17edo} so we use the 17c val instead.\n{17c}\n|:@x10\n[`A Cv5 E]\n[Cv5 E Gv5]\n[`B Dv5 Gv5]\n[`Av5 Dv5 F#]\n{root = Av5} :|"
+        "tune": "{A <- 440Hz}\n# This progression would drift with plain\n# {17edo} so we use the 17c val instead.\n{17c}\n|:@x10\n[`A Cv5 E]\n[Cv5 E Gv5]\n[`B Dv5 Gv5]\n[`Av5 Dv5 F#]\n{root <- Av5} :|"
       },
       {
         "description": "Custom prime mappings are supported.",
-        "tune": "# Generator climb in WE tuned tetracot\n{map = <1199.559c 1903.939c 2784.414c]}\n`A    E     F     |\n`B^5  E     D^5   |\nC#^25 D^5   F^5   |\nD#^125=     E^125 |\nE#^5^5^5^5= C^5   |\n[E, A]===         ||"
+        "tune": "# Generator climb in WE tuned tetracot\n{map <- <1199.559c 1903.939c 2784.414c]}\n`A    E     F     |\n`B^5  E     D^5   |\nC#^25 D^5   F^5   |\nD#^125=     E^125 |\nE#^5^5^5^5= C^5   |\n[E, A]===         ||"
       }
     ]
   }

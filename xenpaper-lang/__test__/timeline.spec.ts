@@ -65,7 +65,7 @@ describe('global grid context', () => {
   })
 
   it('initializes a child from the complete set of declarations at beat zero', () => {
-    const global = initialize('let division = 2/1 fn phrase() { ret C D } . {5edo}')
+    const global = initialize('let division <- 2/1 fn phrase() { ret C D } . {5edo}')
     const lane = initialize('@subdivision(division) fn local() { ret phrase() }', global)
     expect(notes('local()', lane).map(({ start }) => start.toFraction())).toEqual(['0', '1/2'])
   })
@@ -103,8 +103,8 @@ describe('global grid context', () => {
 
   it('preserves local context changes across global switches and isolates groups', () => {
     const initialization = initialize('{5edo} . {12edo}')
-    const result = notes('({root = D} 0 0) 0', initialization)
-    const expected = notes('{5edo} ({root = D} 0) {12edo} ({root = D} 0) 0', initialize(''))
+    const result = notes('({root <- D} 0 0) 0', initialization)
+    const expected = notes('{5edo} ({root <- D} 0) {12edo} ({root <- D} 0) 0', initialize(''))
     expect(result.map(({ pitch }) => pitch.value.valueOf())).toEqual(
       expected.map(({ pitch }) => pitch.value.valueOf()),
     )

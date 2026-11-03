@@ -28,7 +28,7 @@ const notation: StaffNotationShape = {
 
 describe('MusicalStaff', () => {
   it('renders key signatures as staff accidentals', () => {
-    const evaluated = evaluateScoreShape(parse('{key = G} F').body[0]!)
+    const evaluated = evaluateScoreShape(parse('{key <- G} F').body[0]!)
     if (!('shape' in evaluated)) throw new Error('Expected score shape.')
     const wrapper = mount(MusicalStaff, {
       props: { notation: constructStaffNotationShape(evaluated.shape) },
@@ -38,7 +38,7 @@ describe('MusicalStaff', () => {
   })
 
   it('positions key signatures using the active bass clef', () => {
-    const evaluated = evaluateScoreShape(parse('@clef(bass) {key=G} C').body[0]!)
+    const evaluated = evaluateScoreShape(parse('@clef(bass) {key<-G} C').body[0]!)
     if (!('shape' in evaluated)) throw new Error('Expected score shape.')
     const wrapper = mount(MusicalStaff, {
       props: { notation: constructStaffNotationShape(evaluated.shape) },
@@ -207,7 +207,7 @@ describe('MusicalStaff', () => {
   })
 
   it('renders hertz notes relative to the active root frequency', () => {
-    const evaluated = evaluateScoreShape(parse('{root = 220Hz} 220Hz 440Hz').body[0]!)
+    const evaluated = evaluateScoreShape(parse('{root <- 220Hz} 220Hz 440Hz').body[0]!)
     if (!('shape' in evaluated)) throw new Error('Expected shape.')
     const wrapper = mount(MusicalStaff, {
       props: { notation: constructStaffNotationShape(evaluated.shape) },

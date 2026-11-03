@@ -170,7 +170,7 @@ describe('second-party directive extensions', () => {
         }
       },
     }
-    const events = shapeNotes('|: @memo C {root = D} :| E', [memo])
+    const events = shapeNotes('|: @memo C {root <- D} :| E', [memo])
     const memories = events.at(-1)!.directiveState.memo as number[]
     expect(memories).toHaveLength(2)
     expect(memories[0]).not.toBe(memories[1])

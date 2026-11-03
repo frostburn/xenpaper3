@@ -169,9 +169,9 @@
   {
     "id": "diatonic-11",
     "title": "Key signatures",
-    "html": "<p>Key signatures can be set with <code>{key = G}</code> or modal names like <code>{key = D Dorian}</code>. Plain nominals receive the signature accidentals, while an explicit natural sign ♮ or underscore _ restores the unaltered nominal.</p>",
+    "html": "<p>Key signatures can be set with <code>{key &lt;- G}</code> or modal names like <code>{key &lt;- D Dorian}</code>. Plain nominals receive the signature accidentals, while an explicit natural sign ♮ or underscore _ restores the unaltered nominal.</p>",
     "props": {
-      "source": "# G major sharpens F\n{key = G}\nG= A B c d e f g=\n# Flat seventh to tonic\nf_= g=",
+      "source": "# G major sharpens F\n{key <- G}\nG= A B c d e f g=\n# Flat seventh to tonic\nf_= g=",
       "instrument": {
         "type": "patch",
         "patchPreset": "default",
@@ -189,7 +189,7 @@
     "title": "Custom key signatures",
     "description": "Custom key signatures allow you to attach ups, lifts, accidentals and inflections to plain nominals. Inflections will be described in detail later. A natural sign restores the original nominal.",
     "props": {
-      "source": "# 5-limit Phrygian\n{sig = Bbv5 Cv5 Fv5 Gv5}\n`A `B C D E F G A= B_ A=",
+      "source": "# 5-limit Phrygian\n{sig <- Bbv5 Cv5 Fv5 Gv5}\n`A `B C D E F G A= B_ A=",
       "instrument": {
         "type": "patch",
         "patchPreset": "default",
@@ -207,7 +207,7 @@
     "title": "Pythagorean accidentals",
     "description": "Use the pythagorean accidentals p/q (a.k.a. po and qu from Color notation) to jump between named pitches.",
     "props": {
-      "source": "{`A as root}\n# B becomes 10/9 while\n# c takes the place of 9/8.\n{sig = B^5 Cbp}\n`A `B C D E F G A=",
+      "source": "{`A as root}\n# B becomes 10/9 while\n# c takes the place of 9/8.\n{sig <- B^5 Cbp}\n`A `B C D E F G A=",
       "instrument": {
         "type": "patch",
         "patchPreset": "default",
@@ -396,7 +396,7 @@
     "title": "Quartertone key signatures",
     "description": "Key signatures support quartertones.",
     "props": {
-      "source": "{key = C Locrian}\nC F B e a 'd 'g\n{key = Cd Locrian}\nC F B e a 'd 'g\n{key = Cb Locrian}\nC F B e a 'd 'g\n{key = Cdb Locrian}\nC F B e a 'd 'g",
+      "source": "{key <- C Locrian}\nC F B e a 'd 'g\n{key <- Cd Locrian}\nC F B e a 'd 'g\n{key <- Cb Locrian}\nC F B e a 'd 'g\n{key <- Cdb Locrian}\nC F B e a 'd 'g",
       "instrument": {
         "type": "patch",
         "patchPreset": "default",
@@ -468,7 +468,7 @@
     "title": "Semioctave key signatures",
     "description": "Key signatures translate across semioctaves.",
     "props": {
-      "source": "{key = F major}\nF Zet G eta A alp\n# Both B and Bet become flat\nB bet\n\nc gam d del e eps f Zet F=",
+      "source": "{key <- F major}\nF Zet G eta A alp\n# Both B and Bet become flat\nB bet\n\nc gam d del e eps f Zet F=",
       "instrument": {
         "type": "patch",
         "patchPreset": "default",
@@ -557,7 +557,7 @@
     "title": "Custom ups and downs",
     "description": "The Ups-and-Downs inflection is customizable.",
     "props": {
-      "source": "# Make ups septimal\n{^ = 64/63}\n# Down-minor is 6:7:9\n[`A vC E]== .\n# Up-major is 14:18:21\n[`A ^C# E]== .",
+      "source": "# Make ups septimal\n{^ <- 64/63}\n# Down-minor is 6:7:9\n[`A vC E]== .\n# Up-major is 14:18:21\n[`A ^C# E]== .",
       "instrument": {
         "type": "patch",
         "patchPreset": "default",
@@ -575,7 +575,7 @@
     "title": "Custom lifts and drops",
     "description": "By default a tempered lift is worth 5 ups, but can be configured separately.",
     "props": {
-      "source": "{311edo}\n# Make lifts septendecimal\n{/ = 4\\311}\n# ~9:12:16:17\n[C F Bb /cb]===",
+      "source": "{311edo}\n# Make lifts septendecimal\n{/ <- 4\\311}\n# ~9:12:16:17\n[C F Bb /cb]===",
       "instrument": {
         "type": "patch",
         "patchPreset": "default",
@@ -593,7 +593,7 @@
     "title": "Inflected scale degrees",
     "description": "Ups and lifts attach to numeric scale degrees too.",
     "props": {
-      "source": "{^ = 1\\24; / = 5\\25}\n0 ^0 1 v2 2 /0",
+      "source": "{^ <- 1\\24; / <- 5\\25}\n0 ^0 1 v2 2 /0",
       "instrument": {
         "type": "patch",
         "patchPreset": "default",
@@ -683,7 +683,7 @@
     "title": "Wart notation",
     "description": "Instead of \"edo\" you can use Wart Notation to select a different prime mapping.",
     "props": {
-      "source": "{A = 440Hz}\n# This progression would drift with plain\n# {17edo} so we use the 17c val instead.\n{17c}\n|:@x10\n[`A Cv5 E]\n[Cv5 E Gv5]\n[`B Dv5 Gv5]\n[`Av5 Dv5 F#]\n{root = Av5} :|",
+      "source": "{A <- 440Hz}\n# This progression would drift with plain\n# {17edo} so we use the 17c val instead.\n{17c}\n|:@x10\n[`A Cv5 E]\n[Cv5 E Gv5]\n[`B Dv5 Gv5]\n[`Av5 Dv5 F#]\n{root <- Av5} :|",
       "instrument": {
         "type": "patch",
         "patchPreset": "default",
@@ -701,7 +701,7 @@
     "title": "Custom prime mappings",
     "description": "Custom prime mappings are supported.",
     "props": {
-      "source": "# Generator climb in WE tuned tetracot\n{map = <1199.559c 1903.939c 2784.414c]}\n`A    E     F     |\n`B^5  E     D^5   |\nC#^25 D^5   F^5   |\nD#^125=     E^125 |\nE#^5^5^5^5= C^5   |\n[E, A]===         ||",
+      "source": "# Generator climb in WE tuned tetracot\n{map <- <1199.559c 1903.939c 2784.414c]}\n`A    E     F     |\n`B^5  E     D^5   |\nC#^25 D^5   F^5   |\nD#^125=     E^125 |\nE#^5^5^5^5= C^5   |\n[E, A]===         ||",
       "instrument": {
         "type": "patch",
         "patchPreset": "default",
