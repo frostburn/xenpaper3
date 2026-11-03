@@ -8,7 +8,7 @@
       },
       {
         "description": "Moment of symmetry scales consist of large (L) and small (s) steps mixed as evenly as possible. They use nominals from J onwards and J is always aligned with the root frequency.",
-        "tune": "# \"Dylathian\" mode of \"Oneirotonic\"\nMOS{5L3s}\nJ K L M N O P Q j=\n{root = 333Hz}\nJ K L M N O P Q j="
+        "tune": "# \"Dylathian\" mode of \"Oneirotonic\"\nMOS{5L3s}\nJ K L M N O P Q j=\n{root <- 333Hz}\nJ K L M N O P Q j="
       },
       {
         "description": "Modes are selected by specifying an explicit pattern or by using UDP notation.",
@@ -68,7 +68,7 @@
       },
       {
         "description": "MOS ups and lifts are customizable. Integers are interpreted as steps of the host edo.",
-        "tune": "MOS{7L 1s 43:10 3|4; ^=4; /=12}\n[J, vL, /N, O, ^Q, j, k]==="
+        "tune": "MOS{7L 1s 43:10 3|4; ^<-4; /<-12}\n[J, vL, /N, O, ^Q, j, k]==="
       }
     ]
   },
@@ -89,15 +89,15 @@
     "demos": [
       {
         "description": "You can move the same MOS mode to a different key...",
-        "tune": "# \"Erev\" of \"Machinoid\"\nMOS{5L 1s}\nJ K L M N O j=\n\n# Same scale but 4\\11 higher\n# J becomes J& and K becomes K&\nMOS{key = L}\nL M N O j k l="
+        "tune": "# \"Erev\" of \"Machinoid\"\nMOS{5L 1s}\nJ K L M N O j=\n\n# Same scale but 4\\11 higher\n# J becomes J& and K becomes K&\nMOS{key <- L}\nL M N O j k l="
       },
       {
         "description": "...or specify a new UDP mode altogether.",
-        "tune": "# \"Medicinal\" of \"Manual\"\nMOS{4L 1s 3|1}\nJ K L M N j=\n\n# Switch to \"Indical\" mode on K\n# M becomes M@\nMOS{key = K 1|3}\nK L M N j k="
+        "tune": "# \"Medicinal\" of \"Manual\"\nMOS{4L 1s 3|1}\nJ K L M N j=\n\n# Switch to \"Indical\" mode on K\n# M becomes M@\nMOS{key <- K 1|3}\nK L M N j k="
       },
       {
         "description": "Custom key signatures are supported. A natural sign restores the unaltered nominal.",
-        "tune": "MOS{5L 7s 15:13 6|5}\nMOS{sig = ^^^K ^M& vN@ ^^\\P ^^^R vvvS ^^^T vvvU}\nJ K L M N O P Q R S T U j U_ j="
+        "tune": "MOS{5L 7s 15:13 6|5}\nMOS{sig <- ^^^K ^M& vN@ ^^\\P ^^^R vvvS ^^^T vvvU}\nJ K L M N O P Q R S T U j U_ j="
       }
     ]
   },
@@ -115,7 +115,7 @@
     "demos": [
       {
         "description": "MOS scales tuned to just intonation have irrational hardness so you have to define the size of a step directly.",
-        "tune": "# Size of the small step is inferred from the pattern and equave\nMOS{5L 1s; L = 8/7}\nJ K L M N O j"
+        "tune": "# Size of the small step is inferred from the pattern and equave\nMOS{5L 1s; L <- 8/7}\nJ K L M N O j"
       }
     ]
   }

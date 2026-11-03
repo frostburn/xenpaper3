@@ -5,7 +5,7 @@
   "xenpaperVersion": "3.0.0-beta.9",
   "title": "Cosmic Wavelength",
   "globalTrack": {
-    "source": "# Bohlen-Pierce (Lambda 13edt) Aurigan mode\nMOS{4L5s<3> 7|1}\n{root = 300Hz}\n# CC BY 4.0: Lumi Pakkanen\n# https://creativecommons.org/licenses/by/4.0/",
+    "source": "# Bohlen-Pierce (Lambda 13edt) Aurigan mode\nMOS{4L5s<3> 7|1}\n{root <- 300Hz}\n# CC BY 4.0: Lumi Pakkanen\n# https://creativecommons.org/licenses/by/4.0/",
     "tempoChanges": [
       {
         "id": "tempo-1",
@@ -84,7 +84,7 @@
       "id": "instrument-2",
       "name": "Pad",
       "gain": 0.21,
-      "source": "# Defaults inherited by every clip in this lane\n@adsr(100ms, 200ms, 70%, 300ms)\n{root = `J}\n@1/5\n\n",
+      "source": "# Defaults inherited by every clip in this lane\n@adsr(100ms, 200ms, 70%, 300ms)\n{root <- `J}\n@1/5\n\n",
       "clips": [
         {
           "id": "clip-1",
@@ -219,7 +219,7 @@
       "id": "instrument-3",
       "name": "Bass",
       "gain": 0.41,
-      "source": "# Defaults inherited by every clip in this lane\n@adsr(10ms, 20ms, 60%, 30ms)\n{root = ``J}\n@:",
+      "source": "# Defaults inherited by every clip in this lane\n@adsr(10ms, 20ms, 60%, 30ms)\n{root <- ``J}\n@:",
       "clips": [
         {
           "id": "clip-1",

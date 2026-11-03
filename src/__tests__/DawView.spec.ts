@@ -220,7 +220,7 @@ describe('DAW project model', () => {
   })
 
   it('highlights each named value reference alongside its value without leaking other uses', () => {
-    const source = 'let tone = C\ntone tone'
+    const source = 'let tone <- C\ntone tone'
     const notes = parseClipNotes(source)
     const valueRange = { start: source.indexOf('C'), end: source.indexOf('C') + 1 }
     const firstUse = source.indexOf('tone', source.indexOf('\n'))
@@ -252,7 +252,7 @@ describe('DAW project model', () => {
     ['[[C D] [E F]]', 'scale[0][0]'],
     ['[C D]', 'arrayReduce((first, next) => first, scale)'],
   ])('retains named container references when extracting from %s with %s', (value, use) => {
-    const source = `let scale = ${value}\n${use}\n${use}`
+    const source = `let scale <- ${value}\n${use}\n${use}`
     const notes = parseClipNotes(source)
     const firstUse = source.indexOf('scale', source.indexOf('\n'))
     const secondUse = source.lastIndexOf('scale')
@@ -275,7 +275,7 @@ describe('DAW project model', () => {
   })
 
   it('highlights clip-local names for inherited values', () => {
-    const initialization = compileSourceInitialization('let tone = C')
+    const initialization = compileSourceInitialization('let tone <- C')
     const source = 'tone'
     const notes = parseClipNotes(source, Infinity, initialization)
 
@@ -284,7 +284,7 @@ describe('DAW project model', () => {
   })
 
   it('recursively highlights variable names, references, and only their playing values', async () => {
-    const source = 'let sec = 2\nlet con = (1 sec 3)\ncon='
+    const source = 'let sec <- 2\nlet con <- (1 sec 3)\ncon='
     const notes = parseClipNotes(source)
     expect(notes).toHaveLength(3)
     const range = (text: string, offset = 0) => {
@@ -323,7 +323,7 @@ describe('DAW project model', () => {
 
   it('retains recursive origins through nested container aliases and indexing', () => {
     const source =
-      'let note = 2\nlet inner = [1 note]\nlet outer = [inner 3]\nlet alias = outer\nalias[0]'
+      'let note <- 2\nlet inner <- [1 note]\nlet outer <- [inner 3]\nlet alias <- outer\nalias[0]'
     const notes = parseClipNotes(source)
     expect(notes).toHaveLength(2)
     const texts = notes.map((note) =>
@@ -825,7 +825,7 @@ describe('DAW project model', () => {
   })
 
   it('propagates initialization context through declarations and repeats', () => {
-    const declared = compileSourceInitialization('let subdivision = 4/1 @subdivision(subdivision)')
+    const declared = compileSourceInitialization('let subdivision <- 4/1 @subdivision(subdivision)')
     expect(parseClipNotes('C D', Infinity, declared).map(({ beat }) => beat)).toEqual([0, 0.25])
 
     const repeated = compileSourceInitialization('|: @ff @. :|')

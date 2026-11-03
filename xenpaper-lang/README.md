@@ -5,8 +5,8 @@
 The pitched and sample languages share document sequencing, parallel branches,
 normalized groups, repeats, rests, continuations, postfix marks, and directives.
 
-Pitch-context blocks also support `tuning *= factor`. For example,
-`{tuning *= 102%}` stretches the active scale, prime mapping, equave, ups/lifts,
+Pitch-context blocks also support `tuning *<- factor`. For example,
+`{tuning *<- 102%}` stretches the active scale, prime mapping, equave, ups/lifts,
 and MOS intervals to 102% of their current size in pitch-space while leaving the
 root frequency fixed.
 Callers enumerate sample names when parsing, so the grammars split only for those
@@ -141,10 +141,15 @@ their note ends are tied, so tying does not stretch their other subdivisions.
 
 ## Local declarations and functions
 
+Assignments use `<-`: `let name <- expression`, `{root <- 220Hz}`,
+`{scale <- intervals}`, and `MOS{5L2s; L <- 9/8}`. Parameter defaults use
+the same arrow, and tuning stretches use `{tuning *<- 102%}`. Whitespace around
+the arrow is optional. Bare `=` continues a note; it is not an assignment alias.
+
 Declarations are zero-duration score items:
 
 ```text
-let fifth = 3/2
+let fifth <- 3/2
 fn transpose(interval, note) { ret note + interval }
 transpose(fifth, C) transpose(fifth, D)
 ```
@@ -152,7 +157,7 @@ transpose(fifth, C) transpose(fifth, D)
 Parameters may declare coercions and trailing defaults:
 
 ```text
-fn power(value: ratio, exponent: integer = 2/1) { ret value ** exponent }
+fn power(value: ratio, exponent: integer <- 2/1) { ret value ** exponent }
 power(3/2) power(3/2, 3/1)
 ```
 
@@ -180,13 +185,13 @@ as in `^1d`. The suffix is lowercase and must end the numeric token, just like
 and degree 5 rather than a fractional degree. Use spaces
 around division (`3/1 / 2d`) to distinguish it from ratio and pitch-lift syntax.
 
-`let name = expression` evaluates the initializer once using the same rules as
-score literals: `let second = 2` stores scale degree two. Use an explicit ratio
-for a scalar, such as `let octave = 2/1` or `let subdivision = 4/1`.
+`let name <- expression` evaluates the initializer once using the same rules as
+score literals: `let second <- 2` stores scale degree two. Use an explicit ratio
+for a scalar, such as `let octave <- 2/1` or `let subdivision <- 4/1`.
 The `d` suffix remains useful to force degree meaning in arithmetic (`2d * 3/1`). Containers can also be stored and played:
 
 ```text
-let tuplet = [0 1 2]
+let tuplet <- [0 1 2]
 tuplet tuplet
 ```
 
@@ -249,7 +254,7 @@ making repeat notation the sole mechanism for repetition. Declarations emit no
 attack, rest, annotation, beat, duration, or staff symbol.
 
 Key signatures may include a diatonic mode after the tonic, such as
-`{key = D minor}`. The supported names are Lydian, Ionian, Mixolydian, Dorian,
+`{key <- D minor}`. The supported names are Lydian, Ionian, Mixolydian, Dorian,
 Aeolian, Phrygian, and Locrian; `major` aliases Ionian and `minor` aliases
 Aeolian. Mode names are case-insensitive, and a key without a mode remains
 Ionian.

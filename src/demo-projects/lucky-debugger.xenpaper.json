@@ -39,7 +39,7 @@
         "oscillatorType": "semisine"
       },
       "gain": 0.9,
-      "source": "{root = `0}\n@adsr(20ms, 40ms, 80%, 40ms)\n@2",
+      "source": "{root <- `0}\n@adsr(20ms, 40ms, 80%, 40ms)\n@2",
       "clips": [
         {
           "id": "clip-1",
@@ -89,7 +89,7 @@
         "oscillatorType": "fmsine"
       },
       "gain": 0.6,
-      "source": "{root = ```0}\n@adsr(20ms, 40ms, 80%, 40ms)\n@2",
+      "source": "{root <- ```0}\n@adsr(20ms, 40ms, 80%, 40ms)\n@2",
       "clips": [
         {
           "id": "clip-1",

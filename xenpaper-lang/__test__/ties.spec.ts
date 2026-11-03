@@ -232,7 +232,7 @@ describe('binary ties', () => {
       ],
     })
     expect(timing('C -> 0')).toEqual({ duration: '2', notes: [['0', '2']] })
-    expect(timing('C -> ({root = D} C)')).toEqual({
+    expect(timing('C -> ({root <- D} C)')).toEqual({
       duration: '2',
       notes: [
         ['0', '1'],
@@ -320,7 +320,7 @@ describe('binary ties', () => {
       duration: '2',
       notes: [['0', '2']],
     })
-    expect(timing('let motif = [C D E] motif -> E')).toEqual({
+    expect(timing('let motif <- [C D E] motif -> E')).toEqual({
       duration: '2',
       notes: [
         ['0', '1/3'],

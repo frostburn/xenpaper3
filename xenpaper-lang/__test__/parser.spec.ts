@@ -2,8 +2,60 @@ import { describe, expect, it } from 'vitest'
 import { parse } from '../parser.js'
 
 describe('lexical declarations', () => {
+  it.each(['let motif <- [C D]= motif==', 'let motif<-[C D]= motif=='])(
+    'separates binding arrows from note continuations in %s',
+    (source) => {
+      const program = parse(source)
+      expect(program.body[0]).toMatchObject({
+        type: 'Sequence',
+        items: [
+          {
+            type: 'VariableDeclaration',
+            name: { name: 'motif' },
+            value: { type: 'PostfixExpression', marks: [{ type: 'DetachedContinue' }] },
+          },
+          {
+            type: 'PostfixExpression',
+            expression: { type: 'Identifier', name: 'motif' },
+            marks: [{ type: 'DetachedContinue' }, { type: 'DetachedContinue' }],
+          },
+        ],
+      })
+    },
+  )
+
+  it.each([
+    'let motif = [C D]',
+    'fn phrase(note = C) { ret note }',
+    'MOS{5L2s; L=9/8}',
+    'let motif < - [C D]',
+    '{tuning * <- 102%}',
+  ])('rejects obsolete or split assignment operators in %s', (source) => {
+    expect(() => parse(source)).toThrow(/Expected/)
+  })
+
+  it('allows note continuations in degree mappings without interpreting them as assignments', () => {
+    expect(parse('{C= D}').body[0]).toMatchObject({
+      type: 'PitchContextChange',
+      statements: [
+        {
+          type: 'ContextDegreeMapping',
+          values: [
+            {
+              type: 'Sequence',
+              items: [
+                { type: 'PostfixExpression', marks: [{ type: 'DetachedContinue' }] },
+                { type: 'PitchLiteral', raw: 'D' },
+              ],
+            },
+          ],
+        },
+      ],
+    })
+  })
+
   it('allows names that extend a pitch-like prefix', () => {
-    expect(parse('let JJv5Gain = 3/2 JJv5Gain').body[0]).toMatchObject({
+    expect(parse('let JJv5Gain <- 3/2 JJv5Gain').body[0]).toMatchObject({
       type: 'Sequence',
       items: [
         { type: 'VariableDeclaration', name: { name: 'JJv5Gain' } },
@@ -20,7 +72,7 @@ describe('lexical declarations', () => {
   it.each(['0', '2', '-2', '+2', '2d', '2/1', '2 * 3', '^2', '[0 1 2]'])(
     'parses the initializer %s with the score expression rules',
     (source) => {
-      const declaration = parse(`let note = ${source}`).body[0]
+      const declaration = parse(`let note <- ${source}`).body[0]
       if (declaration.type !== 'VariableDeclaration') throw new Error('Expected a variable.')
       expect(declaration.value.type).toBe(parse(source).body[0].type)
     },
@@ -96,7 +148,7 @@ describe('lexical declarations', () => {
 
   it('parses parameter coercions and defaults', () => {
     const declaration = parse(
-      'fn choose(values: container<ratio>, fallback: ratio = 3/2) { ret values[0] al fallback }',
+      'fn choose(values: container<ratio>, fallback: ratio <- 3/2) { ret values[0] al fallback }',
     ).body[0]
     expect(declaration).toMatchObject({
       type: 'FunctionDeclaration',
@@ -146,16 +198,16 @@ describe('lexical declarations', () => {
 
   it('allows declarations in repeated text', () => {
     for (const source of [
-      '|: let interval = 3/2 interval :|',
+      '|: let interval <- 3/2 interval :|',
       '|: C |@^1 fn transform() { ret 3/2 } transform() ||',
-      'let interval = 3/2 interval :|',
+      'let interval <- 3/2 interval :|',
       'fn transform() { ret 3/2 } transform() :|',
     ])
       expect(() => parse(source)).not.toThrow()
   })
 
   it('does not allow declarations to claim musical spellings', () => {
-    for (const source of ['let C = 3/2', 'let x = 3/2', 'fn f() { ret 3/2 }']) {
+    for (const source of ['let C <- 3/2', 'let x <- 3/2', 'fn f() { ret 3/2 }']) {
       expect(() => parse(source)).toThrow(/./)
     }
   })
@@ -333,7 +385,7 @@ describe('enumerated chords', () => {
   })
 
   it('parses an expression-based scale construction', () => {
-    expect(parse('{scale = myScale()}').body[0]).toMatchObject({
+    expect(parse('{scale <- myScale()}').body[0]).toMatchObject({
       type: 'PitchContextChange',
       statements: [
         {
@@ -345,7 +397,7 @@ describe('enumerated chords', () => {
   })
 
   it('keeps semicolon-separated assignments after an expression-based scale', () => {
-    expect(parse('{scale = cps([1 7 11 13], 2); mode = 4}').body[0]).toMatchObject({
+    expect(parse('{scale <- cps([1 7 11 13], 2); mode <- 4}').body[0]).toMatchObject({
       type: 'PitchContextChange',
       statements: [
         {
@@ -402,13 +454,13 @@ describe('enumerated chords', () => {
   })
 
   it('parses a root integer assignment as a scale degree', () => {
-    expect(parse('{root = 3}').body[0]).toMatchObject({
+    expect(parse('{root <- 3}').body[0]).toMatchObject({
       statements: [{ target: { name: 'root' }, value: { type: 'DegreeLiteral', degree: '3' } }],
     })
   })
 
   it('parses an equave-shifted root degree', () => {
-    expect(parse("{root = '0}").body[0]).toMatchObject({
+    expect(parse("{root <- '0}").body[0]).toMatchObject({
       statements: [
         {
           target: { name: 'root' },
@@ -423,7 +475,7 @@ describe('enumerated chords', () => {
   })
 
   it('accepts generic expressions in root assignments', () => {
-    expect(parse('{root = C#}').body[0]).toMatchObject({
+    expect(parse('{root <- C#}').body[0]).toMatchObject({
       statements: [
         {
           type: 'ContextAssignment',
@@ -432,7 +484,7 @@ describe('enumerated chords', () => {
         },
       ],
     })
-    expect(parse('{root = C# + M3}').body[0]).toMatchObject({
+    expect(parse('{root <- C# + M3}').body[0]).toMatchObject({
       statements: [
         {
           type: 'ContextAssignment',
@@ -448,17 +500,20 @@ describe('enumerated chords', () => {
     })
   })
 
-  it('parses tuning stretches as pitch-context statements', () => {
-    expect(parse('{tuning *= 102%}').body[0]).toMatchObject({
-      type: 'PitchContextChange',
-      statements: [
-        {
-          type: 'TuningStretch',
-          factor: { type: 'QuantityLiteral', unit: '%' },
-        },
-      ],
-    })
-  })
+  it.each(['{tuning *<- 102%}', '{tuning*<-102%}', '{TUNING # stretch\n *<- 102%}'])(
+    'parses tuning stretches as pitch-context statements in %s',
+    (source) => {
+      expect(parse(source).body[0]).toMatchObject({
+        type: 'PitchContextChange',
+        statements: [
+          {
+            type: 'TuningStretch',
+            factor: { type: 'QuantityLiteral', unit: '%' },
+          },
+        ],
+      })
+    },
+  )
 
   it('parses root associations in both directions and rejects assignment syntax', () => {
     for (const source of ['{root as D}', '{D as root}', "{root as 'A}", "{'A as root}"]) {
@@ -482,14 +537,14 @@ describe('enumerated chords', () => {
         },
       ],
     })
-    expect(() => parse('{D = root}')).toThrow(/Expected/)
+    expect(() => parse('{D <- root}')).toThrow(/Expected/)
   })
 })
 
 describe('Diamond-MOS tokens', () => {
   it('requires semicolons around MOS assignments and accepts a key UDP selector', () => {
-    expect(() => parse('MOS{5L2s key=K L=2\\12}')).toThrow(/semicolon/)
-    expect(parse('MOS{5L2s; key=K 2|4; L=2\\12}').body[0]).toMatchObject({
+    expect(() => parse('MOS{5L2s key<-K L<-2\\12}')).toThrow(/semicolon/)
+    expect(parse('MOS{5L2s; key<-K 2|4; L<-2\\12}').body[0]).toMatchObject({
       statements: [
         {
           elements: [
@@ -500,15 +555,15 @@ describe('Diamond-MOS tokens', () => {
         },
       ],
     })
-    expect(() => parse('{sig=C# key=G}')).toThrow(/Expected/)
-    expect(parse('{sig=C#; key=G}').body[0]).toMatchObject({ statements: [{}, {}] })
-    expect(parse('{key=D minor}').body[0]).toMatchObject({
+    expect(() => parse('{sig<-C# key<-G}')).toThrow(/Expected/)
+    expect(parse('{sig<-C#; key<-G}').body[0]).toMatchObject({ statements: [{}, {}] })
+    expect(parse('{key<-D minor}').body[0]).toMatchObject({
       statements: [{ type: 'SignatureDeclaration', kind: 'key', mode: 'minor' }],
     })
-    expect(parse('{key=F LYDIAN}').body[0]).toMatchObject({
+    expect(parse('{key<-F LYDIAN}').body[0]).toMatchObject({
       statements: [{ type: 'SignatureDeclaration', kind: 'key', mode: 'lydian' }],
     })
-    expect(() => parse('{key=D melodic}')).toThrow(/Expected/)
+    expect(() => parse('{key<-D melodic}')).toThrow(/Expected/)
   })
 
   it('parses the MOS sub-language structurally in any element order', () => {
@@ -537,7 +592,7 @@ describe('Diamond-MOS tokens', () => {
       type: 'Directive',
       arguments: [{ type: 'CallExpression', callee: 'sqrt' }],
     })
-    expect(parse('{root = 220Hz}').body[0]).toMatchObject({
+    expect(parse('{root <- 220Hz}').body[0]).toMatchObject({
       type: 'PitchContextChange',
       statements: [{ target: { type: 'ContextNameTarget', name: 'root' } }],
     })
@@ -604,7 +659,7 @@ describe('Diamond-MOS tokens', () => {
       sample: 'JJv5',
     })
     expect(() => parse('JJv5')).toThrow(/Expected/)
-    expect(() => parse('let JJv5 = 3/2')).toThrow(/Expected/)
+    expect(() => parse('let JJv5 <- 3/2')).toThrow(/Expected/)
   })
 })
 
@@ -614,9 +669,9 @@ E^5 Ebv5 P1v5 Cv5 E_
 
 # Context changes
 {24edo}
-{^ = 1\24}
-{/ = 5\24}
-{map = <24\24 38\24 56\24 67\24 83\24]}
+{^ <- 1\24}
+{/ <- 5\24}
+{map <- <24\24 38\24 56\24 67\24 83\24]}
 
 # Parallel composition; duration checks happen after parsing
 C D,
@@ -624,7 +679,7 @@ E F G,
 A B . ||
 
 # Repeat remains an AST macro
-{root = 220Hz}
+{root <- 220Hz}
 {${'`'}A as root}
 {41edo}
 |:@x10
@@ -632,7 +687,7 @@ A B . ||
 [Cv5, E, Gv5]
 [${'`'}B, Dv5, Gv5]
 [${'`'}Av5, Dv5, F#]
-{root = ${'`'}Av5}
+{root <- ${'`'}Av5}
 :|`
 
 type SyntaxNode = {
@@ -669,7 +724,7 @@ describe('Xenpaper surface grammar', () => {
   })
 
   it('accepts optional commas between mapping components', () => {
-    const change = parse('{map = <1222c, 1999c]}').body[0] as SyntaxNode
+    const change = parse('{map <- <1222c, 1999c]}').body[0] as SyntaxNode
     const mapping = (change.statements as SyntaxNode[])[0]!.value as SyntaxNode
 
     expect(mapping).toMatchObject({
@@ -681,7 +736,7 @@ describe('Xenpaper surface grammar', () => {
       closingDelimiter: ']',
     })
 
-    const angledChange = parse('{map = ⟨1222¢ 1999¢]}').body[0] as SyntaxNode
+    const angledChange = parse('{map <- ⟨1222¢ 1999¢]}').body[0] as SyntaxNode
     const angledMapping = (angledChange.statements as SyntaxNode[])[0]!.value as SyntaxNode
     expect(angledMapping).toMatchObject({
       type: 'MappingLiteral',
@@ -1055,7 +1110,7 @@ describe('Xenpaper surface grammar', () => {
   })
 
   it('prioritizes attached musical inflections over spaced division', () => {
-    const program = parse(String.raw`{^ = 1\24; / = 5\25}
+    const program = parse(String.raw`{^ <- 1\24; / <- 5\25}
 0 ^0 1 v2 2 /0`)
     const items = (program.body[0] as SyntaxNode).items as SyntaxNode[]
 

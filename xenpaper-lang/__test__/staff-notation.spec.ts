@@ -15,7 +15,7 @@ function notation(source: string) {
 
 describe('staff notation construction', () => {
   it('emits key-signature events and suppresses repeated note accidentals', () => {
-    const evaluated = evaluateScoreShape(parse('{key = G} F F_').body[0] as Expression)
+    const evaluated = evaluateScoreShape(parse('{key <- G} F F_').body[0] as Expression)
     if (!('shape' in evaluated)) throw new Error('Expected a score shape.')
     const staff = constructStaffNotationShape(evaluated.shape)
     if (staff.kind !== 'sequence') throw new Error('Expected a staff sequence.')
@@ -30,7 +30,7 @@ describe('staff notation construction', () => {
   })
 
   it('emits naturals for alterations removed by a replacement key signature', () => {
-    const evaluated = evaluateScoreShape(parse('{key = G} F {key = C} F').body[0] as Expression)
+    const evaluated = evaluateScoreShape(parse('{key <- G} F {key <- C} F').body[0] as Expression)
     if (!('shape' in evaluated)) throw new Error('Expected a score shape.')
     const staff = constructStaffNotationShape(evaluated.shape)
     if (staff.kind !== 'sequence') throw new Error('Expected a staff sequence.')
@@ -69,7 +69,7 @@ describe('staff notation construction', () => {
 
   it('preserves a declared key signature when leaving Diamond-MOS context', () => {
     const evaluated = evaluateScoreShape(
-      parse('MOS{5L2s; key=K} J {12edo; key=G} F').body[0] as Expression,
+      parse('MOS{5L2s; key<-K} J {12edo; key<-G} F').body[0] as Expression,
     )
     if (!('shape' in evaluated)) throw new Error('Expected a score shape.')
     const staff = constructStaffNotationShape(evaluated.shape)
@@ -194,7 +194,7 @@ describe('staff notation construction', () => {
     if (staff.kind !== 'note') throw new Error('Expected a staff note.')
     expect(staff.pitch.inflections).toBeUndefined()
 
-    const rationalNode = parse('{root = 100Hz} 500Hz').body[0] as Expression
+    const rationalNode = parse('{root <- 100Hz} 500Hz').body[0] as Expression
     const rational = evaluateScoreShape(rationalNode)
     if (!('shape' in rational)) throw new Error('Expected a score shape.')
     const rationalStaff = constructStaffNotationShape(rational.shape)
@@ -406,7 +406,7 @@ describe('staff notation construction', () => {
 
   it('constructs a scale from an iterable function result', () => {
     const evaluated = evaluateProgramShape(
-      parse('fn myScale() { ret (4/3 3/2 2/1) }\n{scale = myScale()}\n0 1 2 3'),
+      parse('fn myScale() { ret (4/3 3/2 2/1) }\n{scale <- myScale()}\n0 1 2 3'),
     )
     if (!('shape' in evaluated)) throw new Error('Expected a shape.')
 
@@ -424,7 +424,7 @@ describe('staff notation construction', () => {
   it('broadcasts arithmetic over an iterable scale returned by a function', () => {
     const evaluated = evaluateProgramShape(
       parse(String.raw`fn scl() { ret [2\10 5\10 8\10] + 1\10 }
-{scale = scl()}
+{scale <- scl()}
 0 1 2 3`),
     )
     if (!('shape' in evaluated)) throw new Error('Expected a shape.')
@@ -442,7 +442,7 @@ describe('staff notation construction', () => {
 
   it('retains built-in calls as individual scale degree expressions', () => {
     const evaluated = evaluateProgramShape(
-      parse('{scale = pitch(4/3) ratio(pitch(3/2)) pitch(2/1)}\n0 1 2 3'),
+      parse('{scale <- pitch(4/3) ratio(pitch(3/2)) pitch(2/1)}\n0 1 2 3'),
     )
     if (!('shape' in evaluated)) throw new Error('Expected a shape.')
 
@@ -458,7 +458,7 @@ describe('staff notation construction', () => {
   })
 
   it('constructs a combination product set as the active scale', () => {
-    const evaluated = evaluateProgramShape(parse('{scale = cps([1 3 5 7], 2)}\n1 2 3 4 5 6'))
+    const evaluated = evaluateProgramShape(parse('{scale <- cps([1 3 5 7], 2)}\n1 2 3 4 5 6'))
     if (!('shape' in evaluated)) throw new Error('Expected a shape.')
 
     expect(evaluated.diagnostics).toEqual([])
@@ -474,7 +474,7 @@ describe('staff notation construction', () => {
 
   it('applies a mode in the same context block as a constructed scale', () => {
     const evaluated = evaluateProgramShape(
-      parse('{scale = cps([1 7 11 13], 2); mode = 4}\n0 1 2 3 4 5 6'),
+      parse('{scale <- cps([1 7 11 13], 2); mode <- 4}\n0 1 2 3 4 5 6'),
     )
     if (!('shape' in evaluated)) throw new Error('Expected a shape.')
 
@@ -491,7 +491,7 @@ describe('staff notation construction', () => {
 
   it('passes scale degrees through functions while constructing a scale', () => {
     const evaluated = evaluateProgramShape(
-      parse('fn twice(interval) { ret interval * 2 } {scale = twice(1) twice(2)}\n1 2'),
+      parse('fn twice(interval) { ret interval * 2 } {scale <- twice(1) twice(2)}\n1 2'),
     )
     if (!('shape' in evaluated)) throw new Error('Expected a shape.')
 
@@ -560,7 +560,7 @@ describe('staff notation construction', () => {
   })
 
   it('keeps root-frequency changes out of repeated staff appearances', () => {
-    const node = parse('C |: 1/1 D E {root = D} :| 1/1 C').body[0] as Expression
+    const node = parse('C |: 1/1 D E {root <- D} :| 1/1 C').body[0] as Expression
     const evaluated = evaluateScoreShape(node)
     if (!('shape' in evaluated)) throw new Error('Expected shape.')
 
@@ -591,7 +591,7 @@ describe('staff notation construction', () => {
   })
 
   it('spells ratios relative to a high-prime root-frequency shift', () => {
-    const node = parse('{root = Ev5} 1/1').body[0] as Expression
+    const node = parse('{root <- Ev5} 1/1').body[0] as Expression
     const evaluated = evaluateScoreShape(node)
     if (!('shape' in evaluated)) throw new Error('Expected shape.')
 
@@ -612,7 +612,7 @@ describe('staff notation construction', () => {
   })
 
   it('preserves unary root expressions in context annotations', () => {
-    const evaluated = evaluateScoreShape(parse("{root = '0} 0").body[0]!)
+    const evaluated = evaluateScoreShape(parse("{root <- '0} 0").body[0]!)
     if (!('shape' in evaluated)) throw new Error('Expected shape.')
     const staff = constructStaffNotationShape(evaluated.shape)
     if (staff.kind !== 'sequence') throw new Error('Expected a sequence.')
@@ -621,7 +621,7 @@ describe('staff notation construction', () => {
   })
 
   it('engraves a root-frequency shift relative to the moved root', () => {
-    const node = parse('C D 1/1 {root = D} C D 1/1').body[0] as Expression
+    const node = parse('C D 1/1 {root <- D} C D 1/1').body[0] as Expression
     const evaluated = evaluateScoreShape(node)
     if (!('shape' in evaluated)) throw new Error('Expected shape.')
 

@@ -25,14 +25,14 @@ describe('score-shape timing', () => {
     ['2/1', 1200],
     ['2 * 3', 1200 * Math.log2(6)],
   ])('plays a variable initialized with %s like the same score literal', (value, cents) => {
-    const score = shape(`let note = ${value} note`) as SequenceShape
+    const score = shape(`let note <- ${value} note`) as SequenceShape
     const notes = score.children.filter((child) => child.kind === 'attack')
     expect(notes).toHaveLength(1)
     expect(notes[0]!.pitch.value.valueOf()).toBeCloseTo(cents)
   })
 
   it('evaluates local degree variables in the active tuning', () => {
-    const score = shape('{24edo} fn phrase() { let note = 2 ret note } phrase()') as SequenceShape
+    const score = shape('{24edo} fn phrase() { let note <- 2 ret note } phrase()') as SequenceShape
     const collect = (current: ScoreShape): number[] => {
       if (current.kind === 'attack') return [current.pitch.value.valueOf()]
       if (current.kind === 'sequence') return current.children.flatMap(collect)
@@ -47,10 +47,10 @@ describe('score-shape timing', () => {
     ['sort((2,1))', '(1,2)'],
     ['arrayMap((note) => note, [0 1])', '[0 1]'],
     ['arrayMap((note) => note, (0,1))', '(0,1)'],
-    ['let notes = (0 1) notes==', '(0 1)=='],
-    ['let notes = (0,1) notes==', '(0,1)=='],
-    ['let notes = sort((1 0)) notes==', '(0 1)=='],
-    ['let notes = arrayMap((note) => note, (0 1)) notes==', '(0 1)=='],
+    ['let notes <- (0 1) notes==', '(0 1)=='],
+    ['let notes <- (0,1) notes==', '(0,1)=='],
+    ['let notes <- sort((1 0)) notes==', '(0 1)=='],
+    ['let notes <- arrayMap((note) => note, (0 1)) notes==', '(0 1)=='],
   ])('preserves musical structure in %s', (source, reference) => {
     const snapshot = (score: ScoreShape): unknown => {
       if (score.kind === 'attack')
@@ -68,7 +68,7 @@ describe('score-shape timing', () => {
   })
 
   it('stores bare scale degrees separately from explicit scalar ratios', () => {
-    const score = shape('let second = 2 let octave = 2/1 second octave') as SequenceShape
+    const score = shape('let second <- 2 let octave <- 2/1 second octave') as SequenceShape
     const notes = score.children.filter((child) => child.kind === 'attack')
     expect(notes.map((note) => note.pitch.value.valueOf())).toEqual([200, 1200])
   })
@@ -81,7 +81,7 @@ describe('score-shape timing', () => {
     ['[[0 1] 2]', 1, [0, 100, 200]],
     ['[]', 1, []],
   ])('plays a container variable initialized with %s', (container, duration, cents) => {
-    const score = shape(`let tuplet = ${container} tuplet`)
+    const score = shape(`let tuplet <- ${container} tuplet`)
     const notes: Extract<ScoreShape, { kind: 'attack' }>[] = []
     const collect = (current: ScoreShape) => {
       if (current.kind === 'attack') notes.push(current)
@@ -94,7 +94,7 @@ describe('score-shape timing', () => {
   })
 
   it('captures container pitches once and reuses them under the current timing', () => {
-    const score = shape('let tuplet = [0 1 2] {24edo} @2 tuplet tuplet[1]')
+    const score = shape('let tuplet <- [0 1 2] {24edo} @2 tuplet tuplet[1]')
     const notes: Extract<ScoreShape, { kind: 'attack' }>[] = []
     const collect = (current: ScoreShape) => {
       if (current.kind === 'attack') notes.push(current)
@@ -123,7 +123,7 @@ describe('score-shape timing', () => {
 
   it('evaluates zero-duration lexical declarations before musical calls', () => {
     const score = shape(
-      'let interval = 3/2 fn transpose(note) { let shifted = note * interval ret shifted } transpose(1/1)',
+      'let interval <- 3/2 fn transpose(note) { let shifted <- note * interval ret shifted } transpose(1/1)',
     )
     const attacks: Extract<ScoreShape, { kind: 'attack' }>[] = []
     const collect = (current: ScoreShape) => {
@@ -139,11 +139,11 @@ describe('score-shape timing', () => {
 
   it('inherits lexical bindings in nested score constructs and directives', () => {
     for (const source of [
-      'let interval = 3/2 (interval)',
-      'let interval = 3/2 [interval]',
-      'let interval = 3/2 (interval,interval)',
-      'let interval = 3/2 |: interval :|',
-      'let interval = 3/2 interval?',
+      'let interval <- 3/2 (interval)',
+      'let interval <- 3/2 [interval]',
+      'let interval <- 3/2 (interval,interval)',
+      'let interval <- 3/2 |: interval :|',
+      'let interval <- 3/2 interval?',
     ]) {
       try {
         shape(source)
@@ -152,7 +152,7 @@ describe('score-shape timing', () => {
       }
     }
 
-    const directed = shape('let subdivision = 1/2 @subdivision(subdivision) C')
+    const directed = shape('let subdivision <- 1/2 @subdivision(subdivision) C')
     expect(directed.duration.equals(2)).toBe(true)
   })
 
@@ -199,7 +199,7 @@ LICC()`)
   })
 
   it('applies custom and key signatures while explicit naturals cancel them', () => {
-    const custom = shape('{sig = C# ^D E^5 /Ad} C C_ D E A') as SequenceShape
+    const custom = shape('{sig <- C# ^D E^5 /Ad} C C_ D E A') as SequenceShape
     const attacks = custom.children.filter((child) => child.kind === 'attack')
     expect(attacks.map((attack) => attack.pitch.spelling)).toMatchObject([
       { nominal: 'C', accidentals: ['#'] },
@@ -210,7 +210,7 @@ LICC()`)
     ])
     expect(attacks[0]!.pitch.value.valueOf()).not.toBeCloseTo(attacks[1]!.pitch.value.valueOf())
 
-    const gMajor = shape('{key = G} C D E F G A B') as SequenceShape
+    const gMajor = shape('{key <- G} C D E F G A B') as SequenceShape
     const gAttacks = gMajor.children.filter((child) => child.kind === 'attack')
     expect(gAttacks.map((attack) => attack.pitch.spelling.accidentals)).toEqual([
       [],
@@ -234,14 +234,14 @@ LICC()`)
       ['Locrian', ['b', 'b', 'b']],
     ] as const
     for (const [mode, expectedAccidentals] of modeKeys) {
-      const score = shape(`{key = D ${mode}} C D E F G A B`) as SequenceShape
+      const score = shape(`{key <- D ${mode}} C D E F G A B`) as SequenceShape
       const accidentals = score.children
         .filter((child) => child.kind === 'attack')
         .flatMap((attack) => attack.pitch.spelling.accidentals)
       expect(accidentals).toEqual(expectedAccidentals)
     }
 
-    const upF = shape('{key = ^F} C D E F G A B') as SequenceShape
+    const upF = shape('{key <- ^F} C D E F G A B') as SequenceShape
     const upFAttacks = upF.children.filter((child) => child.kind === 'attack')
     expect(upFAttacks.map((attack) => attack.pitch.spelling.modifiers)).toEqual(
       Array.from({ length: 7 }, () => ['up']),
@@ -256,7 +256,7 @@ LICC()`)
       ['b'],
     ])
 
-    const halfFlatC = shape('{key = Cd} C D E F G A B') as SequenceShape
+    const halfFlatC = shape('{key <- Cd} C D E F G A B') as SequenceShape
     const halfFlatAttacks = halfFlatC.children.filter((child) => child.kind === 'attack')
     expect(halfFlatAttacks.map((attack) => attack.pitch.spelling.accidentals)).toEqual(
       Array.from({ length: 7 }, () => ['d']),
@@ -264,33 +264,33 @@ LICC()`)
   })
 
   it('ties Greek signature defaults to their corresponding Latin nominals', () => {
-    const latin = shape('{sig = C#} C Gam') as SequenceShape
-    const greek = shape('{sig = Gam#} C Gam') as SequenceShape
+    const latin = shape('{sig <- C#} C Gam') as SequenceShape
+    const greek = shape('{sig <- Gam#} C Gam') as SequenceShape
     for (const score of [latin, greek]) {
       const attacks = score.children.filter((child) => child.kind === 'attack')
       expect(attacks.map((attack) => attack.pitch.spelling.accidentals)).toEqual([['#'], ['#']])
     }
-    const greekKey = shape('{key = Eta} F Zet') as SequenceShape
+    const greekKey = shape('{key <- Eta} F Zet') as SequenceShape
     const attacks = greekKey.children.filter((child) => child.kind === 'attack')
     expect(attacks.map((attack) => attack.pitch.spelling.accidentals)).toEqual([['#'], ['#']])
   })
 
   it('applies signatures declared inside Diamond-MOS blocks', () => {
-    const custom = shape('MOS{5L2s; sig = J& L@} J K L') as SequenceShape
+    const custom = shape('MOS{5L2s; sig <- J& L@} J K L') as SequenceShape
     const attacks = custom.children.filter((child) => child.kind === 'attack')
     expect(attacks.map((attack) => attack.pitch.spelling.accidentals)).toEqual([['&'], [], ['@']])
 
-    const keyed = shape('MOS{5L2s; key = K} J K L M N O P') as SequenceShape
+    const keyed = shape('MOS{5L2s; key <- K} J K L M N O P') as SequenceShape
     const keyedAttacks = keyed.children.filter((child) => child.kind === 'attack')
     expect(keyedAttacks.some((attack) => attack.pitch.spelling.accidentals.length)).toBe(true)
 
-    const udp = shape('MOS{5L2s; key = K 2|4} J') as SequenceShape
+    const udp = shape('MOS{5L2s; key <- K 2|4} J') as SequenceShape
     const udpAttack = udp.children.find((child) => child.kind === 'attack')
     expect(udpAttack?.pitch.mos?.context.pattern).toBe('LsLLsLL')
   })
 
   it('uses MOS naturals to undo signature accidentals', () => {
-    const score = shape('MOS{5L2s; sig = J& K@} J J_ J♮ K K_ K♮') as SequenceShape
+    const score = shape('MOS{5L2s; sig <- J& K@} J J_ J♮ K K_ K♮') as SequenceShape
     const attacks = score.children.filter((child) => child.kind === 'attack')
 
     expect(attacks.map((attack) => attack.pitch.spelling.accidentals)).toEqual([
@@ -310,7 +310,7 @@ LICC()`)
   it('selects a keyed MOS mode using the current step counts', () => {
     const score = shape(`MOS{4L 1s 3|1}
 J K L M N j=
-MOS{key = K 1|3}
+MOS{key <- K 1|3}
 K L M N j k=`) as SequenceShape
     const attacks = score.children.filter((child) => child.kind === 'attack')
 
@@ -320,7 +320,7 @@ K L M N j k=`) as SequenceShape
     ])
     expect(attacks[7]?.pitch.spelling).toMatchObject({ nominal: 'M', accidentals: ['@'] })
 
-    const setter = shape('MOS{4L 1s 3|1} MOS{key = K 1|3; ^ = 2} J ^J') as SequenceShape
+    const setter = shape('MOS{4L 1s 3|1} MOS{key <- K 1|3; ^ <- 2} J ^J') as SequenceShape
     const setAttacks = setter.children.filter((child) => child.kind === 'attack')
     const setOffset = setAttacks[1]!.pitch.value.valueOf() - setAttacks[0]!.pitch.value.valueOf()
     expect(setOffset).toBeCloseTo(Value.equalDivision(2, 9, new Value(2)).valueOf())
@@ -363,7 +363,7 @@ K L M N j k=`) as SequenceShape
       { nominal: 'K', system: 'mos', derived: true, accidentals: ['&'] },
     ])
 
-    const naturalTransposed = shape('MOS{5L2s; sig = J&} J_ + M1ms J♮ + M1ms') as SequenceShape
+    const naturalTransposed = shape('MOS{5L2s; sig <- J&} J_ + M1ms J♮ + M1ms') as SequenceShape
     const naturalAttacks = naturalTransposed.children.filter((child) => child.kind === 'attack')
     expect(naturalAttacks.map((attack) => attack.pitch.spelling)).toMatchObject([
       { nominal: 'K', system: 'mos', derived: true, accidentals: [] },
@@ -379,7 +379,7 @@ K L M N j k=`) as SequenceShape
   })
 
   it('aligns MOS and conventional nominal groups through root associations', () => {
-    const score = shape(`MOS{5L2s 5|1; L=9/8} {K as root} J K L M
+    const score = shape(`MOS{5L2s 5|1; L<-9/8} {K as root} J K L M
 {D as root} C D E F`) as SequenceShape
     const cents = score.children
       .filter((child) => child.kind === 'attack')
@@ -425,20 +425,20 @@ K L M N j k=`) as SequenceShape
     const latinAttack = latinOctave.children.find((child) => child.kind === 'attack')
     expect(latinAttack?.pitch.value.equals(Value.pitch(new Value(2)))).toBe(true)
 
-    const set = shape('MOS{5L2s} MOS{^ = 1\\24} ^J') as SequenceShape
+    const set = shape('MOS{5L2s} MOS{^ <- 1\\24} ^J') as SequenceShape
     const setAttack = set.children.find((child) => child.kind === 'attack')
     expect(setAttack?.pitch.value.equals(Value.equalDivision(1, 24, new Value(2)))).toBe(true)
 
-    const integerSet = shape('MOS{5L2s; ^ = 2} ^J') as SequenceShape
+    const integerSet = shape('MOS{5L2s; ^ <- 2} ^J') as SequenceShape
     const integerSetAttack = integerSet.children.find((child) => child.kind === 'attack')
     expect(integerSetAttack?.pitch.value.equals(Value.equalDivision(2, 12, new Value(2)))).toBe(
       true,
     )
 
-    const unhosted = evaluateScoreShape(parse('MOS{5L 2s; L=9/8} ^J').body[0] as Expression)
+    const unhosted = evaluateScoreShape(parse('MOS{5L 2s; L<-9/8} ^J').body[0] as Expression)
     expect(unhosted.diagnostics[0]?.message).toContain('no equal-temperament host')
 
-    const unhostedRegisters = shape("MOS{10L 2s; L = 17/16} 'J `J") as SequenceShape
+    const unhostedRegisters = shape("MOS{10L 2s; L <- 17/16} 'J `J") as SequenceShape
     const registerCents = unhostedRegisters.children
       .filter((child) => child.kind === 'attack')
       .map((attack) => attack.pitch.value.valueOf())
@@ -449,11 +449,11 @@ K L M N j k=`) as SequenceShape
     expect(Math.round(periodAttack!.pitch.value.valueOf())).toBe(600)
 
     const inconsistent = evaluateScoreShape(
-      parse('MOS{5L2s; L = 300c; s = 100c} J').body[0] as Expression,
+      parse('MOS{5L2s; L <- 300c; s <- 100c} J').body[0] as Expression,
     )
     expect(inconsistent.diagnostics[0]?.message).toContain('accumulate to the MOS equave')
 
-    const centsEquave = shape('MOS{5L2s; L = 300c; s = 100c; <1700c>} J j') as SequenceShape
+    const centsEquave = shape('MOS{5L2s; L <- 300c; s <- 100c; <1700c>} J j') as SequenceShape
     const centsEquaveAttacks = centsEquave.children.filter((child) => child.kind === 'attack')
     expect(Math.round(centsEquaveAttacks[1]!.pitch.value.valueOf())).toBe(1700)
   })
@@ -515,7 +515,7 @@ K L M N j k=`) as SequenceShape
   })
 
   it('treats frequency quantities as notes relative to the current root frequency', () => {
-    const result = shape('{root = 220Hz} 220Hz 0.44kHz (1 / 0.001s)') as SequenceShape
+    const result = shape('{root <- 220Hz} 220Hz 0.44kHz (1 / 0.001s)') as SequenceShape
     const attacks = result.children.filter((child) => child.kind === 'attack')
 
     const notationCents = attacks.map((attack) => attack.pitch.notationValue?.valueOf())
@@ -532,7 +532,7 @@ K L M N j k=`) as SequenceShape
   })
 
   it('applies equave shifts to frequency quantities', () => {
-    const result = shape("{root = 220Hz} '220Hz `220Hz") as SequenceShape
+    const result = shape("{root <- 220Hz} '220Hz `220Hz") as SequenceShape
     const attacks = result.children.filter((child) => child.kind === 'attack')
 
     expect(attacks.map((attack) => attack.pitch.notationValue?.valueOf())).toEqual([1200, -1200])
@@ -622,7 +622,7 @@ K L M N j k=`) as SequenceShape
   })
 
   it('moves the root to a scale degree', () => {
-    const result = shape('{200c 400c 700c 1200c}{root = 3} 0 1') as SequenceShape
+    const result = shape('{200c 400c 700c 1200c}{root <- 3} 0 1') as SequenceShape
     const attacks = result.children.filter((child) => child.kind === 'attack')
 
     expect(attacks[0]?.pitch.value.valueOf()).toBeCloseTo(700)
@@ -630,7 +630,7 @@ K L M N j k=`) as SequenceShape
   })
 
   it('moves the root to an equave-shifted scale degree expression', () => {
-    const result = shape("{root = '0} 0 1") as SequenceShape
+    const result = shape("{root <- '0} 0 1") as SequenceShape
     const attacks = result.children.filter((child) => child.kind === 'attack')
 
     expect(attacks[0]?.pitch.value.valueOf()).toBeCloseTo(1200)
@@ -646,7 +646,7 @@ K L M N j k=`) as SequenceShape
           : score.kind === 'parallel'
             ? score.branches.flatMap(attacksIn)
             : []
-    const pitches = attacksIn(shape('{4/3 3/2 2/1}{mode = 1} 0 1 2 3') as SequenceShape).map(
+    const pitches = attacksIn(shape('{4/3 3/2 2/1}{mode <- 1} 0 1 2 3') as SequenceShape).map(
       (attack) => attack.pitch.value,
     )
 
@@ -664,15 +664,15 @@ K L M N j k=`) as SequenceShape
     }
 
     ;[0, 3].forEach((mode) => {
-      const unrotated = pitchRatios(`{4/3 3/2 2/1}{mode = ${mode}} 0 1 2 3`)
+      const unrotated = pitchRatios(`{4/3 3/2 2/1}{mode <- ${mode}} 0 1 2 3`)
       ;[1, 4 / 3, 3 / 2, 2].forEach((ratio, index) => expect(unrotated[index]).toBeCloseTo(ratio))
     })
-    const negative = pitchRatios('{4/3 3/2 2/1}{mode = -1} 0 1 2 3')
+    const negative = pitchRatios('{4/3 3/2 2/1}{mode <- -1} 0 1 2 3')
     ;[1, 4 / 3, 16 / 9, 2].forEach((ratio, index) => expect(negative[index]).toBeCloseTo(ratio))
   })
 
   it('assigns an equave independently of the scale degrees', () => {
-    const result = shape('{4/3 3/2 2/1}{equave = 3/1} 0 1 2 3 4') as SequenceShape
+    const result = shape('{4/3 3/2 2/1}{equave <- 3/1} 0 1 2 3 4') as SequenceShape
     const pitches = result.children
       .filter((child) => child.kind === 'attack')
       .map((attack) => attack.pitch.value)
@@ -683,7 +683,7 @@ K L M N j k=`) as SequenceShape
   })
 
   it('rotates non-monotonic scales without changing their equave', () => {
-    const result = shape('{3/2 4/3 2/1}{equave = 3/1}{mode = 1} 0 1 2 3') as SequenceShape
+    const result = shape('{3/2 4/3 2/1}{equave <- 3/1}{mode <- 1} 0 1 2 3') as SequenceShape
     const pitches = result.children
       .filter((child) => child.kind === 'attack')
       .map((attack) => attack.pitch.value)
@@ -769,7 +769,7 @@ K L M N j k=`) as SequenceShape
   })
 
   it('applies custom prime mappings and leaves omitted primes at their default values', () => {
-    const change = parse('{map = <1199.559c 1903.939c 2784.414c]}').body[0] as PitchContextChange
+    const change = parse('{map <- <1199.559c 1903.939c 2784.414c]}').body[0] as PitchContextChange
     const edo = applyPitchContextChange(parse('{12edo}').body[0] as PitchContextChange)
     let context = edo
     for (let index = 0; index < 20_000; index++) context = applyPitchContextChange(change, context)
@@ -784,7 +784,7 @@ K L M N j k=`) as SequenceShape
   it('stretches scales, prime mappings, and notation operators in pitch-space', () => {
     const base = applyPitchContextChange(parse('{12edo}').body[0] as PitchContextChange)
     const stretched = applyPitchContextChange(
-      parse('{tuning *= 102%}').body[0] as PitchContextChange,
+      parse('{tuning *<- 102%}').body[0] as PitchContextChange,
       base,
     )
 
@@ -797,7 +797,7 @@ K L M N j k=`) as SequenceShape
     expect(stretched.up.valueOf()).toBeCloseTo(base.up.valueOf() * 1.02)
     expect(stretched.lift.valueOf()).toBeCloseTo(base.lift.valueOf() * 1.02)
 
-    const score = shape('{12edo} {tuning *= 102%} 1') as SequenceShape
+    const score = shape('{12edo} {tuning *<- 102%} 1') as SequenceShape
     const attack = score.children.find((child) => child.kind === 'attack')
     expect(attack?.kind === 'attack' ? attack.pitch.value.valueOf() : undefined).toBeCloseTo(102)
   })
@@ -805,14 +805,14 @@ K L M N j k=`) as SequenceShape
   it('stretches active MOS intervals and rejects invalid stretch factors', () => {
     const mos = applyPitchContextChange(parse('MOS{5L2s}').body[0] as PitchContextChange)
     const stretched = applyPitchContextChange(
-      parse('{tuning *= 3/2}').body[0] as PitchContextChange,
+      parse('{tuning *<- 3/2}').body[0] as PitchContextChange,
       mos,
     )
     expect(stretched.mos!.large.valueOf()).toBeCloseTo(mos.mos!.large.valueOf() * 1.5)
     expect([...stretched.mos!.nominals.values()][1]!.valueOf()).toBeCloseTo(
       [...mos.mos!.nominals.values()][1]!.valueOf() * 1.5,
     )
-    for (const source of ['{tuning *= 0%}', '{tuning *= 1s}'])
+    for (const source of ['{tuning *<- 0%}', '{tuning *<- 1s}'])
       expect(() => applyPitchContextChange(parse(source).body[0] as PitchContextChange)).toThrow(
         /positive dimensionless factor/,
       )
@@ -820,7 +820,7 @@ K L M N j k=`) as SequenceShape
 
   it('preserves an active MOS root association while stretching', () => {
     for (const factor of ['100%', '3/2']) {
-      const score = shape(`MOS{5L2s} {K as root} {tuning *= ${factor}} K`) as SequenceShape
+      const score = shape(`MOS{5L2s} {K as root} {tuning *<- ${factor}} K`) as SequenceShape
       const attack = score.children.find((child) => child.kind === 'attack')
       expect(attack?.kind === 'attack' ? attack.pitch.value.valueOf() : undefined).toBeCloseTo(0)
     }
@@ -829,7 +829,7 @@ K L M N j k=`) as SequenceShape
     context = applyPitchContextChange(parse('{K as root}').body[0] as PitchContextChange, context)
     const originalRootOffset = context.rootPitch.rootOffset.valueOf()
     context = applyPitchContextChange(
-      parse('{tuning *= 3/2}').body[0] as PitchContextChange,
+      parse('{tuning *<- 3/2}').body[0] as PitchContextChange,
       context,
     )
     expect(context.rootPitch.rootOffset.valueOf()).toBeCloseTo(originalRootOffset * 1.5)
@@ -948,7 +948,7 @@ K L M N j k=`) as SequenceShape
     ).toEqual([expect.closeTo(step), expect.closeTo(5 * step)])
   })
   it('accepts pitch expressions in up and lift assignments', () => {
-    const result = shape('{^ = 200c; / = 3 * 100c} [^C, /C]') as SequenceShape
+    const result = shape('{^ <- 200c; / <- 3 * 100c} [^C, /C]') as SequenceShape
     const chord = result.children.find((child) => child.kind === 'parallel')
     if (!chord || chord.kind !== 'parallel') throw new Error('Expected a chord.')
 
@@ -960,8 +960,8 @@ K L M N j k=`) as SequenceShape
     ).toEqual([200, 300])
   })
   it('assigns equaves with the register-shift operator', () => {
-    const standard = shape("{' = 3/2} '0") as SequenceShape
-    const mos = shape("MOS{5L2s} MOS{' = 4/3} [j, '0]") as SequenceShape
+    const standard = shape("{' <- 3/2} '0") as SequenceShape
+    const mos = shape("MOS{5L2s} MOS{' <- 4/3} [j, '0]") as SequenceShape
     const attackValues = (score: SequenceShape) =>
       score.children.flatMap((child) =>
         child.kind === 'attack'
@@ -991,7 +991,7 @@ K L M N j k=`) as SequenceShape
     expect(result.children[2].pitch.value.equals(Value.pitch(new Value(9n, 8n)))).toBe(true)
   })
   it('moves the root frequency without reassociating its pitch spelling', () => {
-    const result = shape('{root = D} C 1/1 D') as SequenceShape
+    const result = shape('{root <- D} C 1/1 D') as SequenceShape
     const attacks = result.children.filter((child) => child.kind === 'attack')
 
     expect(attacks).toHaveLength(3)

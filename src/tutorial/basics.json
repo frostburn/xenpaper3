@@ -82,18 +82,18 @@
       },
       {
         "description": "All pitch values other than cycles per second are relative to a root note.",
-        "tune": "0 2 4={root=432Hz}0 2 4="
+        "tune": "0 2 4={root<-432Hz}0 2 4="
       },
       {
         "description": "As each root pitch change is relative to the current root, multiple roots can be chained.",
-        "tune": "4 0= {root = 2} 4 0= {root = 2} 4 0="
+        "tune": "4 0= {root <- 2} 4 0= {root <- 2} 4 0="
       },
       {
         "description": "Root changes can also switch octaves for a time.",
-        "tune": "4 0={root = '0}4 0={root = `0}4 0="
+        "tune": "4 0={root <- '0}4 0={root <- `0}4 0="
       },
       {
-        "tune": "{12edo} [0,4,7]===\n{tuning *= 102%} [0,4,7]===",
+        "tune": "{12edo} [0,4,7]===\n{tuning *<- 102%} [0,4,7]===",
         "html": "<p>Multiply <code>tuning</code> by a positive dimensionless factor to stretch or compress the entire active pitch space while keeping its root fixed. The change scales degrees, the equave, prime mappings, accidentals, and MOS intervals together; here, <code>102%</code> makes 12edo slightly wider.</p>"
       }
     ]
@@ -150,7 +150,7 @@
       },
       {
         "description": "To add more repeats use @x followed by a number attached to the opening |:.",
-        "tune": "|:@x6\n4:5:6\n4:5:3 * 5/4\n8:5:6 * 25/16\n{root = 125/128}\n:|"
+        "tune": "|:@x6\n4:5:6\n4:5:3 * 5/4\n8:5:6 * 25/16\n{root <- 125/128}\n:|"
       },
       {
         "tune": "0 2 |¹ 4 5 :|\n    |² 7 9 ||",
@@ -215,7 +215,7 @@
     "title": "Parallel sections",
     "demos": [
       {
-        "tune": "{root = '0} @4\n5 . 7  . 10 7 5 . 7  . 12 . 10 7 5  . |\n0 . 10 . 7  5 7 . 12 5 7  . 10 . 12 . |,\n\n@2\n[0,4,7]==    [5,9,12]==     [3,7,10]= |\n=   [2,7,12]==   [0,4,7,11,12]===     |,\n\n{root = `0}\n0= 0= | 5= 7= ||",
+        "tune": "{root <- '0} @4\n5 . 7  . 10 7 5 . 7  . 12 . 10 7 5  . |\n0 . 10 . 7  5 7 . 12 5 7  . 10 . 12 . |,\n\n@2\n[0,4,7]==    [5,9,12]==     [3,7,10]= |\n=   [2,7,12]==   [0,4,7,11,12]===     |,\n\n{root <- `0}\n0= 0= | 5= 7= ||",
         "html": "<p>Use the comma <code>,</code> to separate sections that you want to play in parallel and terminate the group with a double bar line.</p>"
       }
     ]

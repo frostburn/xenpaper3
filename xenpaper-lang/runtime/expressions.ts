@@ -43,18 +43,18 @@ export type ExpressionEvaluationResult =
 
 /** Xenpaper declarations installed as the outermost lexical scope by default. */
 export const PRELUDE = `
-let pi = 3.141592653589793r
+let pi <- 3.141592653589793r
 fn sqrt(radicand: ratio) { ret radicand ** 1/2 }
 fn prod(factors: container) { ret arrayReduce((total, element) => total * ratio(element), factors, 1/1) }
 fn ground(scale: container) { ret scale - pitch(scale[0]) }
-fn equaveReduce(scale: container, equave: ratio = niente) {
-  let actualEquave = equave al scale[-1]
+fn equaveReduce(scale: container, equave: ratio <- niente) {
+  let actualEquave <- equave al scale[-1]
   ret ratio(scale) rd ratio(actualEquave)
 }
-fn cps(factors: container<ratio>, count: integer, equave: ratio = niente, withUnity: boolean = false) {
-  let products = sort(arrayMap((combination) => prod(combination), kCombinations(factors, count)))
-  let grounded = products if (withUnity al false) else ground(products)
-  let actualEquave = equave al (pitch(2/1) + grounded[0])
+fn cps(factors: container<ratio>, count: integer, equave: ratio <- niente, withUnity: boolean <- false) {
+  let products <- sort(arrayMap((combination) => prod(combination), kCombinations(factors, count)))
+  let grounded <- products if (withUnity al false) else ground(products)
+  let actualEquave <- equave al (pitch(2/1) + grounded[0])
   ret sort(equaveReduce(grounded, actualEquave))
 }
 `

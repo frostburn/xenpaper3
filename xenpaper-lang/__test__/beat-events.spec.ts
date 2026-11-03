@@ -87,7 +87,7 @@ describe('beat event expansion', () => {
   })
 
   it('compares the sounding value of root-relative absolute pitches', () => {
-    expect(audibleResult('C')).not.toEqual(audibleResult('{root = D} C'))
+    expect(audibleResult('C')).not.toEqual(audibleResult('{root <- D} C'))
   })
 
   it('scales every note when a normalized slot is continued', () => {
@@ -150,11 +150,11 @@ describe('beat event expansion', () => {
     ['(1 2 3) ==', ['0', '1', '2'], ['1', '1', '3'], '5'],
     ['((1 2) 3)==', ['0', '1', '2'], ['1', '1', '3'], '5'],
     ['(1 2 3)== 4', ['0', '1', '2', '5'], ['1', '1', '3', '1'], '6'],
-    ['let phrase = (1 2 3) phrase==', ['0', '1', '2'], ['1', '1', '3'], '5'],
+    ['let phrase <- (1 2 3) phrase==', ['0', '1', '2'], ['1', '1', '3'], '5'],
     ['fn phrase() { ret (1 2 3) } phrase()==', ['0', '1', '2'], ['1', '1', '3'], '5'],
     ['[1 2 3]==', ['0', '1', '2'], ['1', '1', '1'], '3'],
     ['([1 2 3])==', ['0', '1', '2'], ['1', '1', '1'], '3'],
-    ['let phrase = [1 2 3] phrase==', ['0', '1', '2'], ['1', '1', '1'], '3'],
+    ['let phrase <- [1 2 3] phrase==', ['0', '1', '2'], ['1', '1', '1'], '3'],
     ['(1, 2, 3)==', ['0', '0', '0'], ['3', '3', '3'], '3'],
     ['(1, 2 3)=', ['0', '0', '2'], ['2', '2', '2'], '3'],
     ['[0, 4 7]=!', ['0', '0', '1'], ['2', '2', '1'], '2'],
@@ -280,14 +280,14 @@ describe('beat event expansion', () => {
     ['subdivision changes', '@3', 'C @2 D E', 'F'],
     ['articulation shorthand', '', 'C D E F @. G', 'A'],
     ['dynamics', '@p', 'C @ff D', 'E'],
-    ['pitch-context changes', '', '{root = D} C E', 'G'],
+    ['pitch-context changes', '', '{root <- D} C E', 'G'],
     ['hard boundaries', 'A', 'C || D E', 'F'],
     ['nested repeats', '', 'C |:@x2 D :| E', 'F'],
     ['one-shot state across iterations', '', 'C @velocity(1/4)', 'D'],
     [
       'sequential declarations',
-      'let division = 2/1',
-      'let division = division + 1 @subdivision(division) C',
+      'let division <- 2/1',
+      'let division <- division + 1 @subdivision(division) C',
       'D',
     ],
     ['function declarations', '', 'fn phrase() { ret C D } phrase()', 'phrase()'],
@@ -307,7 +307,7 @@ describe('beat event expansion', () => {
       'C @2 D',
       'C D E F @. G',
       '@p C @ff D',
-      '{root = D} C E',
+      '{root <- D} C E',
       'C || D',
       'C |:@x2 D :| E',
     ]
@@ -316,7 +316,7 @@ describe('beat event expansion', () => {
       ['A', 'F'],
       ['@3 A', 'F'],
       ['@p A', '@ff F'],
-      ['{root = E} A', 'F'],
+      ['{root <- E} A', 'F'],
     ]
 
     for (const body of bodies) {
@@ -340,8 +340,8 @@ describe('beat event expansion', () => {
     ['chained implicit repeats', 'C :| D :|', 'C C D C C D'],
     [
       'declarations in alternate endings',
-      '|: C |¹ let interval = 3/2 interval :|² interval ||',
-      'C let interval = 3/2 interval C interval ||',
+      '|: C |¹ let interval <- 3/2 interval :|² interval ||',
+      'C let interval <- 3/2 interval C interval ||',
     ],
   ])('matches the authored expansion for %s', (_description, repeated, authored) => {
     expect(audibleResult(repeated)).toEqual(audibleResult(authored))
