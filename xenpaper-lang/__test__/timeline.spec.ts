@@ -124,6 +124,25 @@ describe('global grid context', () => {
     expect(result[0]!.pitch.value.equals(result[1]!.pitch.value)).toBe(false)
   })
 
+  it('keeps ordinary group attacks on their original global context positions', () => {
+    const initialization = initialize('. [. {5edo} .]')
+    const result = notes('(D D D)==', initialization)
+    const expected = notes('D D D==', initialization)
+    expect(
+      result.map(({ start, duration, pitch }) => [
+        start.toFraction(),
+        duration.toFraction(),
+        pitch.value.valueOf(),
+      ]),
+    ).toEqual(
+      expected.map(({ start, duration, pitch }) => [
+        start.toFraction(),
+        duration.toFraction(),
+        pitch.value.valueOf(),
+      ]),
+    )
+  })
+
   it('settles normalized timing when a global function changes its length', () => {
     const global = initialize('fn phrase() { ret C } [. fn phrase() { ret D E } ..]')
     const result = notes('[phrase() phrase()]', global)

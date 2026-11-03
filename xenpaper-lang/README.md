@@ -193,6 +193,19 @@ tuplet tuplet
 Each use retains the container's sequence or parallel structure and slot timing.
 Its pitches are captured at declaration; playback uses the current timing context.
 
+Postfix `=` continues the active note after an ordinary sequence, including a
+parenthesized or stored phrase: `(1 2 3)==` has note durations 1, 1, and 3.
+A trailing rest clears the active note, so `(1 2 .)=` is an error. A normalized
+slot such as `[1 2 3]==` instead stretches the entire tuplet to three slots.
+Parallel expressions retain their all-note continuation rule; in uneven branches
+this can move later attacks and extend notes beyond the construction's duration.
+Place continuations inside each branch to control its ending independently.
+
+`!` holds every attack to the construction's end. Marks apply in order:
+`(1 2 3)==!` retains starts 0, 1, and 2 and holds all notes to beat 5, while
+`[1 2 3]=!` first stretches the tuplet to two slots and then holds its notes
+to that end. Binary `->` ties matching pitches into the following operand.
+
 `fn name(parameters) {
 ... ret expression }` creates a lexical closure. A function body contains zero
 or more local `let` or `fn` declarations followed by exactly one `ret`, whose

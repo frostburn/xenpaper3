@@ -7,7 +7,7 @@ import type { ExpressionEvaluationResult } from './expressions'
 import { DYNAMIC_VELOCITIES, resolveDirective } from './directives'
 import { Visitor, type VisitorEvaluation } from './visitor'
 import { contextAt } from './initialization'
-import { tieScoreShapes } from './ties'
+import { materializeScoreContinuations, tieScoreShapes } from './ties'
 import { EMPTY_LEXICAL_ENVIRONMENT, extendLexicalEnvironment } from './types'
 import {
   DEFAULT_PITCH_CONTEXT,
@@ -824,7 +824,6 @@ function holdAttacks(
   shape: ScoreShape,
   duration: Fraction,
   extension: Fraction,
-  holdUntilEnd: boolean,
   markOrigins: readonly SourceOrigin[],
 ): ScoreShape | undefined {
   let attackCount = 0
@@ -833,7 +832,7 @@ function holdAttacks(
       attackCount++
       const held: AttackShape = {
         ...current,
-        duration: holdUntilEnd ? duration.sub(start) : current.duration.add(extension),
+        duration: duration.sub(start),
         origins: [...current.origins, ...markOrigins],
       }
       return {
@@ -861,20 +860,6 @@ function holdAttacks(
   if (!attackCount) return undefined
   if (!extension.n) return held
   return sequence([held, generatedRest(extension)], shape.origins)
-}
-
-/** Materialize the timing of postfix continuations before a later `!` mark. */
-function materializeTrailingContinuations(shape: ScoreShape): ScoreShape {
-  if (shape.kind !== 'sequence') return shape
-  let end = shape.children.length
-  while (end && shape.children[end - 1]!.kind === 'continue') end--
-  if (end === shape.children.length || !end) return shape
-  const body = sequence(shape.children.slice(0, end), shape.origins)
-  if (!body.duration.n || !attacks(body).length) return shape
-  const continuationDuration = shape.children
-    .slice(end)
-    .reduce((duration, child) => duration.add(child.duration), new Fraction(0))
-  return scaleShape(body, body.duration.add(continuationDuration).div(body.duration))
 }
 
 function contextAnnotation(
@@ -2167,12 +2152,11 @@ export function evaluateScoreSemantics(
         if (!('shape' in evaluated)) return evaluated
         const continuations = heldFrom.filter((mark) => mark.type === 'DetachedContinue')
         const extension = currentPulse.mul(continuations.length)
-        const base = materializeTrailingContinuations(evaluated.shape)
+        const base = materializeScoreContinuations(evaluated.shape)
         const held = holdAttacks(
           base,
           base.duration.add(extension),
           extension,
-          true,
           current.marks.map((mark) => origin(mark, 'duration')),
         )
         if (held)
@@ -2188,16 +2172,21 @@ export function evaluateScoreSemantics(
       const elimination = current.marks.find((mark) => mark.type === 'TailElimination')
       let evaluated = visitor.visit(current.expression)
       if (!('shape' in evaluated)) return evaluated
-      let distributesHolds = current.expression.type === 'Group'
-      if (continuations.length && !distributesHolds) {
-        const stored = evaluateExpression(current.expression, context, environment)
-        if ('value' in stored)
-          distributesHolds = stored.value.kind === 'container' && !!stored.value.grouped
-      }
+      // Only constructions continued as a unit need their timed contexts moved.
+      // Ordinary sequences keep their attack positions and continue the last note.
+      let continued = evaluated.shape
+      while (
+        continued.kind === 'sequence' &&
+        !continued.normalized &&
+        !continued.continuationTarget &&
+        continued.children.length === 1
+      )
+        continued = continued.children[0]!
       if (
         continuations.length &&
-        (evaluated.shape.kind === 'sequence' || evaluated.shape.kind === 'parallel') &&
-        !distributesHolds &&
+        (continued.kind === 'parallel' ||
+          (continued.kind === 'sequence' &&
+            (continued.normalized || continued.continuationTarget === 'all'))) &&
         !visitor.scope.layout
       ) {
         const duration = evaluated.shape.duration.sub(currentPulse.mul(elimination?.count ?? 0))
@@ -2226,24 +2215,6 @@ export function evaluateScoreSemantics(
             ],
           }
         base = trimShape(base, base.duration.sub(removed))
-      }
-      if (distributesHolds) {
-        const extension = currentPulse.mul(continuations.length)
-        const duration = base.duration.add(extension)
-        const held = holdAttacks(
-          base,
-          duration,
-          extension,
-          false,
-          current.marks
-            .filter((mark) => mark.type === 'DetachedContinue')
-            .map((mark) => origin(mark, 'duration')),
-        )
-        if (held)
-          return withVisitor(
-            { shape: held, diagnostics: evaluated.diagnostics },
-            visitorAfter(evaluated, visitor),
-          )
       }
       if (!continuations.length)
         return withVisitor(
