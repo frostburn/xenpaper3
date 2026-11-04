@@ -29,6 +29,9 @@ describe('first-class musical values', () => {
     '{root <- D} C E',
     'let note <- D note E=',
     '(C=, E G)',
+    '~4::6',
+    '~4:5:6',
+    "'(4::6)",
   ])('evaluates %s uniformly inline, in a binding, and in a return', (phrase) => {
     const expected = music(`(${phrase})`)
     expect(music(`let phrase <- (${phrase}) phrase`)).toEqual(expected)
@@ -66,5 +69,40 @@ describe('first-class musical values', () => {
     expect(result.diagnostics).toContainEqual(
       expect.objectContaining({ code: 'XP_UNDEFINED_NAME' }),
     )
+  })
+  it.each(['3/2', '[C D]', '(C D=)'])(
+    'short-circuits a defined %s before its fallback',
+    (chosen) => {
+      expect(music(`let chosen <- ${chosen} al [C D] chosen`)).toEqual(music(chosen))
+      expect(music(`let chosen <- ${chosen} al (@unsupported C) chosen`)).toEqual(music(chosen))
+      expect(music(`let chosen <- ${chosen} al 1::100000 chosen`)).toEqual(music(chosen))
+    },
+  )
+
+  it('uses a coalescing fallback only when the left value is missing', () => {
+    expect(music('let chosen <- niente al [C D] chosen')).toEqual(music('[C D]'))
+    expect(music('let chosen <- niente al (@4 C D=) chosen')).toEqual(music('(@4 C D=)'))
+  })
+
+  it.each(["'", '-'])('applies %s to a stored musical operand', (operator) => {
+    expect(music(`let phrase <- (1d 2d=) ${operator}phrase`)).toEqual(music(`${operator}(1d 2d=)`))
+  })
+
+  it('diagnoses an unsupported unary musical operand without recursing', () => {
+    const result = expandToBeatEvents(parse('fn invalid() { ret ~(.) } invalid()'))
+    expect(result).not.toHaveProperty('score')
+    expect(result.diagnostics).toContainEqual(
+      expect.objectContaining({
+        code: 'XP_TYPE_MISMATCH',
+        message: 'The operand does not support musical arithmetic.',
+      }),
+    )
+  })
+
+  it('projects a tempered enumerated chord returned without parentheses', () => {
+    const result = music('fn chord() { ret ~4::6 } chord()')
+    expect(result.notes).toHaveLength(3)
+    expect(result.duration).toBe('1')
+    expect(result).toEqual(music('~4::6'))
   })
 })

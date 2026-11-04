@@ -721,6 +721,120 @@ function annotateReference(value: EvaluatedLiteral, origin: SourceOrigin): Evalu
   return { ...value, origins }
 }
 
+const MAX_ENUMERATED_CHORD_SIZE = 10_000n
+
+function expandEnumeratedChord(
+  node: Expression,
+  context: PitchContext,
+): { readonly expressions: readonly Expression[]; readonly diagnostics: readonly Diagnostic[] } {
+  if (node.type === 'EnumeratedChord') {
+    let enumerands = node.enumerands
+    if (!enumerands) {
+      const endpoint = node.rangeEnd!
+      const evaluated = [
+        evaluateExpression(node.first, context),
+        evaluateExpression(endpoint, context),
+      ]
+      const diagnostics = evaluated.flatMap((result) => result.diagnostics)
+      const integers = evaluated.map((result) => {
+        if (!('value' in result) || result.value.kind !== 'scalar') return undefined
+        const exact = result.value.value.exactRational()
+        return exact?.d === 1 ? BigInt(exact.s * exact.n) : undefined
+      })
+      if (integers.some((value) => value === undefined)) {
+        return {
+          expressions: [],
+          diagnostics: [
+            ...diagnostics,
+            {
+              code: 'XP_TYPE_MISMATCH',
+              severity: 'error',
+              message: 'Enumerated chord range endpoints must be exact integers.',
+              locations: [node.location],
+            },
+          ],
+        }
+      }
+      const [start, end] = integers as [bigint, bigint]
+      const distance = start <= end ? end - start : start - end
+      if (distance + 1n > MAX_ENUMERATED_CHORD_SIZE) {
+        return {
+          expressions: [],
+          diagnostics: [
+            ...diagnostics,
+            {
+              code: 'XP_EXPANSION_LIMIT',
+              severity: 'error',
+              message: `Enumerated chord exceeds the ${MAX_ENUMERATED_CHORD_SIZE}-member expansion limit.`,
+              locations: [node.location],
+            },
+          ],
+        }
+      }
+      const step = start <= end ? 1n : -1n
+      enumerands = []
+      for (let value = start; ; value += step) {
+        enumerands.push({
+          type: 'IntegerLiteral',
+          value: String(value),
+          raw: String(value),
+          location: node.location,
+        })
+        if (value === end) break
+      }
+    }
+    return {
+      expressions: enumerands.map((enumerand) => ({
+        type: 'BinaryExpression',
+        operator: '/',
+        left: node.inverted ? node.first : enumerand,
+        right: node.inverted ? enumerand : node.first,
+        location: node.location,
+      })),
+      diagnostics: [],
+    }
+  }
+  if (node.type === 'BinaryExpression' && node.operator !== 'al' && node.operator !== '->') {
+    const left = expandEnumeratedChord(node.left, context)
+    const right = expandEnumeratedChord(node.right, context)
+    if (
+      left.expressions.length === 1 &&
+      left.expressions[0] === node.left &&
+      right.expressions.length === 1 &&
+      right.expressions[0] === node.right
+    ) {
+      return { expressions: [node], diagnostics: [...left.diagnostics, ...right.diagnostics] }
+    }
+    return {
+      expressions: left.expressions.flatMap((lhs) =>
+        right.expressions.map((rhs) => ({ ...node, left: lhs, right: rhs })),
+      ),
+      diagnostics: [...left.diagnostics, ...right.diagnostics],
+    }
+  }
+  if (node.type === 'Group') {
+    const expanded = expandEnumeratedChord(node.expression, context)
+    if (expanded.expressions.length === 1 && expanded.expressions[0] === node.expression) {
+      return { expressions: [node], diagnostics: expanded.diagnostics }
+    }
+    return {
+      expressions: expanded.expressions.map((expression) => ({ ...node, expression })),
+      diagnostics: expanded.diagnostics,
+    }
+  }
+  if (node.type === 'UnaryExpression' || node.type === 'PitchModifierExpression') {
+    const expanded = expandEnumeratedChord(node.operand, context)
+    if (expanded.expressions.length === 1 && expanded.expressions[0] === node.operand) {
+      return { expressions: [node], diagnostics: expanded.diagnostics }
+    }
+    return {
+      expressions: expanded.expressions.map((operand) => ({ ...node, operand })),
+      diagnostics: expanded.diagnostics,
+    }
+  }
+  return { expressions: [node], diagnostics: [] }
+}
+
 /** Musical syntax shares lexical evaluation with arithmetic; only its timing is deferred. */
 function isMusic(node: Expression): boolean {
   switch (node.type) {
@@ -765,6 +879,15 @@ export function evaluateExpression(
       return evaluateExpression(expression, musicContext.pitchContext, musicContext.environment)
     }
     const context = 'rootPitch' in mapping ? mapping : createPitchContext(mapping)
+    const expanded = expandEnumeratedChord(node, context)
+    if (expanded.diagnostics.length) return { diagnostics: expanded.diagnostics }
+    if (expanded.expressions.length !== 1 || expanded.expressions[0] !== node) {
+      return evaluateExpression(
+        { type: 'Parallel', branches: [...expanded.expressions], location: node.location },
+        mapping,
+        environment,
+      )
+    }
     const broadcast = broadcastScalarOperation(node, context, environment)
     if (broadcast) return evaluateExpression(broadcast, mapping, environment)
     if (isMusic(node))
@@ -780,7 +903,6 @@ export function evaluateExpression(
         diagnostics: [],
       }
     if (node.type === 'DegreeLiteral') {
-      const context = 'rootPitch' in mapping ? mapping : createPitchContext(mapping)
       const degree = Number(node.degree)
       const degrees = context.degrees
       const value = (
@@ -882,7 +1004,9 @@ export function evaluateExpression(
           ...node,
           operand: valueExpression(operand.value, node.operand.location),
         }
-        const evaluated = evaluateExpression(expression, mapping, environment)
+        const broadcast = broadcastScalarOperation(expression, context, environment)
+        if (!broadcast) throw new TypeError('The operand does not support musical arithmetic.')
+        const evaluated = evaluateExpression(broadcast, mapping, environment)
         return { ...evaluated, diagnostics: [...operand.diagnostics, ...evaluated.diagnostics] }
       }
       if (
@@ -891,7 +1015,6 @@ export function evaluateExpression(
         operand.value.kind === 'lambda'
       )
         throw new TypeError('Pitch modifiers require a numeric operand.')
-      const context = 'rootPitch' in mapping ? mapping : createPitchContext(mapping)
       const modifier = node.modifier.kind
       const equaveShift = modifierEquaveShift(modifier)
       // A MOS equave governs MOS pitches and scale-relative values. Latin and
@@ -986,7 +1109,9 @@ export function evaluateExpression(
           ...node,
           operand: valueExpression(operand.value, node.operand.location),
         }
-        const evaluated = evaluateExpression(expression, mapping, environment)
+        const broadcast = broadcastScalarOperation(expression, context, environment)
+        if (!broadcast) throw new TypeError('The operand does not support musical arithmetic.')
+        const evaluated = evaluateExpression(broadcast, mapping, environment)
         return { ...evaluated, diagnostics: [...operand.diagnostics, ...evaluated.diagnostics] }
       }
       if (
@@ -1015,7 +1140,6 @@ export function evaluateExpression(
         if (!ratio.isPositiveExactRatio())
           throw new TypeError('Tempering requires a positive exact ratio.')
         const formula = ratio.primeExponents()!
-        const context = 'rootPitch' in mapping ? mapping : createPitchContext(mapping)
         return {
           value: {
             kind: 'pitchOffset',
@@ -1078,6 +1202,7 @@ export function evaluateExpression(
       const right = evaluateExpression(node.right, mapping, environment)
       const diagnostics = [...left.diagnostics, ...right.diagnostics]
       if (!('value' in right)) return { diagnostics }
+      if (node.operator === 'al') return { ...right, diagnostics }
       if (left.value.kind === 'music' || right.value.kind === 'music') {
         const expression = {
           ...node,
