@@ -19,7 +19,7 @@ import {
 
 describe('DAW playback planning', () => {
   it.each([
-    'let licc <- D E F G E= C D==\n@4 licc',
+    'let licc <- (\nD E F G\nE= C D==\n)\n@4 licc',
     'let licc <- (D E F G E= C D==)\n@4 licc',
     'fn phrase() { ret D E F G E= C D== }\nlet licc <- phrase()\n@4 licc',
   ])('highlights individual notes inside a stored musical value: %s', (source) => {

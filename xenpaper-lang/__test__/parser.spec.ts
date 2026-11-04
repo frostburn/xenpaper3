@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { parse } from '../parser.js'
 
 describe('lexical declarations', () => {
-  it.each(['let motif <- [C D]=\nmotif==', 'let motif<-[C D]=\nmotif=='])(
+  it.each(['let motif <- [C D]= motif==', 'let motif<-[C D]= motif=='])(
     'separates binding arrows from note continuations in %s',
     (source) => {
       const program = parse(source)
@@ -55,7 +55,7 @@ describe('lexical declarations', () => {
   })
 
   it('allows names that extend a pitch-like prefix', () => {
-    expect(parse('let JJv5Gain <- 3/2\nJJv5Gain').body[0]).toMatchObject({
+    expect(parse('let JJv5Gain <- 3/2 JJv5Gain').body[0]).toMatchObject({
       type: 'Sequence',
       items: [
         { type: 'VariableDeclaration', name: { name: 'JJv5Gain' } },
@@ -198,9 +198,9 @@ describe('lexical declarations', () => {
 
   it('allows declarations in repeated text', () => {
     for (const source of [
-      '|: let interval <- 3/2\ninterval :|',
+      '|: let interval <- 3/2 interval :|',
       '|: C |@^1 fn transform() { ret 3/2 } transform() ||',
-      'let interval <- 3/2\ninterval :|',
+      'let interval <- 3/2 interval :|',
       'fn transform() { ret 3/2 } transform() :|',
     ])
       expect(() => parse(source)).not.toThrow()

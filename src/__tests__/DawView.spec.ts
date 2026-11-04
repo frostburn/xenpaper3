@@ -825,9 +825,7 @@ describe('DAW project model', () => {
   })
 
   it('propagates initialization context through declarations and repeats', () => {
-    const declared = compileSourceInitialization(
-      'let subdivision <- 4/1\n@subdivision(subdivision)',
-    )
+    const declared = compileSourceInitialization('let subdivision <- 4/1 @subdivision(subdivision)')
     expect(parseClipNotes('C D', Infinity, declared).map(({ beat }) => beat)).toEqual([0, 0.25])
 
     const repeated = compileSourceInitialization('|: @ff @. :|')

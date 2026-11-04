@@ -153,7 +153,7 @@ SequenceExpression
     }
 
 SequenceItem
-  = VariableDeclaration / FunctionDeclaration / Expression
+  = Expression
 
 // Ties compose complete score operands, below arithmetic and postfix marks but
 // above sequencing and parallel composition. Chains associate to the left.
@@ -775,35 +775,9 @@ CallArguments
 // parallel branches receive child scopes. Shadowing is permitted; recursion is
 // deliberately rejected by the evaluator.
 VariableDeclaration
-  = "let" !IdentifierContinue RequiredSpacing name:LocatedIdentifier Spacing "<-" InlineSpacing value:InitializerParallelExpression InitializerEnd {
+  = "let" !IdentifierContinue RequiredSpacing name:LocatedIdentifier Spacing "<-" Spacing value:Expression {
       return node('VariableDeclaration', { name, value });
     }
-
-// Only declaration initializers give an outermost newline syntactic meaning.
-InitializerParallelExpression
-  = first:InitializerSequenceExpression
-    rest:(InlineSpacing "," InlineSpacing branch:InitializerSequenceExpression { return branch; })* {
-      return parallel([first, ...rest]);
-    }
-
-InitializerSequenceExpression
-  = first:InitializerItem rest:(InlineSpacing item:InitializerItem { return item; })* {
-      return sequence([first, ...rest]);
-    }
-
-InitializerEnd
-  = &(InlineSpacing ([\r\n)}\]] / "||" / ":|" / (DeclarationKeyword !IdentifierContinue) / !.))
-
-InitializerItem
-  = !(DeclarationKeyword !IdentifierContinue) expression:LineBoundExpression {
-      return expression;
-    }
-
-InlineSpacing
-  = ([ \t] / Comment)*
-
-RequiredInlineSpacing
-  = ([ \t] / Comment)+
 
 FunctionDeclaration
   = "fn" !IdentifierContinue RequiredSpacing name:LocatedIdentifier Spacing "(" Spacing
