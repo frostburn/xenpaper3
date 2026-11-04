@@ -25,7 +25,7 @@ describe('score-shape timing', () => {
     ['2/1', 1200],
     ['2 * 3', 1200 * Math.log2(6)],
   ])('plays a variable initialized with %s like the same score literal', (value, cents) => {
-    const score = shape(`let note <- ${value} note`) as SequenceShape
+    const score = shape(`let note <- ${value}\nnote`) as SequenceShape
     const notes = score.children.filter((child) => child.kind === 'attack')
     expect(notes).toHaveLength(1)
     expect(notes[0]!.pitch.value.valueOf()).toBeCloseTo(cents)
@@ -47,10 +47,10 @@ describe('score-shape timing', () => {
     ['sort((2,1))', '(1,2)'],
     ['arrayMap((note) => note, [0 1])', '[0 1]'],
     ['arrayMap((note) => note, (0,1))', '(0,1)'],
-    ['let notes <- (0 1) notes==', '(0 1)=='],
-    ['let notes <- (0,1) notes==', '(0,1)=='],
-    ['let notes <- sort((1 0)) notes==', '(0 1)=='],
-    ['let notes <- arrayMap((note) => note, (0 1)) notes==', '(0 1)=='],
+    ['let notes <- (0 1)\nnotes==', '(0 1)=='],
+    ['let notes <- (0,1)\nnotes==', '(0,1)=='],
+    ['let notes <- sort((1 0))\nnotes==', '(0 1)=='],
+    ['let notes <- arrayMap((note) => note, (0 1))\nnotes==', '(0 1)=='],
   ])('preserves musical structure in %s', (source, reference) => {
     const snapshot = (score: ScoreShape): unknown => {
       if (score.kind === 'attack')
@@ -68,7 +68,7 @@ describe('score-shape timing', () => {
   })
 
   it('stores bare scale degrees separately from explicit scalar ratios', () => {
-    const score = shape('let second <- 2 let octave <- 2/1 second octave') as SequenceShape
+    const score = shape('let second <- 2 let octave <- 2/1\nsecond octave') as SequenceShape
     const notes = score.children.filter((child) => child.kind === 'attack')
     expect(notes.map((note) => note.pitch.value.valueOf())).toEqual([200, 1200])
   })
@@ -81,7 +81,7 @@ describe('score-shape timing', () => {
     ['[[0 1] 2]', 1, [0, 100, 200]],
     ['[]', 1, []],
   ])('plays a container variable initialized with %s', (container, duration, cents) => {
-    const score = shape(`let tuplet <- ${container} tuplet`)
+    const score = shape(`let tuplet <- ${container}\ntuplet`)
     const notes: Extract<ScoreShape, { kind: 'attack' }>[] = []
     const collect = (current: ScoreShape) => {
       if (current.kind === 'attack') notes.push(current)
@@ -94,7 +94,7 @@ describe('score-shape timing', () => {
   })
 
   it('captures container pitches once and reuses them under the current timing', () => {
-    const score = shape('let tuplet <- [0 1 2] {24edo} @2 tuplet tuplet[1]')
+    const score = shape('let tuplet <- [0 1 2]\n{24edo} @2 tuplet tuplet[1]')
     const notes: Extract<ScoreShape, { kind: 'attack' }>[] = []
     const collect = (current: ScoreShape) => {
       if (current.kind === 'attack') notes.push(current)
@@ -139,11 +139,11 @@ describe('score-shape timing', () => {
 
   it('inherits lexical bindings in nested score constructs and directives', () => {
     for (const source of [
-      'let interval <- 3/2 (interval)',
-      'let interval <- 3/2 [interval]',
-      'let interval <- 3/2 (interval,interval)',
-      'let interval <- 3/2 |: interval :|',
-      'let interval <- 3/2 interval?',
+      'let interval <- 3/2\n(interval)',
+      'let interval <- 3/2\n[interval]',
+      'let interval <- 3/2\n(interval,interval)',
+      'let interval <- 3/2\n|: interval :|',
+      'let interval <- 3/2\ninterval?',
     ]) {
       try {
         shape(source)
@@ -152,7 +152,7 @@ describe('score-shape timing', () => {
       }
     }
 
-    const directed = shape('let subdivision <- 1/2 @subdivision(subdivision) C')
+    const directed = shape('let subdivision <- 1/2\n@subdivision(subdivision) C')
     expect(directed.duration.equals(2)).toBe(true)
   })
 

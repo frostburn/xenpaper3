@@ -150,11 +150,11 @@ describe('beat event expansion', () => {
     ['(1 2 3) ==', ['0', '1', '2'], ['1', '1', '3'], '5'],
     ['((1 2) 3)==', ['0', '1', '2'], ['1', '1', '3'], '5'],
     ['(1 2 3)== 4', ['0', '1', '2', '5'], ['1', '1', '3', '1'], '6'],
-    ['let phrase <- (1 2 3) phrase==', ['0', '1', '2'], ['1', '1', '3'], '5'],
+    ['let phrase <- (1 2 3)\nphrase==', ['0', '1', '2'], ['1', '1', '3'], '5'],
     ['fn phrase() { ret (1 2 3) } phrase()==', ['0', '1', '2'], ['1', '1', '3'], '5'],
     ['[1 2 3]==', ['0', '1', '2'], ['1', '1', '1'], '3'],
     ['([1 2 3])==', ['0', '1', '2'], ['1', '1', '1'], '3'],
-    ['let phrase <- [1 2 3] phrase==', ['0', '1', '2'], ['1', '1', '1'], '3'],
+    ['let phrase <- [1 2 3]\nphrase==', ['0', '1', '2'], ['1', '1', '1'], '3'],
     ['(1, 2, 3)==', ['0', '0', '0'], ['3', '3', '3'], '3'],
     ['(1, 2 3)=', ['0', '0', '2'], ['2', '2', '2'], '3'],
     ['[0, 4 7]=!', ['0', '0', '1'], ['2', '2', '1'], '2'],
@@ -287,13 +287,13 @@ describe('beat event expansion', () => {
     [
       'sequential declarations',
       'let division <- 2/1',
-      'let division <- division + 1 @subdivision(division) C',
+      'let division <- division + 1\n@subdivision(division) C',
       'D',
     ],
     ['function declarations', '', 'fn phrase() { ret C D } phrase()', 'phrase()'],
   ])('matches authored copies for %s', (_description, prefix, repeatedBody, suffix) => {
-    const repeated = `${prefix} |: ${repeatedBody} :| ${suffix}`
-    const authored = `${prefix} ${repeatedBody} ${repeatedBody} ${suffix}`
+    const repeated = `${prefix}\n|: ${repeatedBody} :| ${suffix}`
+    const authored = `${prefix}\n${repeatedBody} ${repeatedBody} ${suffix}`
 
     expect(audibleResult(repeated)).toEqual(audibleResult(authored))
   })
@@ -322,7 +322,7 @@ describe('beat event expansion', () => {
     for (const body of bodies) {
       for (const [prefix, suffix] of surroundings) {
         for (const count of [1, 2, 3]) {
-          const repeated = `${prefix} |:@x${count} ${body} :| ${suffix}`
+          const repeated = `${prefix}\n|:@x${count} ${body} :| ${suffix}`
           const copies = Array.from({ length: count }, () => body).join(' ')
           const authored = `${prefix} ${copies} ${suffix}`
 
@@ -340,8 +340,8 @@ describe('beat event expansion', () => {
     ['chained implicit repeats', 'C :| D :|', 'C C D C C D'],
     [
       'declarations in alternate endings',
-      '|: C |¹ let interval <- 3/2 interval :|² interval ||',
-      'C let interval <- 3/2 interval C interval ||',
+      '|: C |¹ let interval <- 3/2\ninterval :|² interval ||',
+      'C let interval <- 3/2\ninterval C interval ||',
     ],
   ])('matches the authored expansion for %s', (_description, repeated, authored) => {
     expect(audibleResult(repeated)).toEqual(audibleResult(authored))

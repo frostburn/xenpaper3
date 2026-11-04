@@ -206,8 +206,24 @@ let licc <- (@4 D E F G E= C D==)
 licc licc
 ```
 
-Parentheses delimit a multi-item initializer. A musical value captures its lexical
-bindings and pitch context; playback supplies timing and the current root, just
+An outermost newline ends a `let` initializer; all music on that line belongs to
+the binding. Use parentheses for a multiline initializer:
+
+```text
+let licc <- (
+  @4 D E F G
+  E= C D==
+)
+licc
+```
+
+Newlines remain whitespace in ordinary music and inside nested groups. Begin the
+initializer on the same line as `<-`; keep an operator and its following operand
+on that line, or put the arithmetic inside parentheses. Declaration keywords and
+`ret` also end an initializer, preserving compact function bodies. `||` retains
+its existing musical boundary semantics.
+
+A musical value captures its lexical bindings and pitch context; playback supplies timing and the current root, just
 as for stored pitch containers. Directives inside a parenthesized phrase remain
 local to that phrase. Musical syntax is projected to timed notes when played,
 so errors inside a retained fragment are diagnosed at that point. Fragments may
@@ -302,7 +318,9 @@ not use an epsilon; approximate comparison is explicit.
 
 ## Generated parser
 
-Edit [`xenpaper.peggy`](xenpaper.peggy), not `parser.generated.js`. Generate the
+The compiler derives a horizontal-whitespace variant of expression rules for
+initializers and returns to ordinary rules inside nested scopes. Edit
+[`xenpaper.peggy`](xenpaper.peggy) and [`compile.mjs`](compile.mjs), not `parser.generated.js`. Generate the
 ignored parser artifact with:
 
 ```sh
