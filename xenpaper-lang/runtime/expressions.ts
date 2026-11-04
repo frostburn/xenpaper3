@@ -1,3 +1,5 @@
+import { valueExpression, type ValueExpression } from './value-expression'
+import { broadcastScalarOperation } from './constructions'
 import { parse, type Expression, type FunctionParameter } from '../parser.js'
 import { Fraction, mmod } from 'xen-dev-utils/fraction'
 import type { Diagnostic } from '../diagnostics'
@@ -660,7 +662,9 @@ function binary(
     left.kind === 'undefined' ||
     right.kind === 'undefined' ||
     left.kind === 'lambda' ||
-    right.kind === 'lambda'
+    right.kind === 'lambda' ||
+    left.kind === 'music' ||
+    right.kind === 'music'
   )
     throw new TypeError(`Operator ${operator} requires numeric operands.`)
   switch (operator) {
@@ -717,15 +721,190 @@ function annotateReference(value: EvaluatedLiteral, origin: SourceOrigin): Evalu
   return { ...value, origins }
 }
 
-/** Evaluate the arithmetic subset of the parser AST without throwing for source errors. */
+const MAX_ENUMERATED_CHORD_SIZE = 10_000n
+
+function expandEnumeratedChord(
+  node: Expression,
+  context: PitchContext,
+): { readonly expressions: readonly Expression[]; readonly diagnostics: readonly Diagnostic[] } {
+  if (node.type === 'EnumeratedChord') {
+    let enumerands = node.enumerands
+    if (!enumerands) {
+      const endpoint = node.rangeEnd!
+      const evaluated = [
+        evaluateExpression(node.first, context),
+        evaluateExpression(endpoint, context),
+      ]
+      const diagnostics = evaluated.flatMap((result) => result.diagnostics)
+      const integers = evaluated.map((result) => {
+        if (!('value' in result) || result.value.kind !== 'scalar') return undefined
+        const exact = result.value.value.exactRational()
+        return exact?.d === 1 ? BigInt(exact.s * exact.n) : undefined
+      })
+      if (integers.some((value) => value === undefined)) {
+        return {
+          expressions: [],
+          diagnostics: [
+            ...diagnostics,
+            {
+              code: 'XP_TYPE_MISMATCH',
+              severity: 'error',
+              message: 'Enumerated chord range endpoints must be exact integers.',
+              locations: [node.location],
+            },
+          ],
+        }
+      }
+      const [start, end] = integers as [bigint, bigint]
+      const distance = start <= end ? end - start : start - end
+      if (distance + 1n > MAX_ENUMERATED_CHORD_SIZE) {
+        return {
+          expressions: [],
+          diagnostics: [
+            ...diagnostics,
+            {
+              code: 'XP_EXPANSION_LIMIT',
+              severity: 'error',
+              message: `Enumerated chord exceeds the ${MAX_ENUMERATED_CHORD_SIZE}-member expansion limit.`,
+              locations: [node.location],
+            },
+          ],
+        }
+      }
+      const step = start <= end ? 1n : -1n
+      enumerands = []
+      for (let value = start; ; value += step) {
+        enumerands.push({
+          type: 'IntegerLiteral',
+          value: String(value),
+          raw: String(value),
+          location: node.location,
+        })
+        if (value === end) break
+      }
+    }
+    return {
+      expressions: enumerands.map((enumerand) => ({
+        type: 'BinaryExpression',
+        operator: '/',
+        left: node.inverted ? node.first : enumerand,
+        right: node.inverted ? enumerand : node.first,
+        location: node.location,
+      })),
+      diagnostics: [],
+    }
+  }
+  if (node.type === 'BinaryExpression' && node.operator !== 'al' && node.operator !== '->') {
+    const left = expandEnumeratedChord(node.left, context)
+    const right = expandEnumeratedChord(node.right, context)
+    if (
+      left.expressions.length === 1 &&
+      left.expressions[0] === node.left &&
+      right.expressions.length === 1 &&
+      right.expressions[0] === node.right
+    ) {
+      return { expressions: [node], diagnostics: [...left.diagnostics, ...right.diagnostics] }
+    }
+    return {
+      expressions: left.expressions.flatMap((lhs) =>
+        right.expressions.map((rhs) => ({ ...node, left: lhs, right: rhs })),
+      ),
+      diagnostics: [...left.diagnostics, ...right.diagnostics],
+    }
+  }
+  if (node.type === 'Group') {
+    const expanded = expandEnumeratedChord(node.expression, context)
+    if (expanded.expressions.length === 1 && expanded.expressions[0] === node.expression) {
+      return { expressions: [node], diagnostics: expanded.diagnostics }
+    }
+    return {
+      expressions: expanded.expressions.map((expression) => ({ ...node, expression })),
+      diagnostics: expanded.diagnostics,
+    }
+  }
+  if (node.type === 'UnaryExpression' || node.type === 'PitchModifierExpression') {
+    const expanded = expandEnumeratedChord(node.operand, context)
+    if (expanded.expressions.length === 1 && expanded.expressions[0] === node.operand) {
+      return { expressions: [node], diagnostics: expanded.diagnostics }
+    }
+    return {
+      expressions: expanded.expressions.map((operand) => ({ ...node, operand })),
+      diagnostics: expanded.diagnostics,
+    }
+  }
+  return { expressions: [node], diagnostics: [] }
+}
+
+/** Musical syntax shares lexical evaluation with arithmetic; only its timing is deferred. */
+function isMusic(node: Expression): boolean {
+  switch (node.type) {
+    case 'Group':
+    case 'NormalizeToSlot':
+      return !!node.expression && isMusic(node.expression)
+    case 'Sequence':
+      return node.items.some(isMusic)
+    case 'Parallel':
+      return node.branches.some(isMusic)
+    case 'BinaryExpression':
+      return node.operator === '->'
+    case 'Directive':
+    case 'PitchContextChange':
+    case 'PostfixExpression':
+    case 'Rest':
+    case 'BarRest':
+    case 'DetachedContinue':
+    case 'Barline':
+    case 'HardBoundary':
+    case 'Repeat':
+    case 'EnumeratedChord':
+    case 'VariableDeclaration':
+    case 'FunctionDeclaration':
+      return true
+    default:
+      return false
+  }
+}
+
+/** Evaluate a value, retaining musical syntax for the shared score projection. */
 export function evaluateExpression(
   node: Expression,
   mapping: PrimeMapping | PitchContext = DEFAULT_PITCH_CONTEXT,
   environment: LexicalEnvironment = preludeEnvironment(),
 ): ExpressionEvaluationResult {
   try {
+    const stored = node as ValueExpression
+    if (stored.evaluatedValue) return { value: stored.evaluatedValue, diagnostics: [] }
+    if (stored.musicContext) {
+      const { musicContext, ...expression } = stored
+      return evaluateExpression(expression, musicContext.pitchContext, musicContext.environment)
+    }
+    const context = 'rootPitch' in mapping ? mapping : createPitchContext(mapping)
+    const expanded = expandEnumeratedChord(node, context)
+    if (expanded.diagnostics.length) return { diagnostics: expanded.diagnostics }
+    if (expanded.expressions.length !== 1 || expanded.expressions[0] !== node) {
+      return evaluateExpression(
+        { type: 'Parallel', branches: [...expanded.expressions], location: node.location },
+        mapping,
+        environment,
+      )
+    }
+    const broadcast = broadcastScalarOperation(node, context, environment)
+    if (broadcast) return evaluateExpression(broadcast, mapping, environment)
+    if (isMusic(node))
+      return {
+        value: {
+          kind: 'music',
+          expression: node,
+          environment,
+          pitchContext: 'rootPitch' in mapping ? mapping : createPitchContext(mapping),
+          value: new Value(0),
+          // The retained AST supplies each sounding leaf's source span. Adding
+          // the whole fragment here would highlight every note on every attack.
+          origins: [],
+        },
+        diagnostics: [],
+      }
     if (node.type === 'DegreeLiteral') {
-      const context = 'rootPitch' in mapping ? mapping : createPitchContext(mapping)
       const degree = Number(node.degree)
       const degrees = context.degrees
       const value = (
@@ -755,7 +934,10 @@ export function evaluateExpression(
       return evaluateLiteral(node)
     }
     if (node.type === 'PitchLiteral')
-      return { value: evaluatePitchLiteral(node, mapping), diagnostics: [] }
+      return {
+        value: { ...evaluatePitchLiteral(node, mapping), authoredLabel: node.raw },
+        diagnostics: [],
+      }
     if (node.type === 'IntervalLiteral')
       return { value: evaluateIntervalLiteral(node, mapping), diagnostics: [] }
     if (node.type === 'MosIntervalLiteral')
@@ -813,18 +995,28 @@ export function evaluateExpression(
           },
         ],
       }
-    if (node.type === 'Group') return containerItems(node, mapping, environment)
+    if (node.type === 'Group' || node.type === 'Sequence' || node.type === 'Parallel')
+      return containerItems(node, mapping, environment)
     if (node.type === 'NormalizeToSlot') return containerItems(node, mapping, environment)
     if (node.type === 'PitchModifierExpression') {
       const operand = evaluateExpression(node.operand, mapping, environment)
       if (!('value' in operand)) return operand
+      if (operand.value.kind === 'music') {
+        const expression = {
+          ...node,
+          operand: valueExpression(operand.value, node.operand.location),
+        }
+        const broadcast = broadcastScalarOperation(expression, context, environment)
+        if (!broadcast) throw new TypeError('The operand does not support musical arithmetic.')
+        const evaluated = evaluateExpression(broadcast, mapping, environment)
+        return { ...evaluated, diagnostics: [...operand.diagnostics, ...evaluated.diagnostics] }
+      }
       if (
         operand.value.kind === 'container' ||
         operand.value.kind === 'undefined' ||
         operand.value.kind === 'lambda'
       )
         throw new TypeError('Pitch modifiers require a numeric operand.')
-      const context = 'rootPitch' in mapping ? mapping : createPitchContext(mapping)
       const modifier = node.modifier.kind
       const equaveShift = modifierEquaveShift(modifier)
       // A MOS equave governs MOS pitches and scale-relative values. Latin and
@@ -914,6 +1106,16 @@ export function evaluateExpression(
     if (node.type === 'UnaryExpression') {
       const operand = evaluateExpression(node.operand, mapping, environment)
       if (!('value' in operand)) return operand
+      if (operand.value.kind === 'music') {
+        const expression = {
+          ...node,
+          operand: valueExpression(operand.value, node.operand.location),
+        }
+        const broadcast = broadcastScalarOperation(expression, context, environment)
+        if (!broadcast) throw new TypeError('The operand does not support musical arithmetic.')
+        const evaluated = evaluateExpression(broadcast, mapping, environment)
+        return { ...evaluated, diagnostics: [...operand.diagnostics, ...evaluated.diagnostics] }
+      }
       if (
         operand.value.kind === 'container' ||
         operand.value.kind === 'undefined' ||
@@ -940,7 +1142,6 @@ export function evaluateExpression(
         if (!ratio.isPositiveExactRatio())
           throw new TypeError('Tempering requires a positive exact ratio.')
         const formula = ratio.primeExponents()!
-        const context = 'rootPitch' in mapping ? mapping : createPitchContext(mapping)
         return {
           value: {
             kind: 'pitchOffset',
@@ -1003,7 +1204,26 @@ export function evaluateExpression(
       const right = evaluateExpression(node.right, mapping, environment)
       const diagnostics = [...left.diagnostics, ...right.diagnostics]
       if (!('value' in right)) return { diagnostics }
-      return { value: binary(node.operator, left.value, right.value, node), diagnostics }
+      if (node.operator === 'al') return { ...right, diagnostics }
+      if (left.value.kind === 'music' || right.value.kind === 'music') {
+        const expression = {
+          ...node,
+          left: valueExpression(left.value, node.left.location),
+          right: valueExpression(right.value, node.right.location),
+        }
+        const broadcast = broadcastScalarOperation(expression, context, environment)
+        if (!broadcast)
+          throw new TypeError(`Operator ${node.operator} requires compatible musical operands.`)
+        const evaluated = evaluateExpression(broadcast, mapping, environment)
+        return { ...evaluated, diagnostics: [...diagnostics, ...evaluated.diagnostics] }
+      }
+      const reduced = binary(node.operator, left.value, right.value, node)
+      return {
+        value: stored.broadcastArticulation
+          ? { ...reduced, broadcastArticulation: stored.broadcastArticulation }
+          : reduced,
+        diagnostics,
+      }
     }
     if (node.type === 'IndexExpression') {
       const container = evaluateExpression(node.container, mapping, environment)
@@ -1042,6 +1262,14 @@ export function evaluateExpression(
         const body = evaluateExpression(prepared.expression, mapping, prepared.environment)
         return {
           ...body,
+          ...('value' in body
+            ? {
+                value: annotateReference(body.value, {
+                  location: node.location,
+                  role: 'literal',
+                }),
+              }
+            : {}),
           diagnostics: [...prepared.diagnostics, ...body.diagnostics],
         }
       }
@@ -1049,7 +1277,7 @@ export function evaluateExpression(
         evaluateExpression(expression, mapping, scope),
       )
     }
-    throw new TypeError(`${node.type} is not an arithmetic expression.`)
+    throw new TypeError(`${node.type} is not a value expression.`)
   } catch (error) {
     return { diagnostics: [diagnostic(node, error)] }
   }

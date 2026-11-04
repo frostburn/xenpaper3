@@ -18,6 +18,27 @@ import {
 } from '../daw/web-audio-automation'
 
 describe('DAW playback planning', () => {
+  it.each([
+    'let licc <- (\nD E F G\nE= C D==\n)\n@4 licc',
+    'let licc <- (D E F G E= C D==)\n@4 licc',
+    'fn phrase() { ret D E F G E= C D== }\nlet licc <- phrase()\n@4 licc',
+  ])('highlights individual notes inside a stored musical value: %s', (source) => {
+    const notes = parseClipNotes(source)
+    expect(notes).toHaveLength(7)
+    const start = source.indexOf('D E F')
+    const offsets = [0, 2, 4, 6, 8, 11, 13]
+    for (const [index, note] of notes.entries()) {
+      const offset = start + offsets[index]!
+      expect(note.sourceRanges).toContainEqual({ start: offset, end: offset + 1 })
+      expect(
+        note.sourceRanges.some((range) => range.start <= start && range.end >= start + 3),
+      ).toBe(false)
+      expect(
+        note.sourceRanges.some((range) => source.slice(range.start, range.end) === 'licc'),
+      ).toBe(true)
+    }
+  })
+
   it('clips adjacent signal ramps independently across tempo changes', () => {
     const curves = compileSignalCurves(
       [

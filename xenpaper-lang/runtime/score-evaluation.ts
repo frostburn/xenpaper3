@@ -1,14 +1,15 @@
+import { valueExpression, type ValueExpression } from './value-expression'
 import { Fraction } from 'xen-dev-utils/fraction'
 import type { Expression, Node } from '../parser.generated.js'
 import type { Diagnostic } from '../diagnostics'
 import { Value } from '../value'
-import { evaluateDeclaration, evaluateExpression, prepareFunctionCall } from './expressions'
+import { evaluateDeclaration, evaluateExpression } from './expressions'
 import type { ExpressionEvaluationResult } from './expressions'
 import { DYNAMIC_VELOCITIES, resolveDirective } from './directives'
 import { Visitor, type VisitorEvaluation } from './visitor'
 import { contextAt } from './initialization'
 import { materializeScoreContinuations, tieScoreShapes } from './ties'
-import { EMPTY_LEXICAL_ENVIRONMENT, extendLexicalEnvironment } from './types'
+import { extendLexicalEnvironment } from './types'
 import {
   DEFAULT_PITCH_CONTEXT,
   applyPitchContextChange,
@@ -18,7 +19,6 @@ import {
 } from './pitches'
 import type {
   AttackShape,
-  EvaluatedLiteral,
   AttackAppearance,
   AnnotationShape,
   BarlineShape,
@@ -99,396 +99,6 @@ interface VisitorScope {
 type ScoreVisitor = Visitor<Expression, VisitorScope, ScoreShapeEvaluationResult>
 
 const MAX_REPEAT_EXPANSION_NODES = 100_000
-const MAX_ENUMERATED_CHORD_SIZE = 10_000n
-
-function mapScoreConstruction(
-  node: Expression,
-  mapLeaf: (leaf: Expression) => Expression,
-): Expression | undefined {
-  if (node.type === 'UnaryExpression' || node.type === 'PitchModifierExpression') {
-    return mapScoreConstruction(node.operand, (leaf) => ({ ...node, operand: mapLeaf(leaf) }))
-  }
-  const mapItem = (item: Expression): Expression => {
-    const construction = mapScoreConstruction(item, mapLeaf)
-    if (construction) return construction
-    if (item.type === 'Group') return { ...item, expression: mapItem(item.expression) }
-    if (item.type === 'PostfixExpression') {
-      return { ...item, expression: mapItem(item.expression) }
-    }
-    if (
-      item.type === 'Rest' ||
-      item.type === 'BarRest' ||
-      item.type === 'DetachedContinue' ||
-      item.type === 'Barline' ||
-      item.type === 'HardBoundary' ||
-      item.type === 'Directive' ||
-      item.type === 'PitchContextChange'
-    ) {
-      return item
-    }
-    return mapLeaf(item)
-  }
-  if (node.type === 'BinaryExpression' && node.operator === '->') {
-    return { ...node, left: mapItem(node.left), right: mapItem(node.right) }
-  }
-  if (node.type === 'Sequence') {
-    return {
-      ...node,
-      items: node.items.map(mapItem),
-    }
-  }
-  if (node.type === 'Parallel') {
-    return {
-      ...node,
-      branches: node.branches.map(mapItem),
-    }
-  }
-  if (node.type === 'NormalizeToSlot' && node.expression) {
-    return {
-      ...node,
-      expression: mapItem(node.expression),
-    }
-  }
-  if (node.type === 'Repeat') {
-    return {
-      ...node,
-      body: node.body.map(mapItem),
-      endings: node.endings.map((ending) => ({ ...ending, body: ending.body.map(mapItem) })),
-    }
-  }
-  if (node.type === 'Group') {
-    const expression = mapScoreConstruction(node.expression, mapLeaf)
-    if (expression) return { ...node, expression }
-  }
-  if (node.type === 'PostfixExpression') {
-    const expression = mapScoreConstruction(node.expression, mapLeaf)
-    return { ...node, expression: expression ?? mapLeaf(node.expression) }
-  }
-  return undefined
-}
-
-function isScalarOperand(node: Expression): boolean {
-  if (mapScoreConstruction(node, (leaf) => leaf)) return false
-  if (node.type === 'Group') return isScalarOperand(node.expression)
-  return ![
-    'Rest',
-    'BarRest',
-    'DetachedContinue',
-    'Barline',
-    'HardBoundary',
-    'Directive',
-    'PitchContextChange',
-    'PostfixExpression',
-    'EnumeratedChord',
-  ].includes(node.type)
-}
-
-type BroadcastScalar = {
-  expression: Expression
-  articulation: Fraction
-  continuations: Extract<Expression, { type: 'PostfixExpression' }>['marks']
-}
-
-/** Unwrap a single pitch expression together with the performance context authored around it. */
-function broadcastScalarOperand(
-  node: Expression,
-  context: PitchContext,
-  environment?: LexicalEnvironment,
-): BroadcastScalar | undefined {
-  if (node.type === 'Group') return broadcastScalarOperand(node.expression, context, environment)
-  if (node.type === 'PostfixExpression') {
-    const scalar = broadcastScalarOperand(node.expression, context, environment)
-    if (!scalar) return undefined
-    return {
-      ...scalar,
-      continuations: [
-        ...scalar.continuations,
-        ...node.marks.filter((mark) => mark.type === 'DetachedContinue'),
-      ],
-    }
-  }
-  if (node.type === 'Sequence') {
-    let articulation = new Fraction(1)
-    let scalar: BroadcastScalar | undefined
-    for (const item of node.items) {
-      if (item.type === 'Directive') {
-        const names: Record<string, Fraction> = {
-          'articulation-shorthand': new Fraction(1),
-          art: new Fraction(1),
-          staccatissimo: new Fraction(1, 4),
-          staccato: new Fraction(1, 2),
-          portato: new Fraction(17, 20),
-          tenuto: new Fraction(1),
-          legato: new Fraction(11, 10),
-        }
-        const shorthand = (item as typeof item & { articulationMark?: string }).articulationMark
-        const shorthandRatios: Record<string, Fraction> = {
-          "'": new Fraction(1, 4),
-          '.': new Fraction(1, 2),
-          ':': new Fraction(17, 20),
-          '-': new Fraction(1),
-          _: new Fraction(11, 10),
-        }
-        if (shorthand) articulation = shorthandRatios[shorthand]!
-        else if (item.name !== 'art') {
-          const named = names[item.name]
-          if (!named) return undefined
-          articulation = named
-        } else {
-          const resolved = resolveDirective(item, context, environment).directive
-          if (resolved?.kind !== 'articulation') return undefined
-          articulation = resolved.ratio
-        }
-        continue
-      }
-      if (scalar) return undefined
-      scalar = broadcastScalarOperand(item, context, environment)
-      if (!scalar) return undefined
-    }
-    return scalar ? { ...scalar, articulation } : undefined
-  }
-  return isScalarOperand(node)
-    ? { expression: node, articulation: new Fraction(1), continuations: [] }
-    : undefined
-}
-
-function applyBroadcastContinuations(
-  expression: Expression,
-  continuations: BroadcastScalar['continuations'],
-): Expression {
-  if (!continuations.length) return expression
-  if (expression.type === 'PostfixExpression') {
-    const existing = expression.marks.filter((mark) => mark.type === 'DetachedContinue')
-    if (existing.length >= continuations.length) return expression
-    return {
-      ...expression,
-      marks: [...expression.marks, ...continuations.slice(existing.length)],
-    }
-  }
-  return {
-    type: 'PostfixExpression',
-    expression,
-    marks: continuations,
-    location: expression.location,
-  }
-}
-
-function zipScoreConstructions(
-  left: Expression,
-  right: Expression,
-  combine: (left: Expression, right: Expression) => Expression,
-): Expression | undefined {
-  const zipItems = (leftItems: Expression[], rightItems: Expression[]) => {
-    if (leftItems.length !== rightItems.length) return undefined
-    const items = leftItems.map((leftItem, index) => {
-      const rightItem = rightItems[index]!
-      return (
-        zipScoreConstructions(leftItem, rightItem, combine) ??
-        (isScalarOperand(leftItem) && isScalarOperand(rightItem)
-          ? combine(leftItem, rightItem)
-          : undefined)
-      )
-    })
-    return items.every((item) => item !== undefined) ? items : undefined
-  }
-
-  if (left.type === 'NormalizeToSlot' && right.type === 'NormalizeToSlot') {
-    if (!left.expression || !right.expression) return undefined
-    const expression =
-      zipScoreConstructions(left.expression, right.expression, combine) ??
-      (isScalarOperand(left.expression) && isScalarOperand(right.expression)
-        ? combine(left.expression, right.expression)
-        : undefined)
-    return expression ? { ...left, expression } : undefined
-  }
-  if (left.type === 'Sequence' && right.type === 'Sequence') {
-    const items = zipItems(left.items, right.items)
-    return items ? { ...left, items } : undefined
-  }
-  if (left.type === 'Parallel' && right.type === 'Parallel') {
-    const branches = zipItems(left.branches, right.branches)
-    return branches ? { ...left, branches } : undefined
-  }
-  if (left.type === 'Group' && right.type === 'Group') {
-    const expression =
-      zipScoreConstructions(left.expression, right.expression, combine) ??
-      (isScalarOperand(left.expression) && isScalarOperand(right.expression)
-        ? combine(left.expression, right.expression)
-        : undefined)
-    return expression ? { ...left, expression } : undefined
-  }
-  return undefined
-}
-
-function broadcastScalarOperation(
-  node: Expression,
-  context: PitchContext,
-  environment?: LexicalEnvironment,
-): Expression | undefined {
-  if (node.type === 'Group') {
-    const expression = broadcastScalarOperation(node.expression, context, environment)
-    return expression ? { ...node, expression } : undefined
-  }
-  if (node.type === 'PostfixExpression') {
-    const expression = broadcastScalarOperation(node.expression, context, environment)
-    return expression ? { ...node, expression } : undefined
-  }
-  if (node.type === 'UnaryExpression' || node.type === 'PitchModifierExpression') {
-    const operand = broadcastScalarOperation(node.operand, context, environment)
-    if (operand) return { ...node, operand }
-    return mapScoreConstruction(node.operand, (item) => ({ ...node, operand: item }))
-  }
-  if (node.type !== 'BinaryExpression' || node.operator === '->') return undefined
-  const left = broadcastScalarOperation(node.left, context, environment)
-  if (left) return { ...node, left }
-  const right = broadcastScalarOperation(node.right, context, environment)
-  if (right) return { ...node, right }
-  const zipped = zipScoreConstructions(node.left, node.right, (left, right) => ({
-    ...node,
-    left,
-    right,
-  }))
-  if (zipped) return zipped
-  const leftScalar = broadcastScalarOperand(node.left, context, environment)
-  if (leftScalar) {
-    const mapped = mapScoreConstruction(node.right, (right) => ({
-      ...node,
-      left: leftScalar.expression,
-      right,
-      broadcastArticulation: leftScalar.articulation,
-    }))
-    if (mapped) return applyBroadcastContinuations(mapped, leftScalar.continuations)
-  }
-  const rightScalar = broadcastScalarOperand(node.right, context, environment)
-  if (rightScalar) {
-    const mapped = mapScoreConstruction(node.left, (left) => ({
-      ...node,
-      left,
-      right: rightScalar.expression,
-      broadcastArticulation: rightScalar.articulation,
-    }))
-    if (mapped) return applyBroadcastContinuations(mapped, rightScalar.continuations)
-  }
-  const overLeft = isScalarOperand(node.right)
-    ? mapScoreConstruction(node.left, (left) => ({ ...node, left }))
-    : undefined
-  if (overLeft) return overLeft
-  if (!isScalarOperand(node.left)) return undefined
-  return mapScoreConstruction(node.right, (right) => ({ ...node, right }))
-}
-
-function expandEnumeratedChord(
-  node: Expression,
-  context: PitchContext,
-): { readonly expressions: readonly Expression[]; readonly diagnostics: readonly Diagnostic[] } {
-  if (node.type === 'EnumeratedChord') {
-    let enumerands = node.enumerands
-    if (!enumerands) {
-      const endpoint = node.rangeEnd!
-      const evaluated = [
-        evaluateExpression(node.first, context),
-        evaluateExpression(endpoint, context),
-      ]
-      const diagnostics = evaluated.flatMap((result) => result.diagnostics)
-      const integers = evaluated.map((result) => {
-        if (!('value' in result) || result.value.kind !== 'scalar') return undefined
-        const exact = result.value.value.exactRational()
-        return exact?.d === 1 ? BigInt(exact.s * exact.n) : undefined
-      })
-      if (integers.some((value) => value === undefined)) {
-        return {
-          expressions: [],
-          diagnostics: [
-            ...diagnostics,
-            {
-              code: 'XP_TYPE_MISMATCH',
-              severity: 'error',
-              message: 'Enumerated chord range endpoints must be exact integers.',
-              locations: [node.location],
-            },
-          ],
-        }
-      }
-      const [start, end] = integers as [bigint, bigint]
-      const distance = start <= end ? end - start : start - end
-      if (distance + 1n > MAX_ENUMERATED_CHORD_SIZE) {
-        return {
-          expressions: [],
-          diagnostics: [
-            ...diagnostics,
-            {
-              code: 'XP_EXPANSION_LIMIT',
-              severity: 'error',
-              message: `Enumerated chord exceeds the ${MAX_ENUMERATED_CHORD_SIZE}-member expansion limit.`,
-              locations: [node.location],
-            },
-          ],
-        }
-      }
-      const step = start <= end ? 1n : -1n
-      enumerands = []
-      for (let value = start; ; value += step) {
-        enumerands.push({
-          type: 'IntegerLiteral',
-          value: String(value),
-          raw: String(value),
-          location: node.location,
-        })
-        if (value === end) break
-      }
-    }
-    return {
-      expressions: enumerands.map((enumerand) => ({
-        type: 'BinaryExpression',
-        operator: '/',
-        left: node.inverted ? node.first : enumerand,
-        right: node.inverted ? enumerand : node.first,
-        location: node.location,
-      })),
-      diagnostics: [],
-    }
-  }
-  if (node.type === 'BinaryExpression') {
-    const left = expandEnumeratedChord(node.left, context)
-    const right = expandEnumeratedChord(node.right, context)
-    if (
-      left.expressions.length === 1 &&
-      left.expressions[0] === node.left &&
-      right.expressions.length === 1 &&
-      right.expressions[0] === node.right
-    ) {
-      return { expressions: [node], diagnostics: [...left.diagnostics, ...right.diagnostics] }
-    }
-    return {
-      expressions: left.expressions.flatMap((lhs) =>
-        right.expressions.map((rhs) => ({ ...node, left: lhs, right: rhs })),
-      ),
-      diagnostics: [...left.diagnostics, ...right.diagnostics],
-    }
-  }
-  if (node.type === 'Group') {
-    const expanded = expandEnumeratedChord(node.expression, context)
-    if (expanded.expressions.length === 1 && expanded.expressions[0] === node.expression) {
-      return { expressions: [node], diagnostics: expanded.diagnostics }
-    }
-    return {
-      expressions: expanded.expressions.map((expression) => ({ ...node, expression })),
-      diagnostics: expanded.diagnostics,
-    }
-  }
-  if (node.type === 'UnaryExpression' || node.type === 'PitchModifierExpression') {
-    const expanded = expandEnumeratedChord(node.operand, context)
-    if (expanded.expressions.length === 1 && expanded.expressions[0] === node.operand) {
-      return { expressions: [node], diagnostics: expanded.diagnostics }
-    }
-    return {
-      expressions: expanded.expressions.map((operand) => ({ ...node, operand })),
-      diagnostics: expanded.diagnostics,
-    }
-  }
-  return { expressions: [node], diagnostics: [] }
-}
-
 function repeatCount(node: Extract<Expression, { type: 'Repeat' }>): number | undefined {
   let count: bigint
   try {
@@ -560,21 +170,21 @@ function sequence(
   }
 }
 
-/** Retain the invocation site on every note produced by a function body. */
-function annotateFunctionCall(shape: ScoreShape, callOrigin: SourceOrigin): ScoreShape {
-  if (shape.kind === 'attack') return { ...shape, origins: [...shape.origins, callOrigin] }
+/** Retain reference sites when projecting a captured musical value. */
+function annotateValueOrigins(shape: ScoreShape, origins: readonly SourceOrigin[]): ScoreShape {
+  if (shape.kind === 'attack') return { ...shape, origins: [...shape.origins, ...origins] }
   if (shape.kind === 'sequence')
     return {
       ...shape,
-      children: shape.children.map((child) => annotateFunctionCall(child, callOrigin)),
+      children: shape.children.map((child) => annotateValueOrigins(child, origins)),
     }
   if (shape.kind === 'parallel')
     return {
       ...shape,
-      branches: shape.branches.map((branch) => annotateFunctionCall(branch, callOrigin)),
+      branches: shape.branches.map((branch) => annotateValueOrigins(branch, origins)),
     }
   if (shape.kind === 'drone' && shape.template)
-    return { ...shape, template: annotateFunctionCall(shape.template, callOrigin) }
+    return { ...shape, template: annotateValueOrigins(shape.template, origins) }
   return shape
 }
 
@@ -1237,6 +847,20 @@ export function evaluateScoreSemantics(
     current,
     visitor,
   ) => {
+    const stored = current as ValueExpression
+    if (stored.musicContext) {
+      const { musicContext, ...expression } = stored
+      return changeVisitor(visitor, (context) => ({
+        ...context,
+        pitchContext: {
+          ...musicContext.pitchContext,
+          rootDisplacement: context.pitchContext.rootDisplacement,
+          rootPitch: context.pitchContext.rootPitch,
+          rootFrequency: context.pitchContext.rootFrequency,
+        },
+        lexicalEnvironment: musicContext.environment,
+      })).visit(expression)
+    }
     const {
       context,
       pulse: currentPulse,
@@ -1293,48 +917,6 @@ export function evaluateScoreSemantics(
         raw: current.sample,
         location: current.location,
       })
-    }
-    if (current.type === 'CallExpression') {
-      const prepared = prepareFunctionCall(current, context, environment)
-      if (prepared) {
-        if (!('expression' in prepared)) return prepared
-        const returned = changeVisitor(visitor, (context) => ({
-          ...context,
-          lexicalEnvironment: prepared.environment,
-        })).visit(prepared.expression, {
-          subdivisionContext: visitor.scope.resolve,
-        })
-        return {
-          ...returned,
-          ...('shape' in returned
-            ? { shape: annotateFunctionCall(returned.shape, origin(current)) }
-            : {}),
-          diagnostics: [...prepared.diagnostics, ...returned.diagnostics],
-        }
-      }
-    }
-    const broadcast = broadcastScalarOperation(current, context, environment)
-    if (broadcast) return visitor.visit(broadcast)
-    const expandedChord = expandEnumeratedChord(current, context)
-    if (expandedChord.diagnostics.length) return { diagnostics: expandedChord.diagnostics }
-    if (expandedChord.expressions.length !== 1 || expandedChord.expressions[0] !== current) {
-      const results = expandedChord.expressions.map((expression) => visitor.visit(expression))
-      const diagnostics = results.flatMap((result) => result.diagnostics)
-      if (!results.every(hasShape)) return { diagnostics }
-      const branches = results.map((result) => result.shape)
-      const duration = branches.reduce(
-        (maximum, branch) => (branch.duration.compare(maximum) > 0 ? branch.duration : maximum),
-        new Fraction(0),
-      )
-      return {
-        shape: {
-          kind: 'parallel',
-          duration,
-          branches: branches.map((branch) => pad(branch, duration)),
-          origins: [origin(current)],
-        },
-        diagnostics,
-      }
     }
     if (current.type === 'Rest') {
       return {
@@ -2249,38 +1831,17 @@ export function evaluateScoreSemantics(
       }
     }
     const value = evaluateExpression(current, context, environment)
-    if ('value' in value && value.value.kind === 'container') {
-      const variables = new Map<string, EvaluatedLiteral>()
-      const fragment = (item: EvaluatedLiteral): Expression => {
-        if (item.kind !== 'container') {
-          const name = `$container${variables.size}`
-          variables.set(name, item)
-          return { type: 'Identifier', name, location: current.location }
-        }
-        const children = item.values.map(fragment)
-        const expression: Expression =
-          item.composition === 'parallel'
-            ? { type: 'Parallel', branches: children, location: current.location }
-            : { type: 'Sequence', items: children, location: current.location }
-        const composed: Expression = item.grouped
-          ? { type: 'Group', expression, location: current.location }
-          : expression
-        return item.normalized
-          ? {
-              type: 'NormalizeToSlot',
-              expression: children.length ? composed : null,
-              location: current.location,
-            }
-          : composed
+    if ('value' in value && (value.value.kind === 'container' || value.value.kind === 'music')) {
+      const returned = visitor.visit(valueExpression(value.value, current.location), {
+        subdivisionContext: visitor.scope.resolve,
+      })
+      return {
+        ...returned,
+        ...('shape' in returned && value.value.kind === 'music'
+          ? { shape: annotateValueOrigins(returned.shape, value.value.origins) }
+          : {}),
+        diagnostics: [...value.diagnostics, ...returned.diagnostics],
       }
-      const expression = fragment(value.value)
-      const result = changeVisitor(visitor, (context) => ({
-        ...context,
-        lexicalEnvironment: extendLexicalEnvironment(environment ?? EMPTY_LEXICAL_ENVIRONMENT, {
-          variables,
-        }),
-      })).visit(expression)
-      return { ...result, diagnostics: [...value.diagnostics, ...result.diagnostics] }
     }
     const evaluated = playablePitch(current, context, value)
     if (!('pitch' in evaluated)) return evaluated
@@ -2303,7 +1864,11 @@ export function evaluateScoreSemantics(
       articulation,
       directiveState: { ...currentDirectiveState },
       ...(currentArticulationMarks.length ? { articulationMarks: currentArticulationMarks } : {}),
-      ...('raw' in current ? { authoredLabel: String(current.raw) } : {}),
+      ...('raw' in current
+        ? { authoredLabel: String(current.raw) }
+        : 'authoredLabel' in evaluated.pitch
+          ? { authoredLabel: evaluated.pitch.authoredLabel }
+          : {}),
       ...(evaluated.justIntonation ? { justIntonation: true } : {}),
       ...(current.type === 'DegreeLiteral' ||
       current.type === 'EqualDivisionLiteral' ||

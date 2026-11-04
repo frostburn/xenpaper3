@@ -212,6 +212,7 @@ export interface PitchOffsetValue {
 }
 
 export interface AbsolutePitchValue {
+  readonly authoredLabel?: string
   readonly kind: 'absolutePitch'
   readonly rootOffset: Value
   readonly formula: PrimeMonzo
@@ -244,6 +245,16 @@ export interface ContainerValue {
   readonly normalized?: boolean
   readonly grouped?: boolean
   readonly values: readonly EvaluatedLiteral[]
+  readonly value: Value
+  readonly origins: readonly SourceOrigin[]
+}
+
+/** A musical expression with lexical and pitch context; timing is supplied at playback. */
+export interface MusicValue {
+  readonly kind: 'music'
+  readonly expression: Expression
+  readonly environment: LexicalEnvironment
+  readonly pitchContext: PitchContext
   readonly value: Value
   readonly origins: readonly SourceOrigin[]
 }
@@ -352,13 +363,15 @@ export interface MosContext {
   readonly degrees: readonly MosDegree[]
 }
 
-export type EvaluatedLiteral =
+export type EvaluatedLiteral = (
   | ScalarValue
   | PitchOffsetValue
   | AbsolutePitchValue
   | ContainerValue
   | UndefinedValue
   | LambdaValue
+  | MusicValue
+) & { readonly broadcastArticulation?: Fraction }
 
 /** Renderer-independent description of a note on a treble/bass staff. */
 export interface StaffPitch {
