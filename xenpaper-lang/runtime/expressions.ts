@@ -898,7 +898,9 @@ export function evaluateExpression(
           environment,
           pitchContext: 'rootPitch' in mapping ? mapping : createPitchContext(mapping),
           value: new Value(0),
-          origins: [{ location: node.location, role: 'literal' }],
+          // The retained AST supplies each sounding leaf's source span. Adding
+          // the whole fragment here would highlight every note on every attack.
+          origins: [],
         },
         diagnostics: [],
       }
