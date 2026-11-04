@@ -1,3 +1,5 @@
+import { valueExpression, type ValueExpression } from './value-expression'
+import { broadcastScalarOperation } from './constructions'
 import { parse, type Expression, type FunctionParameter } from '../parser.js'
 import { Fraction, mmod } from 'xen-dev-utils/fraction'
 import type { Diagnostic } from '../diagnostics'
@@ -660,7 +662,9 @@ function binary(
     left.kind === 'undefined' ||
     right.kind === 'undefined' ||
     left.kind === 'lambda' ||
-    right.kind === 'lambda'
+    right.kind === 'lambda' ||
+    left.kind === 'music' ||
+    right.kind === 'music'
   )
     throw new TypeError(`Operator ${operator} requires numeric operands.`)
   switch (operator) {
@@ -717,13 +721,64 @@ function annotateReference(value: EvaluatedLiteral, origin: SourceOrigin): Evalu
   return { ...value, origins }
 }
 
-/** Evaluate the arithmetic subset of the parser AST without throwing for source errors. */
+/** Musical syntax shares lexical evaluation with arithmetic; only its timing is deferred. */
+function isMusic(node: Expression): boolean {
+  switch (node.type) {
+    case 'Group':
+    case 'NormalizeToSlot':
+      return !!node.expression && isMusic(node.expression)
+    case 'Sequence':
+      return node.items.some(isMusic)
+    case 'Parallel':
+      return node.branches.some(isMusic)
+    case 'BinaryExpression':
+      return node.operator === '->'
+    case 'Directive':
+    case 'PitchContextChange':
+    case 'PostfixExpression':
+    case 'Rest':
+    case 'BarRest':
+    case 'DetachedContinue':
+    case 'Barline':
+    case 'HardBoundary':
+    case 'Repeat':
+    case 'EnumeratedChord':
+    case 'VariableDeclaration':
+    case 'FunctionDeclaration':
+      return true
+    default:
+      return false
+  }
+}
+
+/** Evaluate a value, retaining musical syntax for the shared score projection. */
 export function evaluateExpression(
   node: Expression,
   mapping: PrimeMapping | PitchContext = DEFAULT_PITCH_CONTEXT,
   environment: LexicalEnvironment = preludeEnvironment(),
 ): ExpressionEvaluationResult {
   try {
+    const stored = node as ValueExpression
+    if (stored.evaluatedValue) return { value: stored.evaluatedValue, diagnostics: [] }
+    if (stored.musicContext) {
+      const { musicContext, ...expression } = stored
+      return evaluateExpression(expression, musicContext.pitchContext, musicContext.environment)
+    }
+    const context = 'rootPitch' in mapping ? mapping : createPitchContext(mapping)
+    const broadcast = broadcastScalarOperation(node, context, environment)
+    if (broadcast) return evaluateExpression(broadcast, mapping, environment)
+    if (isMusic(node))
+      return {
+        value: {
+          kind: 'music',
+          expression: node,
+          environment,
+          pitchContext: 'rootPitch' in mapping ? mapping : createPitchContext(mapping),
+          value: new Value(0),
+          origins: [{ location: node.location, role: 'literal' }],
+        },
+        diagnostics: [],
+      }
     if (node.type === 'DegreeLiteral') {
       const context = 'rootPitch' in mapping ? mapping : createPitchContext(mapping)
       const degree = Number(node.degree)
@@ -755,7 +810,10 @@ export function evaluateExpression(
       return evaluateLiteral(node)
     }
     if (node.type === 'PitchLiteral')
-      return { value: evaluatePitchLiteral(node, mapping), diagnostics: [] }
+      return {
+        value: { ...evaluatePitchLiteral(node, mapping), authoredLabel: node.raw },
+        diagnostics: [],
+      }
     if (node.type === 'IntervalLiteral')
       return { value: evaluateIntervalLiteral(node, mapping), diagnostics: [] }
     if (node.type === 'MosIntervalLiteral')
@@ -813,11 +871,20 @@ export function evaluateExpression(
           },
         ],
       }
-    if (node.type === 'Group') return containerItems(node, mapping, environment)
+    if (node.type === 'Group' || node.type === 'Sequence' || node.type === 'Parallel')
+      return containerItems(node, mapping, environment)
     if (node.type === 'NormalizeToSlot') return containerItems(node, mapping, environment)
     if (node.type === 'PitchModifierExpression') {
       const operand = evaluateExpression(node.operand, mapping, environment)
       if (!('value' in operand)) return operand
+      if (operand.value.kind === 'music') {
+        const expression = {
+          ...node,
+          operand: valueExpression(operand.value, node.operand.location),
+        }
+        const evaluated = evaluateExpression(expression, mapping, environment)
+        return { ...evaluated, diagnostics: [...operand.diagnostics, ...evaluated.diagnostics] }
+      }
       if (
         operand.value.kind === 'container' ||
         operand.value.kind === 'undefined' ||
@@ -914,6 +981,14 @@ export function evaluateExpression(
     if (node.type === 'UnaryExpression') {
       const operand = evaluateExpression(node.operand, mapping, environment)
       if (!('value' in operand)) return operand
+      if (operand.value.kind === 'music') {
+        const expression = {
+          ...node,
+          operand: valueExpression(operand.value, node.operand.location),
+        }
+        const evaluated = evaluateExpression(expression, mapping, environment)
+        return { ...evaluated, diagnostics: [...operand.diagnostics, ...evaluated.diagnostics] }
+      }
       if (
         operand.value.kind === 'container' ||
         operand.value.kind === 'undefined' ||
@@ -1003,7 +1078,25 @@ export function evaluateExpression(
       const right = evaluateExpression(node.right, mapping, environment)
       const diagnostics = [...left.diagnostics, ...right.diagnostics]
       if (!('value' in right)) return { diagnostics }
-      return { value: binary(node.operator, left.value, right.value, node), diagnostics }
+      if (left.value.kind === 'music' || right.value.kind === 'music') {
+        const expression = {
+          ...node,
+          left: valueExpression(left.value, node.left.location),
+          right: valueExpression(right.value, node.right.location),
+        }
+        const broadcast = broadcastScalarOperation(expression, context, environment)
+        if (!broadcast)
+          throw new TypeError(`Operator ${node.operator} requires compatible musical operands.`)
+        const evaluated = evaluateExpression(broadcast, mapping, environment)
+        return { ...evaluated, diagnostics: [...diagnostics, ...evaluated.diagnostics] }
+      }
+      const reduced = binary(node.operator, left.value, right.value, node)
+      return {
+        value: stored.broadcastArticulation
+          ? { ...reduced, broadcastArticulation: stored.broadcastArticulation }
+          : reduced,
+        diagnostics,
+      }
     }
     if (node.type === 'IndexExpression') {
       const container = evaluateExpression(node.container, mapping, environment)
@@ -1042,6 +1135,14 @@ export function evaluateExpression(
         const body = evaluateExpression(prepared.expression, mapping, prepared.environment)
         return {
           ...body,
+          ...('value' in body
+            ? {
+                value: annotateReference(body.value, {
+                  location: node.location,
+                  role: 'literal',
+                }),
+              }
+            : {}),
           diagnostics: [...prepared.diagnostics, ...body.diagnostics],
         }
       }
@@ -1049,7 +1150,7 @@ export function evaluateExpression(
         evaluateExpression(expression, mapping, scope),
       )
     }
-    throw new TypeError(`${node.type} is not an arithmetic expression.`)
+    throw new TypeError(`${node.type} is not a value expression.`)
   } catch (error) {
     return { diagnostics: [diagnostic(node, error)] }
   }

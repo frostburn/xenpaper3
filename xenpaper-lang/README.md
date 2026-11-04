@@ -198,6 +198,21 @@ tuplet tuplet
 Each use retains the container's sequence or parallel structure and slot timing.
 Its pitches are captured at declaration; playback uses the current timing context.
 
+Bindings, arguments, and function returns use the same value evaluator. Musical
+fragments can include directives, rests, continuations, ties, and repeats:
+
+```text
+let licc <- (@4 D E F G E= C D==)
+licc licc
+```
+
+Parentheses delimit a multi-item initializer. A musical value captures its lexical
+bindings and pitch context; playback supplies timing and the current root, just
+as for stored pitch containers. Directives inside a parenthesized phrase remain
+local to that phrase. Musical syntax is projected to timed notes when played,
+so errors inside a retained fragment are diagnosed at that point. Fragments may
+also be passed to functions, returned, selected conditionally, or transposed.
+
 Postfix `=` continues the active note after an ordinary sequence, including a
 parenthesized or stored phrase: `(1 2 3)==` has note durations 1, 1, and 3.
 A trailing rest clears the active note, so `(1 2 .)=` is an error. A normalized
