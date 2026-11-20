@@ -10,7 +10,6 @@ import {
   preludeEnvironment,
   prepareFunctionCall,
 } from './expressions'
-import { evaluateBuiltinArgument, requireInteger } from './builtins'
 import { expandRepeats } from './repeat-expansion'
 import type { ExpressionEvaluationResult } from './expressions'
 import { DYNAMIC_VELOCITIES, resolveDirective } from './directives'
@@ -1344,48 +1343,37 @@ export function evaluateScoreSemantics(
       )
     }
     if (current.type === 'ForBlock') {
-      const diagnostics: Diagnostic[] = []
-      const integer = (expression: Expression, name: string): number => {
-        const evaluated = evaluateBuiltinArgument(
-          expression,
-          'integer',
-          environment ?? preludeEnvironment(),
-          (operand, scope) => evaluateExpression(operand, context, scope),
-        )
-        diagnostics.push(...evaluated.diagnostics)
-        if (!('value' in evaluated)) throw new EvaluationError(diagnostics)
-        let value: number
-        try {
-          value = requireInteger(evaluated.value, name)
-          if (!Number.isSafeInteger(value)) throw new RangeError(`${name} must be a safe integer.`)
-          if (name === '@for step' && !value) throw new RangeError('@for step must be nonzero.')
-        } catch (error) {
-          throw new EvaluationError([
+      const iterable = evaluateExpression(current.iterable, context, environment)
+      if (!('value' in iterable)) return iterable
+      const diagnostics = [...iterable.diagnostics]
+      if (iterable.value.kind !== 'container') {
+        return {
+          diagnostics: [
             ...diagnostics,
             {
-              code: 'XP_LOOP_BOUNDS',
+              code: 'XP_NOT_ITERABLE',
               severity: 'error',
-              message: error instanceof Error ? error.message : String(error),
-              locations: [expression.location],
+              message: `@for ${current.mode} requires a container.`,
+              locations: [current.iterable.location],
             },
-          ])
+          ],
         }
-        return value
       }
-      const start = integer(current.start, '@for start')
-      const stop = integer(current.stop, '@for stop')
-      const step = current.step ? integer(current.step, '@for step') : 1
+      const { values } = iterable.value
       const body = { type: 'Sequence' as const, items: current.body, location: current.location }
       let active = visitor
       let elapsed = new Fraction(0)
       const shapes: ScoreShape[] = []
-      for (let index = start; step > 0 ? index < stop : index > stop; index += step) {
+      for (let index = 0; index < values.length; index++) {
         active = at(active, visitor.scope.offset.add(elapsed.mul(visitor.scope.timeScale)))
-        const value = {
-          kind: 'scalar' as const,
-          value: new Value(index),
-          origins: [origin(current.name)],
-        }
+        const value =
+          current.mode === 'in'
+            ? {
+                kind: 'scalar' as const,
+                value: new Value(index),
+                origins: [origin(current.name)],
+              }
+            : values[index]!
         const inner = changeVisitor(active, (context) => ({
           ...context,
           lexicalEnvironment: extendLexicalEnvironment(

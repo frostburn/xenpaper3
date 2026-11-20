@@ -556,11 +556,10 @@ BlockSequence
   = items:DocumentBody { return node('Sequence', { items }); }
 
 ForBlock
-  = "@for"i !IdentifierContinue Spacing "(" Spacing name:LocatedIdentifier Spacing ","
-    Spacing start:Expression Spacing "," Spacing stop:Expression
-    step:(Spacing "," Spacing value:Expression { return value; })?
+  = "@for"i !IdentifierContinue Spacing "(" Spacing name:LocatedIdentifier
+    RequiredSpacing mode:$("in" / "of") !IdentifierContinue Spacing iterable:Expression
     Spacing ")" Spacing body:DocumentBody Spacing BlockEnd {
-      return node('ForBlock', { name, start, stop, step: step ?? null, body });
+      return node('ForBlock', { name, mode, iterable, body });
     }
 
 WhileBlock

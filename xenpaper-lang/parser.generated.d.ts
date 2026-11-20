@@ -112,9 +112,8 @@ export interface IfBlock extends Node {
 export interface ForBlock extends Node {
   type: 'ForBlock'
   name: Identifier
-  start: Expression
-  stop: Expression
-  step: Expression | null
+  mode: 'in' | 'of'
+  iterable: Expression
   body: Expression[]
 }
 

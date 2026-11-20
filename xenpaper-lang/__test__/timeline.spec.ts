@@ -35,7 +35,8 @@ function notes(source: string, initialization: ScoreInitialization, offset?: Fra
 describe('global grid context', () => {
   it.each([
     ['@if(true) let chosen <- true @2 . @end'],
-    ['@for(chosen, 1, 2) @2 . @end'],
+    ['@for(chosen in [C D]) @if(chosen @eq 1) @2 . @end @end'],
+    ['@for(chosen of [true]) @2 . @end'],
     ['@while(chosen @eq false) let chosen <- true @2 . @end'],
   ])('restores outer bindings in the timeline after %s', (block) => {
     const initialization = initialize(`let chosen <- false ${block} .`)

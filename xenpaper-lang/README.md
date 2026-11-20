@@ -137,13 +137,13 @@ optional. The block ends at `@end` and may contain other blocks. Indentation is
 optional.
 
 ```text
-@for(index, 0, 4)
-  C E G
-  @if(index @eq 3)
-    C=
-  @else
-    G .
-  @end
+let melody <- [C E G]
+@for(index in melody)
+  melody[index]
+@end
+
+@for(note of melody)
+  note
 @end
 
 let index <- 0/1
@@ -153,11 +153,10 @@ let index <- 0/1
 @end
 ```
 
-`@for(name, start, stop[, step])` includes the start and excludes the stop.
-The step defaults to one and can be negative for a descending range. The bounds
-and step must be exact integers, and the step must be nonzero. Loop arguments
-are evaluated once on entry. Use the existing `|: ... :|` notation for musical
-repeats.
+`@for(name in expression)` visits a container's zero-based indices.
+`@for(name of expression)` visits its elements in order. Both evaluate the
+container expression once before the loop. Empty containers run no iterations.
+Xenpaper currently has positional containers. Use `|: ... :|` for musical repeats.
 
 `@while(condition)` tests the condition before each iteration. A `let` in the
 body can shadow a binding for the next condition and iteration. Those bindings
@@ -165,7 +164,7 @@ are local to the loop. An initially false condition emits no music, and a loop
 that never becomes false reports an expansion-limit error.
 
 Names declared in an `@if` branch or an `@for` iteration stay in that scope,
-including the `@for` index. Prevailing musical settings carry forward from any
+including the `@for` binding. Prevailing musical settings carry forward from any
 executed block. Control flow shares an execution limit across nested blocks.
 
 ## Note ties

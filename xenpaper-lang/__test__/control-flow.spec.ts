@@ -74,8 +74,8 @@ F
   it('plays nested loop results in order and restores shadowed variables', () => {
     const source = `
 let index <- 9/1
-@for(index, 3, -1, -1)
-  @if(index @eq 2)
+@for(index in [C D E F])
+  @if(index @eq 1)
     let pass <- 0/1
     @while(pass @lt 2)
       E
@@ -119,19 +119,44 @@ let cursor <- 0/1
     )
   })
 
-  it('does not evaluate empty ranges or an initially false while body', () => {
-    expect(score('@while(false) missingName @end @for(index, 0, 0) missingName @end D')).toEqual(
-      score('D'),
+  it('uses indices to look up container entries and values to play them directly', () => {
+    const source = 'let melody <- [D F C] '
+    const indexed = '@for(index in melody) melody[index] @end'
+    const each = '@for(note of melody) note @end'
+    expect(score(source + indexed)).toEqual(score('D F C'))
+    expect(score(source + each)).toEqual(score('D F C'))
+  })
+
+  it('evaluates the collection once in the enclosing pitch context', () => {
+    expect(score('{12edo} @for(note of [1d 2d]) {19edo} note @end')).toEqual(
+      score('{12edo} let melody <- [1d 2d] {19edo} melody[0] melody[1]'),
     )
   })
 
-  it('rejects invalid bounds and uses one expansion budget across nested loops', () => {
-    for (const source of ['@for(index, 0, 1, 0) C @end', '@for(index, 0, 3/2) C @end']) {
-      expect(expandToBeatEvents(parse(source)).diagnostics[0]?.code).toBe('XP_LOOP_BOUNDS')
+  it('does not evaluate empty containers or an initially false while body', () => {
+    expect(
+      score(
+        '@while(false) missingName @end @for(index in []) missingName @end @for(note of []) missingName @end D',
+      ),
+    ).toEqual(score('D'))
+  })
+
+  it('rejects counted loops and diagnoses non-container operands', () => {
+    expect(() => parse('@for(index, 0, 2) C @end')).toThrow('but "," found')
+    for (const mode of ['in', 'of']) {
+      const source = `@for(index ${mode} 3/2) C @end`
+      const result = expandToBeatEvents(parse(source))
+      expect(result.diagnostics[0]).toMatchObject({
+        code: 'XP_NOT_ITERABLE',
+        locations: [{ start: { offset: source.indexOf('3/2') } }],
+      })
     }
+  })
+
+  it('uses one expansion budget across nested loops', () => {
     for (const source of [
       '@while(true) @end',
-      '@for(i, 0, 4) @for(innerIndex, 0, 4) C @end @end',
+      '@for(i in [C D E F]) @for(note of [C D E F]) note @end @end',
     ]) {
       expect(expandToBeatEvents(parse(source), { expansionLimit: 8 }).diagnostics[0]?.code).toBe(
         'XP_EXPANSION_LIMIT',
