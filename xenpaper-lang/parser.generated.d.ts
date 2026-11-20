@@ -46,6 +46,7 @@ export type Expression =
   | IfBlock
   | IntegerLiteral
   | LambdaExpression
+  | LoopJump
   | IntervalLiteral
   | IndexExpression
   | MappingLiteral
@@ -114,13 +115,20 @@ export interface ForBlock extends Node {
   name: Identifier
   mode: 'in' | 'of'
   iterable: Expression
-  body: Expression[]
+  body: Sequence
+  alternate: Sequence | null
 }
 
 export interface WhileBlock extends Node {
   type: 'WhileBlock'
   condition: Expression
-  body: Expression[]
+  body: Sequence
+  alternate: Sequence | null
+}
+
+export interface LoopJump extends Node {
+  type: 'LoopJump'
+  action: 'break' | 'continue'
 }
 
 export interface IndexExpression extends Node {

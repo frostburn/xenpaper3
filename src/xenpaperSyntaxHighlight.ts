@@ -85,6 +85,7 @@ const kindsByNodeType: Partial<Record<string, XenpaperHighlightKind>> = {
   IfBlock: 'keyword',
   ForBlock: 'keyword',
   WhileBlock: 'keyword',
+  LoopJump: 'keyword',
   PitchContextChange: 'keyword',
   MosDeclaration: 'mos-declaration',
   MosAbstractPattern: 'mos-pattern',

@@ -29,6 +29,7 @@ export function expandRepeats(
   program: Program,
   options: RepeatExpansionOptions = {},
   onEmission?: () => void,
+  deferRepeats = false,
 ): RepeatExpansionResult {
   const diagnostics: Diagnostic[] = []
   const limit = options.expansionLimit ?? DEFAULT_EXPANSION_LIMIT
@@ -54,7 +55,7 @@ export function expandRepeats(
   }
 
   const cloneNode = (node: SyntaxNode, path: ExpansionPath): ExpandedNode[] => {
-    if (node.type === 'Repeat') {
+    if (node.type === 'Repeat' && !deferRepeats) {
       if (node.incompleteEndings) {
         diagnostics.push({
           code: 'XP_INCOMPLETE_REPEAT_ENDINGS',
@@ -202,7 +203,12 @@ export function expandRepeats(
     const clone: Record<string, unknown> = { ...node, expansionPath: path }
     // Control flow is evaluated in its lexical and musical context. Expanding
     // inside a block here could evaluate a repeat in an untaken branch.
-    if (node.type === 'IfBlock' || node.type === 'ForBlock' || node.type === 'WhileBlock')
+    if (
+      node.type === 'IfBlock' ||
+      node.type === 'ForBlock' ||
+      node.type === 'WhileBlock' ||
+      (node.type === 'Repeat' && deferRepeats)
+    )
       return [clone as ExpandedNode]
     for (const [key, value] of Object.entries(node)) {
       if (key === 'location' || key === 'type') continue

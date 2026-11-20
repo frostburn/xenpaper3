@@ -153,7 +153,7 @@ SequenceExpression
     }
 
 SequenceItem
-  = Expression
+  = LoopJump / Expression
 
 // Ties compose complete score operands, below arithmetic and postfix marks but
 // above sequencing and parallel composition. Chains associate to the left.
@@ -558,14 +558,22 @@ BlockSequence
 ForBlock
   = "@for"i !IdentifierContinue Spacing "(" Spacing name:LocatedIdentifier
     RequiredSpacing mode:$("in" / "of") !IdentifierContinue Spacing iterable:Expression
-    Spacing ")" Spacing body:DocumentBody Spacing BlockEnd {
-      return node('ForBlock', { name, mode, iterable, body });
+    Spacing ")" Spacing body:BlockSequence alternate:LoopElse? Spacing BlockEnd {
+      return node('ForBlock', { name, mode, iterable, body, alternate: alternate ?? null });
     }
 
 WhileBlock
   = "@while"i !IdentifierContinue Spacing "(" Spacing condition:Expression Spacing ")"
-    Spacing body:DocumentBody Spacing BlockEnd {
-      return node('WhileBlock', { condition, body });
+    Spacing body:BlockSequence alternate:LoopElse? Spacing BlockEnd {
+      return node('WhileBlock', { condition, body, alternate: alternate ?? null });
+    }
+
+LoopElse
+  = Spacing "@else"i !IdentifierContinue Spacing @BlockSequence
+
+LoopJump
+  = "@" action:$("break"i / "continue"i) !IdentifierContinue {
+      return node('LoopJump', { action: action.toLowerCase() });
     }
 
 BlockEnd
@@ -573,7 +581,7 @@ BlockEnd
 
 ControlToken
   = ComparisonOperator
-  / "@" ("if"i / "elif"i / "else"i / "for"i / "while"i / "end"i) !IdentifierContinue
+  / "@" ("if"i / "elif"i / "else"i / "for"i / "while"i / "break"i / "continue"i / "end"i) !IdentifierContinue
 
 Directive
   = !ControlToken "@" body:(GlissDirectiveBody / GrooveDirectiveBody / DroneDirectiveBody / ArticulationShorthandBody / NumericDirectiveBody / NamedDirectiveBody) {

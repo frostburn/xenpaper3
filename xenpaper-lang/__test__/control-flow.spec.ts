@@ -164,3 +164,81 @@ let cursor <- 0/1
     }
   })
 })
+
+describe('loop jumps and completion', () => {
+  it.each(['@for(index in [C D])', '@for(note of [C D])', '@while(true)'])(
+    'preserves the music before a break and skips the else for %s',
+    (header) => {
+      const source = `${header} @2 C @if(true) @break @end missingName @else missingName @end D`
+      expect(score(source)).toEqual(score('@2 C D'))
+      const notation = evaluateProgramShape(parse(source))
+      expect(notation.diagnostics).toEqual([])
+      expect('shape' in notation && notation.shape.duration.toFraction()).toBe('1')
+    },
+  )
+
+  it.each(['@for(index in [])', '@for(note of [])', '@while(false)'])(
+    'runs the else after zero iterations for %s',
+    (header) => {
+      expect(score(`${header} missingName @else C @end D`)).toEqual(score('C D'))
+    },
+  )
+
+  it.each(['@for(index in [C D])', '@for(note of [C D])'])(
+    'runs the else after continuing the final iteration for %s',
+    (header) => {
+      expect(score(`${header} C @continue missingName @else E @end F`)).toEqual(score('C C E F'))
+    },
+  )
+
+  it('carries while bindings through continue and restores the outer scope before else', () => {
+    const source = `
+let index <- 0/1
+@while(index @lt 2)
+  let index <- index + 1
+  C @continue missingName
+@else
+  @if(index @eq 0) D @end
+@end
+E
+`
+    expect(score(source)).toEqual(score('C C D E'))
+  })
+
+  it('targets the innermost body and treats an inner else as part of the outer body', () => {
+    const source = `
+@for(note of [C D])
+  note
+  @while(true) E @break @else missingName @end
+  @while(false) missingName @else @continue @end
+  missingName
+@else F
+@end
+G
+`
+    expect(score(source)).toEqual(score('C E D E F G'))
+  })
+
+  it('stops a sequential group and skips repeat expansion after the jump', () => {
+    const source = '@while(true) (C @break missingName) |: @x1000000 E :| @end D'
+    expect(score(source)).toEqual(score('C D'))
+    expect(evaluateProgramShape(parse(source)).diagnostics).toEqual([])
+  })
+
+  it('keeps a jump inside ordinary repeat notation bound to the enclosing loop', () => {
+    const source = '@while(true) |: C @break missingName :| @else missingName @end D'
+    expect(score(source)).toEqual(score('C D'))
+    expect(evaluateProgramShape(parse(source)).diagnostics).toEqual([])
+  })
+
+  it.each([
+    '@break',
+    '@continue',
+    '@while(false) C @else @break @end',
+    'fn phrase() { ret @break } @while(true) phrase() @end',
+    '@while(true) (C, @continue) @end',
+    '@while(true) [C @break] @end',
+  ])('diagnoses an evaluated jump outside its loop body in %s', (source) => {
+    expect(expandToBeatEvents(parse(source)).diagnostics[0]?.code).toBe('XP_LOOP_JUMP')
+  })
+})

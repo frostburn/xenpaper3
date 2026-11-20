@@ -167,6 +167,27 @@ Names declared in an `@if` branch or an `@for` iteration stay in that scope,
 including the `@for` binding. Prevailing musical settings carry forward from any
 executed block. Control flow shares an execution limit across nested blocks.
 
+Both loops can end with an optional `@else` before `@end`. The else runs
+once if a `@for` exhausts its container or a `@while` condition becomes false.
+That includes zero iterations and completion after a `@continue`. A
+`@break` exits the innermost loop and skips its else. A `@continue` skips the
+rest of the current iteration. Music already emitted by the iteration stays.
+
+```text
+@for(note of [C D E])
+  @if(note @eq D) @continue @end
+  @if(note @eq E) @break @end
+  note
+@else
+  G
+@end
+```
+
+A loop's else runs outside that loop's body and local bindings. In a nested
+loop, a jump in its else can target an enclosing loop body. Jumps can pass
+through a sequential group, while functions, score templates, parallel
+branches, and normalized slots need a loop of their own.
+
 ## Note ties
 
 The binary `->` operator sequences two operands and ties matching notes:

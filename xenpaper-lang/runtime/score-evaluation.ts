@@ -84,7 +84,10 @@ function resolveContext(resolver: ContextResolver, base: ScoreVisitorContext): S
   return context
 }
 
+type LoopFrame = { jump?: Extract<Expression, { type: 'LoopJump' }>['action'] }
+
 interface VisitorScope {
+  readonly loop?: LoopFrame
   readonly offset: Fraction
   readonly timeScale: Fraction
   readonly layout?: boolean
@@ -1269,18 +1272,23 @@ export function evaluateScoreSemantics(
     ])
   }
 
+  const expandBlockRepeats = (body: Extract<Expression, { type: 'Sequence' }>, defer: boolean) =>
+    expandRepeats(
+      { type: 'Program', source: '', comments: [], body: body.items, location: body.location },
+      { expansionLimit: flowLimit, preserveBarlines: true },
+      () => spendFlowBudget(body),
+      defer,
+    )
+
   const visitBlock = (
     body: Extract<Expression, { type: 'Sequence' }>,
     visitor: ScoreVisitor,
+    deferRepeats = visitor.scope.loop !== undefined,
   ): ScoreShapeEvaluationResult => {
     spendFlowBudget(body)
     let diagnostics: readonly Diagnostic[] = []
     if (playback) {
-      const expanded = expandRepeats(
-        { type: 'Program', source: '', comments: [], body: body.items, location: body.location },
-        { expansionLimit: flowLimit, preserveBarlines: true },
-        () => spendFlowBudget(body),
-      )
+      const expanded = expandBlockRepeats(body, deferRepeats)
       diagnostics = expanded.diagnostics
       if (!expanded.program) return { diagnostics }
       body = { ...body, items: expanded.program.body as unknown as Expression[] }
@@ -1314,6 +1322,36 @@ export function evaluateScoreSemantics(
     )
   }
 
+  const visitLoopIteration = (
+    body: Extract<Expression, { type: 'Sequence' }>,
+    visitor: ScoreVisitor,
+  ) => {
+    const loop: LoopFrame = {}
+    const result = visitBlock(body, visitor.spawn({ loop }))
+    const after = visitorAfter(result, visitor).spawn({ loop: visitor.scope.loop })
+    return { result: withVisitor(result, after), jump: loop.jump }
+  }
+
+  const visitLoopElse = (
+    loop: Extract<Expression, { type: 'ForBlock' | 'WhileBlock' }>,
+    result: ScoreShapeEvaluationResult,
+    visitor: ScoreVisitor,
+    broke: boolean,
+  ): ScoreShapeEvaluationResult => {
+    if (broke || !loop.alternate || !hasShape(result)) return result
+    const after = at(
+      visitorAfter(result, visitor),
+      visitor.scope.offset.add(result.shape.duration.mul(visitor.scope.timeScale)),
+    )
+    const tail = restoreBlockScope(visitBlock(loop.alternate, after), after, after)
+    const diagnostics = [...result.diagnostics, ...tail.diagnostics]
+    if (!hasShape(tail)) return { diagnostics }
+    return withVisitor(
+      { shape: sequence([result.shape, tail.shape], [origin(loop)]), diagnostics },
+      visitorAfter(tail, after),
+    )
+  }
+
   const evaluateNode: VisitorEvaluation<Expression, VisitorScope, ScoreShapeEvaluationResult> = (
     current,
     visitor,
@@ -1327,6 +1365,22 @@ export function evaluateScoreSemantics(
       directiveState: currentDirectiveState,
       environment,
     } = visitor.scope
+    if (current.type === 'LoopJump') {
+      const loop = visitor.scope.loop
+      if (!loop)
+        return {
+          diagnostics: [
+            {
+              code: 'XP_LOOP_JUMP',
+              severity: 'error',
+              message: `@${current.action} requires an enclosing loop body in the same score scope.`,
+              locations: [current.location],
+            },
+          ],
+        }
+      loop.jump = current.action
+      return { shape: sequence([], [origin(current)]), diagnostics: [] }
+    }
     if (current.type === 'IfBlock') {
       const condition = evaluateExpression(current.condition, context, environment)
       if (!('value' in condition)) return condition
@@ -1360,10 +1414,10 @@ export function evaluateScoreSemantics(
         }
       }
       const { values } = iterable.value
-      const body = { type: 'Sequence' as const, items: current.body, location: current.location }
       let active = visitor
       let elapsed = new Fraction(0)
       const shapes: ScoreShape[] = []
+      let broke = false
       for (let index = 0; index < values.length; index++) {
         active = at(active, visitor.scope.offset.add(elapsed.mul(visitor.scope.timeScale)))
         const value =
@@ -1381,20 +1435,29 @@ export function evaluateScoreSemantics(
             { variables: new Map([[current.name.name, value]]) },
           ),
         }))
-        const iteration = restoreBlockScope(visitBlock(body, inner), inner, active)
+        const { result, jump } = visitLoopIteration(current.body, inner)
+        const iteration = restoreBlockScope(result, inner, active)
         diagnostics.push(...iteration.diagnostics)
         if (!hasShape(iteration)) return { diagnostics }
         const binding = withVisitorContext(sequence([], []), inner)
         shapes.push(sequence([binding, iteration.shape], iteration.shape.origins))
         elapsed = elapsed.add(iteration.shape.duration)
         active = visitorAfter(iteration, active)
+        if (jump === 'break') {
+          broke = true
+          break
+        }
       }
-      return withVisitor({ shape: sequence(shapes, [origin(current)]), diagnostics }, active)
+      const result = withVisitor(
+        { shape: sequence(shapes, [origin(current)]), diagnostics },
+        active,
+      )
+      return visitLoopElse(current, result, visitor, broke)
     }
     if (current.type === 'WhileBlock') {
-      const body = { type: 'Sequence' as const, items: current.body, location: current.location }
       const diagnostics: Diagnostic[] = []
       const shapes: ScoreShape[] = []
+      let broke = false
       let active = visitor
       let elapsed = new Fraction(0)
       for (;;) {
@@ -1407,18 +1470,23 @@ export function evaluateScoreSemantics(
         diagnostics.push(...condition.diagnostics)
         if (!('value' in condition)) return { diagnostics }
         if (!isTruthy(condition.value)) break
-        const iteration = visitBlock(body, active)
+        const { result: iteration, jump } = visitLoopIteration(current.body, active)
         diagnostics.push(...iteration.diagnostics)
         if (!hasShape(iteration)) return { diagnostics }
         shapes.push(iteration.shape)
         elapsed = elapsed.add(iteration.shape.duration)
         active = visitorAfter(iteration, active)
+        if (jump === 'break') {
+          broke = true
+          break
+        }
       }
-      return restoreBlockScope(
+      const result = restoreBlockScope(
         { shape: sequence(shapes, [origin(current)]), diagnostics },
         active,
         visitor,
       )
+      return visitLoopElse(current, result, visitor, broke)
     }
     if (current.type === 'BinaryExpression' && current.operator === '->') {
       const directiveOnly = (expression: Expression): boolean =>
@@ -1440,7 +1508,7 @@ export function evaluateScoreSemantics(
       })
       if (directiveOnly(current.left)) return invalidOperand(current.left)
       const left = visitor.visit(current.left)
-      if (!hasShape(left)) return left
+      if (!hasShape(left) || visitor.scope.loop?.jump) return left
       if (!attacks(left.shape).length) return invalidOperand(current.left, left.diagnostics)
       if (directiveOnly(current.right)) return invalidOperand(current.right, left.diagnostics)
       const next = at(
@@ -1450,6 +1518,11 @@ export function evaluateScoreSemantics(
       const right = next.visit(current.right)
       const diagnostics = [...left.diagnostics, ...right.diagnostics]
       if (!hasShape(right)) return { diagnostics }
+      if (visitor.scope.loop?.jump)
+        return withVisitor(
+          { shape: sequence([left.shape, right.shape], [origin(current)]), diagnostics },
+          visitorAfter(right, next),
+        )
       if (!attacks(right.shape).length) return invalidOperand(current.right, diagnostics)
       return withVisitor(
         {
@@ -1476,6 +1549,7 @@ export function evaluateScoreSemantics(
           ...context,
           lexicalEnvironment: prepared.environment,
         })).visit(prepared.expression, {
+          loop: undefined,
           subdivisionContext: visitor.scope.resolve,
         })
         return {
@@ -1583,6 +1657,14 @@ export function evaluateScoreSemantics(
       }
     }
     if (current.type === 'Repeat') {
+      if (playback) {
+        // Loops defer repeat expansion until execution reaches the repeat.
+        return visitBlock(
+          { type: 'Sequence', items: [current], location: current.location },
+          visitor,
+          false,
+        )
+      }
       const count = repeatCount(current)
       if (count === undefined) {
         return {
@@ -1600,6 +1682,7 @@ export function evaluateScoreSemantics(
       let displayedShapes: ScoreShape[] | undefined
       let displayedAttacks: AttackShape[] = []
       const alternatives: AttackAppearance[][] = []
+      const traversed: ScoreShape[] | undefined = visitor.scope.loop ? [] : undefined
       const diagnostics: Diagnostic[] = []
       // Evaluate the written body once even for x0 so it remains engravable between the markers.
       const iterations = Math.max(1, count)
@@ -1609,11 +1692,15 @@ export function evaluateScoreSemantics(
           items: [...repeatBody(current, iteration)],
           location: current.location,
         }
-        const result = activeVisitor.visit(iterationNode)
+        const result = activeVisitor.visit(
+          iterationNode,
+          !count && visitor.scope.loop ? { loop: {} } : {},
+        )
         const nextVisitor = visitorAfter(result, activeVisitor)
         diagnostics.push(...result.diagnostics)
         if (!hasShape(result)) return { diagnostics }
         const iterationShapes = [result.shape]
+        traversed?.push(result.shape)
         if (!displayedShapes) {
           displayedShapes = iterationShapes
           displayedAttacks = iterationShapes.flatMap(attacks)
@@ -1632,6 +1719,11 @@ export function evaluateScoreSemantics(
             })
           }
         }
+        if (visitor.scope.loop?.jump)
+          return withVisitor(
+            { shape: sequence(traversed ?? iterationShapes, [origin(current)]), diagnostics },
+            nextVisitor,
+          )
         if (iteration < count) activeVisitor = nextVisitor
       }
       const displayed = annotateRepeatAppearances(
@@ -1643,7 +1735,8 @@ export function evaluateScoreSemantics(
         items: current.body,
         location: current.location,
       }
-      const commonResult = visitor.visit(commonNode)
+      const engravingLoop = visitor.scope.loop ? {} : undefined
+      const commonResult = visitor.visit(commonNode, { loop: engravingLoop })
       const endingVisitor = visitorAfter(commonResult, visitor)
       diagnostics.push(...commonResult.diagnostics)
       const commonShapes = hasShape(commonResult) ? [commonResult.shape] : []
@@ -1653,7 +1746,9 @@ export function evaluateScoreSemantics(
           items: ending.body,
           location: current.location,
         }
-        const result = endingVisitor.visit(endingNode)
+        const result = endingVisitor.visit(endingNode, {
+          loop: visitor.scope.loop ? {} : undefined,
+        })
         diagnostics.push(...result.diagnostics)
         return hasShape(result) ? [result.shape] : []
       })
@@ -1702,7 +1797,33 @@ export function evaluateScoreSemantics(
           }
         | undefined
       const results: ScoreShapeEvaluationResult[] = []
-      for (const item of current.items) {
+      const loop = visitor.scope.loop
+      // Expand a reached repeat in place so one-shot directives can see its
+      // items and a jump can still leave later repeats unexpanded.
+      const items = function* (): Generator<Expression> {
+        for (const item of current.items) {
+          if (loop?.jump) return
+          if (playback && item.type === 'Repeat') {
+            const expanded = expandBlockRepeats(
+              { type: 'Sequence', items: [item], location: item.location },
+              false,
+            )
+            if (expanded.diagnostics.length) {
+              results.push(
+                expanded.program
+                  ? { shape: sequence([], []), diagnostics: expanded.diagnostics }
+                  : { diagnostics: expanded.diagnostics },
+              )
+            }
+            if (!expanded.program) return
+            for (const child of expanded.program.body as unknown as Expression[]) {
+              if (loop?.jump) return
+              yield child
+            }
+          } else yield item
+        }
+      }
+      for (const item of items()) {
         activeVisitor = at(
           activeVisitor,
           visitor.scope.offset.add(elapsed.mul(visitor.scope.timeScale)),
@@ -1872,6 +1993,7 @@ export function evaluateScoreSemantics(
           let grooveTemplate: ScoreShape | undefined
           if (directive?.kind === 'groove' && directive.argument) {
             const template = activeVisitor.visit(directive.argument, {
+              loop: undefined,
               dynamic: 'mf',
               articulation: new Fraction(1),
               articulationMarks: [],
@@ -1894,6 +2016,7 @@ export function evaluateScoreSemantics(
           let droneTemplate: ScoreShape | undefined
           if (directive?.kind === 'drone' && directive.argument) {
             const template = activeVisitor.visit(directive.argument, {
+              loop: undefined,
               subdivisionContext: activeVisitor.scope.resolve,
             })
             resolved.diagnostics.push(...template.diagnostics)
@@ -2210,6 +2333,7 @@ export function evaluateScoreSemantics(
     if (current.type === 'Parallel') {
       const results = current.branches.map((branch) =>
         visitor.visit(branch, {
+          loop: undefined,
           subdivisionContext: visitor.scope.resolve,
         }),
       )
@@ -2250,7 +2374,7 @@ export function evaluateScoreSemantics(
           diagnostics: [],
         }
       }
-      const local = { subdivisionContext: visitor.scope.resolve }
+      const local = { loop: undefined, subdivisionContext: visitor.scope.resolve }
       let evaluated = visitor.visit(current.expression, { ...local, layout: true })
       if (!('shape' in evaluated)) return evaluated
       if (!evaluated.shape.duration.n) {
@@ -2323,7 +2447,7 @@ export function evaluateScoreSemantics(
         const evaluated = visitor.visit(
           prefix.length ? { ...current, marks: prefix } : current.expression,
         )
-        if (!('shape' in evaluated)) return evaluated
+        if (!('shape' in evaluated) || visitor.scope.loop?.jump) return evaluated
         const continuations = heldFrom.filter((mark) => mark.type === 'DetachedContinue')
         const extension = currentPulse.mul(continuations.length)
         const base = materializeScoreContinuations(evaluated.shape)
@@ -2345,7 +2469,7 @@ export function evaluateScoreSemantics(
       const continuations = current.marks.filter((mark) => mark.type === 'DetachedContinue')
       const elimination = current.marks.find((mark) => mark.type === 'TailElimination')
       let evaluated = visitor.visit(current.expression)
-      if (!('shape' in evaluated)) return evaluated
+      if (!('shape' in evaluated) || visitor.scope.loop?.jump) return evaluated
       // Only constructions continued as a unit need their timed contexts moved.
       // Ordinary sequences keep their attack positions and continue the last note.
       let continued = evaluated.shape
@@ -2370,7 +2494,7 @@ export function evaluateScoreSemantics(
               .mul(duration.add(currentPulse.mul(continuations.length)))
               .div(duration),
           })
-          if (!('shape' in evaluated)) return evaluated
+          if (!('shape' in evaluated) || visitor.scope.loop?.jump) return evaluated
         }
       }
       let base = evaluated.shape
