@@ -1273,7 +1273,6 @@ export function evaluateScoreSemantics(
   const visitBlock = (
     body: Extract<Expression, { type: 'Sequence' }>,
     visitor: ScoreVisitor,
-    binding?: { name: string; value: EvaluatedLiteral },
   ): ScoreShapeEvaluationResult => {
     spendFlowBudget(body)
     let diagnostics: readonly Diagnostic[] = []
@@ -1288,29 +1287,32 @@ export function evaluateScoreSemantics(
       body = { ...body, items: expanded.program.body as unknown as Expression[] }
     }
 
-    const outer = visitor.scope.resolve
-    const inner = binding
-      ? changeVisitor(visitor, (context) => ({
-          ...context,
-          lexicalEnvironment: extendLexicalEnvironment(
-            context.lexicalEnvironment ?? preludeEnvironment(),
-            { variables: new Map([[binding.name, binding.value]]) },
-          ),
-        }))
-      : visitor
-    const result = inner.visit(body, { subdivisionContext: visitor.scope.resolve })
-    const combined = { ...result, diagnostics: [...diagnostics, ...result.diagnostics] }
+    const evaluated = visitor.visit(body, { subdivisionContext: visitor.scope.resolve })
+    return withVisitor(
+      { ...evaluated, diagnostics: [...diagnostics, ...evaluated.diagnostics] },
+      visitorAfter(evaluated, visitor),
+    )
+  }
+
+  // The timeline reads shape annotations to recover prevailing state at a
+  // clip's start beat, so restore local bindings in both the shape and visitor.
+  const restoreBlockScope = (
+    result: ScoreShapeEvaluationResult,
+    inner: ScoreVisitor,
+    outer: ScoreVisitor,
+  ): ScoreShapeEvaluationResult => {
     const after = visitorAfter(result, inner)
-    // Keep prevailing musical changes while discarding declarations introduced
-    // by the branch or iteration and restoring any shadowed loop variable.
-    const restored =
-      after.scope.environment === visitor.scope.environment
-        ? after
-        : changeVisitor(after, (context, base) => ({
-            ...context,
-            lexicalEnvironment: resolveContext(outer, base).lexicalEnvironment,
-          }))
-    return withVisitor(combined, restored)
+    if (!hasShape(result)) return result
+    if (after.scope.environment === outer.scope.environment) return withVisitor(result, after)
+    const restored = changeVisitor(after, (context, base) => ({
+      ...context,
+      lexicalEnvironment: resolveContext(outer.scope.resolve, base).lexicalEnvironment,
+    }))
+    const end = withVisitorContext(sequence([], []), restored)
+    return withVisitor(
+      { ...result, shape: sequence([result.shape, end], result.shape.origins) },
+      restored,
+    )
   }
 
   const evaluateNode: VisitorEvaluation<Expression, VisitorScope, ScoreShapeEvaluationResult> = (
@@ -1333,13 +1335,15 @@ export function evaluateScoreSemantics(
       if (!branch)
         return { shape: sequence([], [origin(current)]), diagnostics: condition.diagnostics }
       const result =
-        branch.type === 'Sequence' ? visitBlock(branch, visitor) : visitor.visit(branch)
+        branch.type === 'Sequence'
+          ? restoreBlockScope(visitBlock(branch, visitor), visitor, visitor)
+          : visitor.visit(branch)
       return withVisitor(
         { ...result, diagnostics: [...condition.diagnostics, ...result.diagnostics] },
         visitorAfter(result, visitor),
       )
     }
-    if (current.type === 'ForBlock' || current.type === 'RepeatBlock') {
+    if (current.type === 'ForBlock') {
       const diagnostics: Diagnostic[] = []
       const integer = (expression: Expression, name: string): number => {
         const evaluated = evaluateBuiltinArgument(
@@ -1354,8 +1358,6 @@ export function evaluateScoreSemantics(
         try {
           value = requireInteger(evaluated.value, name)
           if (!Number.isSafeInteger(value)) throw new RangeError(`${name} must be a safe integer.`)
-          if (name === '@repeat count' && value < 0)
-            throw new RangeError('@repeat count must be non-negative.')
           if (name === '@for step' && !value) throw new RangeError('@for step must be nonzero.')
         } catch (error) {
           throw new EvaluationError([
@@ -1370,38 +1372,65 @@ export function evaluateScoreSemantics(
         }
         return value
       }
-      const start = current.type === 'ForBlock' ? integer(current.start, '@for start') : 0
-      const stop =
-        current.type === 'ForBlock'
-          ? integer(current.stop, '@for stop')
-          : integer(current.count, '@repeat count')
-      const step =
-        current.type === 'ForBlock' && current.step ? integer(current.step, '@for step') : 1
+      const start = integer(current.start, '@for start')
+      const stop = integer(current.stop, '@for stop')
+      const step = current.step ? integer(current.step, '@for step') : 1
       const body = { type: 'Sequence' as const, items: current.body, location: current.location }
       let active = visitor
       let elapsed = new Fraction(0)
       const shapes: ScoreShape[] = []
       for (let index = start; step > 0 ? index < stop : index > stop; index += step) {
-        const binding =
-          current.type === 'ForBlock'
-            ? {
-                name: current.name.name,
-                value: {
-                  kind: 'scalar' as const,
-                  value: new Value(index),
-                  origins: [origin(current.name)],
-                },
-              }
-            : undefined
         active = at(active, visitor.scope.offset.add(elapsed.mul(visitor.scope.timeScale)))
-        const iteration = visitBlock(body, active, binding)
+        const value = {
+          kind: 'scalar' as const,
+          value: new Value(index),
+          origins: [origin(current.name)],
+        }
+        const inner = changeVisitor(active, (context) => ({
+          ...context,
+          lexicalEnvironment: extendLexicalEnvironment(
+            context.lexicalEnvironment ?? preludeEnvironment(),
+            { variables: new Map([[current.name.name, value]]) },
+          ),
+        }))
+        const iteration = restoreBlockScope(visitBlock(body, inner), inner, active)
         diagnostics.push(...iteration.diagnostics)
-        if (!('shape' in iteration)) return { diagnostics }
-        shapes.push(iteration.shape)
+        if (!hasShape(iteration)) return { diagnostics }
+        const binding = withVisitorContext(sequence([], []), inner)
+        shapes.push(sequence([binding, iteration.shape], iteration.shape.origins))
         elapsed = elapsed.add(iteration.shape.duration)
         active = visitorAfter(iteration, active)
       }
       return withVisitor({ shape: sequence(shapes, [origin(current)]), diagnostics }, active)
+    }
+    if (current.type === 'WhileBlock') {
+      const body = { type: 'Sequence' as const, items: current.body, location: current.location }
+      const diagnostics: Diagnostic[] = []
+      const shapes: ScoreShape[] = []
+      let active = visitor
+      let elapsed = new Fraction(0)
+      for (;;) {
+        active = at(active, visitor.scope.offset.add(elapsed.mul(visitor.scope.timeScale)))
+        const condition = evaluateExpression(
+          current.condition,
+          active.scope.context,
+          active.scope.environment,
+        )
+        diagnostics.push(...condition.diagnostics)
+        if (!('value' in condition)) return { diagnostics }
+        if (!isTruthy(condition.value)) break
+        const iteration = visitBlock(body, active)
+        diagnostics.push(...iteration.diagnostics)
+        if (!hasShape(iteration)) return { diagnostics }
+        shapes.push(iteration.shape)
+        elapsed = elapsed.add(iteration.shape.duration)
+        active = visitorAfter(iteration, active)
+      }
+      return restoreBlockScope(
+        { shape: sequence(shapes, [origin(current)]), diagnostics },
+        active,
+        visitor,
+      )
     }
     if (current.type === 'BinaryExpression' && current.operator === '->') {
       const directiveOnly = (expression: Expression): boolean =>

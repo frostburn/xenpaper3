@@ -33,6 +33,19 @@ function notes(source: string, initialization: ScoreInitialization, offset?: Fra
 }
 
 describe('global grid context', () => {
+  it.each([
+    ['@if(true) let chosen <- true @2 . @end'],
+    ['@for(chosen, 1, 2) @2 . @end'],
+    ['@while(chosen @eq false) let chosen <- true @2 . @end'],
+  ])('restores outer bindings in the timeline after %s', (block) => {
+    const initialization = initialize(`let chosen <- false ${block} .`)
+    const phrase = '@if(chosen) C @else D @end'
+    expect(notes(phrase, initialization, new Fraction(1, 4))[0]?.label).toBe('C')
+    const [after] = notes(phrase, initialization, new Fraction(1, 2))
+    expect(after?.label).toBe('D')
+    expect(after?.duration.toFraction()).toBe('1/2')
+  })
+
   it('applies subdivision changes while advancing the grid, including score length', () => {
     const initialization = initialize('. @2')
     const result = score('C D E F', initialization)

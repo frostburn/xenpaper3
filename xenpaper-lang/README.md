@@ -146,19 +146,27 @@ optional.
   @end
 @end
 
-@repeat(2) C D E @end
+let index <- 0/1
+@while(index @lt 3)
+  C D E
+  let index <- index + 1
+@end
 ```
 
 `@for(name, start, stop[, step])` includes the start and excludes the stop.
 The step defaults to one and can be negative for a descending range. The bounds
-and step must be exact integers, and the step must be nonzero. `@repeat(count)`
-takes a nonnegative integer. Loop arguments are evaluated once on entry. Zero
-iterations emit no music.
+and step must be exact integers, and the step must be nonzero. Loop arguments
+are evaluated once on entry. Use the existing `|: ... :|` notation for musical
+repeats.
 
-A branch or iteration can declare local names. Those names and the loop index
-are scoped to the block, while prevailing musical settings carry forward.
-Untaken branches have no effect. Control flow shares an execution limit across
-nested blocks.
+`@while(condition)` tests the condition before each iteration. A `let` in the
+body can shadow a binding for the next condition and iteration. Those bindings
+are local to the loop. An initially false condition emits no music, and a loop
+that never becomes false reports an expansion-limit error.
+
+Names declared in an `@if` branch or an `@for` iteration stay in that scope,
+including the `@for` index. Prevailing musical settings carry forward from any
+executed block. Control flow shares an execution limit across nested blocks.
 
 ## Note ties
 

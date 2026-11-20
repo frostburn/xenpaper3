@@ -309,7 +309,7 @@ PrimaryExpression
   / PitchContextChange
   / IfBlock
   / ForBlock
-  / RepeatBlock
+  / WhileBlock
   / Directive
   / NormalizedGroup
   / LambdaExpression
@@ -563,10 +563,10 @@ ForBlock
       return node('ForBlock', { name, start, stop, step: step ?? null, body });
     }
 
-RepeatBlock
-  = "@repeat"i !IdentifierContinue Spacing "(" Spacing count:Expression Spacing ")"
+WhileBlock
+  = "@while"i !IdentifierContinue Spacing "(" Spacing condition:Expression Spacing ")"
     Spacing body:DocumentBody Spacing BlockEnd {
-      return node('RepeatBlock', { count, body });
+      return node('WhileBlock', { condition, body });
     }
 
 BlockEnd
@@ -574,7 +574,7 @@ BlockEnd
 
 ControlToken
   = ComparisonOperator
-  / "@" ("if"i / "elif"i / "else"i / "for"i / "repeat"i / "end"i) !IdentifierContinue
+  / "@" ("if"i / "elif"i / "else"i / "for"i / "while"i / "end"i) !IdentifierContinue
 
 Directive
   = !ControlToken "@" body:(GlissDirectiveBody / GrooveDirectiveBody / DroneDirectiveBody / ArticulationShorthandBody / NumericDirectiveBody / NamedDirectiveBody) {

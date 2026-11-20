@@ -202,7 +202,7 @@ export function expandRepeats(
     const clone: Record<string, unknown> = { ...node, expansionPath: path }
     // Control flow is evaluated in its lexical and musical context. Expanding
     // inside a block here could evaluate a repeat in an untaken branch.
-    if (node.type === 'IfBlock' || node.type === 'ForBlock' || node.type === 'RepeatBlock')
+    if (node.type === 'IfBlock' || node.type === 'ForBlock' || node.type === 'WhileBlock')
       return [clone as ExpandedNode]
     for (const [key, value] of Object.entries(node)) {
       if (key === 'location' || key === 'type') continue

@@ -63,7 +63,7 @@ export type Expression =
   | RealLiteral
   | RatioLiteral
   | Repeat
-  | RepeatBlock
+  | WhileBlock
   | Rest
   | Sequence
   | SignatureDeclaration
@@ -118,9 +118,9 @@ export interface ForBlock extends Node {
   body: Expression[]
 }
 
-export interface RepeatBlock extends Node {
-  type: 'RepeatBlock'
-  count: Expression
+export interface WhileBlock extends Node {
+  type: 'WhileBlock'
+  condition: Expression
   body: Expression[]
 }
 

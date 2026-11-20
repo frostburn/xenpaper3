@@ -76,7 +76,11 @@ F
 let index <- 9/1
 @for(index, 3, -1, -1)
   @if(index @eq 2)
-    @repeat(2) E @end
+    let pass <- 0/1
+    @while(pass @lt 2)
+      E
+      let pass <- pass + 1
+    @end
   @else
     D
   @end
@@ -97,19 +101,41 @@ let index <- 9/1
     expect(score('{12edo} @if(E# @eq F) D @else C @end')).toEqual(score('{12edo} D'))
   })
 
-  it('does not evaluate empty ranges or zero repeats', () => {
-    expect(score('@repeat(0) missingName @end @for(index, 0, 0) missingName @end D')).toEqual(
+  it('carries while bindings between iterations and restores them on exit', () => {
+    const source = `
+let cursor <- 0/1
+@while(cursor @lt 3)
+  C
+  let cursor <- cursor + 1
+@end
+@if(cursor @eq 0) D @end
+`
+    expect(score(source)).toEqual(score('C C C D'))
+  })
+
+  it('carries prevailing context out of a while with no local declarations', () => {
+    expect(score('{19edo} @while(C# - C @lt 90c) @2 {12edo} C @end D')).toEqual(
+      score('@2 {12edo} C D'),
+    )
+  })
+
+  it('does not evaluate empty ranges or an initially false while body', () => {
+    expect(score('@while(false) missingName @end @for(index, 0, 0) missingName @end D')).toEqual(
       score('D'),
     )
   })
 
   it('rejects invalid bounds and uses one expansion budget across nested loops', () => {
-    for (const source of ['@repeat(-1) C @end', '@for(index, 0, 1, 0) C @end']) {
+    for (const source of ['@for(index, 0, 1, 0) C @end', '@for(index, 0, 3/2) C @end']) {
       expect(expandToBeatEvents(parse(source)).diagnostics[0]?.code).toBe('XP_LOOP_BOUNDS')
     }
-    expect(
-      expandToBeatEvents(parse('@repeat(4) @repeat(4) C @end @end'), { expansionLimit: 8 })
-        .diagnostics[0]?.code,
-    ).toBe('XP_EXPANSION_LIMIT')
+    for (const source of [
+      '@while(true) @end',
+      '@for(i, 0, 4) @for(innerIndex, 0, 4) C @end @end',
+    ]) {
+      expect(expandToBeatEvents(parse(source), { expansionLimit: 8 }).diagnostics[0]?.code).toBe(
+        'XP_EXPANSION_LIMIT',
+      )
+    }
   })
 })
