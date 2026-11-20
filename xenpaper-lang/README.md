@@ -107,6 +107,59 @@ an integer. `sort(container)`, `arrayMap(callback, container)`, and
 `arrayReduce(callback, container, initial?)` likewise require containers in
 their container positions and diagnose missing or extra arguments.
 
+## Comparisons and control flow
+
+Use `@eq`, `@ne`, `@lt`, `@le`, `@gt`, and `@ge` for equality,
+inequality, and ordering. They are infix operators in the ordinary expression
+grammar, so they work in bindings, function calls, and conditions. Arithmetic
+binds first. Write one comparison per expression or use parentheses to group
+comparisons explicitly.
+
+```text
+let selected <- 1 + 2 @eq 3
+@if(selected)
+  C E G
+@elif(eq @lt e)
+  D F A
+@else
+  C F G
+@end
+```
+
+The bare token `eq` still spells a pitch. Comparisons use the active tuning
+for named pitches, compare quantities of compatible dimensions, and return the
+same Boolean values used by `true` and `false`. A comparison result cannot be
+played as a note. Bare integers in comparisons are scalars. Use the `d` suffix
+to compare scale degrees, as in `12d @eq 2/1`.
+
+An `@if` block runs the first truthy branch. Both `@elif` and `@else` are
+optional. The block ends at `@end` and may contain other blocks. Indentation is
+optional.
+
+```text
+@for(index, 0, 4)
+  C E G
+  @if(index @eq 3)
+    C=
+  @else
+    G .
+  @end
+@end
+
+@repeat(2) C D E @end
+```
+
+`@for(name, start, stop[, step])` includes the start and excludes the stop.
+The step defaults to one and can be negative for a descending range. The bounds
+and step must be exact integers, and the step must be nonzero. `@repeat(count)`
+takes a nonnegative integer. Loop arguments are evaluated once on entry. Zero
+iterations emit no music.
+
+A branch or iteration can declare local names. Those names and the loop index
+are scoped to the block, while prevailing musical settings carry forward.
+Untaken branches have no effect. Control flow shares an execution limit across
+nested blocks.
+
 ## Note ties
 
 The binary `->` operator sequences two operands and ties matching notes:
@@ -246,11 +299,10 @@ Groups, normalized groups, and each parallel branch isolate their local bindings
 hard boundaries retain the surrounding sequence's bindings. Repeats splice their
 body and selected ending into that sequence, just like written-out copies.
 Declarations are evaluated at each occurrence and can shadow earlier bindings;
-only explicit groups, slots, function calls, and parallel branches create scopes.
+explicit groups, slots, function calls, control-flow blocks, and parallel branches create scopes.
 
 Parameter names must be unique. Functions are intentionally non-recursive (both
-direct and mutual recursion are rejected), keeping score evaluation finite and
-making repeat notation the sole mechanism for repetition. Declarations emit no
+direct and mutual recursion are rejected). Declarations emit no
 attack, rest, annotation, beat, duration, or staff symbol.
 
 Key signatures may include a diatonic mode after the tonic, such as

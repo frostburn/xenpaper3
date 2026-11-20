@@ -47,7 +47,7 @@ export function evaluateProgramSemantics(
     items: expanded.program.body,
     location: program.location,
   } as unknown as Expression
-  const result = evaluateScoreSemantics(sequence, options)
+  const result = evaluateScoreSemantics(sequence, options, true)
   const warned = new Set<string>()
   const diagnostics = [...expanded.diagnostics, ...result.diagnostics].filter((diagnostic) => {
     if (diagnostic.code !== 'XP_BARLINE_OFF_CYCLE') return true

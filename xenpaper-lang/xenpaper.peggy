@@ -183,7 +183,7 @@ Expression
     }
 
 TieOperand
-  = expression:(EnumeratedChordArithmetic / ScaleDegreeLiteral / AdditiveExpression)
+  = expression:(EnumeratedChordArithmetic / (degree:ScaleDegreeLiteral !(Spacing ComparisonOperator) { return degree; }) / ValueExpression)
     marks:AttachedPostfixMark* {
       if (!marks.length) return expression;
       return node('PostfixExpression', { expression, marks });
@@ -196,13 +196,29 @@ EnumeratedChordArithmetic
       return foldBinary(foldBinary(first, multiplicative), additive);
     }
 
-AdditiveExpression
-  = consequent:(first:MultiplicativeExpression rest:AdditiveTail* { return foldBinary(first, rest); })
-    alternative:(RequiredSpacing "if" !IdentifierContinue RequiredSpacing condition:AdditiveExpression RequiredSpacing "else" !IdentifierContinue RequiredSpacing alternate:AdditiveExpression {
+ValueExpression
+  = consequent:ComparisonExpression
+    alternative:(RequiredSpacing "if" !IdentifierContinue RequiredSpacing condition:ValueExpression RequiredSpacing "else" !IdentifierContinue RequiredSpacing alternate:ValueExpression {
       return { condition, alternate };
     })? {
       return alternative ? node('ConditionalExpression', { consequent, ...alternative }) : consequent;
     }
+
+// Comparisons bind below arithmetic and above the inline conditional.
+ComparisonExpression
+  = left:AdditiveExpression tail:(Spacing operator:ComparisonOperator Spacing right:AdditiveExpression {
+      return { operator, right };
+    })? {
+      return tail ? binary(tail.operator, left, tail.right) : left;
+    }
+
+ComparisonOperator
+  = operator:$("@" ("eq"i / "ne"i / "lt"i / "le"i / "gt"i / "ge"i)) !IdentifierContinue {
+      return operator.toLowerCase();
+    }
+
+AdditiveExpression
+  = first:MultiplicativeExpression rest:AdditiveTail* { return foldBinary(first, rest); }
 
 // Compact pitch arithmetic such as `G-n3` is accepted when the right operand
 // cannot be mistaken for a signed scale degree. For numeric right operands,
@@ -271,7 +287,7 @@ UnaryOperator
   / "√" { return "√"; }
 
 PostfixExpression
-  = expression:PrimaryExpression indexes:("[" Spacing index:AdditiveExpression Spacing "]" { return index; })* marks:AttachedPostfixMark* {
+  = expression:PrimaryExpression indexes:("[" Spacing index:ValueExpression Spacing "]" { return index; })* marks:AttachedPostfixMark* {
       let result = expression;
       for (const index of indexes) result = node('IndexExpression', { container: result, index });
       if (!marks.length) return result;
@@ -291,6 +307,9 @@ PrimaryExpression
   / RepeatExpression
   / MosDeclaration
   / PitchContextChange
+  / IfBlock
+  / ForBlock
+  / RepeatBlock
   / Directive
   / NormalizedGroup
   / LambdaExpression
@@ -323,7 +342,7 @@ PrimaryExpression
 LambdaExpression
   = "(" Spacing parameters:(first:LocatedIdentifier rest:(Spacing "," Spacing parameter:LocatedIdentifier { return parameter; })* {
       return [first, ...rest];
-    })? Spacing ")" Spacing "=>" Spacing body:AdditiveExpression {
+    })? Spacing ")" Spacing "=>" Spacing body:ValueExpression {
       return node('LambdaExpression', { parameters: parameters ?? [], body });
     }
 
@@ -363,7 +382,7 @@ ChordEnumerand
   / IdentifierExpression
 
 ChordGroupedEnumerand
-  = "(" Spacing expression:AdditiveExpression Spacing ")" {
+  = "(" Spacing expression:ValueExpression Spacing ")" {
       return node('Group', { expression });
     }
 
@@ -513,8 +532,52 @@ RepeatCount
       return node('IntegerLiteral', { raw: value.raw, value: value.value });
     }
 
+// Block bodies are ordinary scores. Reserved markers stop the score grammar
+// at the enclosing branch boundary, including when blocks nest.
+IfBlock
+  = "@if"i !IdentifierContinue branch:IfBranch Spacing BlockEnd {
+      return node('IfBlock', branch);
+    }
+
+IfBranch
+  = Spacing "(" Spacing condition:Expression Spacing ")" Spacing consequent:BlockSequence
+    alternate:(Spacing @(
+      "@elif"i !IdentifierContinue branch:IfBranch { return node('IfBlock', branch); }
+      / "@else"i !IdentifierContinue Spacing @BlockSequence
+    ))? {
+      return {
+        condition,
+        consequent,
+        alternate: alternate ?? null,
+      };
+    }
+
+BlockSequence
+  = items:DocumentBody { return node('Sequence', { items }); }
+
+ForBlock
+  = "@for"i !IdentifierContinue Spacing "(" Spacing name:LocatedIdentifier Spacing ","
+    Spacing start:Expression Spacing "," Spacing stop:Expression
+    step:(Spacing "," Spacing value:Expression { return value; })?
+    Spacing ")" Spacing body:DocumentBody Spacing BlockEnd {
+      return node('ForBlock', { name, start, stop, step: step ?? null, body });
+    }
+
+RepeatBlock
+  = "@repeat"i !IdentifierContinue Spacing "(" Spacing count:Expression Spacing ")"
+    Spacing body:DocumentBody Spacing BlockEnd {
+      return node('RepeatBlock', { count, body });
+    }
+
+BlockEnd
+  = "@end"i !IdentifierContinue
+
+ControlToken
+  = ComparisonOperator
+  / "@" ("if"i / "elif"i / "else"i / "for"i / "repeat"i / "end"i) !IdentifierContinue
+
 Directive
-  = "@" body:(GlissDirectiveBody / GrooveDirectiveBody / DroneDirectiveBody / ArticulationShorthandBody / NumericDirectiveBody / NamedDirectiveBody) {
+  = !ControlToken "@" body:(GlissDirectiveBody / GrooveDirectiveBody / DroneDirectiveBody / ArticulationShorthandBody / NumericDirectiveBody / NamedDirectiveBody) {
       return node('Directive', body);
     }
 
@@ -612,10 +675,10 @@ DirectiveArgumentList
 DirectiveArgument
   // Named arguments are deliberately semantic-free so second-party directive
   // extensions can interpret arbitrary vocabularies and dimensions.
-  = name:Identifier Spacing ":" Spacing value:AdditiveExpression {
+  = name:Identifier Spacing ":" Spacing value:ValueExpression {
       return node('NamedArgument', { name, value });
     }
-  / AdditiveExpression
+  / ValueExpression
 
 PitchContextChange
   = "{" Spacing preset:ContextPreset Spacing "}" {
@@ -650,7 +713,7 @@ ContextAssignmentStart
   / ContextAssignmentTarget Spacing 'as'i !IdentifierContinue Spacing 'root'i !IdentifierContinue
 
 ContextStatement
-  = name:$('tuning'i) !IdentifierContinue Spacing '*<-' Spacing value:AdditiveExpression {
+  = name:$('tuning'i) !IdentifierContinue Spacing '*<-' Spacing value:ValueExpression {
       return node('TuningStretch', { factor: value, raw: text() });
     }
   / "scale"i !IdentifierContinue Spacing "<-" Spacing value:ContextScaleParallelExpression {
@@ -720,11 +783,11 @@ ContextOperatorTarget
 
 ContextValue
   = MappingLiteral
-  / AdditiveExpression
+  / ValueExpression
 
 MappingLiteral
-  = ("<" / "⟨") Spacing first:AdditiveExpression
-    rest:(ComponentSeparator value:AdditiveExpression { return value; })*
+  = ("<" / "⟨") Spacing first:ValueExpression
+    rest:(ComponentSeparator value:ValueExpression { return value; })*
     Spacing close:("]" / ">") {
       return node('MappingLiteral', {
         values: [first, ...rest],
@@ -788,7 +851,7 @@ FunctionDeclaration
 FunctionParameter
   = name:LocatedIdentifier
     coercion:(Spacing ":" Spacing annotation:CoercionAnnotation { return annotation; })?
-    defaultValue:(Spacing "<-" Spacing value:AdditiveExpression { return value; })? {
+    defaultValue:(Spacing "<-" Spacing value:ValueExpression { return value; })? {
       return node('FunctionParameter', {
         name,
         coercion: coercion ?? null,
@@ -909,7 +972,7 @@ MosElement
   / numerator:UnsignedInteger Spacing ":" Spacing denominator:UnsignedInteger {
       return node('MosHardness', { numerator, denominator });
     }
-  / "<" Spacing value:AdditiveExpression Spacing ">" {
+  / "<" Spacing value:ValueExpression Spacing ">" {
       return node('MosEquave', { value });
     }
   / pattern:$([Ls]+) {
@@ -1006,7 +1069,7 @@ MosPitchNominal
     }
 
 MosAccidental
-  = value:$([&@ea_] / "♮") { return node('Accidental', { value }); }
+  = !ControlToken value:$([&@ea_] / "♮") { return node('Accidental', { value }); }
 
 // Bare signed integers are scale degrees unless the following characters
 // clearly continue the token as scalar arithmetic. This is a forward syntactic
@@ -1121,7 +1184,7 @@ UnsignedEqualDivisionLiteral
     }
 
 EquaveSuffix
-  = "<" Spacing value:AdditiveExpression Spacing ">" { return value; }
+  = "<" Spacing value:ValueExpression Spacing ">" { return value; }
 
 QuantityLiteral
   = sign:Sign? magnitude:UnsignedDecimalOrInteger unit:UnitSuffix {

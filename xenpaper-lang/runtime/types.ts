@@ -193,6 +193,8 @@ export interface RepeatExpansionResult {
 
 export interface ScalarValue {
   readonly kind: 'scalar'
+  /** Comparison results use the existing 0/1 Boolean representation. */
+  readonly boolean?: true
   readonly value: Value
   readonly origins: readonly SourceOrigin[]
 }

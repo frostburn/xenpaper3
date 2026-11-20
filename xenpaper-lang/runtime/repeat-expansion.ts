@@ -28,6 +28,7 @@ function isNode(value: unknown): value is SyntaxNode {
 export function expandRepeats(
   program: Program,
   options: RepeatExpansionOptions = {},
+  onEmission?: () => void,
 ): RepeatExpansionResult {
   const diagnostics: Diagnostic[] = []
   const limit = options.expansionLimit ?? DEFAULT_EXPANSION_LIMIT
@@ -39,6 +40,7 @@ export function expandRepeats(
   }
 
   const countEmission = (node: SyntaxNode) => {
+    onEmission?.()
     emitted += 1
     if (emitted > limit) {
       diagnostics.push({
@@ -198,6 +200,10 @@ export function expandRepeats(
 
     countEmission(node)
     const clone: Record<string, unknown> = { ...node, expansionPath: path }
+    // Control flow is evaluated in its lexical and musical context. Expanding
+    // inside a block here could evaluate a repeat in an untaken branch.
+    if (node.type === 'IfBlock' || node.type === 'ForBlock' || node.type === 'RepeatBlock')
+      return [clone as ExpandedNode]
     for (const [key, value] of Object.entries(node)) {
       if (key === 'location' || key === 'type') continue
       if (Array.isArray(value)) {

@@ -39,9 +39,11 @@ export type Expression =
   | EqualDivisionLiteral
   | EnumeratedChord
   | Group
+  | ForBlock
   | FunctionDeclaration
   | HardBoundary
   | Identifier
+  | IfBlock
   | IntegerLiteral
   | LambdaExpression
   | IntervalLiteral
@@ -61,6 +63,7 @@ export type Expression =
   | RealLiteral
   | RatioLiteral
   | Repeat
+  | RepeatBlock
   | Rest
   | Sequence
   | SignatureDeclaration
@@ -97,6 +100,28 @@ export interface ConditionalExpression extends Node {
   condition: Expression
   consequent: Expression
   alternate: Expression
+}
+
+export interface IfBlock extends Node {
+  type: 'IfBlock'
+  condition: Expression
+  consequent: Sequence
+  alternate: IfBlock | Sequence | null
+}
+
+export interface ForBlock extends Node {
+  type: 'ForBlock'
+  name: Identifier
+  start: Expression
+  stop: Expression
+  step: Expression | null
+  body: Expression[]
+}
+
+export interface RepeatBlock extends Node {
+  type: 'RepeatBlock'
+  count: Expression
+  body: Expression[]
 }
 
 export interface IndexExpression extends Node {

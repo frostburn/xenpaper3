@@ -61,7 +61,7 @@ fn cps(factors: container<ratio>, count: integer, equave: ratio <- niente, withU
 
 let cachedPreludeEnvironment: LexicalEnvironment | undefined
 
-function preludeEnvironment(): LexicalEnvironment {
+export function preludeEnvironment(): LexicalEnvironment {
   if (cachedPreludeEnvironment) return cachedPreludeEnvironment
   let environment = EMPTY_LEXICAL_ENVIRONMENT
   const program = parse(PRELUDE)
@@ -613,6 +613,48 @@ function logarithmicDivision(
   return result('scalar', left.value.log(right.value), operatorOrigins(left, right, node))
 }
 
+const comparisons = new Map<string, (order: number, equal: boolean) => boolean>([
+  ['@eq', (_order, equal) => equal],
+  ['@ne', (_order, equal) => !equal],
+  ['@lt', (order) => order < 0],
+  ['@le', (order) => order <= 0],
+  ['@gt', (order) => order > 0],
+  ['@ge', (order) => order >= 0],
+])
+
+export const isComparison = (operator: string): boolean => comparisons.has(operator)
+
+function compareOperands(
+  node: Extract<Expression, { type: 'BinaryExpression' }>,
+  left: EvaluatedLiteral,
+  right: EvaluatedLiteral,
+): ScalarValue {
+  const magnitude = (operand: EvaluatedLiteral): Value => {
+    if (operand.kind === 'absolutePitch') return operand.rootOffset
+    if (operand.kind === 'scalar' || operand.kind === 'pitchOffset') return operand.value
+    throw new TypeError(`Operator ${node.operator} requires numeric or pitch operands.`)
+  }
+  let lhs = magnitude(left)
+  let rhs = magnitude(right)
+  // Positive scalars can represent frequency ratios, just as in pitch arithmetic.
+  if (lhs.dimensions.equals({ pitch: 1 }) && rhs.isPositiveExactRatio()) rhs = Value.pitch(rhs)
+  else if (rhs.dimensions.equals({ pitch: 1 }) && lhs.isPositiveExactRatio()) lhs = Value.pitch(lhs)
+  const order = lhs.compare(rhs)
+  const equal = lhs.isExact() && rhs.isExact() ? lhs.equals(rhs) : lhs.valueOf() === rhs.valueOf()
+  const value = comparisons.get(node.operator)!(order, equal)
+  return {
+    ...result('scalar', new Value(value ? 1 : 0), operatorOrigins(left, right, node)),
+    boolean: true,
+  }
+}
+
+export function isTruthy(value: EvaluatedLiteral): boolean {
+  if (value.kind === 'undefined') return false
+  if (value.kind === 'absolutePitch') return true
+  if (value.kind === 'container') return value.values.length > 0
+  return value.value.valueOf() !== 0
+}
+
 function binary(
   operator: string,
   left: EvaluatedLiteral,
@@ -1003,7 +1045,10 @@ export function evaluateExpression(
       const right = evaluateExpression(node.right, mapping, environment)
       const diagnostics = [...left.diagnostics, ...right.diagnostics]
       if (!('value' in right)) return { diagnostics }
-      return { value: binary(node.operator, left.value, right.value, node), diagnostics }
+      const value = isComparison(node.operator)
+        ? compareOperands(node, left.value, right.value)
+        : binary(node.operator, left.value, right.value, node)
+      return { value, diagnostics }
     }
     if (node.type === 'IndexExpression') {
       const container = evaluateExpression(node.container, mapping, environment)
@@ -1021,15 +1066,8 @@ export function evaluateExpression(
     if (node.type === 'ConditionalExpression') {
       const condition = evaluateExpression(node.condition, mapping, environment)
       if (!('value' in condition)) return condition
-      const truthy =
-        condition.value.kind !== 'undefined' &&
-        (condition.value.kind === 'absolutePitch'
-          ? true
-          : condition.value.kind === 'container'
-            ? condition.value.values.length > 0
-            : condition.value.value.valueOf() !== 0)
       const branch = evaluateExpression(
-        truthy ? node.consequent : node.alternate,
+        isTruthy(condition.value) ? node.consequent : node.alternate,
         mapping,
         environment,
       )

@@ -82,6 +82,9 @@ function heapPop(heap: HighlightRange[]): void {
 const kindsByNodeType: Partial<Record<string, XenpaperHighlightKind>> = {
   Comment: 'comment',
   Directive: 'directive',
+  IfBlock: 'keyword',
+  ForBlock: 'keyword',
+  RepeatBlock: 'keyword',
   PitchContextChange: 'keyword',
   MosDeclaration: 'mos-declaration',
   MosAbstractPattern: 'mos-pattern',

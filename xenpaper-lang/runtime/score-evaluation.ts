@@ -2,7 +2,16 @@ import { Fraction } from 'xen-dev-utils/fraction'
 import type { Expression, Node } from '../parser.generated.js'
 import type { Diagnostic } from '../diagnostics'
 import { Value } from '../value'
-import { evaluateDeclaration, evaluateExpression, prepareFunctionCall } from './expressions'
+import {
+  evaluateDeclaration,
+  evaluateExpression,
+  isComparison,
+  isTruthy,
+  preludeEnvironment,
+  prepareFunctionCall,
+} from './expressions'
+import { evaluateBuiltinArgument, requireInteger } from './builtins'
+import { expandRepeats } from './repeat-expansion'
 import type { ExpressionEvaluationResult } from './expressions'
 import { DYNAMIC_VELOCITIES, resolveDirective } from './directives'
 import { Visitor, type VisitorEvaluation } from './visitor'
@@ -338,7 +347,8 @@ function broadcastScalarOperation(
     if (operand) return { ...node, operand }
     return mapScoreConstruction(node.operand, (item) => ({ ...node, operand: item }))
   }
-  if (node.type !== 'BinaryExpression' || node.operator === '->') return undefined
+  if (node.type !== 'BinaryExpression' || node.operator === '->' || isComparison(node.operator))
+    return undefined
   const left = broadcastScalarOperation(node.left, context, environment)
   if (left) return { ...node, left }
   const right = broadcastScalarOperation(node.right, context, environment)
@@ -448,7 +458,7 @@ function expandEnumeratedChord(
       diagnostics: [],
     }
   }
-  if (node.type === 'BinaryExpression') {
+  if (node.type === 'BinaryExpression' && !isComparison(node.operator)) {
     const left = expandEnumeratedChord(node.left, context)
     const right = expandEnumeratedChord(node.right, context)
     if (
@@ -1047,6 +1057,18 @@ function playablePitch(
       diagnostics: evaluated.diagnostics,
     }
   }
+  if (evaluated.value.kind === 'scalar' && evaluated.value.boolean)
+    return {
+      diagnostics: [
+        ...evaluated.diagnostics,
+        {
+          code: 'XP_TYPE_MISMATCH',
+          severity: 'error',
+          message: 'A comparison result cannot be played as a note.',
+          locations: [node.location],
+        },
+      ],
+    }
   const ratio = evaluated.value.value
   if (ratio.dimensions.equals({ seconds: -1 }) && ratio.valueOf() > 0) {
     const notationRatio = ratio.div(context.rootFrequency)
@@ -1092,6 +1114,7 @@ function playablePitch(
 export function evaluateScoreSemantics(
   node: Expression,
   options: ScoreShapeOptions = {},
+  playback = false,
 ): ScoreShapeEvaluationResult {
   const inherited = contextAt(options.initialization, options.beatOffset ?? new Fraction(0))
   options = {
@@ -1233,6 +1256,63 @@ export function evaluateScoreSemantics(
     visitorContextChange: visitorContext(visitor),
   })
 
+  const flowLimit = options.expansionLimit ?? MAX_REPEAT_EXPANSION_NODES
+  let flowBudget = flowLimit
+  const spendFlowBudget = (current: Expression) => {
+    if (--flowBudget >= 0) return
+    throw new EvaluationError([
+      {
+        code: 'XP_EXPANSION_LIMIT',
+        severity: 'error',
+        message: `Control flow exceeded the ${flowLimit}-step expansion limit.`,
+        locations: [current.location],
+      },
+    ])
+  }
+
+  const visitBlock = (
+    body: Extract<Expression, { type: 'Sequence' }>,
+    visitor: ScoreVisitor,
+    binding?: { name: string; value: EvaluatedLiteral },
+  ): ScoreShapeEvaluationResult => {
+    spendFlowBudget(body)
+    let diagnostics: readonly Diagnostic[] = []
+    if (playback) {
+      const expanded = expandRepeats(
+        { type: 'Program', source: '', comments: [], body: body.items, location: body.location },
+        { expansionLimit: flowLimit, preserveBarlines: true },
+        () => spendFlowBudget(body),
+      )
+      diagnostics = expanded.diagnostics
+      if (!expanded.program) return { diagnostics }
+      body = { ...body, items: expanded.program.body as unknown as Expression[] }
+    }
+
+    const outer = visitor.scope.resolve
+    const inner = binding
+      ? changeVisitor(visitor, (context) => ({
+          ...context,
+          lexicalEnvironment: extendLexicalEnvironment(
+            context.lexicalEnvironment ?? preludeEnvironment(),
+            { variables: new Map([[binding.name, binding.value]]) },
+          ),
+        }))
+      : visitor
+    const result = inner.visit(body, { subdivisionContext: visitor.scope.resolve })
+    const combined = { ...result, diagnostics: [...diagnostics, ...result.diagnostics] }
+    const after = visitorAfter(result, inner)
+    // Keep prevailing musical changes while discarding declarations introduced
+    // by the branch or iteration and restoring any shadowed loop variable.
+    const restored =
+      after.scope.environment === visitor.scope.environment
+        ? after
+        : changeVisitor(after, (context, base) => ({
+            ...context,
+            lexicalEnvironment: resolveContext(outer, base).lexicalEnvironment,
+          }))
+    return withVisitor(combined, restored)
+  }
+
   const evaluateNode: VisitorEvaluation<Expression, VisitorScope, ScoreShapeEvaluationResult> = (
     current,
     visitor,
@@ -1246,6 +1326,83 @@ export function evaluateScoreSemantics(
       directiveState: currentDirectiveState,
       environment,
     } = visitor.scope
+    if (current.type === 'IfBlock') {
+      const condition = evaluateExpression(current.condition, context, environment)
+      if (!('value' in condition)) return condition
+      const branch = isTruthy(condition.value) ? current.consequent : current.alternate
+      if (!branch)
+        return { shape: sequence([], [origin(current)]), diagnostics: condition.diagnostics }
+      const result =
+        branch.type === 'Sequence' ? visitBlock(branch, visitor) : visitor.visit(branch)
+      return withVisitor(
+        { ...result, diagnostics: [...condition.diagnostics, ...result.diagnostics] },
+        visitorAfter(result, visitor),
+      )
+    }
+    if (current.type === 'ForBlock' || current.type === 'RepeatBlock') {
+      const diagnostics: Diagnostic[] = []
+      const integer = (expression: Expression, name: string): number => {
+        const evaluated = evaluateBuiltinArgument(
+          expression,
+          'integer',
+          environment ?? preludeEnvironment(),
+          (operand, scope) => evaluateExpression(operand, context, scope),
+        )
+        diagnostics.push(...evaluated.diagnostics)
+        if (!('value' in evaluated)) throw new EvaluationError(diagnostics)
+        let value: number
+        try {
+          value = requireInteger(evaluated.value, name)
+          if (!Number.isSafeInteger(value)) throw new RangeError(`${name} must be a safe integer.`)
+          if (name === '@repeat count' && value < 0)
+            throw new RangeError('@repeat count must be non-negative.')
+          if (name === '@for step' && !value) throw new RangeError('@for step must be nonzero.')
+        } catch (error) {
+          throw new EvaluationError([
+            ...diagnostics,
+            {
+              code: 'XP_LOOP_BOUNDS',
+              severity: 'error',
+              message: error instanceof Error ? error.message : String(error),
+              locations: [expression.location],
+            },
+          ])
+        }
+        return value
+      }
+      const start = current.type === 'ForBlock' ? integer(current.start, '@for start') : 0
+      const stop =
+        current.type === 'ForBlock'
+          ? integer(current.stop, '@for stop')
+          : integer(current.count, '@repeat count')
+      const step =
+        current.type === 'ForBlock' && current.step ? integer(current.step, '@for step') : 1
+      const body = { type: 'Sequence' as const, items: current.body, location: current.location }
+      let active = visitor
+      let elapsed = new Fraction(0)
+      const shapes: ScoreShape[] = []
+      for (let index = start; step > 0 ? index < stop : index > stop; index += step) {
+        const binding =
+          current.type === 'ForBlock'
+            ? {
+                name: current.name.name,
+                value: {
+                  kind: 'scalar' as const,
+                  value: new Value(index),
+                  origins: [origin(current.name)],
+                },
+              }
+            : undefined
+        active = at(active, visitor.scope.offset.add(elapsed.mul(visitor.scope.timeScale)))
+        const iteration = visitBlock(body, active, binding)
+        diagnostics.push(...iteration.diagnostics)
+        if (!('shape' in iteration)) return { diagnostics }
+        shapes.push(iteration.shape)
+        elapsed = elapsed.add(iteration.shape.duration)
+        active = visitorAfter(iteration, active)
+      }
+      return withVisitor({ shape: sequence(shapes, [origin(current)]), diagnostics }, active)
+    }
     if (current.type === 'BinaryExpression' && current.operator === '->') {
       const directiveOnly = (expression: Expression): boolean =>
         expression.type === 'Directive' ||
