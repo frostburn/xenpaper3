@@ -5,7 +5,7 @@
   "xenpaperVersion": "3.0.0-beta.21",
   "title": "Bach’s Augmentation Canon, BWV 1079",
   "globalTrack": {
-    "source": "# J. S. Bach, The Musical Offering, BWV 1079 (1747)\n# Canon a 2 per augmentationem, contrario motu\n# A realization with simplified ornaments and a closing cadence.\n# Score reference\n# https://archive.schillerinstitute.com/fid_97-01/984_sub_moral_appen_PDFs/chapter-4.PDF\n# Pitch and timing reference\n# https://github.com/x2yzen/x2yzen.github.io/blob/c5c6926832837184a379c82aecd38703ca088622/vitrine/canon_per_augmentationem_vitrine_pbr.html\n{12edo}\n{key <- C minor}\n\n# One line per bar.\nfn subject() {\n  ret @8 ...... C D Eb===== F= G=========== . F Eb D\n    C===== `Bb= `Ab===== `G= `F==== `C `D `E `F===== `Ab=\n    @4 `G=== ....... Eb D== C\n    D== `A `B== C `B== `G `A== `B\n    C== `G C== `Bb `Ab== `Eb `Ab== `G\n    @8 `F=========== . `G `F `E `F===== `G `Ab `D===== `Eb `F\n    `G=========== `A `B D F Ab==== G F E_ F===== `B=\n    C==== `C `D `Eb `F========= `D= `Eb= `F= `G= `Ab= `G= `F=\n}\n\nfn contrary(tone) {\n  # Map the subject’s opening C to G and reverse intervals from C.\n  # Keep the E-flats at the minor third in both registers.\n  let reflected <- G - (tone - C)\n  if (tone @eq Eb) { reflected <- Eb }\n  if (tone @eq `Eb) { reflected <- eb }\n  ret reflected\n}\n",
+    "source": "# J. S. Bach, The Musical Offering, BWV 1079 (1747)\n# Canon a 2 per augmentationem, contrario motu\n# A realization with simplified ornaments and a closing cadence.\n# Score reference\n# https://archive.schillerinstitute.com/fid_97-01/984_sub_moral_appen_PDFs/chapter-4.PDF\n# Pitch and timing reference\n# https://github.com/x2yzen/x2yzen.github.io/blob/c5c6926832837184a379c82aecd38703ca088622/vitrine/canon_per_augmentationem_vitrine_pbr.html\n{12edo}\n{key <- C minor}\n\nfn subject() {\n  ret\n    @8 ...... C D       Eb===== F=       G===========     . F Eb D         |\n       C===== `Bb=      `Ab===== `G=     `F==== `C `D `E  `F===== `Ab=     |\n    @4 `G===            .......          Eb               D== C            |\n       D== `A           `B== C           `B== `G          `A== `B          |\n       C== `G           C== `Bb          `Ab== `Eb        `Ab== `G         |\n    @8 `F===========    . `G `F `E       `F===== `G `Ab   `D===== `Eb `F   |\n       `G===========    `A `B D F        Ab==== G F E_    F===== `B=       |\n       C==== `C `D `Eb  `F=========      `D= `Eb= `F=     `G= `Ab= `G= `F=\n}\n\nfn contrary(tone) {\n  # Map the subject’s opening C to G and reverse intervals from C.\n  # Keep the E-flats at the minor third in both registers.\n  let reflected <- G - (tone - C)\n  if (tone @eq Eb) { reflected <- Eb }\n  if (tone @eq `Eb) { reflected <- eb }\n  ret reflected\n}\n",
     "tempoChanges": [
       {
         "id": "tempo-1",
@@ -51,7 +51,7 @@
             "n": 67,
             "d": 1
           },
-          "source": "fn royalTheme() {\n  ret @4 C==== `B C D Eb===== F=\n    G==== Eb F G Ab===== . C\n    `B==== `G `B D G===== . A\n    F#===== . E_ F===== . G\n    E_===== . D Eb=========\n    D= D== C#=== C=== `B====== `A `G\n    C===== . F Eb==== D C D\n    D===== C=\n}\n\n|: royalTheme() :|\nfit(Eb, 3beat)\n"
+          "source": "|:  @4 C====            `B C D           Eb=====          F=               |\n       G====            Eb F G           Ab=====          . C              |\n       `B====           `G `B D          G=====           . A              |\n       F#=====          . E_             F=====           . G              |\n       E_=====          . D              Eb=======                         |\n       == D=            D== C#===        C===             `B               |\n       ======           `A `G            C=====           . F              |\n       Eb====           D C D            D=====           C=               :|\n@1 Eb==\n"
         }
       ]
     },
@@ -77,7 +77,7 @@
             "n": 67,
             "d": 1
           },
-          "source": "|: subject() :|\nfit(`C, 3beat)\n"
+          "source": "|: subject() :|\n@1 `C==\n"
         }
       ]
     },
@@ -88,7 +88,7 @@
       "instrument": {
         "type": "patch",
         "patchPreset": "default",
-        "oscillatorType": "sine"
+        "oscillatorType": "rich"
       },
       "gain": 0.42,
       "source": "@adsr(15ms, 85ms, 78%, 72ms)\n",
@@ -103,7 +103,7 @@
             "n": 67,
             "d": 1
           },
-          "source": "# Invert and double the 32-beat subject after a one-beat delay.\nfit(., 1beat)\nfit(mapPitches(subject(), (tone) => contrary(tone)), 2 * 32beat)\nfit(c, 2beat)\n"
+          "source": "# Invert and double the 32-beat subject after a one-beat delay.\n@1 .\nfit(mapPitches(subject(), (tone) => contrary(tone)), 2 * 32beat)\n@1 c=\n"
         }
       ]
     }
