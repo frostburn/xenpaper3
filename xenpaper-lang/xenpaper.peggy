@@ -532,10 +532,10 @@ RepeatCount
       return node('IntegerLiteral', { raw: value.raw, value: value.value });
     }
 
-// Block bodies are ordinary scores. Reserved markers stop the score grammar
-// at the enclosing branch boundary, including when blocks nest.
+// A control header requires a brace-delimited score. Pitch context changes
+// inside that score still use the ordinary expression grammar.
 IfBlock
-  = "@if"i !IdentifierContinue branch:IfBranch Spacing BlockEnd {
+  = "@if"i !IdentifierContinue branch:IfBranch {
       return node('IfBlock', branch);
     }
 
@@ -553,18 +553,18 @@ IfBranch
     }
 
 BlockSequence
-  = items:DocumentBody { return node('Sequence', { items }); }
+  = "{" Spacing @(items:DocumentBody { return node('Sequence', { items }); }) Spacing "}"
 
 ForBlock
   = "@for"i !IdentifierContinue Spacing "(" Spacing name:LocatedIdentifier
     RequiredSpacing mode:$("in" / "of") !IdentifierContinue Spacing iterable:Expression
-    Spacing ")" Spacing body:BlockSequence alternate:LoopElse? Spacing BlockEnd {
+    Spacing ")" Spacing body:BlockSequence alternate:LoopElse? {
       return node('ForBlock', { name, mode, iterable, body, alternate: alternate ?? null });
     }
 
 WhileBlock
   = "@while"i !IdentifierContinue Spacing "(" Spacing condition:Expression Spacing ")"
-    Spacing body:BlockSequence alternate:LoopElse? Spacing BlockEnd {
+    Spacing body:BlockSequence alternate:LoopElse? {
       return node('WhileBlock', { condition, body, alternate: alternate ?? null });
     }
 
@@ -576,12 +576,9 @@ LoopJump
       return node('LoopJump', { action: action.toLowerCase() });
     }
 
-BlockEnd
-  = "@end"i !IdentifierContinue
-
 ControlToken
   = ComparisonOperator
-  / "@" ("if"i / "elif"i / "else"i / "for"i / "while"i / "break"i / "continue"i / "end"i) !IdentifierContinue
+  / "@" ("if"i / "elif"i / "else"i / "for"i / "while"i / "break"i / "continue"i) !IdentifierContinue
 
 Directive
   = !ControlToken "@" body:(GlissDirectiveBody / GrooveDirectiveBody / DroneDirectiveBody / ArticulationShorthandBody / NumericDirectiveBody / NamedDirectiveBody) {

@@ -117,13 +117,13 @@ comparisons explicitly.
 
 ```text
 let selected <- 1 + 2 @eq 3
-@if(selected)
+@if(selected) {
   C E G
-@elif(eq @lt e)
+} @elif(eq @lt e) {
   D F A
-@else
+} @else {
   C F G
-@end
+}
 ```
 
 The bare token `eq` still spells a pitch. Comparisons use the active tuning
@@ -133,24 +133,24 @@ played as a note. Bare integers in comparisons are scalars. Use the `d` suffix
 to compare scale degrees, as in `12d @eq 2/1`.
 
 An `@if` block runs the first truthy branch. Both `@elif` and `@else` are
-optional. The block ends at `@end` and may contain other blocks. Indentation is
-optional.
+optional. Each branch uses braces, like a function body. Blocks can nest and
+can contain pitch-context changes such as `{19edo}`. Indentation is optional.
 
 ```text
 let melody <- [C E G]
-@for(index in melody)
+@for(index in melody) {
   melody[index]
-@end
+}
 
-@for(note of melody)
+@for(note of melody) {
   note
-@end
+}
 
 let index <- 0/1
-@while(index @lt 3)
+@while(index @lt 3) {
   C D E
   let index <- index + 1
-@end
+}
 ```
 
 `@for(name in expression)` visits a container's zero-based indices.
@@ -167,20 +167,20 @@ Names declared in an `@if` branch or an `@for` iteration stay in that scope,
 including the `@for` binding. Prevailing musical settings carry forward from any
 executed block. Control flow shares an execution limit across nested blocks.
 
-Both loops can end with an optional `@else` before `@end`. The else runs
+Both loops can have an optional `@else { ... }` after the body. The else runs
 once if a `@for` exhausts its container or a `@while` condition becomes false.
 That includes zero iterations and completion after a `@continue`. A
 `@break` exits the innermost loop and skips its else. A `@continue` skips the
 rest of the current iteration. Music already emitted by the iteration stays.
 
 ```text
-@for(note of [C D E])
-  @if(note @eq D) @continue @end
-  @if(note @eq E) @break @end
+@for(note of [C D E]) {
+  @if(note @eq D) { @continue }
+  @if(note @eq E) { @break }
   note
-@else
+} @else {
   G
-@end
+}
 ```
 
 A loop's else runs outside that loop's body and local bindings. In a nested

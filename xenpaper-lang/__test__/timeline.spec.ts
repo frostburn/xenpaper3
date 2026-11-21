@@ -34,13 +34,13 @@ function notes(source: string, initialization: ScoreInitialization, offset?: Fra
 
 describe('global grid context', () => {
   it.each([
-    ['@if(true) let chosen <- true @2 . @end'],
-    ['@for(chosen in [C D]) @if(chosen @eq 1) @2 . @end @end'],
-    ['@for(chosen of [true]) @2 . @end'],
-    ['@while(chosen @eq false) let chosen <- true @2 . @end'],
+    ['@if(true) { let chosen <- true @2 . }'],
+    ['@for(chosen in [C D]) { @if(chosen @eq 1) { @2 . } }'],
+    ['@for(chosen of [true]) { @2 . }'],
+    ['@while(chosen @eq false) { let chosen <- true @2 . }'],
   ])('restores outer bindings in the timeline after %s', (block) => {
     const initialization = initialize(`let chosen <- false ${block} .`)
-    const phrase = '@if(chosen) C @else D @end'
+    const phrase = '@if(chosen) { C } @else { D }'
     expect(notes(phrase, initialization, new Fraction(1, 4))[0]?.label).toBe('C')
     const [after] = notes(phrase, initialization, new Fraction(1, 2))
     expect(after?.label).toBe('D')
