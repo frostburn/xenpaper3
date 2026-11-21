@@ -54,10 +54,10 @@ fn equaveReduce(scale: container, equave: ratio <- niente) {
   ret ratio(scale) rd ratio(actualEquave)
 }
 fn cps(factors: container<ratio>, count: integer, equave: ratio <- niente, withUnity: boolean <- false) {
-  let products <- sort(arrayMap((combination) => prod(combination), kCombinations(factors, count)))
+  let products <- sorted(arrayMap((combination) => prod(combination), kCombinations(factors, count)))
   let grounded <- products if (withUnity al false) else ground(products)
   let actualEquave <- equave al (pitch(2/1) + grounded[0])
-  ret sort(equaveReduce(grounded, actualEquave))
+  ret sorted(equaveReduce(grounded, actualEquave))
 }
 fn eulerGenus(guide: integer, root: integer <- 1/1, equave: ratio <- 2/1) {
   if(guide @le 0) { throw("Guide tone must be a positive integer.") }
@@ -72,11 +72,11 @@ fn eulerGenus(guide: integer, root: integer <- 1/1, equave: ratio <- 2/1) {
     if(@not (guide mod harmonic)) {
       let reduced <- (harmonic / root) rd equave
       if(reduced @ne 1) {
-        pitches <- push(pitches, reduced)
+        pitches <- pitches << reduced
       }
     }
   }
-  ret sort(pitches)
+  ret sorted(pitches)
 }
 `
 
@@ -694,6 +694,15 @@ function binary(
   node: Expression,
 ): EvaluatedLiteral {
   if (operator === 'al') return left.kind === 'undefined' ? right : left
+  if (operator === '<<') {
+    if (left.kind !== 'container')
+      throw new TypeError('The left operand of << must be a container.')
+    return {
+      ...left,
+      values: [...left.values, right],
+      origins: operatorOrigins(left, right, node),
+    }
+  }
   if (left.kind === 'container' || right.kind === 'container') {
     if (left.kind === 'container' && right.kind === 'container') {
       if (left.composition && right.composition && left.composition !== right.composition)

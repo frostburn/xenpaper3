@@ -32,7 +32,7 @@ describe('arithmetic expression evaluation', () => {
     expect(evaluate('pitch(200c)').value.equals(Value.cents(200))).toBe(true)
     expect(evaluate('pitch(2)').value.equals(Value.cents(1200))).toBe(true)
 
-    for (const source of ['pitch([1d 2d])', 'pitch(sort([2d 1d]))']) {
+    for (const source of ['pitch([1d 2d])', 'pitch(sorted([2d 1d]))']) {
       const pitches = evaluate(source)
       if (pitches.kind !== 'container') throw new Error('Expected a container.')
       expect(pitches.values.map((item) => item.value.valueOf())).toEqual([100, 200])
@@ -260,6 +260,32 @@ describe('arithmetic expression evaluation', () => {
     expect(evaluate('3/2 if false else 5/4').value.equals(new Value(5n, 4n))).toBe(true)
   })
 
+  it('appends to a copy and keeps a container operand nested', () => {
+    const declaration = parse(
+      'fn original() { let items <- [1/1] let appended <- items << 2/1 ret items }',
+    ).body[0]
+    if (declaration.type !== 'FunctionDeclaration') throw new Error('Expected a function.')
+    const { environment } = evaluateDeclaration(declaration)
+    const original = evaluateExpression(
+      expression('original()'),
+      DEFAULT_PITCH_CONTEXT,
+      environment,
+    )
+    expect(original).toMatchObject({ value: { kind: 'container', values: [{ kind: 'scalar' }] } })
+    if (!('value' in original) || original.value.kind !== 'container')
+      throw new Error('Expected a container.')
+    expect(original.value.values).toHaveLength(1)
+    const appended = evaluate('[1/1] << 1/1 + 1/1 << [3/1]')
+    if (appended.kind !== 'container') throw new Error('Expected a container.')
+    expect(appended.values.map((item) => item.kind)).toEqual(['scalar', 'scalar', 'container'])
+    expect(appended.values[1]?.value.equals(2)).toBe(true)
+    const chord = evaluate('5::6 << 2/1')
+    expect(
+      chord.kind === 'container' &&
+        chord.values.map(({ value }) => value.exactRational()?.toFraction()),
+    ).toEqual(['1', '6/5', '2'])
+  })
+
   it('provides combination and sorting container built-ins', () => {
     const combinations = evaluate('kCombinations([1/1, 3/1, 5/1], 2/1)')
     expect(combinations.kind).toBe('container')
@@ -270,10 +296,10 @@ describe('arithmetic expression evaluation', () => {
     if (integerCombinations.kind !== 'container') throw new Error('Expected a container.')
     expect(integerCombinations.values).toHaveLength(3)
 
-    const sorted = evaluate('sort([3/1, 1/1, 2/1])')
+    const sorted = evaluate('sorted([3/1, 1/1, 2/1])')
     if (sorted.kind !== 'container') throw new Error('Expected a container.')
     expect(sorted.values.map((item) => item.value.valueOf())).toEqual([1, 2, 3])
-    const singleton = evaluate('sort([2/1])')
+    const singleton = evaluate('sorted([2/1])')
     if (singleton.kind !== 'container') throw new Error('Expected a container.')
     expect(singleton.values.map((item) => item.value.valueOf())).toEqual([2])
     expect(evaluate('[1/1][0]').value.equals(1)).toBe(true)
@@ -285,20 +311,20 @@ describe('arithmetic expression evaluation', () => {
       evaluate('arrayReduce((total, element) => total + element, [1/1, 2/1, 3/1])').value.equals(6),
     ).toBe(true)
 
-    expect(evaluateExpression(expression('sort([niente, 2/1, 1/1])'))).toMatchObject({
-      diagnostics: [{ code: 'XP_TYPE_MISMATCH', message: 'sort() expects numeric values.' }],
+    expect(evaluateExpression(expression('sorted([niente, 2/1, 1/1])'))).toMatchObject({
+      diagnostics: [{ code: 'XP_TYPE_MISMATCH', message: 'sorted() expects numeric values.' }],
     })
   })
 
   it('validates built-in arities consistently', () => {
-    expect(evaluateExpression(expression('sort()'))).toMatchObject({
+    expect(evaluateExpression(expression('sorted()'))).toMatchObject({
       diagnostics: [
-        { code: 'XP_TYPE_MISMATCH', message: 'sort() expects 1 argument, but received 0.' },
+        { code: 'XP_TYPE_MISMATCH', message: 'sorted() expects 1 argument, but received 0.' },
       ],
     })
-    expect(evaluateExpression(expression('sort([1/1], [2/1])'))).toMatchObject({
+    expect(evaluateExpression(expression('sorted([1/1], [2/1])'))).toMatchObject({
       diagnostics: [
-        { code: 'XP_TYPE_MISMATCH', message: 'sort() expects 1 argument, but received 2.' },
+        { code: 'XP_TYPE_MISMATCH', message: 'sorted() expects 1 argument, but received 2.' },
       ],
     })
     expect(

@@ -298,32 +298,15 @@ class ArrayMapBuiltin extends Builtin {
   }
 }
 
-class PushBuiltin extends Builtin {
-  constructor() {
-    super('push', 2, 2, ['container', undefined])
-  }
-
-  protected call(arguments_: readonly EvaluatedLiteral[]): EvaluatedLiteral {
-    const values = this.requireContainer(arguments_)
-    return {
-      ...arguments_[0],
-      kind: 'container',
-      values: [...values, arguments_[1]!],
-      value: new Value(0),
-      origins: this.origins(arguments_),
-    }
-  }
-}
-
-class SortBuiltin extends Builtin {
-  constructor() {
-    super('sort', 1, 1, ['container'])
+class SortedBuiltin extends Builtin {
+  constructor(name = 'sorted') {
+    super(name, 1, 1, ['container'])
   }
 
   protected call(arguments_: readonly EvaluatedLiteral[]): EvaluatedLiteral {
     const values = this.requireContainer(arguments_)
     if (values.some((item) => item.kind !== 'scalar' && item.kind !== 'pitchOffset'))
-      throw new TypeError('sort() expects numeric values.')
+      throw new TypeError(`${this.name}() expects numeric values.`)
     const numeric = values as readonly Extract<
       EvaluatedLiteral,
       { kind: 'scalar' | 'pitchOffset' }
@@ -345,8 +328,8 @@ const BUILTINS = new Map(
     new KCombinationsBuiltin(),
     new ArrayReduceBuiltin(),
     new ArrayMapBuiltin(),
-    new SortBuiltin(),
-    new PushBuiltin(),
+    new SortedBuiltin(),
+    new SortedBuiltin('sort'),
   ].map((builtin) => [builtin.name, builtin]),
 )
 

@@ -183,7 +183,7 @@ Expression
     }
 
 TieOperand
-  = expression:(EnumeratedChordArithmetic / (degree:ScaleDegreeLiteral !(Spacing ComparisonOperator) { return degree; }) / ValueExpression)
+  = expression:((chord:EnumeratedChordArithmetic !(Spacing "<<") { return chord; }) / (degree:ScaleDegreeLiteral !":" !(Spacing (ComparisonOperator / "<<")) { return degree; }) / ValueExpression)
     marks:AttachedPostfixMark* {
       if (!marks.length) return expression;
       return node('PostfixExpression', { expression, marks });
@@ -206,10 +206,17 @@ ValueExpression
 
 // Comparisons bind below arithmetic and above the inline conditional.
 ComparisonExpression
-  = left:AdditiveExpression tail:(Spacing operator:ComparisonOperator Spacing right:AdditiveExpression {
+  = left:AppendExpression tail:(Spacing operator:ComparisonOperator Spacing right:AppendExpression {
       return { operator, right };
     })? {
       return tail ? binary(tail.operator, left, tail.right) : left;
+    }
+
+AppendExpression
+  = first:AdditiveExpression rest:(Spacing "<<" Spacing right:AdditiveExpression {
+      return { operator: "<<", right };
+    })* {
+      return foldBinary(first, rest);
     }
 
 ComparisonOperator

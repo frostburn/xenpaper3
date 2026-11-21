@@ -236,9 +236,9 @@
   {
     "id": "features-sorting",
     "title": "Sorting scale entries",
-    "description": "sort() puts numeric container values in ascending order. Use it when a generated scale would otherwise put its degrees out of order.",
+    "description": "sorted() returns numeric container values in ascending order. Use it when a generated scale would otherwise put its degrees out of order.",
     "props": {
-      "source": "let intervals <- [3/2, 9/8, 2/1, 5/4]\n{scale <- sort(intervals)}\n0 1 2 3 4=",
+      "source": "let intervals <- [3/2, 9/8, 2/1, 5/4]\n{scale <- sorted(intervals)}\n0 1 2 3 4=",
       "instrument": {
         "type": "patch",
         "patchPreset": "default",

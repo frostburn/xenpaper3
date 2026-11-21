@@ -103,11 +103,14 @@ The built-in identifier `pi` evaluates to the dimensionless real constant π.
 Built-in calls use the same contextual coercions as annotated function
 parameters: a bare integer passed to `pitch()` is a scalar ratio, one passed to
 `ratio()` is a scale degree, and the combination count in `kCombinations()` is
-an integer. `sort(container)`, `push(container, value)`,
-`arrayMap(callback, container)`, and `arrayReduce(callback, container, initial?)`
-require containers in their container positions. `push` returns a copy with one
-element appended, so use `items <- push(items, value)` to update a function
-local.
+an integer. `sorted(container)`, `arrayMap(callback, container)`, and
+`arrayReduce(callback, container, initial?)` require containers. `sorted`
+returns a copy in ascending order. Existing scores can still use `sort`.
+
+`items << value` returns a copy with one element appended. A container on the
+right is appended as a single nested element. Arithmetic binds more tightly,
+and chained appends run left to right. Use `items <- items << value` to update
+a function local.
 
 ## Comparisons and control flow
 

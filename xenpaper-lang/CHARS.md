@@ -37,7 +37,7 @@ context-dependent meanings.
 | U+0030–U+0039  | 0–9      | Scale degrees and numeric literals; identifier continuation                                                                                              |
 | U+003A         | :        | Enumerated-chord separator (`:` or `::`); repeat delimiters `\|:` and `:\|`; named directive argument and MOS hardness separator; articulation shorthand |
 | U+003B         | ;        | Bar rest; context and MOS statement separator                                                                                                            |
-| U+003C         | <        | Assignment arrow `<-`; opens an equal-division equave suffix, mapping, or MOS equave                                                                     |
+| U+003C         | <        | Assignment arrow `<-`; append operator `<<`; opens an equal-division equave suffix, mapping, or MOS equave                                                                     |
 | U+003D         | =        | Note continuation/hold postfix; lambda arrow `=>`                                                                                                        |
 | U+003E         | >        | Closes an equal-division equave suffix, mapping, MOS equave, or monzo (`>@`); binary note tie `->`                                                       |
 | U+003F         | ?        | Note-tail elimination; subdivision grace marker                                                                                                          |
