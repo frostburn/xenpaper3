@@ -119,11 +119,11 @@ comparisons explicitly.
 
 ```text
 let selected <- 1 + 2 @eq 3
-@if(selected) {
+if(selected) {
   C E G
-} @elif(eq @lt e) {
+} elif(eq @lt e) {
   D F A
-} @else {
+} else {
   C F G
 }
 ```
@@ -134,53 +134,54 @@ same Boolean values used by `true` and `false`. A comparison result cannot be
 played as a note. Bare integers in comparisons are scalars. Use the `d` suffix
 to compare scale degrees, as in `12d @eq 2/1`.
 
-An `@if` block runs the first truthy branch. Both `@elif` and `@else` are
+Control keywords are bare and case-sensitive, like `fn` and `ret`.
+An `if` block runs the first truthy branch. Both `elif` and `else` are
 optional. Each branch uses braces, like a function body. Blocks can nest and
 can contain pitch-context changes such as `{19edo}`. Indentation is optional.
 
 ```text
 let melody <- [C E G]
-@for(index in melody) {
+for(index in melody) {
   melody[index]
 }
 
-@for(note of melody) {
+for(note of melody) {
   note
 }
 
 let index <- 0/1
-@while(index @lt 3) {
+while(index @lt 3) {
   C D E
   let index <- index + 1
 }
 ```
 
-`@for(name in expression)` visits a container's zero-based indices.
-`@for(name of expression)` visits its elements in order. Both evaluate the
+`for(name in expression)` visits a container's zero-based indices.
+`for(name of expression)` visits its elements in order. Both evaluate the
 container expression once before the loop. Empty containers run no iterations.
 Xenpaper currently has positional containers. Use `|: ... :|` for musical repeats.
 
-`@while(condition)` tests the condition before each iteration. A `let` in the
+`while(condition)` tests the condition before each iteration. A `let` in the
 body can shadow a binding for the next condition and iteration. Those bindings
 are local to the loop. An initially false condition emits no music, and a loop
 that never becomes false reports an expansion-limit error.
 
-Names declared in an `@if` branch or an `@for` iteration stay in that scope,
-including the `@for` binding. Prevailing musical settings carry forward from any
+Names declared in an `if` branch or an `for` iteration stay in that scope,
+including the `for` binding. Prevailing musical settings carry forward from any
 executed block. Control flow shares an execution limit across nested blocks.
 
-Both loops can have an optional `@else { ... }` after the body. The else runs
-once if a `@for` exhausts its container or a `@while` condition becomes false.
-That includes zero iterations and completion after a `@continue`. A
-`@break` exits the innermost loop and skips its else. A `@continue` skips the
+Both loops can have an optional `else { ... }` after the body. The else runs
+once if a `for` exhausts its container or a `while` condition becomes false.
+That includes zero iterations and completion after a `continue`. A
+`break` exits the innermost loop and skips its else. A `continue` skips the
 rest of the current iteration. Music already emitted by the iteration stays.
 
 ```text
-@for(note of [C D E]) {
-  @if(note @eq D) { @continue }
-  @if(note @eq E) { @break }
+for(note of [C D E]) {
+  if(note @eq D) { continue }
+  if(note @eq E) { break }
   note
-} @else {
+} else {
   G
 }
 ```
@@ -194,7 +195,7 @@ Use `@not value` to negate a truth value. Parenthesize arithmetic or a
 comparison you want to negate as a unit, for example `@not (guide mod root)`.
 
 Harmonic segments are iterable ratio containers in value expressions.
-`@for(harmonic of 1::5) { ... }` visits 1 through 5, while `5::8` supplies
+`for(harmonic of 1::5) { ... }` visits 1 through 5, while `5::8` supplies
 `1/1`, `6/5`, `7/5`, and `8/5`. When played directly in a score, the
 segment remains a chord.
 

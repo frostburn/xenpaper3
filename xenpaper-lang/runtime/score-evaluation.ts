@@ -1312,7 +1312,7 @@ export function evaluateScoreSemantics(
             {
               code: 'XP_LOOP_JUMP',
               severity: 'error',
-              message: `@${current.action} requires an enclosing loop body in the same score scope.`,
+              message: `${current.action} requires an enclosing loop body in the same score scope.`,
               locations: [current.location],
             },
           ],
@@ -1346,7 +1346,7 @@ export function evaluateScoreSemantics(
             {
               code: 'XP_NOT_ITERABLE',
               severity: 'error',
-              message: `@for ${current.mode} requires a container.`,
+              message: `for ${current.mode} requires a container.`,
               locations: [current.iterable.location],
             },
           ],

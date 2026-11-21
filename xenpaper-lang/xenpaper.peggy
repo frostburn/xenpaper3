@@ -536,15 +536,15 @@ RepeatCount
 // A control header requires a brace-delimited score. Pitch context changes
 // inside that score still use the ordinary expression grammar.
 IfBlock
-  = "@if"i !IdentifierContinue branch:IfBranch {
+  = "if" !IdentifierContinue branch:IfBranch {
       return node('IfBlock', branch);
     }
 
 IfBranch
   = Spacing "(" Spacing condition:Expression Spacing ")" Spacing consequent:BlockSequence
     alternate:(Spacing @(
-      "@elif"i !IdentifierContinue branch:IfBranch { return node('IfBlock', branch); }
-      / "@else"i !IdentifierContinue Spacing @BlockSequence
+      "elif" !IdentifierContinue branch:IfBranch { return node('IfBlock', branch); }
+      / "else" !IdentifierContinue Spacing @BlockSequence
     ))? {
       return {
         condition,
@@ -557,32 +557,32 @@ BlockSequence
   = "{" Spacing @(items:DocumentBody { return node('Sequence', { items }); }) Spacing "}"
 
 ForBlock
-  = "@for"i !IdentifierContinue Spacing "(" Spacing name:LocatedIdentifier
+  = "for" !IdentifierContinue Spacing "(" Spacing name:LocatedIdentifier
     RequiredSpacing mode:$("in" / "of") !IdentifierContinue Spacing iterable:Expression
     Spacing ")" Spacing body:BlockSequence alternate:LoopElse? {
       return node('ForBlock', { name, mode, iterable, body, alternate: alternate ?? null });
     }
 
 WhileBlock
-  = "@while"i !IdentifierContinue Spacing "(" Spacing condition:Expression Spacing ")"
+  = "while" !IdentifierContinue Spacing "(" Spacing condition:Expression Spacing ")"
     Spacing body:BlockSequence alternate:LoopElse? {
       return node('WhileBlock', { condition, body, alternate: alternate ?? null });
     }
 
 LoopElse
-  = Spacing "@else"i !IdentifierContinue Spacing @BlockSequence
+  = Spacing "else" !IdentifierContinue Spacing @BlockSequence
 
 LoopJump
-  = "@" action:$("break"i / "continue"i) !IdentifierContinue {
-      return node('LoopJump', { action: action.toLowerCase() });
+  = action:$("break" / "continue") !IdentifierContinue {
+      return node('LoopJump', { action });
     }
 
-ControlToken
+OperatorToken
   = ComparisonOperator
-  / "@" ("if"i / "elif"i / "else"i / "for"i / "while"i / "break"i / "continue"i / "not"i) !IdentifierContinue
+  / "@not"i !IdentifierContinue
 
 Directive
-  = !ControlToken "@" body:(GlissDirectiveBody / GrooveDirectiveBody / DroneDirectiveBody / ArticulationShorthandBody / NumericDirectiveBody / NamedDirectiveBody) {
+  = !OperatorToken "@" body:(GlissDirectiveBody / GrooveDirectiveBody / DroneDirectiveBody / ArticulationShorthandBody / NumericDirectiveBody / NamedDirectiveBody) {
       return node('Directive', body);
     }
 
@@ -1093,7 +1093,7 @@ MosPitchNominal
     }
 
 MosAccidental
-  = !ControlToken value:$([&@ea_] / "♮") { return node('Accidental', { value }); }
+  = !OperatorToken value:$([&@ea_] / "♮") { return node('Accidental', { value }); }
 
 // Bare signed integers are scale degrees unless the following characters
 // clearly continue the token as scalar arithmetic. This is a forward syntactic
@@ -1316,10 +1316,10 @@ Sign
   = $("+" / "-")
 
 Identifier
-  = !(DeclarationKeyword !IdentifierContinue) name:$([A-Za-z_] IdentifierContinue*) { return name; }
+  = !(ReservedKeyword !IdentifierContinue) name:$([A-Za-z_] IdentifierContinue*) { return name; }
 
-DeclarationKeyword
-  = "let" / "fn" / "ret"
+ReservedKeyword
+  = "let" / "fn" / "ret" / "if" / "elif" / "else" / "for" / "while" / "break" / "continue"
 
 IdentifierContinue
   = [A-Za-z0-9_]

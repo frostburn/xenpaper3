@@ -60,18 +60,18 @@ fn cps(factors: container<ratio>, count: integer, equave: ratio <- niente, withU
   ret sort(equaveReduce(grounded, actualEquave))
 }
 fn eulerGenus(guide: integer, root: integer <- 1/1, equave: ratio <- 2/1) {
-  @if(guide @le 0) { throw("Guide tone must be a positive integer.") }
-  @if(root @le 0) { throw("Root tone must be a positive integer.") }
-  @if(equave @le 1) { throw("Equave must be greater than one.") }
-  @if(guide mod root) { throw("Root must divide the guide tone.") }
-  @while(@not (guide mod equave)) {
+  if(guide @le 0) { throw("Guide tone must be a positive integer.") }
+  if(root @le 0) { throw("Root tone must be a positive integer.") }
+  if(equave @le 1) { throw("Equave must be greater than one.") }
+  if(guide mod root) { throw("Root must divide the guide tone.") }
+  while(@not (guide mod equave)) {
     guide <- guide / equave
   }
   let pitches <- [equave]
-  @for(harmonic of 1::guide) {
-    @if(@not (guide mod harmonic)) {
+  for(harmonic of 1::guide) {
+    if(@not (guide mod harmonic)) {
       let reduced <- (harmonic / root) rd equave
-      @if(reduced @ne 1) {
+      if(reduced @ne 1) {
         pitches <- push(pitches, reduced)
       }
     }

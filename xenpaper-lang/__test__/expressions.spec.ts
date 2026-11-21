@@ -391,10 +391,10 @@ describe('arithmetic expression evaluation', () => {
     const declaration = parse(`
 fn countOdds(limit: integer) {
   let total <- 0/1
-  @for(harmonic of 1::limit) {
-    @if(@not (harmonic mod 2)) { @continue }
+  for(harmonic of 1::limit) {
+    if(@not (harmonic mod 2)) { continue }
     total <- total + 1
-  } @else {
+  } else {
     total <- total + 10
   }
   ret total

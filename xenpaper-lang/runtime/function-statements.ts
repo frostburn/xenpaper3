@@ -83,7 +83,7 @@ export function executeFunctionStatements(
             fail(
               statement,
               'XP_LOOP_JUMP',
-              `@${statement.action} requires an enclosing loop body in the same function.`,
+              `${statement.action} requires an enclosing loop body in the same function.`,
             )
           return { scope, jump: statement.action }
         case 'IfBlock': {
@@ -103,7 +103,7 @@ export function executeFunctionStatements(
               return fail(
                 statement.iterable,
                 'XP_NOT_ITERABLE',
-                `@for ${statement.mode} requires a container.`,
+                `for ${statement.mode} requires a container.`,
               )
             for (const [index, item] of iterable.values.entries()) {
               spend(statement)
