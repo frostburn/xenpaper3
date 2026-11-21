@@ -481,6 +481,9 @@ fn countOdds(limit: integer) {
   ] as const)('returns the sorted Euler genus for %s', (source, ratios) => {
     const genus = evaluate(source)
     if (genus.kind !== 'container') throw new Error('Expected a container.')
+    expect(genus.composition).toBe('sequence')
+    expect(genus.normalized).toBeUndefined()
+    expect(genus.grouped).toBeUndefined()
     expect(genus.values).toHaveLength(ratios.length)
     for (const [index, [numerator, denominator]] of ratios.entries())
       expect(

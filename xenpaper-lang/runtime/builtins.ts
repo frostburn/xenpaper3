@@ -303,6 +303,25 @@ class ArrayMapBuiltin extends Builtin {
   }
 }
 
+class CompositionBuiltin extends Builtin {
+  constructor(
+    name: string,
+    private readonly composition: 'sequence' | 'parallel',
+  ) {
+    super(name, 1, 1, ['container'])
+  }
+
+  protected call(arguments_: readonly EvaluatedLiteral[]): EvaluatedLiteral {
+    return {
+      kind: 'container',
+      composition: this.composition,
+      values: this.requireContainer(arguments_),
+      value: new Value(0),
+      origins: this.origins(arguments_),
+    }
+  }
+}
+
 class FlatBuiltin extends Builtin {
   constructor() {
     super('flat', 1, 1, ['container'])
@@ -350,6 +369,8 @@ const BUILTINS = new Map(
     new KCombinationsBuiltin(),
     new ArrayReduceBuiltin(),
     new ArrayMapBuiltin(),
+    new CompositionBuiltin('asSequence', 'sequence'),
+    new CompositionBuiltin('asParallel', 'parallel'),
     new FlatBuiltin(),
     new SortedBuiltin(),
     new SortedBuiltin('sort'),

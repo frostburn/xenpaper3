@@ -28,6 +28,35 @@ const audibleResult = (source: string) => {
 }
 
 describe('beat event expansion', () => {
+  it.each(['cps((1 3 5 7), 2)', 'eulerGenus(45)'])(
+    'supports sequential, slotted, and parallel playback of %s',
+    (source) => {
+      const plain = audibleResult(source)
+      expect(plain.events.map(({ start, duration }) => [start, duration])).toEqual(
+        Array.from({ length: 6 }, (_, index) => [String(index), '1']),
+      )
+      expect(plain.duration).toBe('6')
+
+      const wrapped = audibleResult(`[${source}]`)
+      expect(wrapped.events.map(({ start, duration }) => [start, duration])).toEqual(
+        Array.from({ length: 6 }, (_, index) => [new Fraction(index, 6).toFraction(), '1/6']),
+      )
+      expect(wrapped.duration).toBe('1')
+      const parallel = audibleResult(`asParallel(${source})`)
+      expect(parallel.events.map(({ start, duration }) => [start, duration])).toEqual(
+        Array.from({ length: 6 }, () => ['0', '1']),
+      )
+      expect(parallel.duration).toBe('1')
+      expect(parallel.events.map(({ pitch }) => pitch)).toEqual(
+        plain.events.map(({ pitch }) => pitch),
+      )
+
+      expect(wrapped.events.map(({ pitch }) => pitch)).toEqual(
+        plain.events.map(({ pitch }) => pitch),
+      )
+    },
+  )
+
   it.each([
     ['@time(4/4)1;|2', '@time(4/4)1...|2'],
     ['@time(5/4)1;|2', '@time(5/4)1....|2'],

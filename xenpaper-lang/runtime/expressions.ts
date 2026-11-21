@@ -57,7 +57,7 @@ fn cps(factors: container<ratio>, count: integer, equave: ratio <- niente, withU
   let products <- sorted(arrayMap((combination) => prod(combination), kCombinations(factors, count)))
   let grounded <- products if (withUnity al false) else ground(products)
   let actualEquave <- equave al (pitch(2/1) + grounded[0])
-  ret sorted(equaveReduce(grounded, actualEquave))
+  ret asSequence(sorted(equaveReduce(grounded, actualEquave)))
 }
 fn eulerGenus(guide: integer, root: integer <- 1/1, equave: ratio <- 2/1) {
   if(guide @le 0) { throw("Guide tone must be a positive integer.") }
@@ -76,7 +76,7 @@ fn eulerGenus(guide: integer, root: integer <- 1/1, equave: ratio <- 2/1) {
       }
     }
   }
-  ret sorted(pitches)
+  ret asSequence(sorted(pitches))
 }
 `
 
