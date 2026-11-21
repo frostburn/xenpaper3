@@ -89,6 +89,7 @@ type LoopFrame = { jump?: Extract<Expression, { type: 'LoopJump' }>['action'] }
 
 interface VisitorScope {
   readonly loop?: LoopFrame
+  readonly mapPitch?: (pitch: EvaluatedLiteral, context: PitchContext) => ExpressionEvaluationResult
   readonly offset: Fraction
   readonly timeScale: Fraction
   readonly layout?: boolean
@@ -1624,13 +1625,16 @@ export function evaluateScoreSemantics(
       )
     }
     if (current.type === 'DrumSampleLiteral') {
-      return visitor.visit({
-        type: 'DegreeLiteral',
-        degree: '0',
-        modifiers: [],
-        raw: current.sample,
-        location: current.location,
-      })
+      return visitor.visit(
+        {
+          type: 'DegreeLiteral',
+          degree: '0',
+          modifiers: [],
+          raw: current.sample,
+          location: current.location,
+        },
+        { mapPitch: undefined },
+      )
     }
     if (current.type === 'CallExpression') {
       const prepared = prepareFunctionCall(current, context, environment)
@@ -1649,6 +1653,73 @@ export function evaluateScoreSemantics(
             ? { shape: annotateFunctionCall(returned.shape, origin(current)) }
             : {}),
           diagnostics: [...prepared.diagnostics, ...returned.diagnostics],
+        }
+      }
+      if (current.callee === 'mapPitches') {
+        const [music, mapper] = current.arguments
+        if (current.arguments.length !== 2 || !music || !mapper)
+          return {
+            diagnostics: [
+              {
+                code: 'XP_ARITY',
+                severity: 'error',
+                message: 'mapPitches() expects a score and a one-parameter lambda.',
+                locations: [current.location],
+              },
+            ],
+          }
+        const evaluated = evaluateExpression(mapper, context, environment)
+        if (!('value' in evaluated)) return evaluated
+        const callback = evaluated.value
+        if (callback.kind !== 'lambda' || callback.parameters.length !== 1)
+          return {
+            diagnostics: [
+              ...evaluated.diagnostics,
+              {
+                code: 'XP_TYPE_MISMATCH',
+                severity: 'error',
+                message: 'mapPitches() expects a one-parameter lambda.',
+                locations: [mapper.location],
+              },
+            ],
+          }
+        const outerMap = visitor.scope.mapPitch
+        const result = visitor.visit(music, {
+          mapPitch: (pitch, pitchContext) => {
+            const scope = extendLexicalEnvironment(callback.environment, {
+              variables: new Map([[callback.parameters[0]!, pitch]]),
+            })
+            const mapped = evaluateExpression(callback.body, pitchContext, scope)
+            if (!('value' in mapped)) return mapped
+            const value = mapped.value
+            if (
+              value.kind !== 'absolutePitch' &&
+              value.kind !== 'pitchOffset' &&
+              value.kind !== 'scalar'
+            )
+              return {
+                diagnostics: [
+                  ...mapped.diagnostics,
+                  {
+                    code: 'XP_TYPE_MISMATCH',
+                    severity: 'error',
+                    message: 'A mapPitches() lambda must return a single pitch.',
+                    locations: [callback.body.location],
+                  },
+                ],
+              }
+            const transformed = { ...value, origins: pitch.origins }
+            if (!outerMap) return { ...mapped, value: transformed }
+            const outer = outerMap(transformed, pitchContext)
+            return { ...outer, diagnostics: [...mapped.diagnostics, ...outer.diagnostics] }
+          },
+        })
+        return {
+          ...result,
+          ...('shape' in result
+            ? { shape: annotateFunctionCall(result.shape, origin(current)) }
+            : {}),
+          diagnostics: [...evaluated.diagnostics, ...result.diagnostics],
         }
       }
       if (current.callee === 'fit') {
@@ -2645,7 +2716,19 @@ export function evaluateScoreSemantics(
       })).visit(expression)
       return { ...result, diagnostics: [...value.diagnostics, ...result.diagnostics] }
     }
-    const evaluated = playablePitch(current, context, value)
+    const mapPitch = visitor.scope.mapPitch
+    const mapped =
+      mapPitch &&
+      'value' in value &&
+      value.value.kind !== 'undefined' &&
+      value.value.kind !== 'lambda'
+        ? mapPitch(value.value, context)
+        : undefined
+    const evaluated = playablePitch(
+      current,
+      context,
+      mapped ? { ...mapped, diagnostics: [...value.diagnostics, ...mapped.diagnostics] } : value,
+    )
     if (!('pitch' in evaluated)) return evaluated
     const broadcastContext = current as Expression & {
       readonly broadcastArticulation?: Fraction
@@ -2666,16 +2749,17 @@ export function evaluateScoreSemantics(
       articulation,
       directiveState: { ...currentDirectiveState },
       ...(currentArticulationMarks.length ? { articulationMarks: currentArticulationMarks } : {}),
-      ...('raw' in current ? { authoredLabel: String(current.raw) } : {}),
+      ...(!mapped && 'raw' in current ? { authoredLabel: String(current.raw) } : {}),
       ...(evaluated.justIntonation ? { justIntonation: true } : {}),
-      ...(current.type === 'DegreeLiteral' ||
-      current.type === 'EqualDivisionLiteral' ||
-      (current.type === 'QuantityLiteral' &&
-        ['c', '¢', 'hz', 'khz'].includes(current.unit.toLowerCase()))
+      ...(!mapped &&
+      (current.type === 'DegreeLiteral' ||
+        current.type === 'EqualDivisionLiteral' ||
+        (current.type === 'QuantityLiteral' &&
+          ['c', '¢', 'hz', 'khz'].includes(current.unit.toLowerCase())))
         ? { displayLabel: String(current.raw) }
         : {}),
     }
-    if ('raw' in current) authoredLabels.set(shape, String(current.raw))
+    if (!mapped && 'raw' in current) authoredLabels.set(shape, String(current.raw))
     return { shape, diagnostics: evaluated.diagnostics }
   }
 
