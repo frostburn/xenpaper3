@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { Fraction } from 'xen-dev-utils'
 import router from '../router'
 import { demoProjects } from '../demo-projects'
+import { createPlaybackPlan } from '../daw/playback-plan'
 import DawView from '../views/DawView.vue'
 import PitchedLane from '../components/daw/PitchedLane.vue'
 import DrumLane from '../components/daw/DrumLane.vue'
@@ -1014,6 +1015,36 @@ describe('DawView', () => {
     for (const serializedProject of Object.values(demoProjects)) {
       expect(() => parseDawProject(serializedProject)).not.toThrow()
     }
+  })
+
+  it('plays the Bach canon with a repeated subject and an augmented answer', () => {
+    const project = parseDawProject(demoProjects['bach-augmentation-canon']!)
+    const { lanes, endBeat } = createPlaybackPlan(project)
+    const [theme, subject, answer] = lanes
+    expect(lanes.map((lane) => lane.name)).toEqual(['Royal Theme', 'Subject', 'Answer'])
+    expect(theme!.notes[0]).toMatchObject({ startBeat: 0, pitch: { initialValue: 0 } })
+    expect(subject!.notes[0]).toMatchObject({ startBeat: 0.75, pitch: { initialValue: 0 } })
+
+    const statement = subject!.notes.filter((note) => note.startBeat < 32)
+    const repeat = subject!.notes.filter((note) => note.startBeat >= 32 && note.startBeat < 64)
+    expect(repeat).toHaveLength(statement.length)
+    expect(answer!.notes.slice(0, -1)).toHaveLength(statement.length)
+    for (const [i, note] of statement.entries()) {
+      const cents = note.pitch.initialValue
+      const reflected = 700 - cents
+      // At E-flat the answer keeps the minor third instead of raising it to E-natural.
+      const answerCents = cents === 300 || cents === -900 ? reflected - 100 : reflected
+      expect(repeat[i]).toMatchObject({
+        startBeat: 32 + note.startBeat,
+        pitch: { initialValue: cents },
+      })
+      expect(answer!.notes[i]).toMatchObject({
+        startBeat: 1 + 2 * note.startBeat,
+        endBeat: 1 + 2 * note.endBeat,
+        pitch: { initialValue: answerCents },
+      })
+    }
+    expect(endBeat).toBe(67)
   })
 
   it('loads a built-in demo without fetching it', async () => {

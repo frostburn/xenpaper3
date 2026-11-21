@@ -1336,6 +1336,79 @@ export function evaluateScoreSemantics(
     )
   }
 
+  const fitScore = (
+    expression: Expression,
+    target: Fraction,
+    visitor: ScoreVisitor,
+    source: Expression,
+  ): ScoreShapeEvaluationResult => {
+    const local = { loop: undefined, subdivisionContext: visitor.scope.resolve }
+    let evaluated = visitor.visit(expression, { ...local, layout: true })
+    if (!hasShape(evaluated)) return evaluated
+    if (!evaluated.shape.duration.n)
+      return {
+        diagnostics: [
+          ...evaluated.diagnostics,
+          {
+            code: 'XP_NORMALIZE_ZERO',
+            severity: 'error',
+            message:
+              source.type === 'NormalizeToSlot'
+                ? 'A non-empty zero-duration fragment cannot be normalized.'
+                : 'fit() requires music with a positive duration.',
+            locations: [source.location],
+          },
+        ],
+      }
+
+    if (!visitor.scope.layout) {
+      const tried = new Set<string>()
+      for (;;) {
+        const duration = evaluated.shape.duration
+        const key = duration.toFraction()
+        if (!duration.n || tried.has(key) || tried.size >= 32)
+          return {
+            diagnostics: [
+              {
+                code: 'XP_TIMELINE_LAYOUT',
+                severity: 'error',
+                message:
+                  source.type === 'NormalizeToSlot'
+                    ? 'Timed context changes do not produce a stable rhythm inside this normalized slot.'
+                    : 'Timed context changes do not produce a stable rhythm inside fit().',
+                locations: [source.location],
+              },
+            ],
+          }
+        tried.add(key)
+        evaluated = visitor.visit(expression, {
+          ...local,
+          lockedPulse: visitor.scope.base.pulse,
+          timeScale: visitor.scope.timeScale.mul(target).div(duration),
+        })
+        if (!hasShape(evaluated)) return evaluated
+        if (evaluated.shape.duration.equals(duration)) break
+      }
+    }
+
+    const shape = scaleShape(evaluated.shape, target.div(evaluated.shape.duration))
+    const slots = evaluated.shape.duration.div(target)
+    const tuplet = slots.d === 1 ? slots.n : undefined
+    return {
+      shape: {
+        ...shape,
+        isolatedDirectiveScope: true,
+        ...(source.type === 'NormalizeToSlot' && shape.kind === 'sequence'
+          ? {
+              normalized: true,
+              ...(tuplet && tuplet > 1 && !Number.isInteger(Math.log2(tuplet)) ? { tuplet } : {}),
+            }
+          : {}),
+      },
+      diagnostics: evaluated.diagnostics,
+    }
+  }
+
   const evaluateNode: VisitorEvaluation<Expression, VisitorScope, ScoreShapeEvaluationResult> = (
     current,
     visitor,
@@ -1577,6 +1650,42 @@ export function evaluateScoreSemantics(
             : {}),
           diagnostics: [...prepared.diagnostics, ...returned.diagnostics],
         }
+      }
+      if (current.callee === 'fit') {
+        if (current.arguments.length !== 2)
+          return {
+            diagnostics: [
+              {
+                code: 'XP_ARITY',
+                severity: 'error',
+                message: 'fit() expects a score and a beat duration.',
+                locations: [current.location],
+              },
+            ],
+          }
+
+        const [music, span] = current.arguments
+        const evaluated = evaluateExpression(span!, context, environment)
+        if (!('value' in evaluated)) return evaluated
+        const value = evaluated.value
+        const duration =
+          value.kind === 'scalar' && value.value.dimensions.equals({ beats: 1 })
+            ? value.value.div(Value.beats(1)).exactRational()
+            : null
+        if (!duration || duration.compare(0) <= 0)
+          return {
+            diagnostics: [
+              ...evaluated.diagnostics,
+              {
+                code: 'XP_FIT_DURATION',
+                severity: 'error',
+                message: 'fit() requires a positive exact duration in beats, such as 0.5beat.',
+                locations: [span!.location],
+              },
+            ],
+          }
+        const fitted = fitScore(music!, duration, visitor, current)
+        return { ...fitted, diagnostics: [...evaluated.diagnostics, ...fitted.diagnostics] }
       }
     }
     const broadcast = broadcastScalarOperation(current, context, environment)
@@ -2392,69 +2501,7 @@ export function evaluateScoreSemantics(
           diagnostics: [],
         }
       }
-      const local = { loop: undefined, subdivisionContext: visitor.scope.resolve }
-      let evaluated = visitor.visit(current.expression, { ...local, layout: true })
-      if (!('shape' in evaluated)) return evaluated
-      if (!evaluated.shape.duration.n) {
-        return {
-          diagnostics: [
-            ...evaluated.diagnostics,
-            {
-              code: 'XP_NORMALIZE_ZERO',
-              severity: 'error',
-              message: 'A non-empty zero-duration fragment cannot be normalized.',
-              locations: [current.location],
-            },
-          ],
-        }
-      }
-      if (!visitor.scope.layout) {
-        const tried = new Set<string>()
-        for (;;) {
-          const duration = evaluated.shape.duration
-          if (!duration.n || tried.has(duration.toFraction()) || tried.size >= 32)
-            return {
-              diagnostics: [
-                {
-                  code: 'XP_TIMELINE_LAYOUT',
-                  severity: 'error',
-                  message:
-                    'Timed context changes do not produce a stable rhythm inside this normalized slot.',
-                  locations: [current.location],
-                },
-              ],
-            }
-          tried.add(duration.toFraction())
-          evaluated = visitor.visit(current.expression, {
-            ...local,
-            lockedPulse: visitor.scope.base.pulse,
-            timeScale: visitor.scope.timeScale.mul(currentPulse).div(duration),
-          })
-          if (!('shape' in evaluated)) return evaluated
-          if (evaluated.shape.duration.equals(duration)) break
-        }
-      }
-      const normalizedSlots = evaluated.shape.duration.div(currentPulse)
-      const normalized = scaleShape(evaluated.shape, currentPulse.div(evaluated.shape.duration))
-      const tuplet = Number(normalizedSlots.d) === 1 ? Number(normalizedSlots.n) : undefined
-      if (
-        normalized.kind === 'sequence' &&
-        tuplet &&
-        tuplet > 1 &&
-        !Number.isInteger(Math.log2(tuplet))
-      ) {
-        return {
-          shape: { ...normalized, normalized: true, isolatedDirectiveScope: true, tuplet },
-          diagnostics: evaluated.diagnostics,
-        }
-      }
-      return {
-        shape:
-          normalized.kind === 'sequence'
-            ? { ...normalized, normalized: true, isolatedDirectiveScope: true }
-            : { ...normalized, isolatedDirectiveScope: true },
-        diagnostics: evaluated.diagnostics,
-      }
+      return fitScore(current.expression, currentPulse, visitor, current)
     }
     if (current.type === 'PostfixExpression') {
       const holdIndex = current.marks.findIndex((mark) => mark.type === 'HoldUntilEnd')

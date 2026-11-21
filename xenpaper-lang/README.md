@@ -231,6 +231,20 @@ The reduced guide is subject to the harmonic segment limit of 10,000 members.
 0 1 2 3 4 5 6
 ```
 
+## Fit music to a beat duration
+
+`fit(music, span)` gives a note, rest, chord, or phrase a total duration in
+beats. The span can be a variable. Use a positive exact beat quantity such as
+`0.5beat` or `3/2 * 1beat`. The current subdivision does not change the
+requested length. Within the fragment, notes and rests keep their rhythmic
+proportions, and prevailing settings inside the fragment stay local to it.
+
+```text
+let span <- 1.5beat
+fit(., 0.25beat)
+fit((C E= G), span)
+```
+
 ## Note ties
 
 The binary `->` operator sequences two operands and ties matching notes:
