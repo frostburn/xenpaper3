@@ -72,7 +72,7 @@ fn eulerGenus(guide: integer, root: integer <- 1/1, equave: ratio <- 2/1) {
     if(@not (guide mod harmonic)) {
       let reduced <- (harmonic / root) rd equave
       if(reduced @ne 1) {
-        pitches <- pitches << reduced
+        pitches <- flat((pitches, reduced))
       }
     }
   }
@@ -694,22 +694,6 @@ function binary(
   node: Expression,
 ): EvaluatedLiteral {
   if (operator === 'al') return left.kind === 'undefined' ? right : left
-  if (operator === '<<') {
-    if (left.kind !== 'container')
-      throw new TypeError('The left operand of << must be a container.')
-    const origins = operatorOrigins(left, right, node)
-    if (left.normalized && left.composition === 'parallel') {
-      // Normalize the extended sequence once, after the parallel prefix
-      // has contributed its full duration.
-      return {
-        ...left,
-        composition: 'sequence',
-        values: [{ ...left, normalized: false }, right],
-        origins,
-      }
-    }
-    return { ...left, values: [...left.values, right], origins }
-  }
   if (left.kind === 'container' || right.kind === 'container') {
     if (left.kind === 'container' && right.kind === 'container') {
       if (left.composition && right.composition && left.composition !== right.composition)

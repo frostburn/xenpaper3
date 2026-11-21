@@ -395,7 +395,7 @@ export function applyPitchContextChange(
               iterable: true,
             }
         }
-        if (expression.type === 'BinaryExpression' && expression.operator !== '<<') {
+        if (expression.type === 'BinaryExpression') {
           const left = expandDegreeExpression(expression.left, expressionEnvironment)
           const right = expandDegreeExpression(expression.right, expressionEnvironment)
           if (left.iterable || right.iterable) {

@@ -107,15 +107,11 @@ an integer. `sorted(container)`, `arrayMap(callback, container)`, and
 `arrayReduce(callback, container, initial?)` require containers. `sorted`
 returns a copy in ascending order. Existing scores can still use `sort`.
 
-`items << value` returns a copy with one element appended. A bare integer
-on the right is a scale degree, so `[0 4 7] << 11` plays like `[0 4 7 11]`.
-Use a ratio such as `11/1` for a scalar. Arithmetic binds more tightly than
-append, and a container on the right is appended as a single nested element.
-
-When appending to a parallel tuplet, the new element comes after all its
-voices and shares the same slot, as in `[0, 4 7] << 11`. Appending to a plain
-parallel group such as `(0, 4) << 7` adds a voice. Chained appends run left to
-right. Use `items <- items << value` to update a function local.
+`flat(container)` returns a copy with one level of nesting removed. It opens
+each immediate child container once, in order, and keeps the outer container's
+musical structure. Comma groups keep their nesting unless you call `flat`
+explicitly. For example, `items <- flat((items, value))` adds a scalar to a
+flat container inside a function.
 
 ## Comparisons and control flow
 

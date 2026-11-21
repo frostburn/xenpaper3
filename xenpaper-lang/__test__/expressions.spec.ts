@@ -260,26 +260,20 @@ describe('arithmetic expression evaluation', () => {
     expect(evaluate('3/2 if false else 5/4').value.equals(new Value(5n, 4n))).toBe(true)
   })
 
-  it('appends to a copy and keeps a container operand nested', () => {
-    const declaration = parse(
-      'fn original() { let items <- [1/1] let appended <- items << 2/1 ret items }',
-    ).body[0]
-    if (declaration.type !== 'FunctionDeclaration') throw new Error('Expected a function.')
-    const { environment } = evaluateDeclaration(declaration)
-    const original = evaluateExpression(
-      expression('original()'),
-      DEFAULT_PITCH_CONTEXT,
-      environment,
-    )
-    expect(original).toMatchObject({ value: { kind: 'container', values: [{ kind: 'scalar' }] } })
-    if (!('value' in original) || original.value.kind !== 'container')
-      throw new Error('Expected a container.')
-    expect(original.value.values).toHaveLength(1)
-    const appended = evaluate('[1/1] << 1/1 + 1/1 << [3/1]')
-    if (appended.kind !== 'container') throw new Error('Expected a container.')
-    expect(appended.values.map((item) => item.kind)).toEqual(['scalar', 'scalar', 'container'])
-    expect(appended.values[1]?.value.equals(2)).toBe(true)
-    const chord = evaluate('5::6 << 2/1')
+  it('opens only immediate child containers in flat()', () => {
+    const grouped = evaluate('(1/1, [2/1, [3/1]], 4/1)')
+    const flattened = evaluate('flat((1/1, [2/1, [3/1]], 4/1))')
+    if (grouped.kind !== 'container' || flattened.kind !== 'container')
+      throw new Error('Expected containers.')
+    expect(grouped.values.map((item) => item.kind)).toEqual(['scalar', 'container', 'scalar'])
+    expect(flattened.composition).toBe('parallel')
+    expect(flattened.values.map((item) => item.kind)).toEqual([
+      'scalar',
+      'scalar',
+      'container',
+      'scalar',
+    ])
+    const chord = evaluate('flat((5::6, 2/1))')
     expect(
       chord.kind === 'container' &&
         chord.values.map(({ value }) => value.exactRational()?.toFraction()),

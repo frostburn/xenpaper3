@@ -349,12 +349,7 @@ function broadcastScalarOperation(
     if (operand) return { ...node, operand }
     return mapScoreConstruction(node.operand, (item) => ({ ...node, operand: item }))
   }
-  if (
-    node.type !== 'BinaryExpression' ||
-    node.operator === '->' ||
-    node.operator === '<<' ||
-    isComparison(node.operator)
-  )
+  if (node.type !== 'BinaryExpression' || node.operator === '->' || isComparison(node.operator))
     return undefined
   const left = broadcastScalarOperation(node.left, context, environment)
   if (left) return { ...node, left }
@@ -404,7 +399,7 @@ function expandEnumeratedChord(
       evaluateExpression(endpoint, context, environment),
     )
   }
-  if (node.type === 'BinaryExpression' && node.operator !== '<<' && !isComparison(node.operator)) {
+  if (node.type === 'BinaryExpression' && !isComparison(node.operator)) {
     const left = expandEnumeratedChord(node.left, context, environment)
     const right = expandEnumeratedChord(node.right, context, environment)
     if (

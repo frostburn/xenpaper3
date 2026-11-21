@@ -183,7 +183,7 @@ Expression
     }
 
 TieOperand
-  = expression:((chord:EnumeratedChordArithmetic !(Spacing "<<") { return chord; }) / (degree:ScaleDegreeLiteral !":" !(Spacing (ComparisonOperator / "<<")) { return degree; }) / ValueExpression)
+  = expression:(EnumeratedChordArithmetic / (degree:ScaleDegreeLiteral !(Spacing ComparisonOperator) { return degree; }) / ValueExpression)
     marks:AttachedPostfixMark* {
       if (!marks.length) return expression;
       return node('PostfixExpression', { expression, marks });
@@ -206,24 +206,11 @@ ValueExpression
 
 // Comparisons bind below arithmetic and above the inline conditional.
 ComparisonExpression
-  = left:AppendExpression tail:(Spacing operator:ComparisonOperator Spacing right:AppendExpression {
+  = left:AdditiveExpression tail:(Spacing operator:ComparisonOperator Spacing right:AdditiveExpression {
       return { operator, right };
     })? {
       return tail ? binary(tail.operator, left, tail.right) : left;
     }
-
-AppendExpression
-  = first:AdditiveExpression rest:(Spacing "<<" Spacing right:AppendOperand {
-      return { operator: "<<", right };
-    })* {
-      return foldBinary(first, rest);
-    }
-
-// A bare integer append behaves like an authored score degree. Arithmetic
-// and colon chords still use their usual value grammar.
-AppendOperand
-  = degree:ScaleDegreeLiteral !":" !AdditiveTail { return degree; }
-  / AdditiveExpression
 
 ComparisonOperator
   = operator:$("@" ("eq"i / "ne"i / "lt"i / "le"i / "gt"i / "ge"i)) !IdentifierContinue {
