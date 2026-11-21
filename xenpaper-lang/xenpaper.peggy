@@ -1320,6 +1320,7 @@ Identifier
 
 ReservedKeyword
   = "let" / "fn" / "ret" / "if" / "elif" / "else" / "for" / "while" / "break" / "continue"
+  / "throw" / "try" / "catch"
 
 IdentifierContinue
   = [A-Za-z0-9_]

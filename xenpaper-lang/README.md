@@ -320,11 +320,12 @@ to that end. Binary `->` ties matching pitches into the following operand.
 `fn` declarations, assignments, and control blocks before a final `ret`. Use
 `name <- expression` to update an existing local variable or parameter.
 `throw("message")` halts the call with a diagnostic. The final `ret` can
-produce a value or a score fragment. Commas separate parameters and a trailing comma
-is not accepted. `let`, `fn`, and `ret` are reserved (case-sensitive) and cannot
-be used as pitches, identifiers, or function names. Names that are valid musical
-pitch spellings are likewise unavailable for declarations: music always wins and
-the meaning of a pitch token never depends on lexical scope.
+produce a value or a score fragment. Commas separate parameters, and a trailing
+comma is invalid. Keywords such as `let`, `fn`, `ret`, and `throw` are
+case-sensitive and reserved. `try` and `catch` are reserved for future syntax.
+Names that are valid musical pitch spellings are likewise unavailable for
+declarations: music always wins and the meaning of a pitch token never depends
+on lexical scope.
 
 Every evaluation starts with a prelude written in Xenpaper itself. It currently
 declares `pi` and defines helpers such as `sqrt`, `cps`, and `eulerGenus`.
