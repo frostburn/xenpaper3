@@ -33,6 +33,33 @@ function notes(source: string, initialization: ScoreInitialization, offset?: Fra
 }
 
 describe('global grid context', () => {
+  it.each([
+    ['if(true) { let chosen <- true @2 . }'],
+    ['for(chosen in [C D]) { if(chosen @eq 1) { @2 . } }'],
+    ['for(chosen of [true]) { @2 . }'],
+    ['while(chosen @eq false) { let chosen <- true @2 . }'],
+  ])('restores outer bindings in the timeline after %s', (block) => {
+    const initialization = initialize(`let chosen <- false ${block} .`)
+    const phrase = 'if(chosen) { C } else { D }'
+    expect(notes(phrase, initialization, new Fraction(1, 4))[0]?.label).toBe('C')
+    const [after] = notes(phrase, initialization, new Fraction(1, 2))
+    expect(after?.label).toBe('D')
+    expect(after?.duration.toFraction()).toBe('1/2')
+  })
+
+  it('keeps the old binding in earlier clips and applies loop reassignment at its beat', () => {
+    const initialization = initialize(`
+let chosen <- false
+.
+for (value of [true]) { chosen <- value . }
+.
+`)
+    const phrase = 'if (chosen) { C } else { D }'
+    expect(notes(phrase, initialization, new Fraction(1, 2))[0]?.label).toBe('D')
+    expect(notes(phrase, initialization, new Fraction(1))[0]?.label).toBe('C')
+    expect(notes(phrase, initialization, new Fraction(2))[0]?.label).toBe('C')
+  })
+
   it('applies subdivision changes while advancing the grid, including score length', () => {
     const initialization = initialize('. @2')
     const result = score('C D E F', initialization)

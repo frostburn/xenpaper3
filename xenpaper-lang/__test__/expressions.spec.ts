@@ -32,7 +32,7 @@ describe('arithmetic expression evaluation', () => {
     expect(evaluate('pitch(200c)').value.equals(Value.cents(200))).toBe(true)
     expect(evaluate('pitch(2)').value.equals(Value.cents(1200))).toBe(true)
 
-    for (const source of ['pitch([1d 2d])', 'pitch(sort([2d 1d]))']) {
+    for (const source of ['pitch([1d 2d])', 'pitch(sorted([2d 1d]))']) {
       const pitches = evaluate(source)
       if (pitches.kind !== 'container') throw new Error('Expected a container.')
       expect(pitches.values.map((item) => item.value.valueOf())).toEqual([100, 200])
@@ -260,6 +260,26 @@ describe('arithmetic expression evaluation', () => {
     expect(evaluate('3/2 if false else 5/4').value.equals(new Value(5n, 4n))).toBe(true)
   })
 
+  it('opens only immediate child containers in flat()', () => {
+    const grouped = evaluate('(1/1, [2/1, [3/1]], 4/1)')
+    const flattened = evaluate('flat((1/1, [2/1, [3/1]], 4/1))')
+    if (grouped.kind !== 'container' || flattened.kind !== 'container')
+      throw new Error('Expected containers.')
+    expect(grouped.values.map((item) => item.kind)).toEqual(['scalar', 'container', 'scalar'])
+    expect(flattened.composition).toBe('parallel')
+    expect(flattened.values.map((item) => item.kind)).toEqual([
+      'scalar',
+      'scalar',
+      'container',
+      'scalar',
+    ])
+    const chord = evaluate('flat((5::6, 2/1))')
+    expect(
+      chord.kind === 'container' &&
+        chord.values.map(({ value }) => value.exactRational()?.toFraction()),
+    ).toEqual(['1', '6/5', '2'])
+  })
+
   it('provides combination and sorting container built-ins', () => {
     const combinations = evaluate('kCombinations([1/1, 3/1, 5/1], 2/1)')
     expect(combinations.kind).toBe('container')
@@ -270,10 +290,10 @@ describe('arithmetic expression evaluation', () => {
     if (integerCombinations.kind !== 'container') throw new Error('Expected a container.')
     expect(integerCombinations.values).toHaveLength(3)
 
-    const sorted = evaluate('sort([3/1, 1/1, 2/1])')
+    const sorted = evaluate('sorted([3/1, 1/1, 2/1])')
     if (sorted.kind !== 'container') throw new Error('Expected a container.')
     expect(sorted.values.map((item) => item.value.valueOf())).toEqual([1, 2, 3])
-    const singleton = evaluate('sort([2/1])')
+    const singleton = evaluate('sorted([2/1])')
     if (singleton.kind !== 'container') throw new Error('Expected a container.')
     expect(singleton.values.map((item) => item.value.valueOf())).toEqual([2])
     expect(evaluate('[1/1][0]').value.equals(1)).toBe(true)
@@ -285,20 +305,20 @@ describe('arithmetic expression evaluation', () => {
       evaluate('arrayReduce((total, element) => total + element, [1/1, 2/1, 3/1])').value.equals(6),
     ).toBe(true)
 
-    expect(evaluateExpression(expression('sort([niente, 2/1, 1/1])'))).toMatchObject({
-      diagnostics: [{ code: 'XP_TYPE_MISMATCH', message: 'sort() expects numeric values.' }],
+    expect(evaluateExpression(expression('sorted([niente, 2/1, 1/1])'))).toMatchObject({
+      diagnostics: [{ code: 'XP_TYPE_MISMATCH', message: 'sorted() expects numeric values.' }],
     })
   })
 
   it('validates built-in arities consistently', () => {
-    expect(evaluateExpression(expression('sort()'))).toMatchObject({
+    expect(evaluateExpression(expression('sorted()'))).toMatchObject({
       diagnostics: [
-        { code: 'XP_TYPE_MISMATCH', message: 'sort() expects 1 argument, but received 0.' },
+        { code: 'XP_TYPE_MISMATCH', message: 'sorted() expects 1 argument, but received 0.' },
       ],
     })
-    expect(evaluateExpression(expression('sort([1/1], [2/1])'))).toMatchObject({
+    expect(evaluateExpression(expression('sorted([1/1], [2/1])'))).toMatchObject({
       diagnostics: [
-        { code: 'XP_TYPE_MISMATCH', message: 'sort() expects 1 argument, but received 2.' },
+        { code: 'XP_TYPE_MISMATCH', message: 'sorted() expects 1 argument, but received 2.' },
       ],
     })
     expect(
@@ -385,6 +405,102 @@ describe('arithmetic expression evaluation', () => {
       [7n, 4n],
       [2n, 1n],
     ])
+  })
+
+  it('runs function control flow before ret while keeping local updates scoped', () => {
+    const declaration = parse(`
+fn countOdds(limit: integer) {
+  let total <- 0/1
+  for(harmonic of 1::limit) {
+    if(@not (harmonic mod 2)) { continue }
+    total <- total + 1
+  } else {
+    total <- total + 10
+  }
+  ret total
+}
+`).body[0]
+    if (declaration.type !== 'FunctionDeclaration') throw new Error('Expected a function.')
+    const { environment, diagnostics } = evaluateDeclaration(declaration)
+    expect(diagnostics).toEqual([])
+    for (const limit of [5, 5, 2]) {
+      const result = evaluateExpression(
+        expression(`countOdds(${limit})`),
+        DEFAULT_PITCH_CONTEXT,
+        environment,
+      )
+      expect(result.diagnostics).toEqual([])
+      expect('value' in result && result.value.value.valueOf()).toBe(limit === 5 ? 13 : 11)
+    }
+  })
+
+  it('evaluates harmonic segments as normalized ratio containers', () => {
+    const segment = evaluate('5::8')
+    expect(
+      segment.kind === 'container' &&
+        segment.values.map(({ value }) => value.exactRational()?.toFraction()),
+    ).toEqual(['1', '6/5', '7/5', '8/5'])
+  })
+
+  it.each([
+    [
+      'eulerGenus(45)',
+      [
+        [9, 8],
+        [5, 4],
+        [45, 32],
+        [3, 2],
+        [15, 8],
+        [2, 1],
+      ],
+    ],
+    [
+      'eulerGenus(90, 3)',
+      [
+        [5, 4],
+        [4, 3],
+        [3, 2],
+        [5, 3],
+        [15, 8],
+        [2, 1],
+      ],
+    ],
+    [
+      'eulerGenus(5, 1, 3)',
+      [
+        [5, 3],
+        [3, 1],
+      ],
+    ],
+    ['eulerGenus(8)', [[2, 1]]],
+  ] as const)('returns the sorted Euler genus for %s', (source, ratios) => {
+    const genus = evaluate(source)
+    if (genus.kind !== 'container') throw new Error('Expected a container.')
+    expect(genus.values).toHaveLength(ratios.length)
+    for (const [index, [numerator, denominator]] of ratios.entries())
+      expect(
+        genus.values[index]!.value.equals(new Value(BigInt(numerator), BigInt(denominator))),
+      ).toBe(true)
+  })
+
+  it.each([
+    ['eulerGenus(45, 7)', 'Root must divide the guide tone.'],
+    ['eulerGenus(0)', 'Guide tone must be a positive integer.'],
+    ['eulerGenus(45, 0)', 'Root tone must be a positive integer.'],
+    ['eulerGenus(45, 1, 1)', 'Equave must be greater than one.'],
+  ])('rejects invalid Euler genus arguments in %s', (source, message) => {
+    expect(evaluateExpression(expression(source)).diagnostics).toMatchObject([
+      { code: 'XP_THROW', message },
+    ])
+  })
+
+  it('installs the Euler genus as a playable scale', () => {
+    const change = parse('{scale <- eulerGenus(45)}').body[0]
+    if (change.type !== 'PitchContextChange') throw new Error('Expected a scale change.')
+    const context = applyPitchContextChange(change, DEFAULT_PITCH_CONTEXT)
+    expect(context.degrees).toHaveLength(6)
+    expect(context.degrees[0]?.equals(Value.pitch(new Value(9n, 8n)))).toBe(true)
+    expect(context.degreeEquave.equals(Value.pitch(new Value(2)))).toBe(true)
   })
 
   it('coerces annotated parameters and evaluates declared defaults', () => {

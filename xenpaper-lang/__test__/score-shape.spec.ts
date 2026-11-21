@@ -44,6 +44,7 @@ describe('score-shape timing', () => {
 
   it.each([
     ['sort([2 1])', '[1 2]'],
+    ['flat((5::6, 2/1))', '5:6:10'],
     ['sort((2,1))', '(1,2)'],
     ['arrayMap((note) => note, [0 1])', '[0 1]'],
     ['arrayMap((note) => note, (0,1))', '(0,1)'],

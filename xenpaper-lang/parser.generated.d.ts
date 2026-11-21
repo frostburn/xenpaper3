@@ -22,6 +22,7 @@ export type Expression =
   | Barline
   | BarRest
   | BinaryExpression
+  | BindingAssignment
   | CallExpression
   | ConditionalExpression
   | ContextAssignment
@@ -39,11 +40,14 @@ export type Expression =
   | EqualDivisionLiteral
   | EnumeratedChord
   | Group
+  | ForBlock
   | FunctionDeclaration
   | HardBoundary
   | Identifier
+  | IfBlock
   | IntegerLiteral
   | LambdaExpression
+  | LoopJump
   | IntervalLiteral
   | IndexExpression
   | MappingLiteral
@@ -61,10 +65,12 @@ export type Expression =
   | RealLiteral
   | RatioLiteral
   | Repeat
+  | WhileBlock
   | Rest
   | Sequence
   | SignatureDeclaration
   | TailElimination
+  | ThrowStatement
   | TuningStretch
   | UnaryExpression
   | VariableDeclaration
@@ -97,6 +103,34 @@ export interface ConditionalExpression extends Node {
   condition: Expression
   consequent: Expression
   alternate: Expression
+}
+
+export interface IfBlock extends Node {
+  type: 'IfBlock'
+  condition: Expression
+  consequent: Sequence
+  alternate: IfBlock | Sequence | null
+}
+
+export interface ForBlock extends Node {
+  type: 'ForBlock'
+  name: Identifier
+  mode: 'in' | 'of'
+  iterable: Expression
+  body: Sequence
+  alternate: Sequence | null
+}
+
+export interface WhileBlock extends Node {
+  type: 'WhileBlock'
+  condition: Expression
+  body: Sequence
+  alternate: Sequence | null
+}
+
+export interface LoopJump extends Node {
+  type: 'LoopJump'
+  action: 'break' | 'continue'
 }
 
 export interface IndexExpression extends Node {
@@ -155,9 +189,20 @@ export interface CoercionAnnotation extends Node {
   raw: string
 }
 
+export interface BindingAssignment extends Node {
+  type: 'BindingAssignment'
+  name: Identifier
+  value: Expression
+}
+
+export interface ThrowStatement extends Node {
+  type: 'ThrowStatement'
+  message: string
+}
+
 export interface FunctionBody extends Node {
   type: 'FunctionBody'
-  declarations: Array<VariableDeclaration | FunctionDeclaration>
+  statements: Expression[]
   returnStatement: ReturnStatement
 }
 
