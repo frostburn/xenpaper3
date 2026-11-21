@@ -113,6 +113,9 @@ musical structure. Comma groups keep their nesting unless you call `flat`
 explicitly. For example, `items <- flat((items, value))` adds a scalar to a
 flat container inside a function.
 
+`asSequence(container)` keeps the elements and their order and plays them
+in sequence, without a slot wrapper on the outer container.
+
 `name <- expression` updates an existing score variable without consuming
 time. Selected branches and loop bodies can update outer variables, including
 accumulators. A `let` within a block still introduces a local binding. Updates
@@ -208,6 +211,10 @@ Harmonic segments are iterable ratio containers in value expressions.
 `for(harmonic of 1::5) { ... }` visits 1 through 5, while `5::8` supplies
 `1/1`, `6/5`, `7/5`, and `8/5`. When played directly in a score, the
 segment remains a chord.
+
+The prelude's scale builders `cps` and `eulerGenus` return plain sequences.
+Play a result directly to hear one degree per current slot, or wrap the call
+in brackets to fit the run into one slot.
 
 The prelude defines `eulerGenus(guide, root <- 1/1, equave <- 2/1)`. It derives
 a scale from the guide tone's divisors, rotates it to the root, and reduces it
