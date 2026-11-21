@@ -57,6 +57,29 @@ describe('comparison expressions', () => {
 })
 
 describe('score control flow', () => {
+  it('updates an existing binding without moving the score cursor', () => {
+    expect(score('let note <- C note note <- D note')).toEqual(score('C D'))
+    expect(expandToBeatEvents(parse('missingName <- C')).diagnostics[0]).toMatchObject({
+      code: 'XP_ASSIGNMENT',
+    })
+  })
+
+  it('keeps updates to outer score variables across iterations and discards local shadows', () => {
+    const source = `
+let total <- 0/1
+for (index in [C D E]) {
+  if (index @gt 0) { total <- total + index }
+  let total <- 10/1
+  total <- total + 1
+}
+if (total @eq 3) { D }
+`
+    expect(score(source)).toEqual(score('D'))
+    expect(score('let total <- 0/1 while(total @lt 2) { C total <- total + 1 }')).toEqual(
+      score('C C'),
+    )
+  })
+
   it('evaluates comparisons in declarations and only visits the selected branch', () => {
     const source = `
 let chosen <- 1 + 2 @eq 3

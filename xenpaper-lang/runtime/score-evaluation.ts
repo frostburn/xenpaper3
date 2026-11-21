@@ -1240,6 +1240,42 @@ export function evaluateScoreSemantics(
     )
   }
 
+  // Copy the path to the updated binding. Earlier shapes keep their lexical
+  // snapshots, and block exit can recognize updated versions of outer frames.
+  const originalFrames = new WeakMap<LexicalEnvironment, LexicalEnvironment>()
+  const originalFrame = (scope: LexicalEnvironment) => originalFrames.get(scope) ?? scope
+  const preludeFrames = new Set<LexicalEnvironment>()
+  const assignBinding = (
+    environment: LexicalEnvironment | undefined,
+    name: string,
+    value: EvaluatedLiteral,
+  ): LexicalEnvironment | undefined => {
+    if (!preludeFrames.size) {
+      for (
+        let scope: LexicalEnvironment | undefined = preludeEnvironment();
+        scope;
+        scope = scope.parent
+      )
+        preludeFrames.add(scope)
+    }
+    const path: LexicalEnvironment[] = []
+    let target = environment
+    while (target && !target.variables.has(name) && !target.functions.has(name)) {
+      path.push(target)
+      target = target.parent
+    }
+    if (!target?.variables.has(name) || preludeFrames.has(originalFrame(target))) return undefined
+    const variables = new Map(target.variables).set(name, value)
+    let updated: LexicalEnvironment = { ...target, variables }
+    originalFrames.set(updated, originalFrame(target))
+    for (const frame of path.reverse()) {
+      const copy = { ...frame, parent: updated }
+      originalFrames.set(copy, originalFrame(frame))
+      updated = copy
+    }
+    return updated
+  }
+
   // The timeline reads shape annotations to recover prevailing state at a
   // clip's start beat, so restore local bindings in both the shape and visitor.
   const restoreBlockScope = (
@@ -1250,10 +1286,19 @@ export function evaluateScoreSemantics(
     const after = visitorAfter(result, inner)
     if (!hasShape(result)) return result
     if (after.scope.environment === outer.scope.environment) return withVisitor(result, after)
-    const restored = changeVisitor(after, (context, base) => ({
-      ...context,
-      lexicalEnvironment: resolveContext(outer.scope.resolve, base).lexicalEnvironment,
-    }))
+    const restored = changeVisitor(after, (context, base) => {
+      const outerEnvironment = resolveContext(outer.scope.resolve, base).lexicalEnvironment
+      let lexicalEnvironment = context.lexicalEnvironment
+      if (outerEnvironment) {
+        const expected = originalFrame(outerEnvironment)
+        while (lexicalEnvironment && originalFrame(lexicalEnvironment) !== expected)
+          lexicalEnvironment = lexicalEnvironment.parent
+      }
+      return {
+        ...context,
+        lexicalEnvironment: outerEnvironment && (lexicalEnvironment ?? outerEnvironment),
+      }
+    })
     const end = withVisitorContext(sequence([], []), restored)
     return withVisitor(
       { ...result, shape: sequence([result.shape, end], result.shape.origins) },
@@ -1304,6 +1349,40 @@ export function evaluateScoreSemantics(
       directiveState: currentDirectiveState,
       environment,
     } = visitor.scope
+    if (current.type === 'BindingAssignment') {
+      const evaluated = evaluateExpression(current.value, context, environment)
+      if (!('value' in evaluated)) return evaluated
+      const name = current.name.name
+      const value = evaluated.value
+      const updated = assignBinding(environment, name, value)
+      if (!updated)
+        return {
+          diagnostics: [
+            ...evaluated.diagnostics,
+            {
+              code: 'XP_ASSIGNMENT',
+              severity: 'error',
+              message: `Assignment requires an existing score variable named ${name}.`,
+              locations: [current.name.location],
+            },
+          ],
+        }
+      const next = changeVisitor(visitor, (context) => ({
+        ...context,
+        lexicalEnvironment:
+          context.lexicalEnvironment === environment
+            ? updated
+            : (assignBinding(context.lexicalEnvironment, name, value) ??
+              context.lexicalEnvironment),
+      }))
+      return withVisitor(
+        {
+          shape: withVisitorContext(sequence([], [origin(current)]), next),
+          diagnostics: evaluated.diagnostics,
+        },
+        next,
+      )
+    }
     if (current.type === 'LoopJump') {
       const loop = visitor.scope.loop
       if (!loop)
@@ -1776,7 +1855,7 @@ export function evaluateScoreSemantics(
           activeVisitor = changeVisitor(activeVisitor, (context) => ({
             ...context,
             lexicalEnvironment: extendLexicalEnvironment(
-              context.lexicalEnvironment ?? declared.environment,
+              context.lexicalEnvironment ?? preludeEnvironment(),
               {
                 variables: declared.environment.variables,
                 functions: declared.environment.functions,

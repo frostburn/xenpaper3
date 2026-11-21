@@ -47,6 +47,19 @@ describe('global grid context', () => {
     expect(after?.duration.toFraction()).toBe('1/2')
   })
 
+  it('keeps the old binding in earlier clips and applies loop reassignment at its beat', () => {
+    const initialization = initialize(`
+let chosen <- false
+.
+for (value of [true]) { chosen <- value . }
+.
+`)
+    const phrase = 'if (chosen) { C } else { D }'
+    expect(notes(phrase, initialization, new Fraction(1, 2))[0]?.label).toBe('D')
+    expect(notes(phrase, initialization, new Fraction(1))[0]?.label).toBe('C')
+    expect(notes(phrase, initialization, new Fraction(2))[0]?.label).toBe('C')
+  })
+
   it('applies subdivision changes while advancing the grid, including score length', () => {
     const initialization = initialize('. @2')
     const result = score('C D E F', initialization)

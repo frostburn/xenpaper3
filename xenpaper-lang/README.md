@@ -113,6 +113,12 @@ musical structure. Comma groups keep their nesting unless you call `flat`
 explicitly. For example, `items <- flat((items, value))` adds a scalar to a
 flat container inside a function.
 
+`name <- expression` updates an existing score variable without consuming
+time. Selected branches and loop bodies can update outer variables, including
+accumulators. A `let` within a block still introduces a local binding. Updates
+take effect at the assignment's position, so earlier notes and clips starting
+earlier keep their original lexical values.
+
 ## Comparisons and control flow
 
 Use `@eq`, `@ne`, `@lt`, `@le`, `@gt`, and `@ge` for equality,
