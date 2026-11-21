@@ -1017,34 +1017,33 @@ describe('DawView', () => {
     }
   })
 
-  it('plays the Bach canon with a repeated subject and an augmented answer', () => {
-    const project = parseDawProject(demoProjects['bach-augmentation-canon']!)
+  it('plays Mirror Study with a repeated subject and a delayed, augmented inversion', () => {
+    const project = parseDawProject(demoProjects['mirror-study']!)
     const { lanes, endBeat } = createPlaybackPlan(project)
-    const [theme, subject, answer] = lanes
-    expect(lanes.map((lane) => lane.name)).toEqual(['Royal Theme', 'Subject', 'Answer'])
-    expect(theme!.notes[0]).toMatchObject({ startBeat: 0, pitch: { initialValue: 0 } })
-    expect(subject!.notes[0]).toMatchObject({ startBeat: 0.75, pitch: { initialValue: 0 } })
+    const [subject, answer] = lanes
+    expect(lanes.map((lane) => lane.name)).toEqual(['Subject', 'Answer'])
+    expect(subject!.notes[0]).toMatchObject({ startBeat: 0, pitch: { initialValue: 1200 } })
+    expect(answer).toMatchObject({ instrument: { oscillatorType: 'rich' } })
 
-    const statement = subject!.notes.filter((note) => note.startBeat < 32)
-    const repeat = subject!.notes.filter((note) => note.startBeat >= 32 && note.startBeat < 64)
+    const statement = subject!.notes.filter((note) => note.startBeat < 8)
+    const repeat = subject!.notes.filter((note) => note.startBeat >= 8 && note.startBeat < 16)
+    expect(statement).toHaveLength(9)
     expect(repeat).toHaveLength(statement.length)
-    expect(answer!.notes.slice(0, -1)).toHaveLength(statement.length)
+    expect(answer!.notes).toHaveLength(statement.length)
     for (const [i, note] of statement.entries()) {
       const cents = note.pitch.initialValue
-      const reflected = 700 - cents
-      // At E-flat the answer keeps the minor third instead of raising it to E-natural.
-      const answerCents = cents === 300 || cents === -900 ? reflected - 100 : reflected
       expect(repeat[i]).toMatchObject({
-        startBeat: 32 + note.startBeat,
+        startBeat: 8 + note.startBeat,
+        endBeat: 8 + note.endBeat,
         pitch: { initialValue: cents },
       })
       expect(answer!.notes[i]).toMatchObject({
-        startBeat: 1 + 2 * note.startBeat,
-        endBeat: 1 + 2 * note.endBeat,
-        pitch: { initialValue: answerCents },
+        startBeat: 8 + 2 * note.startBeat,
+        endBeat: 8 + 2 * note.endBeat,
+        pitch: { initialValue: 1600 - cents },
       })
     }
-    expect(endBeat).toBe(67)
+    expect(endBeat).toBe(24)
   })
 
   it('loads a built-in demo without fetching it', async () => {

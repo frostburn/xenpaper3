@@ -18,8 +18,8 @@ import TheFooter from './components/TheFooter.vue'
         <RouterLink :to="{ path: '/daw', query: { demo: 'minuet' } }">
           Open "Minuet in G Major"
         </RouterLink>
-        <RouterLink :to="{ path: '/daw', query: { demo: 'bach-augmentation-canon' } }">
-          Open "Bach’s Augmentation Canon"
+        <RouterLink :to="{ path: '/daw', query: { demo: 'mirror-study' } }">
+          Open "Mirror Study"
         </RouterLink>
         <RouterLink :to="{ path: '/daw', query: { demo: 'lucky-debugger' } }">
           Open "Lucky Debugger"

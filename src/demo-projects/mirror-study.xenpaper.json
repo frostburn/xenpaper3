@@ -1,0 +1,85 @@
+{
+  "format": "xenpaper3-daw",
+  "version": 3,
+  "createdAt": "2026-11-21T12:00:00.000Z",
+  "xenpaperVersion": "3.0.0-beta.21",
+  "title": "Mirror Study",
+  "globalTrack": {
+    "source": "{12edo}\n{key <- C major}\n\nfn subject() {\n  ret @1\n    c   [d e]  g=      |\n    a   [g e]  d   e\n}\n",
+    "tempoChanges": [
+      {
+        "id": "tempo-1",
+        "beat": {
+          "n": 0,
+          "d": 1
+        },
+        "bpm": 96
+      }
+    ],
+    "timeSignatureChanges": [
+      {
+        "id": "time-signature-1",
+        "beat": {
+          "n": 0,
+          "d": 1
+        },
+        "numerator": 4,
+        "denominator": 4
+      }
+    ]
+  },
+  "instrumentLanes": [
+    {
+      "kind": "instrument",
+      "id": "subject",
+      "name": "Subject",
+      "instrument": {
+        "type": "patch",
+        "patchPreset": "default",
+        "oscillatorType": "triangle"
+      },
+      "gain": 0.48,
+      "source": "@adsr(10ms, 90ms, 75%, 100ms)\n",
+      "clips": [
+        {
+          "id": "subject-clip",
+          "start": {
+            "n": 0,
+            "d": 1
+          },
+          "length": {
+            "n": 24,
+            "d": 1
+          },
+          "source": "|: subject() :|\n@1 b   [a g]  a   e   |\n   f=         e   c   |\n"
+        }
+      ]
+    },
+    {
+      "kind": "instrument",
+      "id": "answer",
+      "name": "Answer",
+      "instrument": {
+        "type": "patch",
+        "patchPreset": "default",
+        "oscillatorType": "rich"
+      },
+      "gain": 0.29,
+      "source": "@clef(bass)\n@adsr(25ms, 110ms, 80%, 120ms)\n",
+      "clips": [
+        {
+          "id": "answer-clip",
+          "start": {
+            "n": 8,
+            "d": 1
+          },
+          "length": {
+            "n": 16,
+            "d": 1
+          },
+          "source": "# Start on E below the subject and reverse its intervals.\nfit(mapPitches(subject(), (tone) => E - (tone - c)), 16beat)\n"
+        }
+      ]
+    }
+  ]
+}
