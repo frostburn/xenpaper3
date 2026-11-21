@@ -2,9 +2,11 @@ import luckyDebugger from './lucky-debugger.xenpaper.json'
 import minuet from './minuet.xenpaper.json'
 import cosmicWavelength from './cosmic-wavelength.xenpaper.json'
 import negativeCarry from './negative-carry.xenpaper.json'
+import agnusDeiII from './agnus-dei-ii.xenpaper.json'
 
 /** Built-in projects keyed by IDs that remain stable if their source files move or are renamed. */
 export const demoProjects: Readonly<Record<string, string>> = Object.freeze({
+  'agnus-dei-ii': JSON.stringify(agnusDeiII),
   'cosmic-wavelength': JSON.stringify(cosmicWavelength),
   'lucky-debugger': JSON.stringify(luckyDebugger),
   minuet: JSON.stringify(minuet),

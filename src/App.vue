@@ -18,6 +18,9 @@ import TheFooter from './components/TheFooter.vue'
         <RouterLink :to="{ path: '/daw', query: { demo: 'minuet' } }">
           Open "Minuet in G Major"
         </RouterLink>
+        <RouterLink :to="{ path: '/daw', query: { demo: 'agnus-dei-ii' } }">
+          Open "Agnus Dei II" by Josquin
+        </RouterLink>
         <RouterLink :to="{ path: '/daw', query: { demo: 'lucky-debugger' } }">
           Open "Lucky Debugger"
         </RouterLink>

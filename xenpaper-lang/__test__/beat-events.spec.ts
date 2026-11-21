@@ -28,6 +28,55 @@ const audibleResult = (source: string) => {
 }
 
 describe('beat event expansion', () => {
+  it('maps a stored score’s pitches while fitting its rests, ties, and chord', () => {
+    const result = audibleResult(`
+{12edo}
+let interval <- P5
+fn phrase() { ret (C -> C) . (D, F) }
+fit(mapPitches(phrase(), (tone) => tone + interval), 8beat) E
+`)
+    expect(result.events.map(({ start, duration, pitch }) => [start, duration, pitch[1]])).toEqual([
+      ['0', '4', 700],
+      ['6', '2', 900],
+      ['6', '2', 1200],
+      ['8', '1', 400],
+    ])
+  })
+
+  it('fits a phrase to a variable beat duration independently of subdivision', () => {
+    const source = `
+let span <- 1.5beat
+fn phrase(length) { ret fit((C= D .), length) }
+@4 phrase(span) E
+`
+    const result = audibleResult(source)
+    expect(result.events.map(({ start, duration }) => [start, duration])).toEqual([
+      ['0', '3/4'],
+      ['3/4', '3/8'],
+      ['3/2', '1/4'],
+    ])
+    expect(result.duration).toBe('7/4')
+  })
+
+  it('fits pauses and chords to exact beat durations', () => {
+    const result = audibleResult('fit(., 0.375beat) fit((C, E, G), 2beat)')
+    expect(result.events.map(({ start, duration }) => [start, duration])).toEqual([
+      ['3/8', '2'],
+      ['3/8', '2'],
+      ['3/8', '2'],
+    ])
+    expect(result.duration).toBe('19/8')
+  })
+
+  it.each(['1/1', '1s', '0beat', '-1beat', '1.5r * 1beat', 'C'])(
+    'requires a positive exact beat duration in fit(C, %s)',
+    (span) => {
+      expect(expandToBeatEvents(parse(`fit(C, ${span})`)).diagnostics).toMatchObject([
+        { code: 'XP_FIT_DURATION' },
+      ])
+    },
+  )
+
   it.each(['cps((1 3 5 7), 2)', 'eulerGenus(45)'])(
     'supports sequential, slotted, and parallel playback of %s',
     (source) => {
