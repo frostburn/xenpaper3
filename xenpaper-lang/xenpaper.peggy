@@ -153,7 +153,7 @@ SequenceExpression
     }
 
 SequenceItem
-  = LoopJump / Expression
+  = LoopJump / BindingAssignment / ThrowStatement / Expression
 
 // Ties compose complete score operands, below arithmetic and postfix marks but
 // above sequencing and parallel composition. Chains associate to the left.
@@ -281,7 +281,8 @@ UnaryExpression
     }
 
 UnaryOperator
-  = "+" { return "+"; }
+  = "@not"i !IdentifierContinue { return "@not"; }
+  / "+" { return "+"; }
   / "-" { return "-"; }
   / "~" { return "~"; }
   / "√" { return "√"; }
@@ -578,7 +579,7 @@ LoopJump
 
 ControlToken
   = ComparisonOperator
-  / "@" ("if"i / "elif"i / "else"i / "for"i / "while"i / "break"i / "continue"i) !IdentifierContinue
+  / "@" ("if"i / "elif"i / "else"i / "for"i / "while"i / "break"i / "continue"i / "not"i) !IdentifierContinue
 
 Directive
   = !ControlToken "@" body:(GlissDirectiveBody / GrooveDirectiveBody / DroneDirectiveBody / ArticulationShorthandBody / NumericDirectiveBody / NamedDirectiveBody) {
@@ -846,6 +847,21 @@ VariableDeclaration
       return node('VariableDeclaration', { name, value });
     }
 
+BindingAssignment
+  = name:LocatedIdentifier Spacing "<-" Spacing value:Expression {
+      return node('BindingAssignment', { name, value });
+    }
+
+ThrowStatement
+  = "throw" !IdentifierContinue Spacing "(" Spacing message:DiagnosticString Spacing ")" {
+      return node('ThrowStatement', { message });
+    }
+
+DiagnosticString
+  = '"' ('\\' (["\\/bfnrt] / "u" [0-9a-fA-F] [0-9a-fA-F] [0-9a-fA-F] [0-9a-fA-F]) / [^"\\\x00-\x1F])* '"' {
+      return JSON.parse(text());
+    }
+
 FunctionDeclaration
   = "fn" !IdentifierContinue RequiredSpacing name:LocatedIdentifier Spacing "(" Spacing
     parameters:(first:FunctionParameter rest:(Spacing "," Spacing parameter:FunctionParameter { return parameter; })* { return [first, ...rest]; })? Spacing ")" Spacing body:FunctionBody {
@@ -873,10 +889,14 @@ CoercionAnnotation
     }
 
 FunctionBody
-  = "{" Spacing declarations:(declaration:(VariableDeclaration / FunctionDeclaration) Spacing { return declaration; })*
+  = "{" Spacing statements:(statement:FunctionStatement Spacing { return statement; })*
     returnStatement:ReturnStatement Spacing "}" {
-      return node('FunctionBody', { declarations, returnStatement });
+      return node('FunctionBody', { statements, returnStatement });
     }
+
+FunctionStatement
+  = VariableDeclaration / FunctionDeclaration / BindingAssignment / ThrowStatement
+  / IfBlock / ForBlock / WhileBlock / LoopJump
 
 ReturnStatement
   // Return binds more loosely than sequencing and parallel composition so a

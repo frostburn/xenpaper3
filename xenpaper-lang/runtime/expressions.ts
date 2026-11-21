@@ -4,6 +4,8 @@ import type { Diagnostic } from '../diagnostics'
 import { Value } from '../value'
 import { evaluateBuiltinArgument, evaluateBuiltinCall, requireInteger } from './builtins'
 import { evaluateLiteral, type NumericLiteralNode } from './literals'
+import { executeFunctionStatements, type FunctionBindings } from './function-statements'
+import { expandHarmonicSegment } from './harmonic-segments'
 import { equaveShift as modifierEquaveShift, equaveShifts } from './pitch-modifiers'
 import type {
   EvaluatedLiteral,
@@ -56,6 +58,25 @@ fn cps(factors: container<ratio>, count: integer, equave: ratio <- niente, withU
   let grounded <- products if (withUnity al false) else ground(products)
   let actualEquave <- equave al (pitch(2/1) + grounded[0])
   ret sort(equaveReduce(grounded, actualEquave))
+}
+fn eulerGenus(guide: integer, root: integer <- 1/1, equave: ratio <- 2/1) {
+  @if(guide @le 0) { throw("Guide tone must be a positive integer.") }
+  @if(root @le 0) { throw("Root tone must be a positive integer.") }
+  @if(equave @le 1) { throw("Equave must be greater than one.") }
+  @if(guide mod root) { throw("Root must divide the guide tone.") }
+  @while(@not (guide mod equave)) {
+    guide <- guide / equave
+  }
+  let pitches <- [equave]
+  @for(harmonic of 1::guide) {
+    @if(@not (guide mod harmonic)) {
+      let reduced <- (harmonic / root) rd equave
+      @if(reduced @ne 1) {
+        pitches <- push(pitches, reduced)
+      }
+    }
+  }
+  ret sort(pitches)
 }
 `
 
@@ -319,9 +340,12 @@ export function prepareFunctionCall(
   const diagnostics = supplied.flatMap((result) => result.diagnostics)
   if (!supplied.every((result) => 'value' in result)) return { diagnostics }
   const calls = new Set(environment.calls).add(definition)
+  const functionBudget = environment.functionBudget ?? { remaining: 100_000 }
+  const bindings: FunctionBindings = new WeakMap()
   let bodyEnvironment = extendLexicalEnvironment(definition.environment, {
     functions: new Map([[node.callee, definition]]),
     calls,
+    functionBudget,
   })
   for (const [index, parameter] of definition.parameters.entries()) {
     let evaluated: ExpressionEvaluationResult | undefined = supplied[index]
@@ -346,21 +370,29 @@ export function prepareFunctionCall(
       })
       return { diagnostics }
     }
-    bodyEnvironment = extendLexicalEnvironment(bodyEnvironment, {
-      variables: new Map([[parameter.name.name, value]]),
-      calls,
-    })
+    const variables = new Map([[parameter.name.name, value]])
+    bodyEnvironment = extendLexicalEnvironment(bodyEnvironment, { variables })
+    bindings.set(bodyEnvironment, variables)
   }
-  for (const declaration of definition.body.declarations) {
-    const declared = evaluateDeclaration(declaration, mapping, bodyEnvironment)
-    bodyEnvironment = declared.environment
-    diagnostics.push(...declared.diagnostics)
-    if (declared.diagnostics.some((item) => item.severity === 'error')) break
+  const executed = executeFunctionStatements(
+    definition.body.statements,
+    mapping,
+    bodyEnvironment,
+    bindings,
+    functionBudget,
+  )
+  diagnostics.push(...executed.diagnostics)
+  if (!executed.environment) {
+    return {
+      diagnostics: diagnostics.map((diagnostic) => ({
+        ...diagnostic,
+        locations: [node.location, ...diagnostic.locations],
+      })),
+    }
   }
-  if (diagnostics.some((item) => item.severity === 'error')) return { diagnostics }
   return {
     expression: definition.body.returnStatement.value,
-    environment: bodyEnvironment,
+    environment: executed.environment,
     diagnostics,
   }
 }
@@ -796,6 +828,30 @@ export function evaluateExpression(
       }
       return evaluateLiteral(node)
     }
+    if (node.type === 'EnumeratedChord') {
+      const expanded = expandHarmonicSegment(node, (endpoint) =>
+        evaluateExpression(endpoint, mapping, environment),
+      )
+      if (!expanded.expressions.length) return { diagnostics: expanded.diagnostics }
+      const evaluated = expanded.expressions.map((expression) =>
+        evaluateExpression(expression, mapping, environment),
+      )
+      const diagnostics = [
+        ...expanded.diagnostics,
+        ...evaluated.flatMap((item) => item.diagnostics),
+      ]
+      if (!evaluated.every((item) => 'value' in item)) return { diagnostics }
+      return {
+        value: {
+          kind: 'container',
+          composition: 'parallel',
+          values: evaluated.map((item) => item.value),
+          value: new Value(0),
+          origins: [{ location: node.location, role: 'literal' }],
+        },
+        diagnostics,
+      }
+    }
     if (node.type === 'PitchLiteral')
       return { value: evaluatePitchLiteral(node, mapping), diagnostics: [] }
     if (node.type === 'IntervalLiteral')
@@ -956,6 +1012,17 @@ export function evaluateExpression(
     if (node.type === 'UnaryExpression') {
       const operand = evaluateExpression(node.operand, mapping, environment)
       if (!('value' in operand)) return operand
+      if (node.operator === '@not')
+        return {
+          value: {
+            ...result('scalar', new Value(isTruthy(operand.value) ? 0 : 1), [
+              ...operand.value.origins,
+              { location: node.location, role: 'operator' },
+            ]),
+            boolean: true,
+          },
+          diagnostics: operand.diagnostics,
+        }
       if (
         operand.value.kind === 'container' ||
         operand.value.kind === 'undefined' ||

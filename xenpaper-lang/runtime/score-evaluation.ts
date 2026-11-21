@@ -11,6 +11,7 @@ import {
   prepareFunctionCall,
 } from './expressions'
 import { expandRepeats } from './repeat-expansion'
+import { expandHarmonicSegment } from './harmonic-segments'
 import type { ExpressionEvaluationResult } from './expressions'
 import { DYNAMIC_VELOCITIES, resolveDirective } from './directives'
 import { Visitor, type VisitorEvaluation } from './visitor'
@@ -110,7 +111,6 @@ interface VisitorScope {
 type ScoreVisitor = Visitor<Expression, VisitorScope, ScoreShapeEvaluationResult>
 
 const MAX_REPEAT_EXPANSION_NODES = 100_000
-const MAX_ENUMERATED_CHORD_SIZE = 10_000n
 
 function mapScoreConstruction(
   node: Expression,
@@ -392,77 +392,16 @@ function broadcastScalarOperation(
 function expandEnumeratedChord(
   node: Expression,
   context: PitchContext,
+  environment?: LexicalEnvironment,
 ): { readonly expressions: readonly Expression[]; readonly diagnostics: readonly Diagnostic[] } {
   if (node.type === 'EnumeratedChord') {
-    let enumerands = node.enumerands
-    if (!enumerands) {
-      const endpoint = node.rangeEnd!
-      const evaluated = [
-        evaluateExpression(node.first, context),
-        evaluateExpression(endpoint, context),
-      ]
-      const diagnostics = evaluated.flatMap((result) => result.diagnostics)
-      const integers = evaluated.map((result) => {
-        if (!('value' in result) || result.value.kind !== 'scalar') return undefined
-        const exact = result.value.value.exactRational()
-        return exact?.d === 1 ? BigInt(exact.s * exact.n) : undefined
-      })
-      if (integers.some((value) => value === undefined)) {
-        return {
-          expressions: [],
-          diagnostics: [
-            ...diagnostics,
-            {
-              code: 'XP_TYPE_MISMATCH',
-              severity: 'error',
-              message: 'Enumerated chord range endpoints must be exact integers.',
-              locations: [node.location],
-            },
-          ],
-        }
-      }
-      const [start, end] = integers as [bigint, bigint]
-      const distance = start <= end ? end - start : start - end
-      if (distance + 1n > MAX_ENUMERATED_CHORD_SIZE) {
-        return {
-          expressions: [],
-          diagnostics: [
-            ...diagnostics,
-            {
-              code: 'XP_EXPANSION_LIMIT',
-              severity: 'error',
-              message: `Enumerated chord exceeds the ${MAX_ENUMERATED_CHORD_SIZE}-member expansion limit.`,
-              locations: [node.location],
-            },
-          ],
-        }
-      }
-      const step = start <= end ? 1n : -1n
-      enumerands = []
-      for (let value = start; ; value += step) {
-        enumerands.push({
-          type: 'IntegerLiteral',
-          value: String(value),
-          raw: String(value),
-          location: node.location,
-        })
-        if (value === end) break
-      }
-    }
-    return {
-      expressions: enumerands.map((enumerand) => ({
-        type: 'BinaryExpression',
-        operator: '/',
-        left: node.inverted ? node.first : enumerand,
-        right: node.inverted ? enumerand : node.first,
-        location: node.location,
-      })),
-      diagnostics: [],
-    }
+    return expandHarmonicSegment(node, (endpoint) =>
+      evaluateExpression(endpoint, context, environment),
+    )
   }
   if (node.type === 'BinaryExpression' && !isComparison(node.operator)) {
-    const left = expandEnumeratedChord(node.left, context)
-    const right = expandEnumeratedChord(node.right, context)
+    const left = expandEnumeratedChord(node.left, context, environment)
+    const right = expandEnumeratedChord(node.right, context, environment)
     if (
       left.expressions.length === 1 &&
       left.expressions[0] === node.left &&
@@ -479,7 +418,7 @@ function expandEnumeratedChord(
     }
   }
   if (node.type === 'Group') {
-    const expanded = expandEnumeratedChord(node.expression, context)
+    const expanded = expandEnumeratedChord(node.expression, context, environment)
     if (expanded.expressions.length === 1 && expanded.expressions[0] === node.expression) {
       return { expressions: [node], diagnostics: expanded.diagnostics }
     }
@@ -489,7 +428,7 @@ function expandEnumeratedChord(
     }
   }
   if (node.type === 'UnaryExpression' || node.type === 'PitchModifierExpression') {
-    const expanded = expandEnumeratedChord(node.operand, context)
+    const expanded = expandEnumeratedChord(node.operand, context, environment)
     if (expanded.expressions.length === 1 && expanded.expressions[0] === node.operand) {
       return { expressions: [node], diagnostics: expanded.diagnostics }
     }
@@ -1066,7 +1005,7 @@ function playablePitch(
         {
           code: 'XP_TYPE_MISMATCH',
           severity: 'error',
-          message: 'A comparison result cannot be played as a note.',
+          message: 'A Boolean result cannot be played as a note.',
           locations: [node.location],
         },
       ],
@@ -1563,7 +1502,7 @@ export function evaluateScoreSemantics(
     }
     const broadcast = broadcastScalarOperation(current, context, environment)
     if (broadcast) return visitor.visit(broadcast)
-    const expandedChord = expandEnumeratedChord(current, context)
+    const expandedChord = expandEnumeratedChord(current, context, environment)
     if (expandedChord.diagnostics.length) return { diagnostics: expandedChord.diagnostics }
     if (expandedChord.expressions.length !== 1 || expandedChord.expressions[0] !== current) {
       const results = expandedChord.expressions.map((expression) => visitor.visit(expression))

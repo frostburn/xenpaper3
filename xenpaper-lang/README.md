@@ -103,9 +103,11 @@ The built-in identifier `pi` evaluates to the dimensionless real constant π.
 Built-in calls use the same contextual coercions as annotated function
 parameters: a bare integer passed to `pitch()` is a scalar ratio, one passed to
 `ratio()` is a scale degree, and the combination count in `kCombinations()` is
-an integer. `sort(container)`, `arrayMap(callback, container)`, and
-`arrayReduce(callback, container, initial?)` likewise require containers in
-their container positions and diagnose missing or extra arguments.
+an integer. `sort(container)`, `push(container, value)`,
+`arrayMap(callback, container)`, and `arrayReduce(callback, container, initial?)`
+require containers in their container positions. `push` returns a copy with one
+element appended, so use `items <- push(items, value)` to update a function
+local.
 
 ## Comparisons and control flow
 
@@ -187,6 +189,26 @@ A loop's else runs outside that loop's body and local bindings. In a nested
 loop, a jump in its else can target an enclosing loop body. Jumps can pass
 through a sequential group, while functions, score templates, parallel
 branches, and normalized slots need a loop of their own.
+
+Use `@not value` to negate a truth value. Parenthesize arithmetic or a
+comparison you want to negate as a unit, for example `@not (guide mod root)`.
+
+Harmonic segments are iterable ratio containers in value expressions.
+`@for(harmonic of 1::5) { ... }` visits 1 through 5, while `5::8` supplies
+`1/1`, `6/5`, `7/5`, and `8/5`. When played directly in a score, the
+segment remains a chord.
+
+The prelude defines `eulerGenus(guide, root <- 1/1, equave <- 2/1)`. It derives
+a scale from the guide tone's divisors, rotates it to the root, and reduces it
+into the equave. The guide and root are positive integers, the root must
+divide the guide, and the equave must exceed one. The result omits unison
+and ends at the equave because a Xenpaper scale already has an implicit unison.
+The reduced guide is subject to the harmonic segment limit of 10,000 members.
+
+```text
+{scale <- eulerGenus(45)}
+0 1 2 3 4 5 6
+```
 
 ## Note ties
 
@@ -293,17 +315,19 @@ Place continuations inside each branch to control its ending independently.
 to that end. Binary `->` ties matching pitches into the following operand.
 
 `fn name(parameters) {
-... ret expression }` creates a lexical closure. A function body contains zero
-or more local `let` or `fn` declarations followed by exactly one `ret`, whose
-expression is the call's result. Commas separate parameters and a trailing comma
+... ret expression }` creates a lexical closure. The body can run `let` and
+`fn` declarations, assignments, and control blocks before a final `ret`. Use
+`name <- expression` to update an existing local variable or parameter.
+`throw("message")` halts the call with a diagnostic. The final `ret` can
+produce a value or a score fragment. Commas separate parameters and a trailing comma
 is not accepted. `let`, `fn`, and `ret` are reserved (case-sensitive) and cannot
 be used as pitches, identifiers, or function names. Names that are valid musical
 pitch spellings are likewise unavailable for declarations: music always wins and
 the meaning of a pitch token never depends on lexical scope.
 
 Every evaluation starts with a prelude written in Xenpaper itself. It currently
-declares `pi` and defines `sqrt(radicand: ratio)` as `radicand ** 1/2`; ordinary
-lexical shadowing can replace either name in a narrower scope.
+declares `pi` and defines helpers such as `sqrt`, `cps`, and `eulerGenus`.
+Ordinary lexical shadowing can replace these names in a narrower scope.
 
 `ret` has lower precedence than score sequencing and parallel composition, so a
 function may return an entire musical fragment:

@@ -51,7 +51,7 @@ describe('comparison expressions', () => {
       'XP_DIMENSION_MISMATCH',
     )
     expect(expandToBeatEvents(parse('1 @eq 1')).diagnostics[0]?.message).toMatch(
-      /comparison result cannot be played/,
+      /Boolean result cannot be played/,
     )
   })
 })

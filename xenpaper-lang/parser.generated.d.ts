@@ -22,6 +22,7 @@ export type Expression =
   | Barline
   | BarRest
   | BinaryExpression
+  | BindingAssignment
   | CallExpression
   | ConditionalExpression
   | ContextAssignment
@@ -69,6 +70,7 @@ export type Expression =
   | Sequence
   | SignatureDeclaration
   | TailElimination
+  | ThrowStatement
   | TuningStretch
   | UnaryExpression
   | VariableDeclaration
@@ -187,9 +189,20 @@ export interface CoercionAnnotation extends Node {
   raw: string
 }
 
+export interface BindingAssignment extends Node {
+  type: 'BindingAssignment'
+  name: Identifier
+  value: Expression
+}
+
+export interface ThrowStatement extends Node {
+  type: 'ThrowStatement'
+  message: string
+}
+
 export interface FunctionBody extends Node {
   type: 'FunctionBody'
-  declarations: Array<VariableDeclaration | FunctionDeclaration>
+  statements: Expression[]
   returnStatement: ReturnStatement
 }
 

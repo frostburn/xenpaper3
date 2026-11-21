@@ -96,6 +96,7 @@ export interface LexicalEnvironment {
   readonly functions: ReadonlyMap<string, FunctionDefinition>
   /** Definition identities currently being invoked, used to diagnose prohibited recursion. */
   readonly calls: ReadonlySet<FunctionDefinition>
+  readonly functionBudget?: { remaining: number }
 }
 
 export interface FunctionDefinition {
@@ -117,6 +118,7 @@ export function extendLexicalEnvironment(
     readonly variables?: ReadonlyMap<string, EvaluatedLiteral>
     readonly functions?: ReadonlyMap<string, FunctionDefinition>
     readonly calls?: ReadonlySet<FunctionDefinition>
+    readonly functionBudget?: { remaining: number }
   },
 ): LexicalEnvironment {
   return {
@@ -124,6 +126,7 @@ export function extendLexicalEnvironment(
     variables: additions.variables ?? new Map(),
     functions: additions.functions ?? new Map(),
     calls: additions.calls ?? environment.calls,
+    functionBudget: additions.functionBudget ?? environment.functionBudget,
   }
 }
 
@@ -193,7 +196,7 @@ export interface RepeatExpansionResult {
 
 export interface ScalarValue {
   readonly kind: 'scalar'
-  /** Comparison results use the existing 0/1 Boolean representation. */
+  /** Boolean expressions use the existing 0/1 representation. */
   readonly boolean?: true
   readonly value: Value
   readonly origins: readonly SourceOrigin[]

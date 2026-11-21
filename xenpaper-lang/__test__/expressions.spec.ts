@@ -387,6 +387,102 @@ describe('arithmetic expression evaluation', () => {
     ])
   })
 
+  it('runs function control flow before ret while keeping local updates scoped', () => {
+    const declaration = parse(`
+fn countOdds(limit: integer) {
+  let total <- 0/1
+  @for(harmonic of 1::limit) {
+    @if(@not (harmonic mod 2)) { @continue }
+    total <- total + 1
+  } @else {
+    total <- total + 10
+  }
+  ret total
+}
+`).body[0]
+    if (declaration.type !== 'FunctionDeclaration') throw new Error('Expected a function.')
+    const { environment, diagnostics } = evaluateDeclaration(declaration)
+    expect(diagnostics).toEqual([])
+    for (const limit of [5, 5, 2]) {
+      const result = evaluateExpression(
+        expression(`countOdds(${limit})`),
+        DEFAULT_PITCH_CONTEXT,
+        environment,
+      )
+      expect(result.diagnostics).toEqual([])
+      expect('value' in result && result.value.value.valueOf()).toBe(limit === 5 ? 13 : 11)
+    }
+  })
+
+  it('evaluates harmonic segments as normalized ratio containers', () => {
+    const segment = evaluate('5::8')
+    expect(
+      segment.kind === 'container' &&
+        segment.values.map(({ value }) => value.exactRational()?.toFraction()),
+    ).toEqual(['1', '6/5', '7/5', '8/5'])
+  })
+
+  it.each([
+    [
+      'eulerGenus(45)',
+      [
+        [9, 8],
+        [5, 4],
+        [45, 32],
+        [3, 2],
+        [15, 8],
+        [2, 1],
+      ],
+    ],
+    [
+      'eulerGenus(90, 3)',
+      [
+        [5, 4],
+        [4, 3],
+        [3, 2],
+        [5, 3],
+        [15, 8],
+        [2, 1],
+      ],
+    ],
+    [
+      'eulerGenus(5, 1, 3)',
+      [
+        [5, 3],
+        [3, 1],
+      ],
+    ],
+    ['eulerGenus(8)', [[2, 1]]],
+  ] as const)('returns the sorted Euler genus for %s', (source, ratios) => {
+    const genus = evaluate(source)
+    if (genus.kind !== 'container') throw new Error('Expected a container.')
+    expect(genus.values).toHaveLength(ratios.length)
+    for (const [index, [numerator, denominator]] of ratios.entries())
+      expect(
+        genus.values[index]!.value.equals(new Value(BigInt(numerator), BigInt(denominator))),
+      ).toBe(true)
+  })
+
+  it.each([
+    ['eulerGenus(45, 7)', 'Root must divide the guide tone.'],
+    ['eulerGenus(0)', 'Guide tone must be a positive integer.'],
+    ['eulerGenus(45, 0)', 'Root tone must be a positive integer.'],
+    ['eulerGenus(45, 1, 1)', 'Equave must be greater than one.'],
+  ])('rejects invalid Euler genus arguments in %s', (source, message) => {
+    expect(evaluateExpression(expression(source)).diagnostics).toMatchObject([
+      { code: 'XP_THROW', message },
+    ])
+  })
+
+  it('installs the Euler genus as a playable scale', () => {
+    const change = parse('{scale <- eulerGenus(45)}').body[0]
+    if (change.type !== 'PitchContextChange') throw new Error('Expected a scale change.')
+    const context = applyPitchContextChange(change, DEFAULT_PITCH_CONTEXT)
+    expect(context.degrees).toHaveLength(6)
+    expect(context.degrees[0]?.equals(Value.pitch(new Value(9n, 8n)))).toBe(true)
+    expect(context.degreeEquave.equals(Value.pitch(new Value(2)))).toBe(true)
+  })
+
   it('coerces annotated parameters and evaluates declared defaults', () => {
     const declaration = parse(
       'fn power(value: ratio, exponent: integer <- 2/1) { ret value ** exponent }',

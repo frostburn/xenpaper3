@@ -298,6 +298,23 @@ class ArrayMapBuiltin extends Builtin {
   }
 }
 
+class PushBuiltin extends Builtin {
+  constructor() {
+    super('push', 2, 2, ['container', undefined])
+  }
+
+  protected call(arguments_: readonly EvaluatedLiteral[]): EvaluatedLiteral {
+    const values = this.requireContainer(arguments_)
+    return {
+      ...arguments_[0],
+      kind: 'container',
+      values: [...values, arguments_[1]!],
+      value: new Value(0),
+      origins: this.origins(arguments_),
+    }
+  }
+}
+
 class SortBuiltin extends Builtin {
   constructor() {
     super('sort', 1, 1, ['container'])
@@ -329,6 +346,7 @@ const BUILTINS = new Map(
     new ArrayReduceBuiltin(),
     new ArrayMapBuiltin(),
     new SortBuiltin(),
+    new PushBuiltin(),
   ].map((builtin) => [builtin.name, builtin]),
 )
 
