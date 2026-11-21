@@ -74,13 +74,17 @@ export function evaluateBuiltinArgument(
         },
         diagnostics: [],
       }
-    const element = elementCoercion(coercion)
     if (node.expression.type === 'Sequence' || node.expression.type === 'Parallel') {
-      const evaluated = evaluateBuiltinArgument(node.expression, element, environment, evaluate)
+      const evaluated = evaluateBuiltinArgument(node.expression, coercion, environment, evaluate)
       if (!('value' in evaluated) || evaluated.value.kind !== 'container') return evaluated
       return { ...evaluated, value: { ...evaluated.value, normalized: true } }
     }
-    const item = evaluateBuiltinArgument(node.expression, element, environment, evaluate)
+    const item = evaluateBuiltinArgument(
+      node.expression,
+      elementCoercion(coercion),
+      environment,
+      evaluate,
+    )
     if (!('value' in item)) return item
     return {
       value: {
@@ -95,8 +99,9 @@ export function evaluateBuiltinArgument(
   }
   if (node.type === 'Sequence' || node.type === 'Parallel') {
     const nodes = node.type === 'Sequence' ? node.items : node.branches
+    const element = elementCoercion(coercion)
     const results = nodes.map((item) =>
-      evaluateBuiltinArgument(item, coercion, environment, evaluate),
+      evaluateBuiltinArgument(item, element, environment, evaluate),
     )
     const diagnostics = results.flatMap((item) => item.diagnostics)
     if (!results.every((item) => 'value' in item)) return { diagnostics }

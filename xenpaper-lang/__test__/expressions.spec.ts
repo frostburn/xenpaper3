@@ -72,6 +72,9 @@ describe('arithmetic expression evaluation', () => {
     for (const [source, expected] of [
       ['select([[2d]])', Value.ratio(Value.cents(200))],
       ['select([[2]])', new Value(2)],
+      ['select([[2 3] [5 7]])', new Value(2)],
+      ['select(((2 3) (5 7)))', new Value(2)],
+      ['select(((2d 3), (5 7)))', Value.ratio(Value.cents(200))],
       ['select([[niente]])', Value.ratio(Value.cents(200))],
     ] as const) {
       const evaluated = evaluateExpression(
@@ -397,14 +400,16 @@ describe('arithmetic expression evaluation', () => {
       [7n, 4n],
       [2n, 1n],
     ])
-    expectRatios('cps([1 3 5 7], 2)', [
-      [7n, 6n],
-      [5n, 4n],
-      [35n, 24n],
-      [5n, 3n],
-      [7n, 4n],
-      [2n, 1n],
-    ])
+    for (const source of ['cps([1 3 5 7], 2)', 'cps((1 3 5 7), 2)', 'cps((1, 3, 5, 7), 2)']) {
+      expectRatios(source, [
+        [7n, 6n],
+        [5n, 4n],
+        [35n, 24n],
+        [5n, 3n],
+        [7n, 4n],
+        [2n, 1n],
+      ])
+    }
   })
 
   it('runs function control flow before ret while keeping local updates scoped', () => {
