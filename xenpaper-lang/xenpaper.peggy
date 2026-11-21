@@ -213,11 +213,17 @@ ComparisonExpression
     }
 
 AppendExpression
-  = first:AdditiveExpression rest:(Spacing "<<" Spacing right:AdditiveExpression {
+  = first:AdditiveExpression rest:(Spacing "<<" Spacing right:AppendOperand {
       return { operator: "<<", right };
     })* {
       return foldBinary(first, rest);
     }
+
+// A bare integer append behaves like an authored score degree. Arithmetic
+// and colon chords still use their usual value grammar.
+AppendOperand
+  = degree:ScaleDegreeLiteral !":" !AdditiveTail { return degree; }
+  / AdditiveExpression
 
 ComparisonOperator
   = operator:$("@" ("eq"i / "ne"i / "lt"i / "le"i / "gt"i / "ge"i)) !IdentifierContinue {

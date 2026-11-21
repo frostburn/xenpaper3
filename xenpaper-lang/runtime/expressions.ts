@@ -697,11 +697,18 @@ function binary(
   if (operator === '<<') {
     if (left.kind !== 'container')
       throw new TypeError('The left operand of << must be a container.')
-    return {
-      ...left,
-      values: [...left.values, right],
-      origins: operatorOrigins(left, right, node),
+    const origins = operatorOrigins(left, right, node)
+    if (left.normalized && left.composition === 'parallel') {
+      // Normalize the extended sequence once, after the parallel prefix
+      // has contributed its full duration.
+      return {
+        ...left,
+        composition: 'sequence',
+        values: [{ ...left, normalized: false }, right],
+        origins,
+      }
     }
+    return { ...left, values: [...left.values, right], origins }
   }
   if (left.kind === 'container' || right.kind === 'container') {
     if (left.kind === 'container' && right.kind === 'container') {
