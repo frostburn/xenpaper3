@@ -1017,33 +1017,34 @@ describe('DawView', () => {
     }
   })
 
-  it('plays Mirror Study with a repeated subject and a delayed, augmented inversion', () => {
-    const project = parseDawProject(demoProjects['mirror-study']!)
+  it('plays Agnus Dei II at three speeds with a shared cadence', () => {
+    const project = parseDawProject(demoProjects['agnus-dei-ii']!)
     const { lanes, endBeat } = createPlaybackPlan(project)
-    const [subject, answer] = lanes
-    expect(lanes.map((lane) => lane.name)).toEqual(['Subject', 'Answer'])
-    expect(subject!.notes[0]).toMatchObject({ startBeat: 0, pitch: { initialValue: 1200 } })
-    expect(answer).toMatchObject({ instrument: { oscillatorType: 'rich' } })
+    const [superius, altus, bassus] = lanes
+    expect(lanes.map((lane) => lane.name)).toEqual(['Superius', 'Altus', 'Bassus'])
+    expect(lanes.map((lane) => lane.notes.length)).toEqual([68, 23, 47])
+    expect(bassus!.notes[0]).toMatchObject({ startBeat: 0, pitch: { initialValue: -1000 } })
 
-    const statement = subject!.notes.filter((note) => note.startBeat < 8)
-    const repeat = subject!.notes.filter((note) => note.startBeat >= 8 && note.startBeat < 16)
-    expect(statement).toHaveLength(9)
-    expect(repeat).toHaveLength(statement.length)
-    expect(answer!.notes).toHaveLength(statement.length)
-    for (const [i, note] of statement.entries()) {
-      const cents = note.pitch.initialValue
-      expect(repeat[i]).toMatchObject({
-        startBeat: 8 + note.startBeat,
-        endBeat: 8 + note.endBeat,
-        pitch: { initialValue: cents },
-      })
-      expect(answer!.notes[i]).toMatchObject({
-        startBeat: 8 + 2 * note.startBeat,
-        endBeat: 8 + 2 * note.endBeat,
-        pitch: { initialValue: 1600 - cents },
-      })
+    for (const [i, note] of bassus!.notes.slice(0, -1).entries()) {
+      const higher = superius!.notes[i]!
+      expect(higher.startBeat).toBeCloseTo((note.startBeat * 2) / 3, 10)
+      expect(higher.endBeat).toBeCloseTo((note.endBeat * 2) / 3, 10)
+      expect(higher.pitch.initialValue).toBe(note.pitch.initialValue + 1200)
     }
-    expect(endBeat).toBe(24)
+    for (const [i, note] of altus!.notes.slice(0, -1).entries()) {
+      const source = bassus!.notes[i]!
+      expect(note.startBeat).toBe(source.startBeat * 2)
+      expect(note.endBeat).toBe(source.endBeat * 2)
+      expect(note.pitch.initialValue).toBe(source.pitch.initialValue + 700)
+    }
+    expect(lanes.map(({ notes }) => notes[notes.length - 1])).toMatchObject(
+      [500, 200, -1000].map((initialValue) => ({
+        startBeat: 48,
+        endBeat: 50,
+        pitch: { initialValue },
+      })),
+    )
+    expect(endBeat).toBe(50)
   })
 
   it('loads a built-in demo without fetching it', async () => {
