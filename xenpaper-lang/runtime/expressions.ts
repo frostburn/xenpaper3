@@ -571,6 +571,19 @@ function addOrSubtract(
   )
 }
 
+/** Apply a score transposition using the same pitch arithmetic as a written sum. */
+export function addPitchInterval(
+  pitch: EvaluatedLiteral,
+  interval: PitchOffsetValue,
+  node: Expression,
+): ExpressionEvaluationResult {
+  try {
+    return { value: addOrSubtract(pitch, interval, false, node), diagnostics: [] }
+  } catch (error) {
+    return { diagnostics: [diagnostic(node, error)] }
+  }
+}
+
 function multiplyOrDivide(
   left: EvaluatedLiteral,
   right: EvaluatedLiteral,

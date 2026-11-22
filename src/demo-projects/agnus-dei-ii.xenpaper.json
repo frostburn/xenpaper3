@@ -51,7 +51,7 @@
             "n": 50,
             "d": 1
           },
-          "source": "# An octave above the bassus, at three times the altus speed.\nfit(mapPitches((opening() | continuation() | extension()), (tone) => tone + P8), cadence)\n| @1 F= ||\n"
+          "source": "# An octave above the bassus, at three times the altus speed.\nfit((opening() | continuation() | extension()) + P8, cadence)\n| @1 F= ||\n"
         }
       ]
     },
@@ -77,7 +77,7 @@
             "n": 50,
             "d": 1
           },
-          "source": "# A fifth above the bassus, at the slowest speed.\nfit(mapPitches(opening(), (tone) => tone + P5), cadence)\n| @1 D= ||\n"
+          "source": "# A fifth above the bassus, at the slowest speed.\nfit(opening() + P5, cadence)\n| @1 D= ||\n"
         }
       ]
     },

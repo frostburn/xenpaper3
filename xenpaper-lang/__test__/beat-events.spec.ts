@@ -28,6 +28,35 @@ const audibleResult = (source: string) => {
 }
 
 describe('beat event expansion', () => {
+  it.each(['opening() + interval', 'interval + (opening())', 'opening() + M2 + P4'])(
+    'transposes a returned score while fitting its rhythm: %s',
+    (phrase) => {
+      const result = audibleResult(`
+{12edo}
+let interval <- P5
+fn opening() {
+  let interval <- P1
+  ret @2 C= . (E, G)
+}
+fit(${phrase}, 4beat) C
+`)
+      expect(
+        result.events.map(({ start, duration, pitch }) => [start, duration, pitch[1]]),
+      ).toEqual([
+        ['0', '2', 700],
+        ['3', '1', 1100],
+        ['3', '1', 1400],
+        ['4', '1', 0],
+      ])
+    },
+  )
+
+  it('transposes using the tuning at each returned note', () => {
+    expect(audibleResult('{12edo} fn opening() { ret C {19edo} C } opening() + P5')).toEqual(
+      audibleResult('{12edo} (C + P5) {19edo} (C + P5)'),
+    )
+  })
+
   it('maps a stored score’s pitches while fitting its rests, ties, and chord', () => {
     const result = audibleResult(`
 {12edo}

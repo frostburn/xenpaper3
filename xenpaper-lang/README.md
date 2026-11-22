@@ -248,6 +248,9 @@ fit((C E= G), span)
 ## Reuse and transform a written phrase
 
 A score-returning function can hold a passage in regular Xenpaper notation.
+Add a pitch interval to its call to transpose the passage with its original
+rhythm. For example, `subject() + P5` raises each note by a perfect fifth.
+
 `mapPitches(music, (tone) => expression)` applies a one-parameter lambda to
 each pitched note. The lambda uses the note's active tuning. Rests and
 durations carry through, and the result can itself be fitted to a beat span.
@@ -255,6 +258,7 @@ durations carry through, and the result can itself be fitted to a beat span.
 ```text
 fn subject() { ret @2 C= . D Eb= }
 subject()
+subject() + P5
 fit(mapPitches(subject(), (tone) => G - (tone - C)), 6beat)
 ```
 

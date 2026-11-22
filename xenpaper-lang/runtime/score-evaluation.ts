@@ -3,6 +3,7 @@ import type { Expression, Node } from '../parser.generated.js'
 import type { Diagnostic } from '../diagnostics'
 import { Value } from '../value'
 import {
+  addPitchInterval,
   evaluateDeclaration,
   evaluateExpression,
   isComparison,
@@ -110,6 +111,34 @@ interface VisitorScope {
 }
 
 type ScoreVisitor = Visitor<Expression, VisitorScope, ScoreShapeEvaluationResult>
+
+function containsScoreCall(node: Expression): boolean {
+  if (node.type === 'CallExpression') return true
+  if (node.type === 'Group') return containsScoreCall(node.expression)
+  return (
+    node.type === 'BinaryExpression' &&
+    node.operator === '+' &&
+    (containsScoreCall(node.left) || containsScoreCall(node.right))
+  )
+}
+
+function visitWithPitchMap(
+  music: Expression,
+  visitor: ScoreVisitor,
+  mapPitch: NonNullable<VisitorScope['mapPitch']>,
+): ScoreShapeEvaluationResult {
+  const outerMap = visitor.scope.mapPitch
+  return visitor.visit(music, {
+    mapPitch: !outerMap
+      ? mapPitch
+      : (pitch, context) => {
+          const mapped = mapPitch(pitch, context)
+          if (!('value' in mapped)) return mapped
+          const outer = outerMap(mapped.value, context)
+          return { ...outer, diagnostics: [...mapped.diagnostics, ...outer.diagnostics] }
+        },
+  })
+}
 
 const MAX_REPEAT_EXPANSION_NODES = 100_000
 
@@ -1683,36 +1712,30 @@ export function evaluateScoreSemantics(
               },
             ],
           }
-        const outerMap = visitor.scope.mapPitch
-        const result = visitor.visit(music, {
-          mapPitch: (pitch, pitchContext) => {
-            const scope = extendLexicalEnvironment(callback.environment, {
-              variables: new Map([[callback.parameters[0]!, pitch]]),
-            })
-            const mapped = evaluateExpression(callback.body, pitchContext, scope)
-            if (!('value' in mapped)) return mapped
-            const value = mapped.value
-            if (
-              value.kind !== 'absolutePitch' &&
-              value.kind !== 'pitchOffset' &&
-              value.kind !== 'scalar'
-            )
-              return {
-                diagnostics: [
-                  ...mapped.diagnostics,
-                  {
-                    code: 'XP_TYPE_MISMATCH',
-                    severity: 'error',
-                    message: 'A mapPitches() lambda must return a single pitch.',
-                    locations: [callback.body.location],
-                  },
-                ],
-              }
-            const transformed = { ...value, origins: pitch.origins }
-            if (!outerMap) return { ...mapped, value: transformed }
-            const outer = outerMap(transformed, pitchContext)
-            return { ...outer, diagnostics: [...mapped.diagnostics, ...outer.diagnostics] }
-          },
+        const result = visitWithPitchMap(music, visitor, (pitch, pitchContext) => {
+          const scope = extendLexicalEnvironment(callback.environment, {
+            variables: new Map([[callback.parameters[0]!, pitch]]),
+          })
+          const mapped = evaluateExpression(callback.body, pitchContext, scope)
+          if (!('value' in mapped)) return mapped
+          const value = mapped.value
+          if (
+            value.kind !== 'absolutePitch' &&
+            value.kind !== 'pitchOffset' &&
+            value.kind !== 'scalar'
+          )
+            return {
+              diagnostics: [
+                ...mapped.diagnostics,
+                {
+                  code: 'XP_TYPE_MISMATCH',
+                  severity: 'error',
+                  message: 'A mapPitches() lambda must return a single pitch.',
+                  locations: [callback.body.location],
+                },
+              ],
+            }
+          return { ...mapped, value: { ...value, origins: pitch.origins } }
         })
         return {
           ...result,
@@ -1761,6 +1784,39 @@ export function evaluateScoreSemantics(
     }
     const broadcast = broadcastScalarOperation(current, context, environment)
     if (broadcast) return visitor.visit(broadcast)
+    if (current.type === 'BinaryExpression' && current.operator === '+') {
+      for (const [music, interval] of [
+        [current.left, current.right],
+        [current.right, current.left],
+      ] as const) {
+        if (!containsScoreCall(music)) continue
+        const initial = evaluateExpression(interval, context, environment)
+        if (!('value' in initial) || initial.value.kind !== 'pitchOffset') continue
+        const mapped = visitWithPitchMap(music, visitor, (pitch, pitchContext) => {
+          const resolved =
+            pitchContext === context
+              ? initial
+              : evaluateExpression(interval, pitchContext, environment)
+          if (!('value' in resolved)) return resolved
+          if (resolved.value.kind !== 'pitchOffset')
+            return {
+              diagnostics: [
+                ...resolved.diagnostics,
+                {
+                  code: 'XP_TYPE_MISMATCH',
+                  severity: 'error',
+                  message: 'Score transposition requires a pitch interval.',
+                  locations: [interval.location],
+                },
+              ],
+            }
+          const shifted = addPitchInterval(pitch, resolved.value, current)
+          return { ...shifted, diagnostics: [...resolved.diagnostics, ...shifted.diagnostics] }
+        })
+        // The pitch map applies only within the transposed operand.
+        return { ...mapped }
+      }
+    }
     const expandedChord = expandEnumeratedChord(current, context, environment)
     if (expandedChord.diagnostics.length) return { diagnostics: expandedChord.diagnostics }
     if (expandedChord.expressions.length !== 1 || expandedChord.expressions[0] !== current) {
