@@ -86,12 +86,11 @@ fit(${phrase}, 4beat) C
     ])
   })
 
-  it('maps a stored score’s pitches while fitting its rests, ties, and chord', () => {
+  it('broadcasts over a returned score with rests, ties, and a chord inside fit', () => {
     const result = audibleResult(`
 {12edo}
-let interval <- P5
 fn phrase() { ret (C -> C) . (D, F) }
-fit(mapPitches(phrase(), (tone) => tone + interval), 8beat) E
+fit(phrase() + P5, 8beat) E
 `)
     expect(result.events.map(({ start, duration, pitch }) => [start, duration, pitch[1]])).toEqual([
       ['0', '4', 700],

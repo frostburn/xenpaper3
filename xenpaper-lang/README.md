@@ -254,16 +254,12 @@ For example, `subject() + P5` raises each note by the current tuning's perfect f
 `subject() + 3/2` shifts it by the exact ratio, and `intervals() * 3/2`
 stretches a phrase of relative pitch intervals by a factor of 1.5.
 
-`mapPitches(music, (tone) => expression)` applies a one-parameter lambda to
-each pitched note. The lambda uses the note's active tuning. Rests and
-durations carry through, and the result can itself be fitted to a beat span.
-
 ```text
 fn subject() { ret @2 C= . D Eb= }
 subject()
 subject() + P5
 subject() + 3/2
-fit(mapPitches(subject(), (tone) => G - (tone - C)), 6beat)
+fit(subject() + P5, 6beat)
 ```
 
 ## Note ties

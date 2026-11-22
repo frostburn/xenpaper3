@@ -87,10 +87,20 @@ function resolveContext(resolver: ContextResolver, base: ScoreVisitorContext): S
 }
 
 type LoopFrame = { jump?: Extract<Expression, { type: 'LoopJump' }>['action'] }
+type BinaryExpression = Extract<Expression, { type: 'BinaryExpression' }>
+
+interface ScoreBroadcast {
+  readonly expression: BinaryExpression
+  readonly scalar: Expression
+  readonly scalarOnLeft: boolean
+  readonly initial: Extract<ExpressionEvaluationResult, { value: EvaluatedLiteral }>
+  readonly context: PitchContext
+  readonly environment?: LexicalEnvironment
+}
 
 interface VisitorScope {
   readonly loop?: LoopFrame
-  readonly mapPitch?: (pitch: EvaluatedLiteral, context: PitchContext) => ExpressionEvaluationResult
+  readonly broadcasts?: readonly ScoreBroadcast[]
   readonly offset: Fraction
   readonly timeScale: Fraction
   readonly layout?: boolean
@@ -112,7 +122,7 @@ interface VisitorScope {
 
 type ScoreVisitor = Visitor<Expression, VisitorScope, ScoreShapeEvaluationResult>
 
-function isArithmetic(node: Expression): node is Extract<Expression, { type: 'BinaryExpression' }> {
+function isArithmetic(node: Expression): node is BinaryExpression {
   return (
     node.type === 'BinaryExpression' &&
     node.operator !== '->' &&
@@ -129,24 +139,6 @@ function containsScoreCall(node: Expression): boolean {
 
 function isNumeric(value: EvaluatedLiteral): boolean {
   return value.kind === 'scalar' || value.kind === 'pitchOffset' || value.kind === 'absolutePitch'
-}
-
-function visitWithPitchMap(
-  music: Expression,
-  visitor: ScoreVisitor,
-  mapPitch: NonNullable<VisitorScope['mapPitch']>,
-): ScoreShapeEvaluationResult {
-  const outerMap = visitor.scope.mapPitch
-  return visitor.visit(music, {
-    mapPitch: !outerMap
-      ? mapPitch
-      : (pitch, context) => {
-          const mapped = mapPitch(pitch, context)
-          if (!('value' in mapped)) return mapped
-          const outer = outerMap(mapped.value, context)
-          return { ...outer, diagnostics: [...mapped.diagnostics, ...outer.diagnostics] }
-        },
-  })
 }
 
 const MAX_REPEAT_EXPANSION_NODES = 100_000
@@ -1671,7 +1663,7 @@ export function evaluateScoreSemantics(
           raw: current.sample,
           location: current.location,
         },
-        { mapPitch: undefined },
+        { broadcasts: undefined },
       )
     }
     if (current.type === 'CallExpression') {
@@ -1691,67 +1683,6 @@ export function evaluateScoreSemantics(
             ? { shape: annotateFunctionCall(returned.shape, origin(current)) }
             : {}),
           diagnostics: [...prepared.diagnostics, ...returned.diagnostics],
-        }
-      }
-      if (current.callee === 'mapPitches') {
-        const [music, mapper] = current.arguments
-        if (current.arguments.length !== 2 || !music || !mapper)
-          return {
-            diagnostics: [
-              {
-                code: 'XP_ARITY',
-                severity: 'error',
-                message: 'mapPitches() expects a score and a one-parameter lambda.',
-                locations: [current.location],
-              },
-            ],
-          }
-        const evaluated = evaluateExpression(mapper, context, environment)
-        if (!('value' in evaluated)) return evaluated
-        const callback = evaluated.value
-        if (callback.kind !== 'lambda' || callback.parameters.length !== 1)
-          return {
-            diagnostics: [
-              ...evaluated.diagnostics,
-              {
-                code: 'XP_TYPE_MISMATCH',
-                severity: 'error',
-                message: 'mapPitches() expects a one-parameter lambda.',
-                locations: [mapper.location],
-              },
-            ],
-          }
-        const result = visitWithPitchMap(music, visitor, (pitch, pitchContext) => {
-          const scope = extendLexicalEnvironment(callback.environment, {
-            variables: new Map([[callback.parameters[0]!, pitch]]),
-          })
-          const mapped = evaluateExpression(callback.body, pitchContext, scope)
-          if (!('value' in mapped)) return mapped
-          const value = mapped.value
-          if (
-            value.kind !== 'absolutePitch' &&
-            value.kind !== 'pitchOffset' &&
-            value.kind !== 'scalar'
-          )
-            return {
-              diagnostics: [
-                ...mapped.diagnostics,
-                {
-                  code: 'XP_TYPE_MISMATCH',
-                  severity: 'error',
-                  message: 'A mapPitches() lambda must return a single pitch.',
-                  locations: [callback.body.location],
-                },
-              ],
-            }
-          return { ...mapped, value: { ...value, origins: pitch.origins } }
-        })
-        return {
-          ...result,
-          ...('shape' in result
-            ? { shape: annotateFunctionCall(result.shape, origin(current)) }
-            : {}),
-          diagnostics: [...evaluated.diagnostics, ...result.diagnostics],
         }
       }
       if (current.callee === 'fit') {
@@ -2729,30 +2660,19 @@ export function evaluateScoreSemantics(
         const initial = evaluateExpression(scalar, context, environment)
         if (!('value' in initial) || !isNumeric(initial.value)) continue
 
-        const mapped = visitWithPitchMap(music, visitor, (pitch, pitchContext) => {
-          const resolved =
-            pitchContext === context
-              ? initial
-              : evaluateExpression(scalar, pitchContext, environment)
-          if (!('value' in resolved)) return resolved
-          if (!isNumeric(resolved.value))
-            return {
-              diagnostics: [
-                ...resolved.diagnostics,
-                {
-                  code: 'XP_TYPE_MISMATCH',
-                  severity: 'error',
-                  message: 'Score broadcasting requires a scalar operand.',
-                  locations: [scalar.location],
-                },
-              ],
-            }
-          return music === current.left
-            ? evaluateBinaryValues(current, pitch, resolved.value, resolved.diagnostics)
-            : evaluateBinaryValues(current, resolved.value, pitch, resolved.diagnostics)
+        const broadcast: ScoreBroadcast = {
+          expression: current,
+          scalar,
+          scalarOnLeft: music === current.right,
+          initial,
+          context,
+          environment,
+        }
+        const result = visitor.visit(music, {
+          broadcasts: [broadcast, ...(visitor.scope.broadcasts ?? [])],
         })
         // Keep the arithmetic local to this operand.
-        return { ...mapped }
+        return { ...result }
       }
       if (functionBudget && remainingAfterValue !== undefined)
         functionBudget.remaining = remainingAfterValue
@@ -2790,19 +2710,35 @@ export function evaluateScoreSemantics(
       })).visit(expression)
       return { ...result, diagnostics: [...value.diagnostics, ...result.diagnostics] }
     }
-    const mapPitch = visitor.scope.mapPitch
-    const mapped =
-      mapPitch &&
-      'value' in value &&
-      value.value.kind !== 'undefined' &&
-      value.value.kind !== 'lambda'
-        ? mapPitch(value.value, context)
-        : undefined
-    const evaluated = playablePitch(
-      current,
-      context,
-      mapped ? { ...mapped, diagnostics: [...value.diagnostics, ...mapped.diagnostics] } : value,
-    )
+    let note = value
+    for (const broadcast of visitor.scope.broadcasts ?? []) {
+      if (!('value' in note) || !isNumeric(note.value)) break
+      const { expression, scalar, scalarOnLeft } = broadcast
+      const resolved =
+        context === broadcast.context
+          ? broadcast.initial
+          : evaluateExpression(scalar, context, broadcast.environment)
+      const diagnostics = [...note.diagnostics, ...resolved.diagnostics]
+      if (!('value' in resolved)) return { diagnostics }
+      if (!isNumeric(resolved.value))
+        return {
+          diagnostics: [
+            ...diagnostics,
+            {
+              code: 'XP_TYPE_MISMATCH',
+              severity: 'error',
+              message: 'Score broadcasting requires a scalar operand.',
+              locations: [scalar.location],
+            },
+          ],
+        }
+      const combined = scalarOnLeft
+        ? evaluateBinaryValues(expression, resolved.value, note.value, [])
+        : evaluateBinaryValues(expression, note.value, resolved.value, [])
+      note = { ...combined, diagnostics: [...diagnostics, ...combined.diagnostics] }
+    }
+    const broadcasted = note !== value
+    const evaluated = playablePitch(current, context, note)
     if (!('pitch' in evaluated)) return evaluated
     const broadcastContext = current as Expression & {
       readonly broadcastArticulation?: Fraction
@@ -2823,9 +2759,9 @@ export function evaluateScoreSemantics(
       articulation,
       directiveState: { ...currentDirectiveState },
       ...(currentArticulationMarks.length ? { articulationMarks: currentArticulationMarks } : {}),
-      ...(!mapped && 'raw' in current ? { authoredLabel: String(current.raw) } : {}),
+      ...(!broadcasted && 'raw' in current ? { authoredLabel: String(current.raw) } : {}),
       ...(evaluated.justIntonation ? { justIntonation: true } : {}),
-      ...(!mapped &&
+      ...(!broadcasted &&
       (current.type === 'DegreeLiteral' ||
         current.type === 'EqualDivisionLiteral' ||
         (current.type === 'QuantityLiteral' &&
@@ -2833,7 +2769,7 @@ export function evaluateScoreSemantics(
         ? { displayLabel: String(current.raw) }
         : {}),
     }
-    if (!mapped && 'raw' in current) authoredLabels.set(shape, String(current.raw))
+    if (!broadcasted && 'raw' in current) authoredLabels.set(shape, String(current.raw))
     return { shape, diagnostics: evaluated.diagnostics }
   }
 
