@@ -3,7 +3,7 @@ import type { Expression, Node } from '../parser.generated.js'
 import type { Diagnostic } from '../diagnostics'
 import { Value } from '../value'
 import {
-  addPitchInterval,
+  evaluateBinaryValues,
   evaluateDeclaration,
   evaluateExpression,
   isComparison,
@@ -112,14 +112,23 @@ interface VisitorScope {
 
 type ScoreVisitor = Visitor<Expression, VisitorScope, ScoreShapeEvaluationResult>
 
+function isArithmetic(node: Expression): node is Extract<Expression, { type: 'BinaryExpression' }> {
+  return (
+    node.type === 'BinaryExpression' &&
+    node.operator !== '->' &&
+    node.operator !== 'al' &&
+    !isComparison(node.operator)
+  )
+}
+
 function containsScoreCall(node: Expression): boolean {
   if (node.type === 'CallExpression') return true
   if (node.type === 'Group') return containsScoreCall(node.expression)
-  return (
-    node.type === 'BinaryExpression' &&
-    node.operator === '+' &&
-    (containsScoreCall(node.left) || containsScoreCall(node.right))
-  )
+  return isArithmetic(node) && (containsScoreCall(node.left) || containsScoreCall(node.right))
+}
+
+function isNumeric(value: EvaluatedLiteral): boolean {
+  return value.kind === 'scalar' || value.kind === 'pitchOffset' || value.kind === 'absolutePitch'
 }
 
 function visitWithPitchMap(
@@ -1784,39 +1793,6 @@ export function evaluateScoreSemantics(
     }
     const broadcast = broadcastScalarOperation(current, context, environment)
     if (broadcast) return visitor.visit(broadcast)
-    if (current.type === 'BinaryExpression' && current.operator === '+') {
-      for (const [music, interval] of [
-        [current.left, current.right],
-        [current.right, current.left],
-      ] as const) {
-        if (!containsScoreCall(music)) continue
-        const initial = evaluateExpression(interval, context, environment)
-        if (!('value' in initial) || initial.value.kind !== 'pitchOffset') continue
-        const mapped = visitWithPitchMap(music, visitor, (pitch, pitchContext) => {
-          const resolved =
-            pitchContext === context
-              ? initial
-              : evaluateExpression(interval, pitchContext, environment)
-          if (!('value' in resolved)) return resolved
-          if (resolved.value.kind !== 'pitchOffset')
-            return {
-              diagnostics: [
-                ...resolved.diagnostics,
-                {
-                  code: 'XP_TYPE_MISMATCH',
-                  severity: 'error',
-                  message: 'Score transposition requires a pitch interval.',
-                  locations: [interval.location],
-                },
-              ],
-            }
-          const shifted = addPitchInterval(pitch, resolved.value, current)
-          return { ...shifted, diagnostics: [...resolved.diagnostics, ...shifted.diagnostics] }
-        })
-        // The pitch map applies only within the transposed operand.
-        return { ...mapped }
-      }
-    }
     const expandedChord = expandEnumeratedChord(current, context, environment)
     if (expandedChord.diagnostics.length) return { diagnostics: expandedChord.diagnostics }
     if (expandedChord.expressions.length !== 1 || expandedChord.expressions[0] !== current) {
@@ -2738,7 +2714,49 @@ export function evaluateScoreSemantics(
         return { shape: contextAnnotation(current), diagnostics: [] }
       }
     }
+    const functionBudget = environment?.functionBudget
+    const remaining = functionBudget?.remaining
     const value = evaluateExpression(current, context, environment)
+    if (!('value' in value) && isArithmetic(current) && containsScoreCall(current)) {
+      const remainingAfterValue = functionBudget?.remaining
+      for (const [music, scalar] of [
+        [current.left, current.right],
+        [current.right, current.left],
+      ] as const) {
+        if (!containsScoreCall(music)) continue
+        // A failed value probe must leave the budget available for score evaluation.
+        if (functionBudget && remaining !== undefined) functionBudget.remaining = remaining
+        const initial = evaluateExpression(scalar, context, environment)
+        if (!('value' in initial) || !isNumeric(initial.value)) continue
+
+        const mapped = visitWithPitchMap(music, visitor, (pitch, pitchContext) => {
+          const resolved =
+            pitchContext === context
+              ? initial
+              : evaluateExpression(scalar, pitchContext, environment)
+          if (!('value' in resolved)) return resolved
+          if (!isNumeric(resolved.value))
+            return {
+              diagnostics: [
+                ...resolved.diagnostics,
+                {
+                  code: 'XP_TYPE_MISMATCH',
+                  severity: 'error',
+                  message: 'Score broadcasting requires a scalar operand.',
+                  locations: [scalar.location],
+                },
+              ],
+            }
+          return music === current.left
+            ? evaluateBinaryValues(current, pitch, resolved.value, resolved.diagnostics)
+            : evaluateBinaryValues(current, resolved.value, pitch, resolved.diagnostics)
+        })
+        // Keep the arithmetic local to this operand.
+        return { ...mapped }
+      }
+      if (functionBudget && remainingAfterValue !== undefined)
+        functionBudget.remaining = remainingAfterValue
+    }
     if ('value' in value && value.value.kind === 'container') {
       const variables = new Map<string, EvaluatedLiteral>()
       const fragment = (item: EvaluatedLiteral): Expression => {

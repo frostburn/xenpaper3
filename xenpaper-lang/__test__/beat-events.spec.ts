@@ -57,6 +57,35 @@ fit(${phrase}, 4beat) C
     )
   })
 
+  it.each([
+    ['@2 C= . (E, G)', 'opening() + 3/2', '(@2 C= . (E, G)) + 3/2'],
+    ['@2 C= . (E, G)', '3/2 + opening()', '3/2 + (@2 C= . (E, G))'],
+    ['@2 P1= . (M3, P5)', 'opening() * 3/2', '(@2 P1= . (M3, P5)) * 3/2'],
+    ['@2 P1= . (M3, P5)', 'opening() * 3/2 + M2', '(@2 P1= . (M3, P5)) * 3/2 + M2'],
+    ['@2 5/4= . (3/2, 9/8)', '3/2 / opening()', '3/2 / (@2 5/4= . (3/2, 9/8))'],
+  ])('broadcasts arithmetic on a returned score like inline music: %s %s', (body, call, inline) => {
+    expect(audibleResult(`{12edo} fn opening() { ret ${body} } (${call}) C`)).toEqual(
+      audibleResult(`{12edo} (${inline}) C`),
+    )
+  })
+
+  it('retains array arithmetic for calls that return values', () => {
+    const music = audibleResult('fn values() { ret [1/1 3/2] } values() rd 3/2')
+    expect(music.events.map(({ pitch }) => pitch[1])).toEqual(
+      audibleResult('3/2 3/2').events.map(({ pitch }) => pitch[1]),
+    )
+  })
+
+  it('reports the ordinary arithmetic error for scaling returned absolute pitches', () => {
+    const source = 'fn opening() { ret @2 C } opening() * 3/2'
+    expect(expandToBeatEvents(parse(source)).diagnostics).toMatchObject([
+      {
+        code: 'XP_TYPE_MISMATCH',
+        message: 'Absolute pitches cannot be multiplied or divided.',
+      },
+    ])
+  })
+
   it('maps a stored score’s pitches while fitting its rests, ties, and chord', () => {
     const result = audibleResult(`
 {12edo}

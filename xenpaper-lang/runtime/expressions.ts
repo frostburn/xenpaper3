@@ -571,19 +571,6 @@ function addOrSubtract(
   )
 }
 
-/** Apply a score transposition using the same pitch arithmetic as a written sum. */
-export function addPitchInterval(
-  pitch: EvaluatedLiteral,
-  interval: PitchOffsetValue,
-  node: Expression,
-): ExpressionEvaluationResult {
-  try {
-    return { value: addOrSubtract(pitch, interval, false, node), diagnostics: [] }
-  } catch (error) {
-    return { diagnostics: [diagnostic(node, error)] }
-  }
-}
-
 function multiplyOrDivide(
   left: EvaluatedLiteral,
   right: EvaluatedLiteral,
@@ -774,6 +761,23 @@ function binary(
     }
     default:
       throw new TypeError(`Unknown binary operator ${operator}.`)
+  }
+}
+
+/** Evaluate already resolved operands, including when one comes from a score note. */
+export function evaluateBinaryValues(
+  node: Extract<Expression, { type: 'BinaryExpression' }>,
+  left: EvaluatedLiteral,
+  right: EvaluatedLiteral,
+  diagnostics: readonly Diagnostic[],
+): ExpressionEvaluationResult {
+  try {
+    const value = isComparison(node.operator)
+      ? compareOperands(node, left, right)
+      : binary(node.operator, left, right, node)
+    return { value, diagnostics }
+  } catch (error) {
+    return { diagnostics: [diagnostic(node, error)] }
   }
 }
 
@@ -1125,10 +1129,7 @@ export function evaluateExpression(
       const right = evaluateExpression(node.right, mapping, environment)
       const diagnostics = [...left.diagnostics, ...right.diagnostics]
       if (!('value' in right)) return { diagnostics }
-      const value = isComparison(node.operator)
-        ? compareOperands(node, left.value, right.value)
-        : binary(node.operator, left.value, right.value, node)
-      return { value, diagnostics }
+      return evaluateBinaryValues(node, left.value, right.value, diagnostics)
     }
     if (node.type === 'IndexExpression') {
       const container = evaluateExpression(node.container, mapping, environment)
