@@ -60,6 +60,25 @@ for (value of [true]) { chosen <- value . }
     expect(notes(phrase, initialization, new Fraction(2))[0]?.label).toBe('C')
   })
 
+  it('reads the timed context at fitted note positions', () => {
+    const initialization = initialize('@2 ... {19edo}')
+    const starting = notes('D', initialize(''))[0]!.pitch.value
+    const later = notes('D', initialize('{19edo}'))[0]!.pitch.value
+    const fitted = notes('fit((D D), 4beat) D', initialization)
+    expect(
+      fitted.map(({ start, duration }) => [start.toFraction(), duration.toFraction()]),
+    ).toEqual([
+      ['0', '2'],
+      ['2', '2'],
+      ['4', '1/2'],
+    ])
+    expect(fitted.map(({ pitch }) => pitch.value.valueOf())).toEqual([
+      starting.valueOf(),
+      later.valueOf(),
+      later.valueOf(),
+    ])
+  })
+
   it('applies subdivision changes while advancing the grid, including score length', () => {
     const initialization = initialize('. @2')
     const result = score('C D E F', initialization)

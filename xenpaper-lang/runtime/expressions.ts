@@ -427,7 +427,12 @@ function operatorOrigins(
   return [...left.origins, ...right.origins, { location: node.location, role: 'operator' }]
 }
 
-function pitchCoercion(value: EvaluatedLiteral): PitchOffsetValue {
+type NumericOperand = Extract<
+  EvaluatedLiteral,
+  { kind: 'scalar' | 'pitchOffset' | 'absolutePitch' }
+>
+
+function pitchCoercion(value: NumericOperand): PitchOffsetValue {
   if (value.kind === 'pitchOffset') return value
   if (value.kind === 'absolutePitch')
     throw new TypeError('An absolute pitch cannot be coerced to a pitch offset.')
@@ -439,8 +444,8 @@ function pitchCoercion(value: EvaluatedLiteral): PitchOffsetValue {
 }
 
 function addOrSubtract(
-  left: EvaluatedLiteral,
-  right: EvaluatedLiteral,
+  left: NumericOperand,
+  right: NumericOperand,
   subtract: boolean,
   node: Expression,
 ): EvaluatedLiteral {
@@ -572,8 +577,8 @@ function addOrSubtract(
 }
 
 function multiplyOrDivide(
-  left: EvaluatedLiteral,
-  right: EvaluatedLiteral,
+  left: NumericOperand,
+  right: NumericOperand,
   divide: boolean,
   node: Expression,
 ): EvaluatedLiteral {
@@ -606,11 +611,7 @@ function multiplyOrDivide(
   )
 }
 
-function modulo(
-  left: EvaluatedLiteral,
-  right: EvaluatedLiteral,
-  node: Expression,
-): EvaluatedLiteral {
+function modulo(left: NumericOperand, right: NumericOperand, node: Expression): EvaluatedLiteral {
   if (left.kind === 'absolutePitch' || right.kind === 'absolutePitch') {
     throw new TypeError('Modulo does not support absolute pitches.')
   }
@@ -682,7 +683,7 @@ function compareOperands(
 
 export function isTruthy(value: EvaluatedLiteral): boolean {
   if (value.kind === 'undefined') return false
-  if (value.kind === 'absolutePitch') return true
+  if (value.kind === 'absolutePitch' || value.kind === 'score') return true
   if (value.kind === 'container') return value.values.length > 0
   return value.value.valueOf() !== 0
 }
@@ -694,6 +695,8 @@ function binary(
   node: Expression,
 ): EvaluatedLiteral {
   if (operator === 'al') return left.kind === 'undefined' ? right : left
+  if (left.kind === 'score' || right.kind === 'score')
+    throw new TypeError(`Operator ${operator} requires numeric operands.`)
   if (left.kind === 'container' || right.kind === 'container') {
     if (left.kind === 'container' && right.kind === 'container') {
       if (left.composition && right.composition && left.composition !== right.composition)
@@ -764,6 +767,23 @@ function binary(
   }
 }
 
+/** Evaluate already resolved operands, including when one comes from a score note. */
+export function evaluateBinaryValues(
+  node: Extract<Expression, { type: 'BinaryExpression' }>,
+  left: EvaluatedLiteral,
+  right: EvaluatedLiteral,
+  diagnostics: readonly Diagnostic[],
+): ExpressionEvaluationResult {
+  try {
+    const value = isComparison(node.operator)
+      ? compareOperands(node, left, right)
+      : binary(node.operator, left, right, node)
+    return { value, diagnostics }
+  } catch (error) {
+    return { diagnostics: [diagnostic(node, error)] }
+  }
+}
+
 function scalarInteger(value: EvaluatedLiteral, name: string): number {
   return requireInteger(value, name)
 }
@@ -789,6 +809,72 @@ function annotateReference(value: EvaluatedLiteral, origin: SourceOrigin): Evalu
       values: value.values.map((item) => annotateReference(item, origin)),
     }
   return { ...value, origins }
+}
+
+export function lookupVariable(
+  name: string,
+  environment: LexicalEnvironment = preludeEnvironment(),
+): EvaluatedLiteral | undefined {
+  for (let scope: LexicalEnvironment | undefined = environment; scope; scope = scope.parent) {
+    const value = scope.variables.get(name)
+    if (value) return value
+  }
+}
+
+function hasScoreSyntax(node: Expression): boolean {
+  switch (node.type) {
+    case 'Group':
+      return hasScoreSyntax(node.expression)
+    case 'Sequence':
+      return node.items.some(hasScoreSyntax)
+    case 'Parallel':
+      return node.branches.some(hasScoreSyntax)
+    case 'NormalizeToSlot':
+      return !!node.expression && hasScoreSyntax(node.expression)
+    case 'BinaryExpression':
+      return node.operator === '->' || hasScoreSyntax(node.left) || hasScoreSyntax(node.right)
+    case 'ConditionalExpression':
+      return hasScoreSyntax(node.consequent) || hasScoreSyntax(node.alternate)
+    case 'PitchModifierExpression':
+    case 'UnaryExpression':
+      return hasScoreSyntax(node.operand)
+    case 'Barline':
+    case 'BarRest':
+    case 'BindingAssignment':
+    case 'DetachedContinue':
+    case 'Directive':
+    case 'DrumSampleLiteral':
+    case 'ForBlock':
+    case 'FunctionDeclaration':
+    case 'HardBoundary':
+    case 'IfBlock':
+    case 'LoopJump':
+    case 'MosDeclaration':
+    case 'PitchContextChange':
+    case 'PostfixExpression':
+    case 'Repeat':
+    case 'Rest':
+    case 'ThrowStatement':
+    case 'VariableDeclaration':
+    case 'WhileBlock':
+      return true
+    default:
+      return false
+  }
+}
+
+function captureScoreEnvironment(environment: LexicalEnvironment): LexicalEnvironment {
+  // Function statements update their local binding maps in place.
+  const frames: LexicalEnvironment[] = []
+  let scope = environment
+  while (scope.functionBudget && scope.parent) {
+    frames.push(scope)
+    scope = scope.parent
+  }
+  return frames.reduceRight(
+    (parent, frame) => ({ ...frame, parent, variables: new Map(frame.variables) }),
+    scope,
+  )
 }
 
 /** Evaluate the arithmetic subset of the parser AST without throwing for source errors. */
@@ -859,14 +945,12 @@ export function evaluateExpression(
     if (node.type === 'MosIntervalLiteral')
       return { value: evaluateMosIntervalLiteral(node, mapping), diagnostics: [] }
     if (node.type === 'Identifier') {
-      for (let scope: LexicalEnvironment | undefined = environment; scope; scope = scope.parent) {
-        const value = scope.variables.get(node.name)
-        if (value)
-          return {
-            value: annotateReference(value, { location: node.location, role: 'literal' }),
-            diagnostics: [],
-          }
-      }
+      const value = lookupVariable(node.name, environment)
+      if (value)
+        return {
+          value: annotateReference(value, { location: node.location, role: 'literal' }),
+          diagnostics: [],
+        }
     }
     if (node.type === 'Identifier' && node.name === 'niente')
       return {
@@ -911,7 +995,19 @@ export function evaluateExpression(
           },
         ],
       }
-    if (node.type === 'Group') return containerItems(node, mapping, environment)
+    if (node.type === 'Group') {
+      if (hasScoreSyntax(node.expression))
+        return {
+          value: {
+            kind: 'score',
+            expression: node,
+            environment: captureScoreEnvironment(environment),
+            origins: [{ location: node.location, role: 'literal' }],
+          },
+          diagnostics: [],
+        }
+      return containerItems(node, mapping, environment)
+    }
     if (node.type === 'NormalizeToSlot') return containerItems(node, mapping, environment)
     if (node.type === 'PitchModifierExpression') {
       const operand = evaluateExpression(node.operand, mapping, environment)
@@ -919,6 +1015,7 @@ export function evaluateExpression(
       if (
         operand.value.kind === 'container' ||
         operand.value.kind === 'undefined' ||
+        operand.value.kind === 'score' ||
         operand.value.kind === 'lambda'
       )
         throw new TypeError('Pitch modifiers require a numeric operand.')
@@ -1026,6 +1123,7 @@ export function evaluateExpression(
       if (
         operand.value.kind === 'container' ||
         operand.value.kind === 'undefined' ||
+        operand.value.kind === 'score' ||
         operand.value.kind === 'lambda'
       )
         throw new TypeError('Unary operators require a numeric operand.')
@@ -1112,10 +1210,7 @@ export function evaluateExpression(
       const right = evaluateExpression(node.right, mapping, environment)
       const diagnostics = [...left.diagnostics, ...right.diagnostics]
       if (!('value' in right)) return { diagnostics }
-      const value = isComparison(node.operator)
-        ? compareOperands(node, left.value, right.value)
-        : binary(node.operator, left.value, right.value, node)
-      return { value, diagnostics }
+      return evaluateBinaryValues(node, left.value, right.value, diagnostics)
     }
     if (node.type === 'IndexExpression') {
       const container = evaluateExpression(node.container, mapping, environment)

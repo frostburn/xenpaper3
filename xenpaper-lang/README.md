@@ -231,6 +231,37 @@ The reduced guide is subject to the harmonic segment limit of 10,000 members.
 0 1 2 3 4 5 6
 ```
 
+## Fit music to a beat duration
+
+`fit(music, span)` gives a note, rest, chord, or phrase a total duration in
+beats. The span can be a variable. Use a positive exact beat quantity such as
+`0.5beat` or `3/2 * 1beat`. The current subdivision does not change the
+requested length. Within the fragment, notes and rests keep their rhythmic
+proportions, and prevailing settings inside the fragment stay local to it.
+
+```text
+let span <- 1.5beat
+fit(., 0.25beat)
+fit((C E= G), span)
+```
+
+## Reuse and transform a written phrase
+
+A score-returning function can hold a passage in regular Xenpaper notation.
+Arithmetic with a scalar broadcasts over the notes of a returned score and
+preserves its rhythm. The same arithmetic rules apply as in inline music.
+For example, `subject() + P5` raises each note by the current tuning's perfect fifth,
+`subject() + 3/2` shifts it by the exact ratio, and `intervals() * 3/2`
+stretches a phrase of relative pitch intervals by a factor of 1.5.
+
+```text
+fn subject() { ret @2 C= . D Eb= }
+subject()
+subject() + P5
+subject() + 3/2
+fit(subject() + P5, 6beat)
+```
+
 ## Note ties
 
 The binary `->` operator sequences two operands and ties matching notes:
@@ -321,6 +352,16 @@ tuplet tuplet
 
 Each use retains the container's sequence or parallel structure and slot timing.
 Its pitches are captured at declaration; playback uses the current timing context.
+
+Parenthesize written music with rhythmic marks or directives to store it as a
+reusable score. The score captures its lexical bindings at declaration and uses
+the prevailing tuning and timing each time it plays. Arithmetic such as
+`opening + P5` applies to the notes throughout the score.
+
+```text
+let opening <- (@4 D=== D=== D=== F=====)
+opening | fit(opening + P5, 4beat)
+```
 
 Postfix `=` continues the active note after an ordinary sequence, including a
 parenthesized or stored phrase: `(1 2 3)==` has note durations 1, 1, and 3.

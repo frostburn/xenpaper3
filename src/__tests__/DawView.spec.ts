@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { Fraction } from 'xen-dev-utils'
 import router from '../router'
 import { demoProjects } from '../demo-projects'
+import { createPlaybackPlan } from '../daw/playback-plan'
 import DawView from '../views/DawView.vue'
 import PitchedLane from '../components/daw/PitchedLane.vue'
 import DrumLane from '../components/daw/DrumLane.vue'
@@ -1014,6 +1015,41 @@ describe('DawView', () => {
     for (const serializedProject of Object.values(demoProjects)) {
       expect(() => parseDawProject(serializedProject)).not.toThrow()
     }
+  })
+
+  it('plays Agnus Dei II in 31-EDO at three speeds with a shared cadence', () => {
+    const project = parseDawProject(demoProjects['agnus-dei-ii']!)
+    const { lanes, endBeat } = createPlaybackPlan(project)
+    const [superius, altus, bassus] = lanes
+    const cents = (steps: number) => (steps * 1200) / 31
+    expect(lanes.map((lane) => lane.name)).toEqual(['Superius', 'Altus', 'Bassus'])
+    expect(lanes.map((lane) => lane.notes.length)).toEqual([68, 23, 47])
+    expect(bassus!.notes[0]?.startBeat).toBe(0)
+    expect(bassus!.notes[0]?.pitch.initialValue).toBeCloseTo(cents(-26), 10)
+    expect(Math.min(...bassus!.notes.map(({ pitch }) => pitch.initialValue))).toBeCloseTo(
+      cents(-39),
+      10,
+    )
+
+    for (const [i, note] of bassus!.notes.slice(0, -1).entries()) {
+      const higher = superius!.notes[i]!
+      expect(higher.startBeat).toBeCloseTo((note.startBeat * 2) / 3, 10)
+      expect(higher.endBeat).toBeCloseTo((note.endBeat * 2) / 3, 10)
+      expect(higher.pitch.initialValue).toBeCloseTo(note.pitch.initialValue + 1200, 10)
+    }
+    for (const [i, note] of altus!.notes.slice(0, -1).entries()) {
+      const source = bassus!.notes[i]!
+      expect(note.startBeat).toBe(source.startBeat * 2)
+      expect(note.endBeat).toBe(source.endBeat * 2)
+      expect(note.pitch.initialValue).toBeCloseTo(source.pitch.initialValue + cents(18), 10)
+    }
+    for (const [i, steps] of [13, 5, -26].entries()) {
+      const notes = lanes[i]!.notes
+      const final = notes[notes.length - 1]!
+      expect(final).toMatchObject({ startBeat: 48, endBeat: 50 })
+      expect(final.pitch.initialValue).toBeCloseTo(cents(steps), 10)
+    }
+    expect(endBeat).toBe(50)
   })
 
   it('loads a built-in demo without fetching it', async () => {

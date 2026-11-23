@@ -3,10 +3,12 @@ import type { Expression, Node } from '../parser.generated.js'
 import type { Diagnostic } from '../diagnostics'
 import { Value } from '../value'
 import {
+  evaluateBinaryValues,
   evaluateDeclaration,
   evaluateExpression,
   isComparison,
   isTruthy,
+  lookupVariable,
   preludeEnvironment,
   prepareFunctionCall,
 } from './expressions'
@@ -86,9 +88,20 @@ function resolveContext(resolver: ContextResolver, base: ScoreVisitorContext): S
 }
 
 type LoopFrame = { jump?: Extract<Expression, { type: 'LoopJump' }>['action'] }
+type BinaryExpression = Extract<Expression, { type: 'BinaryExpression' }>
+
+interface ScoreBroadcast {
+  readonly expression: BinaryExpression
+  readonly scalar: Expression
+  readonly scalarOnLeft: boolean
+  readonly initial: Extract<ExpressionEvaluationResult, { value: EvaluatedLiteral }>
+  readonly context: PitchContext
+  readonly environment?: LexicalEnvironment
+}
 
 interface VisitorScope {
   readonly loop?: LoopFrame
+  readonly broadcasts?: readonly ScoreBroadcast[]
   readonly offset: Fraction
   readonly timeScale: Fraction
   readonly layout?: boolean
@@ -109,6 +122,29 @@ interface VisitorScope {
 }
 
 type ScoreVisitor = Visitor<Expression, VisitorScope, ScoreShapeEvaluationResult>
+
+function isArithmetic(node: Expression): node is BinaryExpression {
+  return (
+    node.type === 'BinaryExpression' &&
+    node.operator !== '->' &&
+    node.operator !== 'al' &&
+    !isComparison(node.operator)
+  )
+}
+
+function canProduceScore(node: Expression, environment: LexicalEnvironment | undefined): boolean {
+  if (node.type === 'CallExpression') return true
+  if (node.type === 'Identifier') return lookupVariable(node.name, environment)?.kind === 'score'
+  if (node.type === 'Group') return canProduceScore(node.expression, environment)
+  return (
+    isArithmetic(node) &&
+    (canProduceScore(node.left, environment) || canProduceScore(node.right, environment))
+  )
+}
+
+function isNumeric(value: EvaluatedLiteral): boolean {
+  return value.kind === 'scalar' || value.kind === 'pitchOffset' || value.kind === 'absolutePitch'
+}
 
 const MAX_REPEAT_EXPANSION_NODES = 100_000
 
@@ -511,21 +547,21 @@ function sequence(
   }
 }
 
-/** Retain the invocation site on every note produced by a function body. */
-function annotateFunctionCall(shape: ScoreShape, callOrigin: SourceOrigin): ScoreShape {
+/** Retain the use site on every note produced by a named score. */
+function annotateScoreReference(shape: ScoreShape, callOrigin: SourceOrigin): ScoreShape {
   if (shape.kind === 'attack') return { ...shape, origins: [...shape.origins, callOrigin] }
   if (shape.kind === 'sequence')
     return {
       ...shape,
-      children: shape.children.map((child) => annotateFunctionCall(child, callOrigin)),
+      children: shape.children.map((child) => annotateScoreReference(child, callOrigin)),
     }
   if (shape.kind === 'parallel')
     return {
       ...shape,
-      branches: shape.branches.map((branch) => annotateFunctionCall(branch, callOrigin)),
+      branches: shape.branches.map((branch) => annotateScoreReference(branch, callOrigin)),
     }
   if (shape.kind === 'drone' && shape.template)
-    return { ...shape, template: annotateFunctionCall(shape.template, callOrigin) }
+    return { ...shape, template: annotateScoreReference(shape.template, callOrigin) }
   return shape
 }
 
@@ -1010,8 +1046,8 @@ function playablePitch(
         },
       ],
     }
-  const ratio = evaluated.value.value
-  if (ratio.dimensions.equals({ seconds: -1 }) && ratio.valueOf() > 0) {
+  const ratio = 'value' in evaluated.value ? evaluated.value.value : undefined
+  if (ratio?.dimensions.equals({ seconds: -1 }) && ratio.valueOf() > 0) {
     const notationRatio = ratio.div(context.rootFrequency)
     return {
       pitch: {
@@ -1024,7 +1060,7 @@ function playablePitch(
       diagnostics: evaluated.diagnostics,
     }
   }
-  if (!ratio.dimensions.isDimensionless || ratio.valueOf() <= 0) {
+  if (!ratio?.dimensions.isDimensionless || ratio.valueOf() <= 0) {
     return {
       diagnostics: [
         ...evaluated.diagnostics,
@@ -1336,6 +1372,79 @@ export function evaluateScoreSemantics(
     )
   }
 
+  const fitScore = (
+    expression: Expression,
+    target: Fraction,
+    visitor: ScoreVisitor,
+    source: Expression,
+  ): ScoreShapeEvaluationResult => {
+    const local = { loop: undefined, subdivisionContext: visitor.scope.resolve }
+    let evaluated = visitor.visit(expression, { ...local, layout: true })
+    if (!hasShape(evaluated)) return evaluated
+    if (!evaluated.shape.duration.n)
+      return {
+        diagnostics: [
+          ...evaluated.diagnostics,
+          {
+            code: 'XP_NORMALIZE_ZERO',
+            severity: 'error',
+            message:
+              source.type === 'NormalizeToSlot'
+                ? 'A non-empty zero-duration fragment cannot be normalized.'
+                : 'fit() requires music with a positive duration.',
+            locations: [source.location],
+          },
+        ],
+      }
+
+    if (!visitor.scope.layout) {
+      const tried = new Set<string>()
+      for (;;) {
+        const duration = evaluated.shape.duration
+        const key = duration.toFraction()
+        if (!duration.n || tried.has(key) || tried.size >= 32)
+          return {
+            diagnostics: [
+              {
+                code: 'XP_TIMELINE_LAYOUT',
+                severity: 'error',
+                message:
+                  source.type === 'NormalizeToSlot'
+                    ? 'Timed context changes do not produce a stable rhythm inside this normalized slot.'
+                    : 'Timed context changes do not produce a stable rhythm inside fit().',
+                locations: [source.location],
+              },
+            ],
+          }
+        tried.add(key)
+        evaluated = visitor.visit(expression, {
+          ...local,
+          lockedPulse: visitor.scope.base.pulse,
+          timeScale: visitor.scope.timeScale.mul(target).div(duration),
+        })
+        if (!hasShape(evaluated)) return evaluated
+        if (evaluated.shape.duration.equals(duration)) break
+      }
+    }
+
+    const shape = scaleShape(evaluated.shape, target.div(evaluated.shape.duration))
+    const slots = evaluated.shape.duration.div(target)
+    const tuplet = slots.d === 1 ? slots.n : undefined
+    return {
+      shape: {
+        ...shape,
+        isolatedDirectiveScope: true,
+        ...(source.type === 'NormalizeToSlot' && shape.kind === 'sequence'
+          ? {
+              normalized: true,
+              ...(tuplet && tuplet > 1 && !Number.isInteger(Math.log2(tuplet)) ? { tuplet } : {}),
+            }
+          : {}),
+      },
+      diagnostics: evaluated.diagnostics,
+    }
+  }
+
   const evaluateNode: VisitorEvaluation<Expression, VisitorScope, ScoreShapeEvaluationResult> = (
     current,
     visitor,
@@ -1551,13 +1660,16 @@ export function evaluateScoreSemantics(
       )
     }
     if (current.type === 'DrumSampleLiteral') {
-      return visitor.visit({
-        type: 'DegreeLiteral',
-        degree: '0',
-        modifiers: [],
-        raw: current.sample,
-        location: current.location,
-      })
+      return visitor.visit(
+        {
+          type: 'DegreeLiteral',
+          degree: '0',
+          modifiers: [],
+          raw: current.sample,
+          location: current.location,
+        },
+        { broadcasts: undefined },
+      )
     }
     if (current.type === 'CallExpression') {
       const prepared = prepareFunctionCall(current, context, environment)
@@ -1573,10 +1685,46 @@ export function evaluateScoreSemantics(
         return {
           ...returned,
           ...('shape' in returned
-            ? { shape: annotateFunctionCall(returned.shape, origin(current)) }
+            ? { shape: annotateScoreReference(returned.shape, origin(current)) }
             : {}),
           diagnostics: [...prepared.diagnostics, ...returned.diagnostics],
         }
+      }
+      if (current.callee === 'fit') {
+        if (current.arguments.length !== 2)
+          return {
+            diagnostics: [
+              {
+                code: 'XP_ARITY',
+                severity: 'error',
+                message: 'fit() expects a score and a beat duration.',
+                locations: [current.location],
+              },
+            ],
+          }
+
+        const [music, span] = current.arguments
+        const evaluated = evaluateExpression(span!, context, environment)
+        if (!('value' in evaluated)) return evaluated
+        const value = evaluated.value
+        const duration =
+          value.kind === 'scalar' && value.value.dimensions.equals({ beats: 1 })
+            ? value.value.div(Value.beats(1)).exactRational()
+            : null
+        if (!duration || duration.compare(0) <= 0)
+          return {
+            diagnostics: [
+              ...evaluated.diagnostics,
+              {
+                code: 'XP_FIT_DURATION',
+                severity: 'error',
+                message: 'fit() requires a positive exact duration in beats, such as 0.5beat.',
+                locations: [span!.location],
+              },
+            ],
+          }
+        const fitted = fitScore(music!, duration, visitor, current)
+        return { ...fitted, diagnostics: [...evaluated.diagnostics, ...fitted.diagnostics] }
       }
     }
     const broadcast = broadcastScalarOperation(current, context, environment)
@@ -2392,69 +2540,7 @@ export function evaluateScoreSemantics(
           diagnostics: [],
         }
       }
-      const local = { loop: undefined, subdivisionContext: visitor.scope.resolve }
-      let evaluated = visitor.visit(current.expression, { ...local, layout: true })
-      if (!('shape' in evaluated)) return evaluated
-      if (!evaluated.shape.duration.n) {
-        return {
-          diagnostics: [
-            ...evaluated.diagnostics,
-            {
-              code: 'XP_NORMALIZE_ZERO',
-              severity: 'error',
-              message: 'A non-empty zero-duration fragment cannot be normalized.',
-              locations: [current.location],
-            },
-          ],
-        }
-      }
-      if (!visitor.scope.layout) {
-        const tried = new Set<string>()
-        for (;;) {
-          const duration = evaluated.shape.duration
-          if (!duration.n || tried.has(duration.toFraction()) || tried.size >= 32)
-            return {
-              diagnostics: [
-                {
-                  code: 'XP_TIMELINE_LAYOUT',
-                  severity: 'error',
-                  message:
-                    'Timed context changes do not produce a stable rhythm inside this normalized slot.',
-                  locations: [current.location],
-                },
-              ],
-            }
-          tried.add(duration.toFraction())
-          evaluated = visitor.visit(current.expression, {
-            ...local,
-            lockedPulse: visitor.scope.base.pulse,
-            timeScale: visitor.scope.timeScale.mul(currentPulse).div(duration),
-          })
-          if (!('shape' in evaluated)) return evaluated
-          if (evaluated.shape.duration.equals(duration)) break
-        }
-      }
-      const normalizedSlots = evaluated.shape.duration.div(currentPulse)
-      const normalized = scaleShape(evaluated.shape, currentPulse.div(evaluated.shape.duration))
-      const tuplet = Number(normalizedSlots.d) === 1 ? Number(normalizedSlots.n) : undefined
-      if (
-        normalized.kind === 'sequence' &&
-        tuplet &&
-        tuplet > 1 &&
-        !Number.isInteger(Math.log2(tuplet))
-      ) {
-        return {
-          shape: { ...normalized, normalized: true, isolatedDirectiveScope: true, tuplet },
-          diagnostics: evaluated.diagnostics,
-        }
-      }
-      return {
-        shape:
-          normalized.kind === 'sequence'
-            ? { ...normalized, normalized: true, isolatedDirectiveScope: true }
-            : { ...normalized, isolatedDirectiveScope: true },
-        diagnostics: evaluated.diagnostics,
-      }
+      return fitScore(current.expression, currentPulse, visitor, current)
     }
     if (current.type === 'PostfixExpression') {
       const holdIndex = current.marks.findIndex((mark) => mark.type === 'HoldUntilEnd')
@@ -2564,7 +2650,56 @@ export function evaluateScoreSemantics(
         return { shape: contextAnnotation(current), diagnostics: [] }
       }
     }
+    const functionBudget = environment?.functionBudget
+    const remaining = functionBudget?.remaining
     const value = evaluateExpression(current, context, environment)
+    if (!('value' in value) && isArithmetic(current) && canProduceScore(current, environment)) {
+      const remainingAfterValue = functionBudget?.remaining
+      for (const [music, scalar] of [
+        [current.left, current.right],
+        [current.right, current.left],
+      ] as const) {
+        if (!canProduceScore(music, environment)) continue
+        // A failed value probe must leave the budget available for score evaluation.
+        if (functionBudget && remaining !== undefined) functionBudget.remaining = remaining
+        const initial = evaluateExpression(scalar, context, environment)
+        if (!('value' in initial) || !isNumeric(initial.value)) continue
+
+        const broadcast: ScoreBroadcast = {
+          expression: current,
+          scalar,
+          scalarOnLeft: music === current.right,
+          initial,
+          context,
+          environment,
+        }
+        const result = visitor.visit(music, {
+          broadcasts: [broadcast, ...(visitor.scope.broadcasts ?? [])],
+        })
+        // Keep the arithmetic local to this operand.
+        return { ...result }
+      }
+      if (functionBudget && remainingAfterValue !== undefined)
+        functionBudget.remaining = remainingAfterValue
+    }
+    if ('value' in value && value.value.kind === 'score') {
+      const { expression, environment: captured } = value.value
+      const result = changeVisitor(visitor, (context) => ({
+        ...context,
+        lexicalEnvironment: {
+          ...captured,
+          calls: environment?.calls ?? EMPTY_LEXICAL_ENVIRONMENT.calls,
+          functionBudget: environment?.functionBudget,
+        },
+      })).visit(expression, { loop: undefined })
+      return {
+        ...result,
+        ...('shape' in result
+          ? { shape: annotateScoreReference(result.shape, origin(current)) }
+          : {}),
+        diagnostics: [...value.diagnostics, ...result.diagnostics],
+      }
+    }
     if ('value' in value && value.value.kind === 'container') {
       const variables = new Map<string, EvaluatedLiteral>()
       const fragment = (item: EvaluatedLiteral): Expression => {
@@ -2598,7 +2733,35 @@ export function evaluateScoreSemantics(
       })).visit(expression)
       return { ...result, diagnostics: [...value.diagnostics, ...result.diagnostics] }
     }
-    const evaluated = playablePitch(current, context, value)
+    let note = value
+    for (const broadcast of visitor.scope.broadcasts ?? []) {
+      if (!('value' in note) || !isNumeric(note.value)) break
+      const { expression, scalar, scalarOnLeft } = broadcast
+      const resolved =
+        context === broadcast.context
+          ? broadcast.initial
+          : evaluateExpression(scalar, context, broadcast.environment)
+      const diagnostics = [...note.diagnostics, ...resolved.diagnostics]
+      if (!('value' in resolved)) return { diagnostics }
+      if (!isNumeric(resolved.value))
+        return {
+          diagnostics: [
+            ...diagnostics,
+            {
+              code: 'XP_TYPE_MISMATCH',
+              severity: 'error',
+              message: 'Score broadcasting requires a scalar operand.',
+              locations: [scalar.location],
+            },
+          ],
+        }
+      const combined = scalarOnLeft
+        ? evaluateBinaryValues(expression, resolved.value, note.value, [])
+        : evaluateBinaryValues(expression, note.value, resolved.value, [])
+      note = { ...combined, diagnostics: [...diagnostics, ...combined.diagnostics] }
+    }
+    const broadcasted = note !== value
+    const evaluated = playablePitch(current, context, note)
     if (!('pitch' in evaluated)) return evaluated
     const broadcastContext = current as Expression & {
       readonly broadcastArticulation?: Fraction
@@ -2619,16 +2782,17 @@ export function evaluateScoreSemantics(
       articulation,
       directiveState: { ...currentDirectiveState },
       ...(currentArticulationMarks.length ? { articulationMarks: currentArticulationMarks } : {}),
-      ...('raw' in current ? { authoredLabel: String(current.raw) } : {}),
+      ...(!broadcasted && 'raw' in current ? { authoredLabel: String(current.raw) } : {}),
       ...(evaluated.justIntonation ? { justIntonation: true } : {}),
-      ...(current.type === 'DegreeLiteral' ||
-      current.type === 'EqualDivisionLiteral' ||
-      (current.type === 'QuantityLiteral' &&
-        ['c', '¢', 'hz', 'khz'].includes(current.unit.toLowerCase()))
+      ...(!broadcasted &&
+      (current.type === 'DegreeLiteral' ||
+        current.type === 'EqualDivisionLiteral' ||
+        (current.type === 'QuantityLiteral' &&
+          ['c', '¢', 'hz', 'khz'].includes(current.unit.toLowerCase())))
         ? { displayLabel: String(current.raw) }
         : {}),
     }
-    if ('raw' in current) authoredLabels.set(shape, String(current.raw))
+    if (!broadcasted && 'raw' in current) authoredLabels.set(shape, String(current.raw))
     return { shape, diagnostics: evaluated.diagnostics }
   }
 
