@@ -8,6 +8,7 @@ import {
   evaluateExpression,
   isComparison,
   isTruthy,
+  lookupVariable,
   preludeEnvironment,
   prepareFunctionCall,
 } from './expressions'
@@ -131,10 +132,14 @@ function isArithmetic(node: Expression): node is BinaryExpression {
   )
 }
 
-function containsScoreCall(node: Expression): boolean {
+function canProduceScore(node: Expression, environment: LexicalEnvironment | undefined): boolean {
   if (node.type === 'CallExpression') return true
-  if (node.type === 'Group') return containsScoreCall(node.expression)
-  return isArithmetic(node) && (containsScoreCall(node.left) || containsScoreCall(node.right))
+  if (node.type === 'Identifier') return lookupVariable(node.name, environment)?.kind === 'score'
+  if (node.type === 'Group') return canProduceScore(node.expression, environment)
+  return (
+    isArithmetic(node) &&
+    (canProduceScore(node.left, environment) || canProduceScore(node.right, environment))
+  )
 }
 
 function isNumeric(value: EvaluatedLiteral): boolean {
@@ -542,21 +547,21 @@ function sequence(
   }
 }
 
-/** Retain the invocation site on every note produced by a function body. */
-function annotateFunctionCall(shape: ScoreShape, callOrigin: SourceOrigin): ScoreShape {
+/** Retain the use site on every note produced by a named score. */
+function annotateScoreReference(shape: ScoreShape, callOrigin: SourceOrigin): ScoreShape {
   if (shape.kind === 'attack') return { ...shape, origins: [...shape.origins, callOrigin] }
   if (shape.kind === 'sequence')
     return {
       ...shape,
-      children: shape.children.map((child) => annotateFunctionCall(child, callOrigin)),
+      children: shape.children.map((child) => annotateScoreReference(child, callOrigin)),
     }
   if (shape.kind === 'parallel')
     return {
       ...shape,
-      branches: shape.branches.map((branch) => annotateFunctionCall(branch, callOrigin)),
+      branches: shape.branches.map((branch) => annotateScoreReference(branch, callOrigin)),
     }
   if (shape.kind === 'drone' && shape.template)
-    return { ...shape, template: annotateFunctionCall(shape.template, callOrigin) }
+    return { ...shape, template: annotateScoreReference(shape.template, callOrigin) }
   return shape
 }
 
@@ -1041,8 +1046,8 @@ function playablePitch(
         },
       ],
     }
-  const ratio = evaluated.value.value
-  if (ratio.dimensions.equals({ seconds: -1 }) && ratio.valueOf() > 0) {
+  const ratio = 'value' in evaluated.value ? evaluated.value.value : undefined
+  if (ratio?.dimensions.equals({ seconds: -1 }) && ratio.valueOf() > 0) {
     const notationRatio = ratio.div(context.rootFrequency)
     return {
       pitch: {
@@ -1055,7 +1060,7 @@ function playablePitch(
       diagnostics: evaluated.diagnostics,
     }
   }
-  if (!ratio.dimensions.isDimensionless || ratio.valueOf() <= 0) {
+  if (!ratio?.dimensions.isDimensionless || ratio.valueOf() <= 0) {
     return {
       diagnostics: [
         ...evaluated.diagnostics,
@@ -1680,7 +1685,7 @@ export function evaluateScoreSemantics(
         return {
           ...returned,
           ...('shape' in returned
-            ? { shape: annotateFunctionCall(returned.shape, origin(current)) }
+            ? { shape: annotateScoreReference(returned.shape, origin(current)) }
             : {}),
           diagnostics: [...prepared.diagnostics, ...returned.diagnostics],
         }
@@ -2648,13 +2653,13 @@ export function evaluateScoreSemantics(
     const functionBudget = environment?.functionBudget
     const remaining = functionBudget?.remaining
     const value = evaluateExpression(current, context, environment)
-    if (!('value' in value) && isArithmetic(current) && containsScoreCall(current)) {
+    if (!('value' in value) && isArithmetic(current) && canProduceScore(current, environment)) {
       const remainingAfterValue = functionBudget?.remaining
       for (const [music, scalar] of [
         [current.left, current.right],
         [current.right, current.left],
       ] as const) {
-        if (!containsScoreCall(music)) continue
+        if (!canProduceScore(music, environment)) continue
         // A failed value probe must leave the budget available for score evaluation.
         if (functionBudget && remaining !== undefined) functionBudget.remaining = remaining
         const initial = evaluateExpression(scalar, context, environment)
@@ -2676,6 +2681,24 @@ export function evaluateScoreSemantics(
       }
       if (functionBudget && remainingAfterValue !== undefined)
         functionBudget.remaining = remainingAfterValue
+    }
+    if ('value' in value && value.value.kind === 'score') {
+      const { expression, environment: captured } = value.value
+      const result = changeVisitor(visitor, (context) => ({
+        ...context,
+        lexicalEnvironment: {
+          ...captured,
+          calls: environment?.calls ?? EMPTY_LEXICAL_ENVIRONMENT.calls,
+          functionBudget: environment?.functionBudget,
+        },
+      })).visit(expression, { loop: undefined })
+      return {
+        ...result,
+        ...('shape' in result
+          ? { shape: annotateScoreReference(result.shape, origin(current)) }
+          : {}),
+        diagnostics: [...value.diagnostics, ...result.diagnostics],
+      }
     }
     if ('value' in value && value.value.kind === 'container') {
       const variables = new Map<string, EvaluatedLiteral>()

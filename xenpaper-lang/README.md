@@ -353,6 +353,16 @@ tuplet tuplet
 Each use retains the container's sequence or parallel structure and slot timing.
 Its pitches are captured at declaration; playback uses the current timing context.
 
+Parenthesize written music with rhythmic marks or directives to store it as a
+reusable score. The score captures its lexical bindings at declaration and uses
+the prevailing tuning and timing each time it plays. Arithmetic such as
+`opening + P5` applies to the notes throughout the score.
+
+```text
+let opening <- (@4 D=== D=== D=== F=====)
+opening | fit(opening + P5, 4beat)
+```
+
 Postfix `=` continues the active note after an ordinary sequence, including a
 parenthesized or stored phrase: `(1 2 3)==` has note durations 1, 1, and 3.
 A trailing rest clears the active note, so `(1 2 .)=` is an error. A normalized

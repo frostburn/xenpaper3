@@ -57,6 +57,38 @@ fit(${phrase}, 4beat) C
     )
   })
 
+  it('plays a stored rhythmic phrase with its written timing and the prevailing tuning', () => {
+    expect(
+      audibleResult(`
+{12edo}
+let phrase <- (@2 C= . | (E, G))
+let span <- (4beat)
+{19edo}
+fit(phrase + P5, span) phrase C
+`),
+    ).toEqual(
+      audibleResult(`
+{19edo}
+fit((@2 (C + P5)= . | (E + P5, G + P5)), 4beat)
+(@2 C= . | (E, G)) C
+`),
+    )
+  })
+
+  it('retains the local bindings from when a rhythmic phrase was stored', () => {
+    expect(
+      audibleResult(`
+fn makePhrase() {
+  let tone <- C
+  let phrase <- (@2 tone= .)
+  tone <- G
+  ret phrase
+}
+makePhrase() E
+`),
+    ).toEqual(audibleResult('let tone <- C (@2 tone= .) E'))
+  })
+
   it.each([
     ['@2 C= . (E, G)', 'opening() + 3/2', '(@2 C= . (E, G)) + 3/2'],
     ['@2 C= . (E, G)', '3/2 + opening()', '3/2 + (@2 C= . (E, G))'],

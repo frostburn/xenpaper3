@@ -5,7 +5,7 @@
   "xenpaperVersion": "3.0.0-beta.21",
   "title": "Agnus Dei II — Josquin des Prez",
   "globalTrack": {
-    "source": "# Josquin des Prez, Agnus Dei II from Missa L’homme armé super voces musicales\n# One melody, read at three speeds. Each voice sings as far as its cadence.\n# Strict proportional reading of the mensuration signs (3:1:2).\n# See the facsimile and discussion in chapter 5 of\n# https://www.collectionscanada.ca/obj/thesescanada/vol1/QMM/TC-QMM-32503.pdf\n# Note names and durations checked against the Josquin Research Project (Jos0603e).\n{31edo}\nlet cadence <- 48beat\n\nfn opening() {\n  ret @4\n    D===       D===       D===       F=====     D=         F==  G    |\n    A=======              A===       A=====     G=         F===      |\n    E===       C=====     `A=        `A===      ....       A===      |\n    G===       E=====     F=         G===       C=======\n}\n\nfn continuation() {\n  ret @4\n    G===       E=====     F=         G=======              ....      |\n    G===       G===       G===       E=====     C=         C===      |\n    ....       G===       G===       G=====     F=         E===      |\n    D===       G=====     A=         B==  A     B=  G===   F  E\n}\n\nfn extension() {\n  ret @4\n    D===       G=======              G===       G=======             |\n    F===       D===       G===       D===       G===       D===      |\n    G===       ....       G===       F===       D===       G===      |\n    D===       G===       D===       G===       D===       G===\n}\n",
+    "source": "# Josquin des Prez, Agnus Dei II from Missa L’homme armé super voces musicales\n# One melody, read at three speeds. Each voice sings as far as its cadence.\n# Strict proportional reading of the mensuration signs (3:1:2).\n# See the facsimile and discussion in chapter 5 of\n# https://www.collectionscanada.ca/obj/thesescanada/vol1/QMM/TC-QMM-32503.pdf\n# Note names and durations checked against the Josquin Research Project (Jos0603e).\n{31edo}\nlet cadence <- 48beat\n\nlet opening <- (@4\n    D===       D===       D===       F=====     D=         F==  G    |\n    A=======              A===       A=====     G=         F===      |\n    E===       C=====     `A=        `A===      ....       A===      |\n    G===       E=====     F=         G===       C=======\n)\n\nlet continuation <- (@4\n    G===       E=====     F=         G=======              ....      |\n    G===       G===       G===       E=====     C=         C===      |\n    ....       G===       G===       G=====     F=         E===      |\n    D===       G=====     A=         B==  A     B=  G===   F  E\n)\n\nlet extension <- (@4\n    D===       G=======              G===       G=======             |\n    F===       D===       G===       D===       G===       D===      |\n    G===       ....       G===       F===       D===       G===      |\n    D===       G===       D===       G===       D===       G===\n)\n",
     "tempoChanges": [
       {
         "id": "tempo-1",
@@ -51,7 +51,7 @@
             "n": 50,
             "d": 1
           },
-          "source": "# An octave above the bassus, at three times the altus speed.\nfit((opening() | continuation() | extension()), cadence)\n| @1 F= ||\n"
+          "source": "# An octave above the bassus, at three times the altus speed.\nfit((opening | continuation | extension), cadence)\n| @1 F= ||\n"
         }
       ]
     },
@@ -77,7 +77,7 @@
             "n": 50,
             "d": 1
           },
-          "source": "# A fifth above the bassus, at the slowest speed.\nfit(opening() - P4, cadence)\n| @1 D= ||\n"
+          "source": "# A fifth above the bassus, at the slowest speed.\nfit(opening - P4, cadence)\n| @1 D= ||\n"
         }
       ]
     },
@@ -103,7 +103,7 @@
             "n": 50,
             "d": 1
           },
-          "source": "# An octave below the written line, at twice the altus speed.\n(opening() | continuation() | @1 D=) - P8 ||\n"
+          "source": "# An octave below the written line, at twice the altus speed.\n(opening | continuation | @1 D=) - P8 ||\n"
         }
       ]
     }

@@ -36,7 +36,7 @@ const GREEK_RANK: Readonly<Record<string, number>> = {
 
 const UPWARD_GREEK_NOMINALS = new Set(['BET', 'Β'])
 
-type NotatedPitchValue = EvaluatedLiteral | FrequencyPitchValue
+type NotatedPitchValue = Exclude<EvaluatedLiteral, { kind: 'score' }> | FrequencyPitchValue
 
 function formulaOf(value: NotatedPitchValue): PrimeMonzo | undefined {
   if (value.kind === 'absolutePitch') return value.formula

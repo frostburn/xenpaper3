@@ -270,6 +270,14 @@ export interface LambdaValue {
   readonly origins: readonly SourceOrigin[]
 }
 
+/** Written score with its lexical bindings, evaluated when it is played. */
+export interface ScoreValue {
+  readonly kind: 'score'
+  readonly expression: Extract<Expression, { type: 'Group' }>
+  readonly environment: LexicalEnvironment
+  readonly origins: readonly SourceOrigin[]
+}
+
 export type PrimeMonzo = ReadonlyMap<number, Fraction>
 
 export interface IntervalSpelling {
@@ -364,6 +372,7 @@ export type EvaluatedLiteral =
   | ContainerValue
   | UndefinedValue
   | LambdaValue
+  | ScoreValue
 
 /** Renderer-independent description of a note on a treble/bass staff. */
 export interface StaffPitch {
