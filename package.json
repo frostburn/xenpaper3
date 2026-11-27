@@ -4,28 +4,27 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "run-s compile:sw-patch compile:xenpaper-lang && vite",
-    "build": "run-s compile:sw-patch compile:xenpaper-lang && run-p type-check \"build-only {@}\" --",
+    "dev": "npm run compile:sw-patch && vite",
+    "build": "npm run compile:sw-patch && run-p type-check \"build-only {@}\" --",
     "preview": "vite preview",
-    "test:unit": "run-p compile:sw-patch compile:xenpaper-lang && vitest",
+    "test:unit": "npm run compile:sw-patch && vitest",
     "build-only": "vite build",
     "type-check": "vue-tsc --build",
     "lint": "run-s \"lint:*\"",
     "lint:oxlint": "oxlint . --fix",
     "lint:eslint": "eslint . --fix --cache",
-    "format": "oxfmt src/ xenpaper-lang/ sw-patch/ sw-seq/",
-    "compile:sw-patch": "peggy --format es sw-patch/sw-patch.peggy -o sw-patch/parser.generated.js",
-    "compile:xenpaper-lang": "peggy --format es xenpaper-lang/xenpaper.peggy -o xenpaper-lang/parser.generated.js"
+    "format": "oxfmt src/ sw-patch/ sw-seq/",
+    "compile:sw-patch": "peggy --format es sw-patch/sw-patch.peggy -o sw-patch/parser.generated.js"
   },
   "dependencies": {
     "aperiodic-oscillator": "^0.3.3",
     "audiobuffer-to-wav": "^1.0.0",
-    "moment-of-symmetry": "^0.10.0",
     "peggy": "^5.1.0",
     "pinia": "^4.0.2",
     "vue": "^3.5.40",
     "vue-router": "^5.2.0",
-    "xen-dev-utils": "^0.16.0"
+    "xen-dev-utils": "^0.16.0",
+    "xenpaper-lang": "github:frostburn/xenpaper-lang#v0.2.0"
   },
   "devDependencies": {
     "@tsconfig/node24": "^24.0.4",
@@ -53,6 +52,6 @@
     "vue-tsc": "^3.3.7"
   },
   "engines": {
-    "node": "^22.18.0 || >=24.12.0"
+    "node": "^22.18.0 || ^24.12.0 || >=26.0.0"
   }
 }

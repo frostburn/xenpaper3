@@ -1,9 +1,10 @@
 import {
+  contextAt,
   expandToBeatEvents,
   evaluateProgramSemantics,
   parse,
   scoreTimelineContexts,
-} from '../xenpaper-lang'
+} from 'xenpaper-lang'
 import {
   beat,
   createDefaultProject,
@@ -12,7 +13,6 @@ import {
 } from './daw/project'
 import { compileLaneSourceInitialization, ENVELOPE_EXTENSIONS } from './daw/score'
 import type { PlaybackPlanOptions } from './daw/playback-plan'
-import { contextAt } from '../xenpaper-lang/runtime/initialization'
 
 export const SNIPPET_PLAYBACK_OPTIONS: PlaybackPlanOptions = {
   allowClipTempoDirective: true,

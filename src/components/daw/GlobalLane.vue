@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { Diagnostic } from '../../../xenpaper-lang'
+import type { Diagnostic } from 'xenpaper-lang'
 import type { GlobalTrack } from '../../daw/project'
 import XenpaperSourceEditor from './XenpaperSourceEditor.vue'
 

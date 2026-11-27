@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, toRaw, watch } from 'vue'
 import type { Fraction } from 'xen-dev-utils/fraction'
-import type { BeatTimedScore } from '../../xenpaper-lang'
+import type { BeatTimedScore } from 'xenpaper-lang'
 
 const props = defineProps<{ score?: BeatTimedScore; theme?: 'light' | 'dark' }>()
 export interface PianoRollElementInfo {

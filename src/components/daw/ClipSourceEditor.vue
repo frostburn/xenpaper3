@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { beatToNumber, type SourceClip } from '../../daw/project'
-import type { Diagnostic } from '../../../xenpaper-lang'
+import type { Diagnostic } from 'xenpaper-lang'
 import type { SourceLineCaret } from '../../daw/score'
 import ToggleSwitch from '../ToggleSwitch.vue'
 import XenpaperSourceEditor from './XenpaperSourceEditor.vue'

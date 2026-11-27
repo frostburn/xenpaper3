@@ -1,4 +1,4 @@
-import type { Node, Program } from '../xenpaper-lang/parser.generated'
+import type { Node, Program } from 'xenpaper-lang'
 
 export type XenpaperHighlightKind =
   | 'comment'

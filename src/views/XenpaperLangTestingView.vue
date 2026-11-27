@@ -7,7 +7,7 @@ import {
   parse,
   type StaffNotationShape,
   type BeatTimedScore,
-} from '../../xenpaper-lang'
+} from 'xenpaper-lang'
 import MusicalStaff from '../components/MusicalStaff.vue'
 import PianoRoll from '../components/PianoRoll.vue'
 import type { PianoRollInspection } from '../components/PianoRoll.vue'

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { onBeforeUnmount, ref, watch } from 'vue'
-import type { Diagnostic } from '../../../xenpaper-lang'
+import type { Diagnostic } from 'xenpaper-lang'
 import type { SourceLineCaret } from '../../daw/score'
 import XenpaperSourceHighlight from './XenpaperSourceHighlight.vue'
 

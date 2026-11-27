@@ -27,7 +27,7 @@ export default defineConfig({
             },
             {
               name: 'xenpaper-lang',
-              test: /[\\/]xenpaper-lang[\\/]/,
+              test: /[\\/]node_modules[\\/]xenpaper-lang[\\/]/,
             },
             {
               name: 'sw-patch',
