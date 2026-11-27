@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import { parse, type Diagnostic } from '../../../xenpaper-lang'
+import { parse, type Diagnostic } from 'xenpaper-lang'
 import { highlightXenpaper, type XenpaperHighlightToken } from '../../xenpaperSyntaxHighlight'
 
 const props = defineProps<{

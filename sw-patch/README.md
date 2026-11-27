@@ -68,7 +68,7 @@ tools.
 
 ```ts
 import { createDrumkit, drumNames } from './sw-patch'
-import { parse } from './xenpaper-lang'
+import { parse } from 'xenpaper-lang'
 import source from './src/patches/drumkit.swpatch?raw'
 
 const drums = drumNames(source) // ['bd', 'sd', 'hh']

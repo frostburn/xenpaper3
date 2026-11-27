@@ -25,7 +25,7 @@ const { constructStaffNotationShape, evaluateProgramShape, expandToBeatEvents, p
     })),
   }),
 )
-vi.mock('../../xenpaper-lang', () => ({
+vi.mock('xenpaper-lang', () => ({
   constructStaffNotationShape,
   evaluateProgramShape,
   expandToBeatEvents,

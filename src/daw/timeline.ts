@@ -1,4 +1,4 @@
-import { evaluateTimeline, gridMeasureBoundaries, parse } from '../../xenpaper-lang'
+import { evaluateTimeline, gridMeasureBoundaries, parse } from 'xenpaper-lang'
 import {
   beatToNumber,
   type DawProject,

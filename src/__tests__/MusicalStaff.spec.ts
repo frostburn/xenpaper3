@@ -6,7 +6,7 @@ import {
   evaluateScoreShape,
   parse,
   type StaffNotationShape,
-} from '../../xenpaper-lang'
+} from 'xenpaper-lang'
 
 const notation: StaffNotationShape = {
   kind: 'sequence',
@@ -772,14 +772,15 @@ describe('MusicalStaff', () => {
     expect(wrapper.findAll('.tuplet-bracket')).toHaveLength(0)
   })
 
-  it('distributes a continuation over every note of an uneven parallel', () => {
-    const evaluated = evaluateScoreShape(parse('(C, D E) =').body[0]!)
+  it('renders branch-local continuations in an uneven parallel', () => {
+    const evaluated = evaluateScoreShape(parse('(C=, D E=)').body[0]!)
     if (!('shape' in evaluated)) throw new Error('Expected a score shape.')
     const wrapper = mount(MusicalStaff, {
       props: { notation: constructStaffNotationShape(evaluated.shape) },
     })
 
-    expect(wrapper.findAll('.notehead--open')).toHaveLength(3)
+    expect(wrapper.findAll('.notehead')).toHaveLength(3)
+    expect(wrapper.findAll('.notehead--open')).toHaveLength(2)
   })
 
   it('splits continued notes at barlines and joins the repeated notehead with a tie', () => {

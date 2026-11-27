@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { highlightXenpaper } from '../xenpaperSyntaxHighlight'
-import { parse } from '../../xenpaper-lang'
+import { parse } from 'xenpaper-lang'
 import basics from '../tutorial/interactive/basics.json'
 
 describe('highlightXenpaper', () => {

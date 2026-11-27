@@ -459,9 +459,9 @@
   {
     "id": "features-parallel-continuations",
     "title": "Continuations in parallel voices",
-    "html": "<p>A continuation after a chord extends all its notes. After an uneven parallel expression it stretches every collected note, including earlier attacks, and can move later attacks or make notes sound past the construction's end. Put continuations inside individual branches to control their endings: in <code>(0=, 4 7=)</code>, only 0 and the final 7 are extended. Compare that with a continuation outside <code>(0, 4 7)</code>.</p>",
+    "html": "<p>A continuation after a chord extends all its notes when they start together and reach the end of the chord. In uneven parallels, put continuations inside each branch. In <code>(0=, 4 7=)</code>, 0 and 7 each gain a beat. In <code>(0==, 4 7)</code>, the lower voice sustains after the upper voice ends.</p>",
     "props": {
-      "source": "# A three-beat chord\n(0, 4, 7)== .\n# Continue each voice explicitly\n(0=, 4 7=) .\n# Stretch every collected note\n(0, 4 7)= .",
+      "source": "# A three-beat chord\n(0, 4, 7)== .\n# Continue both voices\n(0=, 4 7=) .\n# Continue the lower voice\n(0==, 4 7) .",
       "instrument": {
         "type": "patch",
         "patchPreset": "default",

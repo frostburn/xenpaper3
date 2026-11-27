@@ -7,7 +7,7 @@ import type {
   StaffNotationShape,
   StaffPitch,
   StaffClef,
-} from '../../xenpaper-lang'
+} from 'xenpaper-lang'
 import { Fraction } from 'xen-dev-utils/fraction'
 
 const props = defineProps<{

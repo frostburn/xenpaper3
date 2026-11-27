@@ -43,6 +43,7 @@ import {
   drumSamplesForLane,
   sourceLineCarets,
 } from '../daw/score'
+import { createPlaybackPlan } from '../daw/playback-plan'
 
 describe('DAW project model', () => {
   it('paginates clip source sideways and repeats it across the clip', () => {
@@ -825,7 +826,9 @@ describe('DAW project model', () => {
   })
 
   it('propagates initialization context through declarations and repeats', () => {
-    const declared = compileSourceInitialization('let subdivision <- 4/1 @subdivision(subdivision)')
+    const declared = compileSourceInitialization(
+      'let subdivision <- 4/1 $ @subdivision(subdivision)',
+    )
     expect(parseClipNotes('C D', Infinity, declared).map(({ beat }) => beat)).toEqual([0, 0.25])
 
     const repeated = compileSourceInitialization('|: @ff @. :|')
@@ -1010,11 +1013,13 @@ describe('DAW routing', () => {
 })
 
 describe('DawView', () => {
-  it('parses every bundled demo project through the standard project parser', () => {
-    for (const serializedProject of Object.values(demoProjects)) {
-      expect(() => parseDawProject(serializedProject)).not.toThrow()
-    }
-  })
+  it.each(Object.entries(demoProjects))(
+    'compiles the bundled %s demo for playback',
+    (_id, serializedProject) => {
+      const plan = createPlaybackPlan(parseDawProject(serializedProject))
+      expect(plan.lanes.length).toBeGreaterThan(0)
+    },
+  )
 
   it('loads a built-in demo without fetching it', async () => {
     const fetcher = vi.fn<typeof fetch>()

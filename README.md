@@ -1,11 +1,11 @@
 # Xenpaper 3
 
 Xenpaper 3 is an in-progress browser environment for writing and rendering
-microtonal music. The repository currently contains two language runtimes and a
-Vue test application used to exercise them:
+microtonal music.
 
-- [`xenpaper-lang/`](xenpaper-lang/) parses Xenpaper scores, evaluates their
+- The standalone `xenpaper-lang` package parses Xenpaper scores, evaluates their
   pitches and rhythm, and projects them to beat events and staff notation.
+  [Language repository](https://github.com/frostburn/xenpaper-lang)
 - [`sw-patch/`](sw-patch/) implements a sandboxed language for constructing Web
   Audio synthesizers and effects.
 - [`src/`](src/) contains test pages and notation, piano-roll, and waveform
@@ -13,7 +13,7 @@ Vue test application used to exercise them:
 
 ## Requirements
 
-- Node.js 22.18 or later (Node.js 24.12 or later is also supported)
+- Node.js 22.18+ in the 22.x line, 24.12+ in the 24.x line, or 26.0+
 - npm
 
 ## Setup
@@ -22,9 +22,8 @@ Vue test application used to exercise them:
 npm install
 ```
 
-The Peggy parsers are generated locally and deliberately excluded from version
-control. The development, build, and test commands generate both parsers before
-using them.
+npm installs `xenpaper-lang` from GitHub and builds its parser. The development,
+build, and test commands generate the local SW Patch parser.
 
 ## Development
 
@@ -124,9 +123,14 @@ language runtime sources with oxfmt.
 
 ## Language documentation
 
-See [`xenpaper-lang/README.md`](xenpaper-lang/README.md) for the score-language
-pipeline and public entry points. See [`sw-patch/README.md`](sw-patch/README.md)
-for patch syntax and runtime behavior.
+The standalone package documents the score language and its public API.
+[Xenpaper language documentation](https://github.com/frostburn/xenpaper-lang#readme)
+
+With `xenpaper-lang` 0.2.0, separate a variable declaration from a directive on
+the same line with `$`, as in `let division <- 4/1 $ @subdivision(division)`.
+Write continuations inside branches of uneven parallels, as in `(C=, D E=)`.
+
+See [`sw-patch/README.md`](sw-patch/README.md) for patch syntax and runtime behavior.
 
 ## License
 

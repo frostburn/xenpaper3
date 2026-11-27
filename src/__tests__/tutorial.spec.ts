@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { tutorialChapters } from '../../src/tutorial'
-import { parse } from '../parser.js'
-import { expandToBeatEvents } from '../runtime/beat-events'
+import { expandToBeatEvents, parse } from 'xenpaper-lang'
+import { tutorialChapters } from '../tutorial'
 
 describe('Xenpaper tutorial', () => {
   it('contains executable score examples', () => {

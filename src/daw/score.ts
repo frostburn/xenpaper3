@@ -9,7 +9,7 @@ import {
   type PitchContext,
   type ScoreInitialization,
   type BeatTimedNoteEvent,
-} from '../../xenpaper-lang'
+} from 'xenpaper-lang'
 import { Fraction, type FractionValue } from 'xen-dev-utils/fraction'
 import { drumNames } from '../../sw-patch'
 import { parseStrudelSampleMap, strudelSampleNames, type StrudelSampleMap } from '../../sw-seq'

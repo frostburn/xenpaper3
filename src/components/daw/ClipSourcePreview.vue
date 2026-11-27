@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
-import { parse } from '../../../xenpaper-lang'
+import { parse } from 'xenpaper-lang'
 import type { SourceRange } from '../../daw/score'
 import { highlightXenpaper, type XenpaperHighlightToken } from '../../xenpaperSyntaxHighlight'
 
