@@ -51,6 +51,14 @@
     "vue-eslint-parser": "^10.4.1",
     "vue-tsc": "^3.3.7"
   },
+  "overrides": {
+    "@vue/test-utils": {
+      "js-beautify": {
+        "editorconfig": "^4.0.1",
+        "glob": "^14.0.2"
+      }
+    }
+  },
   "engines": {
     "node": "^22.18.0 || ^24.12.0 || >=26.0.0"
   }
